@@ -19,7 +19,7 @@ user's machine. The Python packages needed are as follows:
 
 They should all be installable via "pip install"
 
-All of the fortran codes are compilable either with a gnu or ifort compiler. In the scripts folder, there is a Python script titled "compile_fortran_codes.py". Running this code should compile all of the necessary codes needed for the main SAPP-SS pipeline. It makes use of the OS Python package.
+All of the fortran codes are compilable either with a gnu or ifort compiler. In the scripts folder, there is a Python script titled "compile_fortran_codes.py". Running this code should compile all of the necessary codes needed for the main TSFitPy pipeline. It makes use of the OS Python package.
 
 TSFitPy uses a system of relative directories to run Turbospectrum and know where to find various inputs that control the fitting procedure. These directories need to be preserved in order to run correctly. The main directories in use are input_files, output_files, scripts, turbospectrum, and the various folders within. A working Turbospectrum installation needs to be installed in the "turbospectrum" directory so that the executive files for Turbospectrum are in a directory "turbospectrum/exec/" (or in "turbospectrum/exec-gf/" if using the gnu compiler).
 
