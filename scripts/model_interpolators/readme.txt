@@ -1,0 +1,1 @@
+put the model interpolators (fortran scripts) from https://github.com/bertrandplez/Turbospectrum2020/interpolator into this folder
