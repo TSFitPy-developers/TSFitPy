@@ -23,7 +23,7 @@ def calculate_vturb(teff, logg, met):
     return vturb
 
 #parameters to adjust
-ts_compiler = "intel"
+ts_compiler = "intel" #needs to be "intel" or "gnu"
 atmosphere_type = "1D"
 windows_flag = False
 teff = 5771
