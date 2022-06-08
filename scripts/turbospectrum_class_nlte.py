@@ -8,6 +8,7 @@ import numpy as np
 import math
 
 from solar_abundances import solar_abundances, periodic_table
+from solar_isotopes import solar_isotopes
 
 class TurboSpectrum:
     """
@@ -87,7 +88,7 @@ class TurboSpectrum:
         self.t_eff = 5100.0
         self.turbulent_velocity = 2.0  # micro turbulence, km/s
         self.free_abundances = None
-        #self.free_isotopes = None
+        self.free_isotopes = None
         self.sphere = None
         self.alpha = None
         self.s_process = 0
@@ -219,7 +220,7 @@ class TurboSpectrum:
 
     def configure(self, lambda_min=None, lambda_max=None, lambda_delta=None,
                   metallicity=None, log_g=None, t_eff=None, stellar_mass=None,
-                  turbulent_velocity=None, free_abundances=None,
+                  turbulent_velocity=None, free_abundances=None, free_isotopes=None,
                   sphere=None, alpha=None, s_process=None, r_process=None,
                   line_list_paths=None, line_list_files=None,
                   verbose=None, counter_spectra=None, temp_directory=None, nlte_flag=None, atmosphere_dimension=None, windows_flag=None,
@@ -284,8 +285,8 @@ class TurboSpectrum:
             self.turbulent_velocity = turbulent_velocity
         if free_abundances is not None:
             self.free_abundances = free_abundances
-        #if free_isotopes is not None:
-        #    self.free_isotopes = free_isotopes
+        if free_isotopes is not None:
+            self.free_isotopes = free_isotopes
         if sphere is not None:
             self.sphere = sphere
         if alpha is not None:
@@ -1005,6 +1006,19 @@ class TurboSpectrum:
         #print(individual_abundances.strip())
         #print(individual_abundances)
 
+        # Allow for user input isotopes as a dictionary (similar to abundances)
+        
+        individual_isotopes = "'ISOTOPES : ' '149'\n"
+        if self.free_isotopes is None:
+            for isotope, ratio in solar_isotopes.items():
+                individual_isotopes += "{}  {:6f}\n".format(isotope, ratio)
+        else:
+            for isotope, ratio in self.free_isotopes.items():
+                solar_isotopes[isotope] = ratio
+            for isotope, ratio in solar_isotopes.items():
+                individual_isotopes += "{}  {:6f}\n".format(isotope, ratio)
+
+
         #if self.free_isotopes is None:
         #    free_isotopes = "'ISOTOPES : ' '{:d}'\n".format(len(self.))
         #else:
@@ -1071,156 +1085,7 @@ class TurboSpectrum:
 'R-PROCESS  :'    '{this[r_process]:.2f}'
 'S-PROCESS  :'    '{this[s_process]:.2f}'
 {individual_abundances}
-'ISOTOPES : ' '149'
- 3.006  0.0759
- 3.007  0.9241
- 5.010  0.199
- 5.011  0.801
- 6.012  0.988938
- 6.013  0.011062
- 7.014  0.99771
- 7.015  0.00229
- 8.016  0.997621
- 8.017  0.000379
- 8.018  0.002
-10.020  0.929431
-10.021  0.002228
-10.022  0.068341
-12.024  0.7899
-12.025  0.1000
-12.026  0.1101
-14.028  0.922297
-14.029  0.046832
-14.030  0.030872
-16.032  0.9493
-16.033  0.0076
-16.034  0.0429
-16.036  0.0002
-17.035  0.7578
-17.037  0.2422
-18.036  0.845946
-18.038  0.153808
-18.040  0.000246
-19.039  0.93132
-19.040  0.00147
-19.041  0.06721
-20.040  0.96941
-20.042  0.00647
-20.043  0.00135
-20.044  0.02086
-20.046  0.00004
-20.048  0.00187
-22.046  0.0825
-22.047  0.0744
-22.048  0.7372
-22.049  0.0541
-22.050  0.0518
-23.050  0.0025
-23.051  0.9975
-24.050  0.04345
-24.052  0.83789
-24.053  0.09501
-24.054  0.02365
-26.054  0.05845
-26.056  0.91754
-26.057  0.02119
-26.058  0.00282
-28.058  0.680769
-28.060  0.262231
-28.061  0.011399
-28.062  0.036345
-28.064  0.009256
-29.063  0.6917
-29.065  0.3083
-30.064  0.4863
-30.066  0.279
-30.067  0.041
-30.068  0.1875
-30.070  0.0062
-31.069  0.60108
-31.071  0.39892
-32.070  0.2084
-32.072  0.2754
-32.073  0.0773
-32.074  0.3628
-32.076  0.0761
-34.074  0.0089
-34.076  0.0937
-34.077  0.0763
-34.078  0.2377
-34.080  0.4961
-34.082  0.0873
-35.079  0.5069
-35.081  0.4931
-36.078  0.00362
-36.080  0.02326
-36.082  0.11655
-36.083  0.11546
-36.084  0.56903
-36.086  0.17208
-37.085  0.70844
-37.087  0.29156
-38.084  0.00558
-38.086  0.098678
-38.087  0.068961
-38.088  0.826781
-40.090  0.5145
-40.091  0.1122
-40.092  0.1715
-40.094  0.1738
-40.096  0.028
-42.092  0.14525
-42.094  0.09151
-42.095  0.15838
-42.096  0.16672
-42.097  0.09599
-42.098  0.24391
-42.100  0.09824
-44.096  0.0554
-44.098  0.0187
-44.099  0.1276
-44.100  0.126
-44.101  0.1706
-44.102  0.3155
-44.104  0.1862
-46.102  0.0102
-46.104  0.1114
-46.105  0.2233
-46.106  0.2733
-46.108  0.2646
-46.110  0.1172
-47.107  0.51839
-47.109  0.48161
-48.106  0.0125
-48.108  0.0089
-48.110  0.1249
-48.111  0.128
-48.112  0.2413
-48.113  0.1222
-48.114  0.2873
-48.116  0.0749
-49.113  0.0429
-49.115  0.9571
-50.112  0.0097
-50.114  0.0066
-50.115  0.0034
-50.116  0.1454
-50.117  0.0768
-50.118  0.2422
-50.119  0.0859
-50.120  0.3258
-50.122  0.0463
-50.124  0.0579
-51.121  0.5721
-51.123  0.4279
-52.120  0.0009
-52.122  0.0255
-52.123  0.0089
-52.124  0.0474
-52.125  0.0707
-52.126  0.1884
-52.128  0.3174
-52.130  0.3408
+{individual_isotopes}
 {line_lists}
 'SPHERICAL:'  '{spherical}'
   30
@@ -1231,6 +1096,7 @@ class TurboSpectrum:
            alpha=alpha,
            spherical=spherical_boolean_code,
            individual_abundances=individual_abundances.strip(),
+           individual_isotopes=individual_isotopes.strip(),
            line_lists=line_lists.strip(),
            pure_lte=pure_lte_boolean_code,
            nlte=nlte_boolean_code
@@ -1284,156 +1150,7 @@ class TurboSpectrum:
 'R-PROCESS  :'    '{this[r_process]:.2f}'
 'S-PROCESS  :'    '{this[s_process]:.2f}'
 {individual_abundances}
-'ISOTOPES : ' '149'
- 3.006  0.0759
- 3.007  0.9241
- 5.010  0.199
- 5.011  0.801
- 6.012  0.988938
- 6.013  0.011062
- 7.014  0.99771
- 7.015  0.00229
- 8.016  0.997621
- 8.017  0.000379
- 8.018  0.002
-10.020  0.929431
-10.021  0.002228
-10.022  0.068341
-12.024  0.7899
-12.025  0.1000
-12.026  0.1101
-14.028  0.922297
-14.029  0.046832
-14.030  0.030872
-16.032  0.9493
-16.033  0.0076
-16.034  0.0429
-16.036  0.0002
-17.035  0.7578
-17.037  0.2422
-18.036  0.845946
-18.038  0.153808
-18.040  0.000246
-19.039  0.93132
-19.040  0.00147
-19.041  0.06721
-20.040  0.96941
-20.042  0.00647
-20.043  0.00135
-20.044  0.02086
-20.046  0.00004
-20.048  0.00187
-22.046  0.0825
-22.047  0.0744
-22.048  0.7372
-22.049  0.0541
-22.050  0.0518
-23.050  0.0025
-23.051  0.9975
-24.050  0.04345
-24.052  0.83789
-24.053  0.09501
-24.054  0.02365
-26.054  0.05845
-26.056  0.91754
-26.057  0.02119
-26.058  0.00282
-28.058  0.680769
-28.060  0.262231
-28.061  0.011399
-28.062  0.036345
-28.064  0.009256
-29.063  0.6917
-29.065  0.3083
-30.064  0.4863
-30.066  0.279
-30.067  0.041
-30.068  0.1875
-30.070  0.0062
-31.069  0.60108
-31.071  0.39892
-32.070  0.2084
-32.072  0.2754
-32.073  0.0773
-32.074  0.3628
-32.076  0.0761
-34.074  0.0089
-34.076  0.0937
-34.077  0.0763
-34.078  0.2377
-34.080  0.4961
-34.082  0.0873
-35.079  0.5069
-35.081  0.4931
-36.078  0.00362
-36.080  0.02326
-36.082  0.11655
-36.083  0.11546
-36.084  0.56903
-36.086  0.17208
-37.085  0.70844
-37.087  0.29156
-38.084  0.00558
-38.086  0.098678
-38.087  0.068961
-38.088  0.826781
-40.090  0.5145
-40.091  0.1122
-40.092  0.1715
-40.094  0.1738
-40.096  0.028
-42.092  0.14525
-42.094  0.09151
-42.095  0.15838
-42.096  0.16672
-42.097  0.09599
-42.098  0.24391
-42.100  0.09824
-44.096  0.0554
-44.098  0.0187
-44.099  0.1276
-44.100  0.126
-44.101  0.1706
-44.102  0.3155
-44.104  0.1862
-46.102  0.0102
-46.104  0.1114
-46.105  0.2233
-46.106  0.2733
-46.108  0.2646
-46.110  0.1172
-47.107  0.51839
-47.109  0.48161
-48.106  0.0125
-48.108  0.0089
-48.110  0.1249
-48.111  0.128
-48.112  0.2413
-48.113  0.1222
-48.114  0.2873
-48.116  0.0749
-49.113  0.0429
-49.115  0.9571
-50.112  0.0097
-50.114  0.0066
-50.115  0.0034
-50.116  0.1454
-50.117  0.0768
-50.118  0.2422
-50.119  0.0859
-50.120  0.3258
-50.122  0.0463
-50.124  0.0579
-51.121  0.5721
-51.123  0.4279
-52.120  0.0009
-52.122  0.0255
-52.123  0.0089
-52.124  0.0474
-52.125  0.0707
-52.126  0.1884
-52.128  0.3174
-52.130  0.3408
+{individual_isotopes}
 {line_lists}
 'SPHERICAL:'  '{spherical}'
   30
@@ -1444,6 +1161,7 @@ class TurboSpectrum:
            alpha=alpha,
            spherical=spherical_boolean_code,
            individual_abundances=individual_abundances.strip(),
+           individual_isotopes=individual_isotopes.strip(),
            line_lists=line_lists.strip(),
            pure_lte=pure_lte_boolean_code,
            nlte=nlte_boolean_code
