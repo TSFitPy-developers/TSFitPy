@@ -587,7 +587,7 @@ depart_aux_file = []
 model_atom_file = []
 
 #read the configuration file
-with open("../input_files/sapp_ss_input_configuration.txt") as fp:
+with open("../input_files/tsfitpy_input_configuration.txt") as fp:
     line = fp.readline()
     while line:
         fields = line.strip().split()
@@ -756,9 +756,9 @@ elif fitting_mode == "lbl":
 
 seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), unpack=True)
 
-#if fitting_mode == "all":
-#    os.system("rm {}/*".format(line_list_path_trimmed))
-#    create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules, 0, len(seg_ends))
+if fitting_mode == "all":
+    os.system("rm {}/*".format(line_list_path_trimmed))
+    create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules, 0, len(seg_ends))
 
 for i in range(specname_fitlist.size):
     # this next step is in case you're only fitting one star
