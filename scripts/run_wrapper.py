@@ -59,7 +59,7 @@ macroturbulence = 3.5 #in km/s
 linemask_file = "Fe/fe-lmask.txt"
 segment_file = "Fe/fe-seg.txt"
 
-nlte_flag = True
+nlte_flag = False
 #other files needed for nlte calculations, ignore if not using nlte
 depart_bin_file = {}
 depart_bin_file["H"] = "H/1D_NLTE_grid_H_MARCSfullGrid_reformat_May-10-2021.bin"
@@ -107,7 +107,7 @@ model_atom_file["Fe"] = "atom.fe607"
 
 #whether or not you want to rename output file, default is "final_spectrum.spec"
 rename_spectrum = True
-spectrum_name = "solar_1d_nlte.spec"
+spectrum_name = "solar_1d_lte.spec"
 
 #set directories
 if ts_compiler == "intel":
@@ -176,7 +176,7 @@ if windows_flag == True:
             j+=1
         while wave_mod_orig[j] >= seg_begins[i] and wave_mod_orig[j] <= seg_ends[i]:
             wave_mod_filled.append(wave_mod_orig[j])
-            flux_norm_mod_filled.append(flux_norm_mod_filled[j])
+            flux_norm_mod_filled.append(flux_norm_mod_orig[j])
             flux_mod_filled.append(flux_mod_orig[j])
             j+=1
         if i < len(seg_begins)-1:
