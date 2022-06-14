@@ -15,9 +15,9 @@ nlte = True
 #whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode
 fit_microturb = No
 #
-#whether Teff and logg are fit or read from input file ('Yes' or 'No')
-fit_teff = Yes
-fit_logg = Yes
+#whether Teff and logg are fit or read from input file ('Yes' or 'No'), currently in progress. should always be 'No' for both until updated. - JMG 14-06-2022
+fit_teff = No
+fit_logg = No
 #
 #number of elements to fit
 element_number = 1
