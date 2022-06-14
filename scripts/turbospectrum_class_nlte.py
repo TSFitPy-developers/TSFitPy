@@ -1069,7 +1069,7 @@ class TurboSpectrum:
 #'DEPARTUREFILE:'  '{this[tmp_dir]}{this[marcs_model_name]}_coef.dat'
 #'DEPARTBINARY:'   '.false.'
 #'CONTMASKFILE:'     '{this[cont_mask_file]}'
-'LINEMASKFILE:'     '{this[line_mask_file]}'
+#'LINEMASKFILE:'     '{this[line_mask_file]}'
 'SEGMENTSFILE:'     '{this[segment_file]}'
 'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
