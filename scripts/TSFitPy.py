@@ -80,12 +80,12 @@ def calculate_vturb(teff, logg, met):
     return vturb
 
 def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file, segment_file, depart_bin_file_list, depart_aux_file_list, model_atom_file_list, atmosphere_type, nlte_flag, doppler, teff, logg, met, vturb, macro, fwhm, rot, abund_name, abund_low, abund_high, ldelta, lmin, lmax):
-    teff = param[0]
-    logg = param[1]
-    met = param[2]
+    #teff = param[0]
+    #logg = param[1]
+    #met = param[2]
 
-    abund = param[3]
-    doppler = doppler + param[4]
+    abund = param[0]
+    doppler = doppler + param[1]
 
     wave_obs, flux_obs = np.loadtxt(obs_name, usecols=(0,1), unpack=True)
 
@@ -114,9 +114,9 @@ def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file,
         chi_square = 99.9999
     elif abund < -40:
         chi_square = 999.999
-    elif nlte_flag == "True" and (abund + met + solar_abundances[abund_name[0]] < met_low_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_low_bracket + abund_high or abund + met + solar_abundances[abund_name[0]] < met_high_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_high_bracket + abund_high): #note was 5-8 previously
-        chi_square = 999.999
-        print("abundance range outside of values in departure file")
+    #elif nlte_flag == "True" and (abund + met + solar_abundances[abund_name[0]] < met_low_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_low_bracket + abund_high or abund + met + solar_abundances[abund_name[0]] < met_high_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_high_bracket + abund_high): #note was 5-8 previously
+    #    chi_square = 999.999
+    #    print("abundance range outside of values in departure file")
     #elif os_path.exists('{}/marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}.interpol'.format(temp_directory, teff, logg, met, vturb)):
     else:
 
@@ -389,9 +389,9 @@ def chi_square_broad_lbl(param, obs_name, temp_directory, spectrum_count, depart
         chi_square = 99.9999
     elif abund < -40:
         chi_square = 999.999
-    elif nlte_flag == "True" and (abund + met + solar_abundances[abund_name[0]] < met_low_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_low_bracket + abund_high or abund + met + solar_abundances[abund_name[0]] < met_high_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_high_bracket + abund_high): #note was 5-8 previously
-        chi_square = 999.999
-        print("abundance range outside of values in departure file")
+    #elif nlte_flag == "True" and (abund + met + solar_abundances[abund_name[0]] < met_low_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_low_bracket + abund_high or abund + met + solar_abundances[abund_name[0]] < met_high_bracket + abund_low or abund + met + solar_abundances[abund_name[0]] > met_high_bracket + abund_high): #note was 5-8 previously
+    #    chi_square = 999.999
+    #    print("abundance range outside of values in departure file")
     #elif os_path.exists('{}/marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}.interpol'.format(temp_directory, teff, logg, met, vturb)):
     else:
 
@@ -859,8 +859,9 @@ for i in range(specname_fitlist.size):
                 abund_low = -99.
                 abund_high = 99.
 
-            res = minimize(chi_square_broad, param0, args = (np.str(specname), temp_directory, i, linemask_file, segment_file, depart_bin_file, depart_aux_file, model_atom_file, atmosphere_type, nlte_flag, rv, teff, logg, met, vturb, macroturb, fwhm, rot, element, abund_low, abund_high, ldelta, lmin, lmax), method='Nelder-Mead', bounds=[(teff,teff),(logg,logg),(met,met),(-99.,99.),(0.0,99.)], options={'maxiter':ndimen*50,'disp':True, 'initial_simplex':initial_guess, 'xatol':0.05, 'fatol':0.05})
+            #res = minimize(chi_square_broad, param0, args = (np.str(specname), temp_directory, i, linemask_file, segment_file, depart_bin_file, depart_aux_file, model_atom_file, atmosphere_type, nlte_flag, rv, teff, logg, met, vturb, macroturb, fwhm, rot, element, abund_low, abund_high, ldelta, lmin, lmax), method='Nelder-Mead', bounds=[(teff,teff),(logg,logg),(met,met),(-99.,99.),(0.0,99.)], options={'maxiter':ndimen*50,'disp':True, 'initial_simplex':initial_guess, 'xatol':0.05, 'fatol':0.05})
 
+            res = minimize(chi_square_broad, param0, args = (np.str(specname), temp_directory, i, linemask_file, segment_file, depart_bin_file, depart_aux_file, model_atom_file, atmosphere_type, nlte_flag, rv, teff, logg, met, vturb, macroturb, fwhm, rot, element, abund_low, abund_high, ldelta, lmin, lmax), method='Nelder-Mead', options={'maxiter':ndimen*50,'disp':True, 'initial_simplex':initial_guess, 'xatol':0.05, 'fatol':0.05})
             print(res.x)
 
             #time_end = time.time()
