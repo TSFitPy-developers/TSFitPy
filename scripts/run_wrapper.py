@@ -164,7 +164,7 @@ time_end = time.time()
 print("Total runtime bsyn was {:.2f} seconds.".format((time_end-time_start)))
 time_start = time.time()
 
-wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt('{}/spectrum_00000000.spec'.format(temp_directory), usecols=(0,1,2), unpack=True)
+wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory), usecols=(0,1,2), unpack=True)
 if windows_flag == True:
     seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), unpack=True)
     wave_mod_filled = []
