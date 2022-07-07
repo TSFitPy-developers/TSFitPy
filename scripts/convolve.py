@@ -32,7 +32,7 @@ def conv_macroturbulence(wave, flux, vmac):
             i_end = 0
             for i in range(num_intervals):
                 #i_end = i_start
-                while (wave[i_end] < wave[i_start]+5.) and (i_end <= len(wave)):
+                while (i_end < len(wave)) and (wave[i_end] < wave[i_start]+5.):
                     i_end += 1
 
                 offset = int(2./(wave[1]-wave[0]))
@@ -92,7 +92,7 @@ def conv_rotation(wave, flux, vrot):
             i_end = 0
             for i in range(num_intervals):
                 #i_end = i_start
-                while (wave[i_end] < wave[i_start]+5.) and (i_end <= len(wave)):
+                while (i_end < len(wave)) and (wave[i_end] < wave[i_start]+5.):
                     i_end += 1
 
                 offset = int(2./(wave[1]-wave[0]))
