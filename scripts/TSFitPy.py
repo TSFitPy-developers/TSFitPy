@@ -766,8 +766,8 @@ seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), u
 
 if fitting_mode == "all":
     print("Trimming down the linelist to only lines within segments for faster fitting")
-    #os.system("rm {}/*".format(line_list_path_trimmed))
-    #create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules, 0, len(seg_ends))
+    os.system("rm {}/*".format(line_list_path_trimmed))
+    create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules, 0, len(seg_ends))
 
 print("Finished trimming linelist")
 
