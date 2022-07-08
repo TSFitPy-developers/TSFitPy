@@ -123,6 +123,8 @@ def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file,
         #turbospec_atmosphere(teff, logg, met, vturb, 0.005, 4800, 6800)
 
         item_abund = {}
+        for i in range(1,len(periodic_table)):
+            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
         item_abund["Fe"] = met
         item_abund[abund_name[0]] = abund+met
 
@@ -255,6 +257,8 @@ def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_f
     else:
 
         item_abund = {}
+        for i in range(1,len(periodic_table)):
+            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
         item_abund["Fe"] = met
 
         if nlte_flag == "False":
@@ -398,6 +402,8 @@ def chi_square_broad_lbl(param, obs_name, temp_directory, spectrum_count, depart
         #turbospec_atmosphere(teff, logg, met, vturb, 0.005, 4800, 6800)
 
         item_abund = {}
+        for i in range(1,len(periodic_table)):
+            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
         item_abund["Fe"] = met
         item_abund[abund_name[0]] = abund+met
 
@@ -505,6 +511,8 @@ def chi_square_broad_met_lbl(param, obs_name, temp_directory, spectrum_count, de
     else:
 
         item_abund = {}
+        for i in range(1,len(periodic_table)):
+            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
         item_abund["Fe"] = met
 
         if nlte_flag == "False":
@@ -758,8 +766,8 @@ seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), u
 
 if fitting_mode == "all":
     print("Trimming down the linelist to only lines within segments for faster fitting")
-    os.system("rm {}/*".format(line_list_path_trimmed))
-    create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules, 0, len(seg_ends))
+    #os.system("rm {}/*".format(line_list_path_trimmed))
+    #create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules, 0, len(seg_ends))
 
 print("Finished trimming linelist")
 
