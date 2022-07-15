@@ -10,12 +10,12 @@ mode = all
 include_molecules = True
 #
 #whether to use nlte or not. ('True' or 'False')
-nlte = True
+nlte = False
 #
 #whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode
 fit_microturb = No
 #
-#whether Teff and logg are fit or read from input file ('Yes' or 'No'), currently in progress. should always be 'No' for both until updated. - JMG 14-06-2022
+#whether Teff and logg are fit or read from input file ('Yes' or 'No')
 fit_teff = No
 fit_logg = No
 #
@@ -31,17 +31,17 @@ linemask_file = Fe/fe-lmask.txt
 segment_file = Fe/fe-seg.txt
 #
 #other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte
-departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
-departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
-model_atom_file = atom.fe607
+#departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
+#departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
+#model_atom_file = atom.fe607
 #
 #spectrum parameters (wavelength in angstrom)
 wavelengh_minimum = 4800
 wavelength_maximum = 6800
 wavelength_delta = 0.005
-FWHM = 0 #fwhm in milli-angstroms, negative in km/s, 0 means no convolution based on resolution
-macroturbulence = 3.5 #in km/s
-rotation = 10.0 #in km/s
+resolution = 0 #R (lambda_center/delta_lambda), 0 means no convolution based on resolution
+macroturbulence = 0.0 #in km/s
+rotation = 0.0 #in km/s
 temporary_directory = temp_directory/ #where temporary files created during fitting (opacity files, interpolated model atmospheres, etc.) are stored
 #
 #other inputs for fitting

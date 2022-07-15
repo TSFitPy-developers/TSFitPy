@@ -681,7 +681,7 @@ with open("../input_files/tsfitpy_input_configuration.txt") as fp:
             lmax = float(fields[2])
         if fields[0] == "wavelength_delta":
             ldelta = float(fields[2])
-        if fields[0] == "FWHM":
+        if fields[0] == "resolution":
             fwhm = float(fields[2])
         if fields[0] == "macroturbulence":
             macroturb = float(fields[2])
