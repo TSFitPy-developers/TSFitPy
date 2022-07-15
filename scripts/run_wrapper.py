@@ -52,8 +52,8 @@ if not os.path.exists(temp_directory):
     os.makedirs(temp_directory)
 
 #parameters for convolving if needed, if not set to zero
-fwhm = 0.0 #fwhm in milli-angstroms, negative in km/s, 0 means no convolution based on resolution, was 160 for higher convolution h lines
-macroturbulence = 3.5 #in km/s
+resolution = 0.0 #R (lambda_center/delta_lambda), 0 means no convolution based on resolution
+macroturbulence = 0.0 #in km/s
 
 #adjust the following only if using windows mode. if not, you can leave alone
 linemask_file = "Fe/fe-lmask.txt"
@@ -191,9 +191,9 @@ elif windows_flag == False:
     flux_norm_mod_filled = flux_norm_mod_orig
     flux_mod_filled = flux_mod_orig
 
-if fwhm != 0.0:
-    wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, fwhm)
-    wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, fwhm)
+if resolution != 0.0:
+    wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+    wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, resolution)
 else:
     wave_mod_conv = wave_mod_filled
     flux_norm_mod_conv = flux_norm_mod_filled
