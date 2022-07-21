@@ -472,8 +472,10 @@ def chi_square_broad_lbl(param, obs_name, temp_directory, spectrum_count, depart
 
             os.system("mv {}spectrum_00000000.spec ../output_files/spectrum_{:08d}.spec".format(temp_directory, spectrum_count+1))
             out = open("../output_files/spectrum_{:08d}_convolved.spec".format(spectrum_count+1), 'w')
-            for i in range(len(wave_mod)):
-                print("{}  {}".format(wave_mod[i], flux_mod[i]), file=out)
+            #for i in range(len(wave_mod)):
+            #    print("{}  {}".format(wave_mod[i], flux_mod[i]), file=out)
+            for i in range(len(wave_line)):
+                print("{}  {}".format(wave_line[i], flux_line_mod[i], file=out))
             out.close()
         elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat('{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
             chi_square = 999.99
@@ -573,8 +575,10 @@ def chi_square_broad_met_lbl(param, obs_name, temp_directory, spectrum_count, de
         
             os.system("mv {}spectrum_00000000.spec ../output_files/spectrum_{:08d}.spec".format(temp_directory, spectrum_count+1))
             out = open("../output_files/spectrum_{:08d}_convolved.spec".format(spectrum_count+1), 'w')
-            for i in range(len(wave_mod)):
-                print("{}  {}".format(wave_mod[i], flux_mod[i]), file=out)
+            #for i in range(len(wave_mod)):
+            #    print("{}  {}".format(wave_mod[i], flux_mod[i]), file=out)
+            for i in range(len(wave_line)):
+                print("{}  {}".format(wave_line[i], flux_line_mod[i], file=out))
             out.close()
         elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat('{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
             chi_square = 999.99
