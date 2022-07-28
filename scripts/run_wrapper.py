@@ -54,6 +54,7 @@ if not os.path.exists(temp_directory):
 #parameters for convolving if needed, if not set to zero
 resolution = 0.0 #R (lambda_center/delta_lambda), 0 means no convolution based on resolution
 macroturbulence = 0.0 #in km/s
+rotation = 0.0 #in km/s
 
 #adjust the following only if using windows mode. if not, you can leave alone
 linemask_file = "Fe/fe-lmask.txt"
@@ -199,8 +200,22 @@ else:
     flux_norm_mod_conv = flux_norm_mod_filled
     flux_mod_conv = flux_mod_filled
 
-wave_mod, flux_norm_mod = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macroturbulence)
-wave_mod, flux_mod = conv_macroturbulence(wave_mod_conv, flux_mod_conv, macroturbulence)
+if macroturbulence != 0.0:
+    wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macroturbulence)
+    wave_mod_macro, flux_mod_macro = conv_macroturbulence(wave_mod_conv, flux_mod_conv, macroturbulence)
+else:
+    wave_mod_macro = wave_mod_conv
+    flux_norm_mod_macro = flux_norm_mod_conv
+    flux_mod_macro = flux_mod_conv
+
+if rotation != 0.0:
+    wave_mod, flux_norm_mod = conv_macroturbulence(wave_mod_macro, flux_norm_mod_macro, rotation)
+    wave_mod, flux_mod = conv_macroturbulence(wave_mod_macro, flux_mod_macro, rotation)
+else:
+    wave_mod = wave_mod_macro
+    flux_norm_mod = flux_norm_mod_macro
+    flux_mod = flux_mod_macro
+
 
 if rename_spectrum == True:
     #os.system("mv {}spectrum_00000000.spec {}{}".format(temp_directory, temp_directory, spectrum_name))
