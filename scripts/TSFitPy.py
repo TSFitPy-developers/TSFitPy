@@ -123,8 +123,8 @@ def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file,
         #turbospec_atmosphere(teff, logg, met, vturb, 0.005, 4800, 6800)
 
         item_abund = {}
-        for i in range(1,len(periodic_table)):
-            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
+        #for i in range(1,len(periodic_table)):
+        #    item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]] #deleted this and moved to turbospectrum_class_nlte.py (was causing issues with nlte)
         item_abund["Fe"] = met
         item_abund[abund_name[0]] = abund+met
 
@@ -257,8 +257,8 @@ def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_f
     else:
 
         item_abund = {}
-        for i in range(1,len(periodic_table)):
-            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
+        #for i in range(1,len(periodic_table)):
+        #    item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]] #deleted this and moved to turbospectrum_class_nlte.py (was causing issues with nlte)
         item_abund["Fe"] = met
 
         if nlte_flag == "False":
@@ -402,8 +402,8 @@ def chi_square_broad_lbl(param, obs_name, temp_directory, spectrum_count, depart
         #turbospec_atmosphere(teff, logg, met, vturb, 0.005, 4800, 6800)
 
         item_abund = {}
-        for i in range(1,len(periodic_table)):
-            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
+        #for i in range(1,len(periodic_table)):
+        #    item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]] #deleted this and moved to turbospectrum_class_nlte.py (was causing issues with nlte)
         item_abund["Fe"] = met
         item_abund[abund_name[0]] = abund+met
 
@@ -513,8 +513,8 @@ def chi_square_broad_met_lbl(param, obs_name, temp_directory, spectrum_count, de
     else:
 
         item_abund = {}
-        for i in range(1,len(periodic_table)):
-            item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]]
+        #for i in range(1,len(periodic_table)):
+        #    item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]] #deleted this and moved to turbospectrum_class_nlte.py (was causing issues with nlte)
         item_abund["Fe"] = met
 
         if nlte_flag == "False":

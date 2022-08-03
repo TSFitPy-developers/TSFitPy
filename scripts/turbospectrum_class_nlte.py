@@ -991,6 +991,7 @@ class TurboSpectrum:
                 alpha = 0
 
         # Allow for user input abundances as a dictionary of the form {element: abundance}
+        """ deprecated 8-2022
         if self.free_abundances is None:
             individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '0'\n"
         else:
@@ -1004,6 +1005,23 @@ class TurboSpectrum:
                 individual_abundances += "{:d}  {:.2f}\n".format(int(atomic_number),
                                                                  float(solar_abundances[element]) + round(float(abundance),2))
         #print(individual_abundances.strip())
+        #print(individual_abundances)
+        """
+
+        # Updated abundances to below to allow user to set solar abundances through solar_abundances.py and not have to adjust make_abund.f
+
+        individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table)-1)
+        if self.free_abundances is None:
+            for i in range(1,len(periodic_table)):
+                individual_abundances += "{:d}  {:.2f}\n".format(i, float(solar_abundances[periodic_table[i]]))
+        else:
+            item_abund = {}
+            for i in range(1,len(periodic_table)):
+                item_abund[periodic_table[i]] = solar_abundances[periodic_table[i]]
+            for element, abundance in self.free_abundances.items():
+                item_abund[element] = float(solar_abundances[element]) + round(float(abundance),2)
+            for i in range(1,len(periodic_table)):
+                individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
         #print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
