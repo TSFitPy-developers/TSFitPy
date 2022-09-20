@@ -991,7 +991,8 @@ class TurboSpectrum:
                 alpha = 0
 
         # Allow for user input abundances as a dictionary of the form {element: abundance}
-        """ deprecated 8-2022
+        #deprecated 8-2022
+        """
         if self.free_abundances is None:
             individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '0'\n"
         else:
@@ -1013,11 +1014,12 @@ class TurboSpectrum:
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table)-1)
         if self.free_abundances is None:
             for i in range(1,len(periodic_table)):
-                individual_abundances += "{:d}  {:.2f}\n".format(i, float(solar_abundances[periodic_table[i]]))
+                individual_abundances += "{:d}  {:.2f}\n".format(i, float(solar_abundances[periodic_table[i]])+self.metallicity)
         else:
             item_abund = {}
-            for i in range(1,len(periodic_table)):
-                item_abund[periodic_table[i]] = solar_abundances[periodic_table[i]]
+            item_abund['H'] = 12.00
+            for i in range(2,len(periodic_table)):
+                item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity),2)
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance),2)
             for i in range(1,len(periodic_table)):
