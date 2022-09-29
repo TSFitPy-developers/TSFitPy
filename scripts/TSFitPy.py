@@ -192,6 +192,8 @@ def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file,
                 flux_mod = flux_mod_macro
         
             line_begins_sorted = np.array(line_begins_sorted)
+            wave_mod = np.array(wave_mod)
+            flux_mod = np.array(flux_mod)
             if wave_mod[1] - wave_mod[0] <= wave_obs[1]-wave_obs[0]:
                 flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
                 chi_square = 0
@@ -679,7 +681,7 @@ with open("../input_files/tsfitpy_input_configuration.txt") as fp:
         elif fields[0] == "model_atom_file" and element[0] == "Fe" and nlte_flag == "True":
             for i in range(nelement):
                 model_atom_file.append(fields[2*(i+1)])
-        if fields[0] == "wavelengh_minimum":
+        if fields[0] == "wavelength_minimum":
             lmin = float(fields[2])
         if fields[0] == "wavelength_maximum":
             lmax = float(fields[2])
@@ -978,13 +980,13 @@ for i in range(specname_fitlist.size):
                 print("{} {} {} {} {} {} {} {}".format(specname.replace("../input_files/observed_spectra/",""), line_centers_sorted[j], line_begins_sorted[j], line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun), file=f)
 
                 wave_result, flux_norm_result, flux_result = np.loadtxt("../output_files/spectrum_{:08d}.spec".format(i+1), unpack=True)
-                g = open("../output_files/result_spectrum_{:08d}.spec".format(i), 'a')
+                g = open("../output_files/result_spectrum_{}.spec".format(specname.replace("../input_files/observed_spectra/","")), 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
                 os.system("rm ../output_files/spectrum_{:08d}.spec".format(i+1))
 
                 wave_result, flux_norm_result = np.loadtxt("../output_files/spectrum_{:08d}_convolved.spec".format(i+1), unpack=True)
-                h = open("../output_files/result_spectrum_{:08d}_convolved.spec".format(i), 'a')
+                h = open("../output_files/result_spectrum_{}_convolved.spec".format(specname.replace("../input_files/observed_spectra/","")), 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
                 os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i+1))

@@ -36,7 +36,7 @@ segment_file = Fe/fe-seg.txt
 #model_atom_file = atom.fe607
 #
 #spectrum parameters (wavelength in angstrom)
-wavelengh_minimum = 4800
+wavelength_minimum = 4800
 wavelength_maximum = 6800
 wavelength_delta = 0.005
 resolution = 0 #R (lambda_center/delta_lambda), 0 means no convolution based on resolution
