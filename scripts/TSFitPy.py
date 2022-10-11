@@ -175,6 +175,9 @@ def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file,
                         flux_mod_filled.append(1.0)
                         k+=1
 
+            wave_mod_filled = np.array(wave_mod_filled)
+            flux_mod_filled = np.array(flux_mod_filled)
+
             if fwhm != 0.0:
                 wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, fwhm)
             else:
@@ -307,6 +310,9 @@ def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_f
                         wave_mod_filled.append(seg_ends[i]+0.005*k)
                         flux_mod_filled.append(1.0)
                         k+=1
+
+            wave_mod_filled = np.array(wave_mod_filled)
+            flux_mod_filled = np.array(flux_mod_filled)
 
             if fwhm != 0.0:
                 wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, fwhm)
