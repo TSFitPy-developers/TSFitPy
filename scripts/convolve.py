@@ -11,7 +11,8 @@ def conv_res(wave, flux, resolution):
     sigma = d_lam / (2.0 * np.sqrt(2. * np.log(2.)))
     kernel = convolution.Gaussian1DKernel(sigma/(wave[1]-wave[0]))
     flux_conv = convolution.convolve(flux, kernel, fill_value=1)
-    return wave, flux_conv
+    wave_conv = np.array(wave)
+    return wave_conv, flux_conv
 
 def conv_macroturbulence(wave, flux, vmac):
     if vmac == 0:
