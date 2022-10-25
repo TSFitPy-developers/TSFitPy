@@ -9,7 +9,7 @@ output_file = "sample_nlte_converted_linelist"
 nlte_models = ["../input_files/nlte_data/model_atoms/atom.o41f", "../input_files/nlte_data/model_atoms/atom.mg86b", "../input_files/nlte_data/model_atoms/atom.caNew"]
 
 transition_names = [["O I", "O II"], ["Mg I", "Mg II"], ["Ca I", "Ca II"]] #needs to match the length of nlte_models and needs to match the transition names in the lte linelist
-ion_energy = [[0.0, 13.61805], [0.0, 7.646235], [0.0, 6.11316]]
+ion_energy = [[0.0, 13.61805], [0.0, 7.646235], [0.0, 6.11316]] #ionization energy in eV from NIST
 
 accessory_match = False #whether or not to use accessory matching files set as True or False, in almost all cases, this will be false (it is outdated)
 accessory_matching_files = [] #can leave empty if not using accessory matching files
