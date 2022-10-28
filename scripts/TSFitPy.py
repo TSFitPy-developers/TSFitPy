@@ -20,22 +20,21 @@ from create_window_linelist_function import *
 def calculate_vturb(teff, logg, met):
     t0 = 5500.
     g0 = 4.
-    m0 = 0.
 
     if teff >= 5000.:
-        vturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
+        v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
                 logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
     elif teff < 5000. and logg >= 3.5:
-        vturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (5250. - t0) * (5250. - t0) - 0.14 * (logg - g0) - 0.005 * (
+        v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (5250. - t0) * (5250. - t0) - 0.14 * (logg - g0) - 0.005 * (
                 logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
     elif teff < 5500. and logg < 3.5:
-        vturb = 1.25 + 4.01e-4 * (teff - t0) + 3.1e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
+        v_mturb = 1.25 + 4.01e-4 * (teff - t0) + 3.1e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
                 logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
 
     if teff == 5771 and logg == 4.44:
-        vturb = 0.9
+        v_mturb = 0.9
 
-    return vturb
+    return v_mturb
 
 
 def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file, segment_file, depart_bin_file_list,
@@ -216,22 +215,14 @@ def chi_square_broad(param, obs_name, temp_directory, spectrum_count, mask_file,
 
 def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_file, segment_file, depart_bin_file_list,
                          depart_aux_file_list, model_atom_file_list, atmosphere_type, nlte_flag, doppler, teff, logg,
-                         macro, fwhm, rot, ldelta, lmin, lmax):
+                         macro, fwhm, rot, ldelta, lmin, lmax, wave_obs, flux_obs, line_begins_sorted, line_ends_sorted,
+                         seg_begins, seg_ends):
     met = param[0]
     doppler = doppler + param[1]
     if len(param) > 2:
         macro = param[2]
 
-    wave_obs, flux_obs = np.loadtxt(obs_name, usecols=(0, 1), unpack=True)
-
     wave_obs = wave_obs / (1 + (doppler / 300000.))
-
-    line_centers, line_begins, line_ends = np.loadtxt(mask_file, comments=";", usecols=(0, 1, 2), unpack=True)
-
-    line_begins_sorted = sorted(line_begins)
-    line_ends_sorted = sorted(line_ends)
-
-    seg_begins, seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
 
     if atmosphere_type == "1D":
         vturb = calculate_vturb(teff, logg, met)
@@ -243,11 +234,7 @@ def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_f
     elif macro < 0.0:
         chi_square = 9999.9999
     else:
-
-        item_abund = {}
-        # for i in range(1,len(periodic_table)):
-        #    item_abund[periodic_table[i]] = 0.0#solar_abundances[periodic_table[i]] #deleted this and moved to turbospectrum_class_nlte.py (was causing issues with nlte)
-        item_abund["Fe"] = met
+        item_abund = {"Fe": met}
 
         if nlte_flag == "False":
             ts.configure(t_eff=teff, log_g=logg, metallicity=met,
@@ -279,25 +266,12 @@ def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_f
                 '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
             wave_mod_orig, flux_mod_orig = np.loadtxt('{}/spectrum_00000000.spec'.format(temp_directory),
                                                       usecols=(0, 1), unpack=True)
-            wave_mod_filled = []
-            flux_mod_filled = []
-            for i in range(len(seg_begins)):
-                j = 0
-                while wave_mod_orig[j] < seg_begins[i]:
-                    j += 1
-                while wave_mod_orig[j] >= seg_begins[i] and wave_mod_orig[j] <= seg_ends[i]:
-                    wave_mod_filled.append(wave_mod_orig[j])
-                    flux_mod_filled.append(flux_mod_orig[j])
-                    j += 1
-                if i < len(seg_begins) - 1:
-                    k = 1
-                    while (seg_begins[i + 1] - 0.001 > seg_ends[i] + k * 0.005):
-                        wave_mod_filled.append(seg_ends[i] + 0.005 * k)
-                        flux_mod_filled.append(1.0)
-                        k += 1
+            wave_mod_filled = np.copy(wave_mod_orig)
+            flux_mod_filled = np.copy(flux_mod_orig)
 
-            wave_mod_filled = np.array(wave_mod_filled)
-            flux_mod_filled = np.array(flux_mod_filled)
+            for l in range(len(seg_begins) - 1):
+                flux_mod_filled[
+                    np.logical_and.reduce((wave_mod_orig > seg_ends[l], wave_mod_orig <= seg_begins[l + 1]))] = 1.0
 
             if fwhm != 0.0:
                 wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, fwhm)
@@ -315,48 +289,38 @@ def chi_square_broad_met(param, obs_name, temp_directory, spectrum_count, mask_f
                 wave_mod = wave_mod_macro
                 flux_mod = flux_mod_macro
 
-            line_begins_sorted = np.array(line_begins_sorted)
             if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
                 flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
                 chi_square = 0
-                for i in range(len(line_begins_sorted[np.where(
+                for l in range(len(line_begins_sorted[np.where(
                         (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends)))])):
                     # print(line_begins_sorted[i])
-                    wave_line = wave_obs[
-                        np.where((wave_obs <= line_ends_sorted[i]) & (wave_obs >= line_begins_sorted[i]))]
                     flux_line_obs = flux_obs[
-                        np.where((wave_obs <= line_ends_sorted[i]) & (wave_obs >= line_begins_sorted[i]))]
+                        np.where((wave_obs <= line_ends_sorted[l]) & (wave_obs >= line_begins_sorted[l]))]
                     flux_line_mod = flux_mod_interp[
-                        np.where((wave_obs <= line_ends_sorted[i]) & (wave_obs >= line_begins_sorted[i]))]
-                    for j in range(len(wave_line)):
-                        chi_square += ((flux_line_obs[j] - flux_line_mod[j]) * (flux_line_obs[j] - flux_line_mod[j])) / \
-                                      flux_line_mod[j]
+                        np.where((wave_obs <= line_ends_sorted[l]) & (wave_obs >= line_begins_sorted[l]))]
+                    chi_square += np.sum(np.square((flux_line_obs - flux_line_mod)) / flux_line_mod)
                     # print(chi_square)
             else:
                 flux_obs_interp = np.interp(wave_mod, wave_obs, flux_obs)
                 chi_square = 0
-                for i in range(len(line_begins_sorted[np.where(
+                for l in range(len(line_begins_sorted[np.where(
                         (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends)))])):
                     # print(line_begins_sorted[i])
-                    wave_line = wave_mod[
-                        np.where((wave_mod <= line_ends_sorted[i]) & (wave_mod >= line_begins_sorted[i]))]
                     flux_line_obs = flux_obs_interp[
-                        np.where((wave_mod <= line_ends_sorted[i]) & (wave_mod >= line_begins_sorted[i]))]
+                        np.where((wave_mod <= line_ends_sorted[l]) & (wave_mod >= line_begins_sorted[l]))]
                     flux_line_mod = flux_mod[
-                        np.where((wave_mod <= line_ends_sorted[i]) & (wave_mod >= line_begins_sorted[i]))]
-                    for j in range(len(wave_line)):
-                        chi_square += ((flux_line_obs[j] - flux_line_mod[j]) * (flux_line_obs[j] - flux_line_mod[j])) / \
-                                      flux_line_mod[j]
+                        np.where((wave_mod <= line_ends_sorted[l]) & (wave_mod >= line_begins_sorted[l]))]
+                    chi_square += np.sum(np.square(flux_line_obs - flux_line_mod) / flux_line_mod)
                     # print(chi_square)
 
-            os.system("mv {}spectrum_00000000.spec ../output_files/spectrum_fit_{}".format(temp_directory,
-                                                                                           obs_name.replace(
-                                                                                               "../input_files/observed_spectra/",
-                                                                                               "")))
-            out = open("../output_files/spectrum_fit_convolved_{}".format(
-                obs_name.replace("../input_files/observed_spectra/", "")), 'w')
-            for i in range(len(wave_mod)):
-                print("{}  {}".format(wave_mod[i], flux_mod[i]), file=out)
+            os.system(
+                f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/')}")
+            out = open(
+                f"../output_files/spectrum_fit_convolved_{obs_name.replace('../input_files/observed_spectra/', '')}",
+                'w')
+            for l in range(len(wave_mod)):
+                print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
             out.close()
         elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
@@ -860,21 +824,34 @@ for i in range(specname_fitlist.size):
 
         if element[0] == "Fe" or element[0] == "fe":
 
+            wave_ob, flux_ob = np.loadtxt(np.str(specname), usecols=(0, 1), unpack=True)
+
+            line_centers_, line_begins_, line_ends_ = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2),
+                                                                 unpack=True)
+
+            line_begins_sorted_ = np.array(sorted(line_begins_))
+            line_ends_sorted_ = sorted(line_ends_)
+
+            seg_begins_, seg_ends_ = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
+
             time_start = time.time()
 
             res = minimize(chi_square_broad_met, param0, args=(
                 np.str(specname), temp_directory, i, linemask_file, segment_file, depart_bin_file, depart_aux_file,
-                model_atom_file, atmosphere_type, nlte_flag, rv, teff, logg, macroturb, fwhm, rot, ldelta, lmin, lmax),
+                model_atom_file, atmosphere_type, nlte_flag, rv, teff, logg, macroturb, fwhm, rot, ldelta, lmin, lmax,
+                wave_ob, flux_ob, line_begins_sorted_, line_ends_sorted_, seg_begins_, seg_ends_),
                            method='Nelder-Mead',
                            options={'maxiter': ndimen * 50, 'disp': True, 'initial_simplex': initial_guess,
                                     'xatol': 0.05, 'fatol': 0.05})
 
             print(res.x)
             if len(param0) < 2:
-                print(f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}", file=f)
-            else:
-                print(f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.x[2]} {res.fun}",
+                print(f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}",
                       file=f)
+            else:
+                print(
+                    f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.x[2]} {res.fun}",
+                    file=f)
 
             time_end = time.time()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
