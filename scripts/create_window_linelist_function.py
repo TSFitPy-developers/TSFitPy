@@ -14,6 +14,9 @@ def create_window_linelist(segment_file, old_path_name, new_path_name, molecules
 
 	if not os.path.exists(new_path_name):
 		os.makedirs(new_path_name)
+	else:
+		print("Trimmed files exist already")
+		return
 
 	line_list_files = []
 	for i in range(len(line_list_files_draft)):
