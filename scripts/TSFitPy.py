@@ -463,7 +463,7 @@ def chi_square_broad_met_lbl(param, ts, obs_name, temp_directory, spectrum_count
     return chi_square
 
 
-def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element, f, fit_microturb,
+def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element, fit_microturb,
                     fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta, line_list_path_orig,
                     line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb, met_fitlist,
                     model_atmosphere_grid_path, model_atmosphere_list, model_atom_file, model_atom_path, ndimen,
@@ -535,11 +535,11 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
             if len(param0) < 2:
                 print(f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}",
-                      file=f)
+                )
             else:
                 print(
                     f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}",
-                    file=f)
+            )
 
             time_end = time.time()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -564,11 +564,11 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
             if len(param0) < 2:
                 print(f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}",
-                      file=f)
+                )
             else:
                 print(
                     f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}",
-                    file=f)
+            )
 
     elif fitting_mode == "lbl":
         line_centers, line_begins, line_ends = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2),
@@ -623,12 +623,12 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                 print("{} {} {} {} {} {} {} {}".format(specname.replace("../input_files/observed_spectra/", ""),
                                                        line_centers_sorted[j], line_begins_sorted[j],
                                                        line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun),
-                      file=f)
+                )
 
                 wave_result, flux_norm_result, flux_result = np.loadtxt(
                     "../output_files/spectrum_{:08d}.spec".format(i + 1), unpack=True)
                 g = open("../output_files/result_spectrum_{:08d}.spec".format(i), 'a')
-                for k in range(len(wave_result)):
+                for k in range(len(wave_result)): #TODO not opening file?
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
                 os.system("rm ../output_files/spectrum_{:08d}.spec".format(i + 1))
 
@@ -685,7 +685,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                 print("{} {} {} {} {} {} {} {}".format(specname.replace("../input_files/observed_spectra/", ""),
                                                        line_centers_sorted[j], line_begins_sorted[j],
                                                        line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun),
-                      file=f)
+                )
 
                 wave_result, flux_norm_result, flux_result = np.loadtxt(
                     "../output_files/spectrum_{:08d}.spec".format(i + 1), unpack=True)
@@ -878,18 +878,18 @@ def run_TSFitPy():
 
     output = "../output_files/" + output
 
-    f = open(output, 'a')
+    #f = open(output, 'a')
     if fitting_mode == "all" and (element[0] == "Fe" or element[0] == "fe"):    #TODO add other parameters? macroturbulence?
-        print("#specname        Fe_H     Doppler_Shift_add_to_RV    chi_squared", file=f)
+        print("#specname        Fe_H     Doppler_Shift_add_to_RV    chi_squared")
     elif fitting_mode == "all":
-        print(f"#specname        {element[0]}_Fe     Doppler_Shift_add_to_RV    chi_squared", file=f)
+        print(f"#specname        {element[0]}_Fe     Doppler_Shift_add_to_RV    chi_squared")
     elif fitting_mode == "lbl" and (element[0] == "Fe" or element[0] == "fe"):
         print(
             "#specname        wave_center  wave_start  wave_end  Fe_H    Microturb     Doppler_Shift_add_to_RV    chi_squared",
-            file=f)
+    )
     elif fitting_mode == "lbl":
         print(
-            f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Microturb     Doppler_Shift_add_to_RV    chi_squared", file=f)
+            f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Microturb     Doppler_Shift_add_to_RV    chi_squared")
 
     seg_begins, seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
 
@@ -916,7 +916,7 @@ def run_TSFitPy():
 
         futures = []
         for i in range(specname_fitlist.size):
-            future = client.submit(fit_one_spectra, atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element, f,
+            future = client.submit(fit_one_spectra, atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element,
                             fit_microturb, fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta,
                             line_list_path_orig, line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb,
                             met_fitlist, model_atmosphere_grid_path, model_atmosphere_list, model_atom_file,
@@ -930,14 +930,14 @@ def run_TSFitPy():
         print("Worker calculation done")  # when done, save values
     else:
         for i in range(specname_fitlist.size):
-            fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element, f,
+            fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element,
                             fit_microturb, fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta,
                             line_list_path_orig, line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb,
                             met_fitlist, model_atmosphere_grid_path, model_atmosphere_list, model_atom_file,
                             model_atom_path, ndimen, nlte_flag, param0, rot, rv_fitlist, segment_file, specname_fitlist,
                             teff_fitlist, temp_directory, turbospec_path)
 
-    f.close()
+    #f.close()
 
 
 if __name__ == '__main__':
