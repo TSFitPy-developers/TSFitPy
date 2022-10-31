@@ -872,6 +872,7 @@ def run_TSFitPy():
 
     if (element[0] == "Fe" or element[0] == "fe") and fit_teff == "No" and fit_logg == "No":
         rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, usecols=(1, 2, 3), unpack=True)
+        met_fitlist = None
     else:
         rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, usecols=(1, 2, 3, 4), unpack=True)
 
