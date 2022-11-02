@@ -916,14 +916,14 @@ def run_TSFitPy():
 
     if workers > 1:
         print("Preparing workers")
-        client = Client(threads_per_worker=threads_per_worker, n_workers=workers)
+        client = Client(threads_per_worker=1, n_workers=workers)  # if # of threads are not equal to 1, then may break the program
         print(client)
 
         host = client.run_on_scheduler(socket.gethostname)
         port = client.scheduler_info()['services']['dashboard']
         print(f"Assuming that the cluster is ran at {login_node_address} (change in code if not the case)")
 
-        print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
+        #print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
         print(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
 
         print("Worker preparation complete")
@@ -988,5 +988,4 @@ def run_TSFitPy():
 if __name__ == '__main__':
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     workers = 1  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
-    threads_per_worker = 1  # seemed to work best with 1; play around if you want.
     run_TSFitPy()
