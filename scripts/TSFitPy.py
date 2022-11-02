@@ -606,9 +606,9 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                os.system("rm {}*".format(ts.line_list_paths))
+                os.system("rm {}*".format(ts.line_list_paths[0]))
 
-                create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths, include_molecules,
+                create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
                                        start, start + 1, lbl=True)    #TODO not recreate window every time here as well
 
                 res = minimize(chi_square_broad_met_lbl, param0, args=(ts,
@@ -649,7 +649,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
                 os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
 
-                os.system("rm {}*".format(ts.line_list_paths))  #TODO not recreate window every time here as well
+                os.system("rm {}*".format(ts.line_list_paths[0]))  #TODO not recreate window every time here as well
 
                 time_end = time.time()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -669,9 +669,9 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                os.system("rm {}*".format(ts.line_list_paths))
+                os.system("rm {}*".format(ts.line_list_paths[0]))
 
-                create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths, include_molecules,
+                create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
                                        start, start + 1, lbl=True)  # TODO not recreate window every time here as well
 
                 res = minimize(chi_square_broad_lbl, param0, args=(ts,
@@ -715,7 +715,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
                 os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
 
-                os.system("rm {}/*".format(ts.line_list_paths))  #TODO not recreate window every time here as well
+                os.system("rm {}/*".format(ts.line_list_paths[0]))  #TODO not recreate window every time here as well
 
                 time_end = time.time()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
