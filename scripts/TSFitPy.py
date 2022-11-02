@@ -540,9 +540,9 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
             print(res.x)
 
             if len(param0) < 3:
-                result = [f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"]
+                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"
             else:
-                result = [f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"]
+                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
 
             time_end = time.time()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -566,9 +566,9 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
             print(res.x)
 
             if len(param0) < 3:
-                result = [f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"]
+                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"
             else:
-                result = [f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"]
+                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
 
 
     elif fitting_mode == "lbl":
@@ -624,8 +624,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 result.append("{} {} {} {} {} {} {} {}".format(specname.replace("../input_files/observed_spectra/", ""),
                                                        line_centers_sorted[j], line_begins_sorted[j],
-                                                       line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun),
-                )
+                                                       line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun))
 
                 wave_result, flux_norm_result, flux_result = np.loadtxt(
                     "../output_files/spectrum_{:08d}.spec".format(i + 1), unpack=True)
@@ -921,13 +920,14 @@ def run_TSFitPy():
         results = futures
         print("Worker calculation done")  # when done, save values
     else:
+        results = []
         for i in range(specname_fitlist.size):
-            results = fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element,
+            results.append(fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element,
                             fit_microturb, fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta,
                             line_list_path_orig, line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb,
                             met_fitlist, model_atmosphere_grid_path, model_atmosphere_list, model_atom_file,
                             model_atom_path, ndimen, nlte_flag, param0, rot, rv_fitlist, segment_file, specname_fitlist,
-                            teff_fitlist, temp_directory, turbospec_path)
+                            teff_fitlist, temp_directory, turbospec_path))
 
     output = "../output_files/" + output
 
@@ -946,8 +946,15 @@ def run_TSFitPy():
         print(
             f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Microturb     Doppler_Shift_add_to_RV    chi_squared", file=f)
 
-    for i in range(len(results)):
-        print(results[i], file=f)
+    results = np.array(results)
+
+    if np.ndim(results) == 1:
+        for i in range(np.size(results)):
+            print(results[i], file=f)
+    else:
+        for i in range(int(np.size(results) / np.size(results[0]))):
+            for j in range(np.size(results[0])):
+                print(results[i][j], file=f)
 
     f.close()
 
