@@ -890,7 +890,7 @@ def run_TSFitPy():
         print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
-        trimmed_end = len(seg_ends)
+        trimmed_end = np.size(seg_ends)
         line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{include_molecules}_{trimmed_start}_{trimmed_end}/"
         create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
                                trimmed_start,
