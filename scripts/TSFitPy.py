@@ -604,7 +604,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                         start = k
                 print(line_centers_sorted[j], seg_begins[start], seg_ends[start])
 
-                ts.line_list_paths = f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"
+                ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
                 os.system("rm {}*".format(ts.line_list_paths))
 
@@ -667,7 +667,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                         start = k
                 print(line_centers_sorted[j], seg_begins[start], seg_ends[start])
 
-                ts.line_list_paths = f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1} /"
+                ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
                 os.system("rm {}*".format(ts.line_list_paths))
 
