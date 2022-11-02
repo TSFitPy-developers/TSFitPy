@@ -609,7 +609,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                 os.system("rm {}*".format(ts.line_list_paths))
 
                 create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths, include_molecules,
-                                       start, start + 1)    #TODO not recreate window every time here as well
+                                       start, start + 1, lbl=True)    #TODO not recreate window every time here as well
 
                 res = minimize(chi_square_broad_met_lbl, param0, args=(ts,
                                                                        np.str(specname), temp_directory, i,
@@ -672,7 +672,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                 os.system("rm {}*".format(ts.line_list_paths))
 
                 create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths, include_molecules,
-                                       start, start + 1)  # TODO not recreate window every time here as well
+                                       start, start + 1, lbl=True)  # TODO not recreate window every time here as well
 
                 res = minimize(chi_square_broad_lbl, param0, args=(ts,
                                                                    np.str(specname), temp_directory, i,
