@@ -472,26 +472,26 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
     # this next step is in case you're only fitting one star
     if specname_fitlist.size > 1 and (element[0] == "Fe" or element[0] == "fe"):
         specname = "../input_files/observed_spectra/" + specname_fitlist[i]
-        temp_directory = f"{temp_directory}/{specname_fitlist[i]}"
+        temp_directory = f"{temp_directory}{specname_fitlist[i]}/"
         teff = teff_fitlist[i]
         logg = logg_fitlist[i]
         rv = rv_fitlist[i]
     elif specname_fitlist.size > 1:
         specname = "../input_files/observed_spectra/" + specname_fitlist[i]
-        temp_directory = f"{temp_directory}/{specname_fitlist[i]}"
+        temp_directory = f"{temp_directory}{specname_fitlist[i]}/"
         teff = teff_fitlist[i]
         logg = logg_fitlist[i]
         rv = rv_fitlist[i]
         met = met_fitlist[i]
     elif specname_fitlist.size == 1 and (element[0] == "Fe" or element[0] == "fe"):
         specname = "../input_files/observed_spectra/" + np.str(specname_fitlist)
-        temp_directory = f"{temp_directory}/{np.str(specname_fitlist)}"
+        temp_directory = f"{temp_directory}{np.str(specname_fitlist)}/"
         teff = teff_fitlist
         logg = logg_fitlist
         rv = rv_fitlist
     elif specname_fitlist.size == 1:
         specname = "../input_files/observed_spectra/" + np.str(specname_fitlist)
-        temp_directory = f"{temp_directory}/{np.str(specname_fitlist)}"
+        temp_directory = f"{temp_directory}{np.str(specname_fitlist)}"
         teff = teff_fitlist
         logg = logg_fitlist
         rv = rv_fitlist
@@ -816,7 +816,7 @@ def run_TSFitPy():
             if fields[0] == "temporary_directory":
                 temp_directory = fields[2]
                 today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
-                temp_directory = f"../{temp_directory}/{today}/"
+                temp_directory = f"../{temp_directory}{today}/"
             if fields[0] == "initial_guess_array":
                 initial_guess_string = fields[2].strip().split(",")
             if fields[0] == "ndimen":
