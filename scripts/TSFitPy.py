@@ -571,8 +571,6 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                 result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"
             else:
                 result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
-
-
     elif fitting_mode == "lbl":
         result = []
         line_centers, line_begins, line_ends = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2),
@@ -588,8 +586,15 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
         seg_begins, seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
 
-        if element[0] == "Fe" or element[0] == "fe":
+        for j in range(len(line_begins_sorted)):
+            for k in range(len(seg_begins)):
+                if line_centers_sorted[j] <= seg_ends[k] and line_centers_sorted[j] > seg_begins[k]:
+                    start = k
+            line_list_path_trimmed_element = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"
+            create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed_element, include_molecules,
+                                   start, start + 1)
 
+        if element[0] == "Fe" or element[0] == "fe":
             for j in range(len(line_begins_sorted)):
                 time_start = time.time()
                 print("Fitting line at {} angstroms".format(line_centers_sorted[j]))
@@ -599,10 +604,12 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                         start = k
                 print(line_centers_sorted[j], seg_begins[start], seg_ends[start])
 
-                os.system("rm {}*".format(line_list_path_trimmed))
+                ts.line_list_paths = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"
 
-                create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
-                                       start, start + 1)    #TODO not recreate window every time here as well
+                #os.system("rm {}*".format(line_list_path_trimmed))
+
+                #create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
+                #                       start, start + 1)    #TODO not recreate window every time here as well
 
                 res = minimize(chi_square_broad_met_lbl, param0, args=(ts,
                                                                        np.str(specname), temp_directory, i,
@@ -642,7 +649,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
                 os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
 
-                os.system("rm {}*".format(line_list_path_trimmed))  #TODO not recreate window every time here as well
+                #os.system("rm {}*".format(line_list_path_trimmed))  #TODO not recreate window every time here as well
 
                 time_end = time.time()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -660,10 +667,12 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                         start = k
                 print(line_centers_sorted[j], seg_begins[start], seg_ends[start])
 
-                os.system("rm {}/*".format(line_list_path_trimmed))
+                ts.line_list_paths = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"
 
-                create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
-                                       start, start + 1)  #TODO not recreate window every time here as well
+                #os.system("rm {}/*".format(line_list_path_trimmed))
+
+                #create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
+                #                       start, start + 1)  #TODO not recreate window every time here as well
 
                 res = minimize(chi_square_broad_lbl, param0, args=(ts,
                                                                    np.str(specname), temp_directory, i,
@@ -706,7 +715,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
                 os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
 
-                os.system("rm {}/*".format(line_list_path_trimmed))  #TODO not recreate window every time here as well
+                #os.system("rm {}/*".format(line_list_path_trimmed))  #TODO not recreate window every time here as well
 
                 time_end = time.time()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -898,6 +907,8 @@ def run_TSFitPy():
                                trimmed_end)
     else:
         line_list_path_trimmed = line_list_path_trimmed + "lbl/"
+        if not os.path.exists(line_list_path_trimmed):
+            os.makedirs(line_list_path_trimmed)
 
     print("Finished trimming linelist")
 
