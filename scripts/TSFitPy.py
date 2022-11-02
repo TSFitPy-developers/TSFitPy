@@ -606,7 +606,8 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                #os.system("rm {}*".format(ts.line_list_paths[0]))
+                if os.path.exists(ts.line_list_paths[0]):
+                    os.system("rm {}*".format(ts.line_list_paths[0]))
 
                 create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
                                        start, start + 1, lbl=True)    #TODO not recreate window every time here as well
@@ -669,7 +670,8 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                #os.system("rm {}*".format(ts.line_list_paths[0]))
+                if os.path.exists(ts.line_list_paths[0]):
+                    os.system("rm {}*".format(ts.line_list_paths[0]))
 
                 create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
                                        start, start + 1, lbl=True)  # TODO not recreate window every time here as well
@@ -922,6 +924,7 @@ def run_TSFitPy():
         print(f"Assuming that the cluster is ran at {login_node_address} (change in code if not the case)")
 
         print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
+        print(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
 
         print("Worker preparation complete")
 
