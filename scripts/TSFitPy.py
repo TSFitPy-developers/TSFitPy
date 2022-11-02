@@ -973,6 +973,6 @@ def run_TSFitPy():
 
 if __name__ == '__main__':
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
-    workers = 1  # should be the same as cores; use value of 1 if do not want to use multithprocessing
+    workers = 1  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
     threads_per_worker = 1  # seemed to work best with 1; play around if you want.
     run_TSFitPy()
