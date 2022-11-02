@@ -496,6 +496,11 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
         logg = logg_fitlist
         rv = rv_fitlist
         met = met_fitlist
+    if not os.path.exists(temp_directory):
+        try:
+            os.mkdir(temp_directory)
+        except FileNotFoundError:
+            os.makedirs(temp_directory)
     print(f"Fitting {specname}")
     print(f"Teff = {teff}; logg = {logg}; RV = {rv}")
     # time_start = time.time() used to evaluate computation time
