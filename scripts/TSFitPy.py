@@ -817,6 +817,11 @@ def run_TSFitPy():
                 temp_directory = fields[2]
                 today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
                 temp_directory = f"../{temp_directory}{today}/"
+                if not os.path.exists(temp_directory):
+                    try:
+                        os.mkdir(temp_directory)
+                    except FileNotFoundError:
+                        os.makedirs(temp_directory)
             if fields[0] == "initial_guess_array":
                 initial_guess_string = fields[2].strip().split(",")
             if fields[0] == "ndimen":
