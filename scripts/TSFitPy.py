@@ -606,7 +606,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                os.system("rm {}*".format(ts.line_list_paths[0]))
+                #os.system("rm {}*".format(ts.line_list_paths[0]))
 
                 create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
                                        start, start + 1, lbl=True)    #TODO not recreate window every time here as well
@@ -669,7 +669,7 @@ def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure
 
                 ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                os.system("rm {}*".format(ts.line_list_paths[0]))
+                #os.system("rm {}*".format(ts.line_list_paths[0]))
 
                 create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
                                        start, start + 1, lbl=True)  # TODO not recreate window every time here as well
