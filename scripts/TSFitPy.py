@@ -905,12 +905,12 @@ def run_TSFitPy():
         create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
                                trimmed_start,
                                trimmed_end)
+        print("Finished trimming linelist")
     else:
         line_list_path_trimmed = line_list_path_trimmed + "lbl/"
         if not os.path.exists(line_list_path_trimmed):
             os.makedirs(line_list_path_trimmed)
 
-    print("Finished trimming linelist")
 
     if workers > 1:
         print("Preparing workers")
@@ -921,7 +921,7 @@ def run_TSFitPy():
         port = client.scheduler_info()['services']['dashboard']
         print(f"Assuming that the cluster is ran at {login_node_address} (change in code if not the case)")
 
-        logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+        print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
 
         print("Worker preparation complete")
 
