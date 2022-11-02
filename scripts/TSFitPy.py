@@ -929,6 +929,8 @@ def run_TSFitPy():
                             model_atom_path, ndimen, nlte_flag, param0, rot, rv_fitlist, segment_file, specname_fitlist,
                             teff_fitlist, temp_directory, turbospec_path))
 
+    shutil.rmtree(temp_directory)   # clean up temp directory
+
     output = "../output_files/" + output
 
     f = open(output, 'a')
