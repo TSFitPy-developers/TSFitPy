@@ -1,3 +1,9 @@
+# Fork of TSFitPy
+
+Changes:
+- Multiprocessing support using Dask. Change number of workers to number of requested CPUs (setting to 1 does not turn on multithreading) in the TSFitPy.py (at the bottom). Change login_node_access to your node login. Then check the status of the Dask by checking the output of the slurm script (should be something like ssh -N -L PORT_NUMBER:node03:PORT_NUMBER supercomputer.university.edu), run that command on your local terminal. Now you should be able to connect to Dask dashboard via "localhost:8787/status" (more about it here: https://github.com/dask/dask/discussions/7480).
+
+
 # Turbospectrum Spectral Fitting with Python (TSFitPy)
 <!--# AKA PODRACES (Pipeline for the Objective Determination of Realistically Accurate Characteristics and Elements of Stars)-->
 
