@@ -126,7 +126,7 @@ def calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line
     return chi_square
 
 
-def calc_ts_spectra_all_lines(obs_name, temp_directory, wave_obs, flux_obs, macro, fwhm, rot, line_begins_sorted,
+def calc_ts_spectra_all_lines(obs_name, temp_directory, output_dir, wave_obs, flux_obs, macro, fwhm, rot, line_begins_sorted,
                               line_ends_sorted, seg_begins, seg_ends):
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
@@ -163,8 +163,8 @@ def calc_ts_spectra_all_lines(obs_name, temp_directory, wave_obs, flux_obs, macr
                                                      line_ends_sorted, seg_begins, seg_ends)
 
         os.system(
-            f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
-        out = open(f"../output_files/spectrum_fit_convolved_{obs_name.replace('../input_files/observed_spectra/', '')}",
+            f"mv {temp_directory}spectrum_00000000.spec {output_dir}spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
+        out = open(f"{output_dir}spectrum_fit_convolved_{obs_name.replace('../input_files/observed_spectra/', '')}",
                    'w')
         for l in range(len(wave_mod)):
             print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
@@ -249,6 +249,7 @@ class Spectra:
     macroturb = None
     rot = None
     fitting_mode = None  # "lbl" = line by line or "all"
+    output_folder = None
 
     global_temp_dir = None
     line_begins_sorted = None
@@ -392,12 +393,12 @@ class Spectra:
                           f"{Spectra.line_ends_sorted[j]} {res.x[0]} {res.x[1]} {microturb} {macroturb} {res.fun}") # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
 
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec", unpack=True)
-            g = open(f"../output_files/result_spectrum_{self.spec_name}.spec", 'a')
+            g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
             for k in range(len(wave_result)):
                 print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
 
             wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
-            h = open(f"../output_files/result_spectrum_{self.spec_name}_convolved.spec", 'a')
+            h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
             for k in range(len(wave_result)):
                 print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
             #os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
@@ -500,7 +501,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
 
         spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax)
 
-        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
+        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir, spectra_to_fit.output_folder,
                                                wave_obs, spectra_to_fit.flux_ob,
                                                macroturb, Spectra.fwhm, Spectra.rot,
                                                Spectra.line_begins_sorted, Spectra.line_ends_sorted,
@@ -688,11 +689,13 @@ def run_TSFitPy():
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
     Spectra.model_atom_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/model_atoms/"
     Spectra.departure_file_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/"
+    Spectra.output_folder = f"../output_files/{today}/"
 
     Spectra.linemask_file = "../input_files/linemask_files/" + linemask_file
     Spectra.segment_file = "../input_files/linemask_files/" + segment_file
 
     create_dir(temp_directory)
+    create_dir(Spectra.output_folder)
 
     fitlist = "../input_files/" + fitlist
 
@@ -779,7 +782,7 @@ def run_TSFitPy():
 
     shutil.rmtree(temp_directory)  # clean up temp directory
 
-    output = "../output_files/" + output
+    output = Spectra.output_folder + output
 
     f = open(output, 'a')
 
