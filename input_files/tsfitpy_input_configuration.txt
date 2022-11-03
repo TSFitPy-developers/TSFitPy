@@ -12,7 +12,7 @@ include_molecules = True
 #whether to use nlte or not. ('True' or 'False')
 nlte = False
 #
-#whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode
+#whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode # or "Input" if one adds a column to the fitlist
 fit_microturb = No
 #
 #whether Teff and logg are fit or read from input file ('Yes' or 'No')

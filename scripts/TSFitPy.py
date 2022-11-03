@@ -263,14 +263,17 @@ class Spectra:
     model_atom_file_dict = None
     ndimen = None
 
-    def __init__(self, specname, teff, logg, rv, met, line_list_path_trimmed, init_param_guess):
-        self.spec_name = np.str(specname)
-        self.spec_path = os.path.join(spec_input_path, np.str(specname))
+    def __init__(self, specname, teff, logg, rv, met, micro, line_list_path_trimmed, init_param_guess):
+        self.spec_name = str(specname)
+        self.spec_path = os.path.join(spec_input_path, str(specname))
         self.teff = teff
         self.logg = logg
         self.met = met
         self.abund = -99  # if fitting abundance of an element
-        self.vmicro = None
+        if Spectra.fit_microturb == "Input":
+            self.vmicro = micro
+        else:
+            self.vmicro = None
         self.temp_dir = os.path.join(Spectra.global_temp_dir, self.spec_name)
         create_dir(self.temp_dir)  # create temp directory
         self.rv = rv
@@ -368,15 +371,18 @@ class Spectra:
 
             print(res.x)
 
-            if not Spectra.fit_microturb and Spectra.atmosphere_type == "1D":
-                if Spectra.fit_met:
-                    microturb = calculate_vturb(self.teff, self.logg, res.x[0])
-                else:
-                    microturb = calculate_vturb(self.teff, self.logg, self.met)
-            elif Spectra.fit_microturb and Spectra.atmosphere_type == "1D":
-                microturb = res.x[2]
+            if self.vmicro is not None:
+                microturb = self.vmicro
             else:
-                microturb = 2.0
+                if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
+                    if Spectra.fit_met:
+                        microturb = calculate_vturb(self.teff, self.logg, res.x[0])
+                    else:
+                        microturb = calculate_vturb(self.teff, self.logg, self.met)
+                elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
+                    microturb = res.x[2]
+                else:
+                    microturb = 2.0
             if Spectra.fit_macroturb:
                 macroturb = res.x[-1]
             else:
@@ -413,19 +419,22 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
 
     abund = param[0]
     doppler = spectra_to_fit.rv + param[1]
-    if not Spectra.fit_microturb and Spectra.atmosphere_type == "1D":
-        if Spectra.fit_met:
-            microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, abund)
+    if spectra_to_fit.vmicro is not None:
+        microturb = spectra_to_fit.vmicro
+    else:
+        if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
+            if Spectra.fit_met:
+                microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, abund)
+            else:
+                microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
+        elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
+            microturb = param[1]
         else:
-            microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
-    elif Spectra.fit_microturb and Spectra.atmosphere_type == "1D":
-        microturb = param[1]
-    else:
-        microturb = 2.0
-    if Spectra.fit_macroturb:
-        macroturb = param[-1]
-    else:
-        macroturb = Spectra.macroturb
+            microturb = 2.0
+        if Spectra.fit_macroturb:
+            macroturb = param[-1]
+        else:
+            macroturb = Spectra.macroturb
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
@@ -470,18 +479,24 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
 
     wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
-    if spectra_to_fit.met > 0.5 or spectra_to_fit.met < -4.0 or spectra_to_fit.vmicro <= 0.0 or macroturb < 0.0 or abund < -40 or (
+    if spectra_to_fit.met > 0.5 or spectra_to_fit.met < -4.0 or macroturb < 0.0 or abund < -40 or (
             Spectra.fit_met and (abund < -4.0 or abund > 0.5)):
         chi_square = 9999.9999
     else:
         if Spectra.fit_met:
             item_abund = {"Fe": abund}
             met = abund
-            vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
+            if spectra_to_fit.vmicro is not None:
+                vmicro = spectra_to_fit.vmicro
+            else:
+                vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
         else:
             item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit: abund + spectra_to_fit.met}
             met = spectra_to_fit.met
-            vmicro = spectra_to_fit.vmicro
+            if spectra_to_fit.vmicro is not None:
+                vmicro = spectra_to_fit.vmicro
+            else:
+                vmicro = spectra_to_fit.vmicro
 
         spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax)
 
@@ -497,11 +512,11 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
 
 
 def create_and_fit_spectra(index, specname_fitlist, teff_fitlist, logg_fitlist, rv_fitlist, met_fitlist,
-                           initial_guess_string, line_list_path_trimmed):
+                           microturb_input, initial_guess_string, line_list_path_trimmed):
     line_list_path_trimmed = line_list_path_trimmed
 
     spectra = Spectra(specname_fitlist[index], teff_fitlist[index], logg_fitlist[index], rv_fitlist[index],
-                      met_fitlist[index], line_list_path_trimmed, initial_guess_string)
+                      met_fitlist[index], microturb_input[index], line_list_path_trimmed, initial_guess_string)
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
@@ -565,7 +580,7 @@ def run_TSFitPy():
                     Spectra.nlte_flag = True
                 else:
                     Spectra.nlte_flag = False
-            if fields[0] == "fit_microturb":
+            if fields[0] == "fit_microturb": # Yes No Input
                 Spectra.fit_microturb = fields[2]
             if fields[0] == "fit_teff":
                 Spectra.fit_teff = fields[2]
@@ -691,6 +706,11 @@ def run_TSFitPy():
                                                                                            unpack=True)
         met_fitlist = np.zeros(np.size(specname_fitlist))
 
+    if Spectra.fit_microturb == "Input":
+        microturb_input = np.loadtxt(fitlist, dtype='str', usecols=(5),  unpack=True)
+    else:
+        microturb_input = np.zeros(np.size(specname_fitlist))
+
     line_centers, line_begins, line_ends = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2), unpack=True)
 
     if line_centers.size > 1:
@@ -743,7 +763,7 @@ def run_TSFitPy():
         futures = []
         for i in range(specname_fitlist.size):
             future = client.submit(create_and_fit_spectra, i, specname_fitlist, teff_fitlist, logg_fitlist, rv_fitlist,
-                                   met_fitlist, initial_guess_string, line_list_path_trimmed)
+                                   met_fitlist, microturb_input, initial_guess_string, line_list_path_trimmed)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -754,7 +774,8 @@ def run_TSFitPy():
         results = []
         for i in range(specname_fitlist.size):
             results.append(create_and_fit_spectra(i, specname_fitlist, teff_fitlist, logg_fitlist, rv_fitlist,
-                                                  met_fitlist, initial_guess_string, line_list_path_trimmed))
+                                                  met_fitlist, microturb_input,
+                                                  initial_guess_string, line_list_path_trimmed))
 
     shutil.rmtree(temp_directory)  # clean up temp directory
 
