@@ -267,17 +267,16 @@ class Spectra:
     def __init__(self, specname, teff, logg, rv, met, micro, line_list_path_trimmed, init_param_guess):
         self.spec_name = str(specname)
         self.spec_path = os.path.join(spec_input_path, str(specname))
-        self.teff = teff
-        self.logg = logg
-        self.met = met
-        self.abund = -99  # if fitting abundance of an element
+        self.teff = float(teff)
+        self.logg = float(logg)
+        self.met = float(met)
         if Spectra.fit_microturb == "Input":
-            self.vmicro = micro
+            self.vmicro = float(micro)
         else:
             self.vmicro = None
-        self.temp_dir = os.path.join(Spectra.global_temp_dir, self.spec_name)
+        self.temp_dir = os.path.join(Spectra.global_temp_dir, self.spec_name, '')
         create_dir(self.temp_dir)  # create temp directory
-        self.rv = rv
+        self.rv = float(rv)
         self.param_guess = None
 
         self.init_param_guess = None
@@ -295,7 +294,7 @@ class Spectra:
             model_atom_path=self.model_atom_path,
             departure_file_path=self.departure_file_path)
 
-        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True)
+        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)
 
     def set_param_guess(self, init_param_guess):
         # make an array for initial guess equal to n x ndimen+1
@@ -309,24 +308,24 @@ class Spectra:
         self.init_param_guess = initial_guess[0]
         self.initial_simplex_guess = initial_guess
 
-    def configure_and_run_ts(self, met, elem_abund, vmicro, lmin, lmax):
+    def configure_and_run_ts(self, met, elem_abund, vmicro, lmin, lmax, windows_flag):
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
         """
         if self.nlte_flag:
             self.ts.configure(t_eff=self.teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
                               lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
-                              free_abundances=elem_abund, temp_directory=self.temp_dir, nlte_flag=False, verbose=False,
-                              atmosphere_dimension=self.atmosphere_type, windows_flag=True,
-                              segment_file=self.segment_file, line_mask_file=self.linemask_file)
-        else:
-            self.ts.configure(t_eff=self.teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
-                              lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                               free_abundances=elem_abund, temp_directory=self.temp_dir, nlte_flag=True, verbose=False,
-                              atmosphere_dimension=self.atmosphere_type, windows_flag=True,
+                              atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
                               segment_file=self.segment_file, line_mask_file=self.linemask_file,
                               depart_bin_file=self.depart_bin_file_dict, depart_aux_file=self.depart_aux_file_dict,
                               model_atom_file=self.model_atom_file_dict)
+        else:
+            self.ts.configure(t_eff=self.teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
+                              lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
+                              free_abundances=elem_abund, temp_directory=self.temp_dir, nlte_flag=False, verbose=False,
+                              atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
+                              segment_file=self.segment_file, line_mask_file=self.linemask_file)
         self.ts.run_turbospectrum_and_atmosphere()
 
     def fit_all(self):
@@ -361,7 +360,9 @@ class Spectra:
                     start = k
             print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
 
-            self.ts.line_list_paths = [get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, start)]
+            self.ts.line_list_paths = [get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, j, start)]
+
+            print(self.ts.line_list_paths)
 
             res = minimize(lbl_broad_abund_chi_sqr, self.init_param_guess, args=(self,
                                                                                  Spectra.line_begins_sorted[j] - 5.,
@@ -450,7 +451,7 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
             item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit: abund + spectra_to_fit.met}
             met = spectra_to_fit.met
 
-        spectra_to_fit.configure_and_run_ts(met, item_abund, microturb, lmin, lmax)
+        spectra_to_fit.configure_and_run_ts(met, item_abund, microturb, lmin, lmax, False)
 
         if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
@@ -499,7 +500,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
             else:
                 vmicro = spectra_to_fit.vmicro
 
-        spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax)
+        spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
         chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir, spectra_to_fit.output_folder,
                                                wave_obs, spectra_to_fit.flux_ob,
@@ -645,8 +646,8 @@ def run_TSFitPy():
                 Spectra.rot = float(fields[2])
             if fields[0] == "temporary_directory":
                 temp_directory = fields[2]
-                temp_directory = os.path.join(temp_directory, today)
-                Spectra.global_temp_dir = temp_directory
+                temp_directory = os.path.join(temp_directory, today, '')
+                Spectra.global_temp_dir = f"../{temp_directory}"
                 if not os.path.exists(temp_directory):
                     try:
                         os.mkdir(temp_directory)
@@ -719,38 +720,36 @@ def run_TSFitPy():
     else:
         microturb_input = np.zeros(np.size(specname_fitlist))
 
-    line_centers, line_begins, line_ends = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2), unpack=True)
+    line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2), unpack=True)
 
     if line_centers.size > 1:
-        Spectra.line_begins_sorted = sorted(line_begins)
-        Spectra.line_ends_sorted = sorted(line_ends)
-        Spectra.line_centers_sorted = sorted(line_centers)
+        Spectra.line_begins_sorted = np.array(sorted(line_begins))
+        Spectra.line_ends_sorted = np.array(sorted(line_ends))
+        Spectra.line_centers_sorted = np.array(sorted(line_centers))
     elif line_centers.size == 1:
-        Spectra.line_begins_sorted = [line_begins]
-        Spectra.line_ends_sorted = [line_ends]
-        Spectra.line_centers_sorted = [line_centers]
+        Spectra.line_begins_sorted = np.array([line_begins])
+        Spectra.line_ends_sorted = np.array([line_ends])
+        Spectra.line_centers_sorted = np.array([line_centers])
 
-    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
-
+    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
+    Spectra.fitting_mode = "lbl"
     if Spectra.fitting_mode == "all":
         print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
         trimmed_end = len(Spectra.seg_ends)
         line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{Spectra.include_molecules}_{trimmed_start}_{trimmed_end}/"
-        create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, Spectra.include_molecules,
+        create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed, Spectra.include_molecules,
                                trimmed_start, trimmed_end)
         print("Finished trimming linelist")
     else:
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl")
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", '')
         for j in range(len(Spectra.line_begins_sorted)):
             for k in range(len(Spectra.seg_begins)):
                 if Spectra.line_centers_sorted[j] <= Spectra.seg_ends[k] and Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
                     start = k
-            line_list_path_trimmed_new = get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, start)
-            create_dir(line_list_path_trimmed_new)
-
-            create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed_new,
+            line_list_path_trimmed_new = get_trimmed_lbl_path_name(element, line_list_path_trimmed, Spectra.segment_file, j, start)
+            create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed_new,
                                    Spectra.include_molecules, start, start + 1)
 
     if workers > 1:
@@ -822,9 +821,9 @@ def run_TSFitPy():
     f.close()
 
 
-def get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, start):
+def get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, j, start):
     return os.path.join(line_list_path_trimmed,
-                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{Spectra.include_molecules}_{start}_{start + 1}_{Spectra.line_centers_sorted[start].replace('.', '_')}_{Spectra.seg_begins[start].replace('.', '_')}_{Spectra.seg_ends[start]}")
+                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}", '')
 
 
 if __name__ == '__main__':
