@@ -583,6 +583,11 @@ def run_TSFitPy():
                     Spectra.nlte_flag = False
             if fields[0] == "fit_microturb": # Yes No Input
                 Spectra.fit_microturb = fields[2]
+            if fields[0] == "fit_macroturb": # Yes No Input
+                if fields[2] == "Yes":
+                    Spectra.fit_macroturb = True
+                else:
+                    Spectra.fit_macroturb = False
             if fields[0] == "fit_teff":
                 Spectra.fit_teff = fields[2]
             if fields[0] == "fit_logg":
