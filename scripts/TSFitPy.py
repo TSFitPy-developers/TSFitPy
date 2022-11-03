@@ -362,8 +362,6 @@ class Spectra:
 
             self.ts.line_list_paths = [get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, j, start)]
 
-            print(self.ts.line_list_paths)
-
             res = minimize(lbl_broad_abund_chi_sqr, self.init_param_guess, args=(self,
                                                                                  Spectra.line_begins_sorted[j] - 5.,
                                                                                  Spectra.line_ends_sorted[j] + 5.),
