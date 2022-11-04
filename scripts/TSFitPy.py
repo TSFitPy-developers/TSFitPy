@@ -701,7 +701,7 @@ def run_TSFitPy():
         Spectra.turbospec_path = "../turbospectrum/exec-gf/"
     Spectra.interpol_path = interpol_path
     line_list_path_orig = line_list_path
-    line_list_path_trimmed = f".{line_list_path}../linelist_for_fitting_trimmed/"
+    line_list_path_trimmed = f"{line_list_path}../linelist_for_fitting_trimmed/"
     if Spectra.atmosphere_type == "1D":
         Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_1D
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
