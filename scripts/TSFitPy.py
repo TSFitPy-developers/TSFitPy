@@ -502,7 +502,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
             if spectra_to_fit.vmicro is not None:
                 vmicro = spectra_to_fit.vmicro
             else:
-                vmicro = spectra_to_fit.vmicro
+                vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
         spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
