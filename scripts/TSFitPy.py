@@ -233,15 +233,15 @@ class Spectra:
     departure_file_path = None
     linemask_file = None
     segment_file = None
-    atmosphere_type = None  # 1D or 3D
-    include_molecules = None
+    atmosphere_type = None  # "1D" or "3D", string
+    include_molecules = None    # "True" or "False", string
     nlte_flag = None
-    fit_microturb = None
-    fit_macroturb = None
-    fit_teff = None
-    fit_logg = None
+    fit_microturb = "No"
+    fit_macroturb = False
+    fit_teff = None     # does not work atm
+    fit_logg = None     # does not work atm
     fit_met = None
-    elem_to_fit = None
+    elem_to_fit = None  # only 1 element at a time is support atm, a list otherwise
     lmin = None
     lmax = None
     ldelta = None
@@ -511,12 +511,10 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
     return chi_square
 
 
-def create_and_fit_spectra(index, specname_fitlist, teff_fitlist, logg_fitlist, rv_fitlist, met_fitlist,
-                           microturb_input, initial_guess_string, line_list_path_trimmed):
+def create_and_fit_spectra(specname, teff, logg, rv, met, microturb, initial_guess_string, line_list_path_trimmed):
     line_list_path_trimmed = line_list_path_trimmed
 
-    spectra = Spectra(specname_fitlist[index], teff_fitlist[index], logg_fitlist[index], rv_fitlist[index],
-                      met_fitlist[index], microturb_input[index], line_list_path_trimmed, initial_guess_string)
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, line_list_path_trimmed, initial_guess_string)
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
@@ -530,7 +528,7 @@ def create_and_fit_spectra(index, specname_fitlist, teff_fitlist, logg_fitlist, 
         return
 
     return result
-
+ #15502511-1406053.txt
 
 def run_TSFitPy():
     depart_bin_file = []
@@ -767,8 +765,11 @@ def run_TSFitPy():
 
         futures = []
         for i in range(specname_fitlist.size):
-            future = client.submit(create_and_fit_spectra, i, specname_fitlist, teff_fitlist, logg_fitlist, rv_fitlist,
-                                   met_fitlist, microturb_input, initial_guess_string, line_list_path_trimmed)
+            specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
+                                                             rv_fitlist[i], met_fitlist[i], microturb_input[i]
+
+            future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1,
+                                   initial_guess_string, line_list_path_trimmed)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -778,9 +779,10 @@ def run_TSFitPy():
     else:
         results = []
         for i in range(specname_fitlist.size):
-            results.append(create_and_fit_spectra(i, specname_fitlist, teff_fitlist, logg_fitlist, rv_fitlist,
-                                                  met_fitlist, microturb_input,
-                                                  initial_guess_string, line_list_path_trimmed))
+            specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
+                                                             rv_fitlist[i], met_fitlist[i], microturb_input[i]
+            results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, initial_guess_string,
+                                                  line_list_path_trimmed))
 
     shutil.rmtree(temp_directory)  # clean up temp directory
 
