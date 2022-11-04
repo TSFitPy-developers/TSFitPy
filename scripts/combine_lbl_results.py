@@ -30,7 +30,7 @@ def combine_lbl(input_location, output_location):
     doppler_shift = output[:, 5].astype(float)
     microturb = output[:, 6].astype(float)
     macroturb = output[:, 7].astype(float)
-    chi_squared = output[:, 2].astype(float)
+    chi_squared = output[:, 8].astype(float)
 
     unique_star_names = np.unique(star_names)
 
