@@ -29,14 +29,14 @@ fit_microturb = No
 #whether or not macroturbulence is fit as a parameter or taken from the value below ('Yes' / "No")
 fit_macroturb = No
 #
-#whether Teff and logg are fit or read from input file ('Yes' or 'No')
+#whether Teff and logg are fit or read from input file ('Yes' or 'No')  # Does not fit anything atm
 fit_teff = No
 fit_logg = No
 #
-#number of elements to fit
+#number of elements to fit  # Fits only one element a time right now
 element_number = 1
 #
-#element fit
+#element fit   
 element = Fe
 #
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
