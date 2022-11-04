@@ -65,4 +65,3 @@ input_file = fitlist #list of observation spectra (textfiles) and atmospheric pa
 output_file = output
 #Multiprocessing: workers is the requested amount of CPUs
 workers = 1
-
