@@ -8,8 +8,8 @@ model_atmosphere_grid_path_3D = /mnt/beegfs/gemini/groups/bergemann/users/storm/
 model_atom_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/model_atoms/
 departure_file_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/
 output_folder = ../output_files/
-linemask_file = ../input_files/linemask_files/
-segment_file = ../input_files/linemask_files/
+linemask_file_folder_location = ../input_files/linemask_files/
+segment_file_folder_location = ../input_files/linemask_files/
 spec_input_path = ../input_files/observed_spectra/
 fitlist_input_folder = ../input_files/
 #type of atmosphere (1D or 3D). current models tested are 1D MARCS model textfiles and average 3D Stagger grid textfiles in MULTI format.

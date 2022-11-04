@@ -573,9 +573,9 @@ def run_TSFitPy():
                 departure_file_path = fields[2]
             if fields[0] == "output_folder":
                 output_folder_og = fields[2]
-            if fields[0] == "linemask_file":
+            if fields[0] == "linemask_file_folder_location":
                 linemask_file_og = fields[2]
-            if fields[0] == "segment_file":
+            if fields[0] == "segment_file_folder_location":
                 segment_file_og = fields[2]
             if fields[0] == "spec_input_path":
                 spec_input_path = fields[2]
