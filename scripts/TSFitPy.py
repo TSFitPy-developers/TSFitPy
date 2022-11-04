@@ -263,10 +263,11 @@ class Spectra:
     depart_aux_file_dict = None
     model_atom_file_dict = None
     ndimen = None
+    spec_input_path = None
 
     def __init__(self, specname, teff, logg, rv, met, micro, line_list_path_trimmed, init_param_guess):
         self.spec_name = str(specname)
-        self.spec_path = os.path.join(spec_input_path, str(specname))
+        self.spec_path = os.path.join(self.spec_input_path, str(specname))
         self.teff = float(teff)
         self.logg = float(logg)
         self.met = float(met)
@@ -469,6 +470,11 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
     return chi_square
 
 
+def get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, j, start):
+    return os.path.join(line_list_path_trimmed,
+                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}", '')
+
+
 def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
     abund = param[0]
     doppler = spectra_to_fit.rv + param[1]
@@ -528,7 +534,7 @@ def create_and_fit_spectra(specname, teff, logg, rv, met, microturb, initial_gue
         return
 
     return result
- #15502511-1406053.txt
+
 
 def run_TSFitPy():
     depart_bin_file = []
@@ -545,25 +551,36 @@ def run_TSFitPy():
             if len(fields) == 0:
                 line = fp.readline()
                 fields = line.strip().split()
-            # if fields[0] == "turbospec_path":
+            #if fields[0] == "turbospec_path":
             #    turbospec_path = fields[2]
-            #    #line = fp.readline()
-            # if fields[0] == "interpol_path":
-            #    interpol_path = fields[2]
-            # if fields[0] == "line_list_path":
-            #    line_list_path = fields[2]
-            # if fields[0] == "line_list_folder":
+            if fields[0] == "interpol_path":
+                interpol_path = fields[2]
+            if fields[0] == "line_list_path":
+                line_list_path = fields[2]
+            #if fields[0] == "line_list_folder":
             #    linelist_folder = fields[2]
-            # if fields[0] == "model_atmosphere_grid_path":
-            #    model_atmosphere_grid_path = fields[2]
-            # if fields[0] == "model_atmosphere_folder":
+            if fields[0] == "model_atmosphere_grid_path_1D":
+                model_atmosphere_grid_path_1D = fields[2]
+            if fields[0] == "model_atmosphere_grid_path_3D":
+                model_atmosphere_grid_path_3D = fields[2]
+            #if fields[0] == "model_atmosphere_folder":
             #    model_atmosphere_folder = fields[2]
-            # if fields[0] == "model_atmosphere_list":
+            #if fields[0] == "model_atmosphere_list":
             #    model_atmosphere_list = fields[2]
-            # if fields[0] == "model_atom_path":
-            #    model_atom_path = fields[2]
-            # if fields[0] == "departure_file_path":
-            #    departure_file_path = fields[2]
+            if fields[0] == "model_atom_path":
+                model_atom_path = fields[2]
+            if fields[0] == "departure_file_path":
+                departure_file_path = fields[2]
+            if fields[0] == "output_folder":
+                output_folder_og = fields[2]
+            if fields[0] == "linemask_file":
+                linemask_file_og = fields[2]
+            if fields[0] == "segment_file":
+                segment_file_og = fields[2]
+            if fields[0] == "spec_input_path":
+                spec_input_path = fields[2]
+            if fields[0] == "fitlist_input_folder":
+                fitlist_input_folder = fields[2]
             if fields[0] == "turbospectrum_compiler":
                 ts_compiler = fields[2]
             if fields[0] == "atmosphere_type":
@@ -657,6 +674,8 @@ def run_TSFitPy():
                 fitlist = fields[2]
             if fields[0] == "output_file":
                 output = fields[2]
+            if fields[0] == "workers":
+                workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
             line = fp.readline()
         fp.close()
 
@@ -680,26 +699,27 @@ def run_TSFitPy():
         Spectra.turbospec_path = "../turbospectrum/exec/"
     elif ts_compiler == "gnu":
         Spectra.turbospec_path = "../turbospectrum/exec-gf/"
-    Spectra.interpol_path = "./model_interpolators/"
-    line_list_path_orig = "../input_files/linelists/linelist_for_fitting/"
-    line_list_path_trimmed = "../input_files/linelists/linelist_for_fitting_trimmed/"
+    Spectra.interpol_path = interpol_path
+    line_list_path_orig = line_list_path
+    line_list_path_trimmed = f".{line_list_path}../linelist_for_fitting_trimmed/"
     if Spectra.atmosphere_type == "1D":
-        Spectra.model_atmosphere_grid_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/1D/"
+        Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_1D
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
     elif Spectra.atmosphere_type == "3D":
-        Spectra.model_atmosphere_grid_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/3D/"
+        Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_3D
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    Spectra.model_atom_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/model_atoms/"
-    Spectra.departure_file_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/"
-    Spectra.output_folder = f"../output_files/{today}/"
+    Spectra.model_atom_path = model_atom_path
+    Spectra.departure_file_path = departure_file_path
+    Spectra.output_folder = f"{output_folder_og}{today}/"
+    Spectra.spec_input_path = spec_input_path
 
-    Spectra.linemask_file = "../input_files/linemask_files/" + linemask_file
-    Spectra.segment_file = "../input_files/linemask_files/" + segment_file
+    Spectra.linemask_file = f"{linemask_file_og}{linemask_file}"
+    Spectra.segment_file = f"{segment_file_og}{segment_file}"
 
     create_dir(temp_directory)
     create_dir(Spectra.output_folder)
 
-    fitlist = "../input_files/" + fitlist
+    fitlist = f"{fitlist_input_folder}{fitlist}"
 
     if Spectra.fit_met:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, dtype='str',
@@ -712,7 +732,7 @@ def run_TSFitPy():
         met_fitlist = np.zeros(np.size(specname_fitlist))
 
     if Spectra.fit_microturb == "Input":
-        microturb_input = np.loadtxt(fitlist, dtype='str', usecols=(5),  unpack=True)
+        microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)
     else:
         microturb_input = np.zeros(np.size(specname_fitlist))
 
@@ -821,15 +841,7 @@ def run_TSFitPy():
     f.close()
 
 
-def get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, j, start):
-    return os.path.join(line_list_path_trimmed,
-                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}", '')
-
-
 if __name__ == '__main__':
-    spec_input_path = "../input_files/observed_spectra/"
-
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
-    workers = 1  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
     run_TSFitPy()

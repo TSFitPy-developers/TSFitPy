@@ -1,5 +1,17 @@
 #Turbospectrum compiled version (intel or gnu)
 turbospectrum_compiler = intel
+#Main paths, please with / at the end
+interpol_path = ./model_interpolators/
+line_list_path = ../input_files/linelists/linelist_for_fitting/
+model_atmosphere_grid_path_1D = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/1D/
+model_atmosphere_grid_path_3D = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/3D/
+model_atom_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/model_atoms/
+departure_file_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/
+output_folder = ../output_files/
+linemask_file = ../input_files/linemask_files/
+segment_file = ../input_files/linemask_files/
+spec_input_path = ../input_files/observed_spectra/
+fitlist_input_folder = ../input_files/
 #type of atmosphere (1D or 3D). current models tested are 1D MARCS model textfiles and average 3D Stagger grid textfiles in MULTI format.
 atmosphere_type = 1D
 #
@@ -51,3 +63,6 @@ initial_guess_array = -1.0,0.5,0.4,1.0,-1.5,-0.5 #the length of this list should
 ndimen = 2 #number of variables being fit
 input_file = fitlist #list of observation spectra (textfiles) and atmospheric parameters needed (teff, logg, met)
 output_file = output
+#Multiprocessing: workers is the requested amount of CPUs
+workers = 1
+
