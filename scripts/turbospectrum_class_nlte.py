@@ -1464,11 +1464,7 @@ class TurboSpectrum:
         # figure out if we need to interpolate the model atmosphere for microturbulence
         possible_turbulence = [0.0, 1.0, 2.0, 5.0]
         flag_dont_interp_microturb = 0
-        for i in range(len(possible_turbulence)):
-            if self.turbulent_velocity == possible_turbulence[i]:
-                flag_dont_interp_microturb = 1
-
-        if self.log_g < 3:
+        if self.turbulent_velocity in possible_turbulence or self.log_g < 3:
             flag_dont_interp_microturb = 1
 
         if flag_dont_interp_microturb == 0 and self.turbulent_velocity < 2.0 and (self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):

@@ -15,6 +15,7 @@ def conv_res(wave, flux, resolution):
     return wave_conv, flux_conv
 
 def conv_macroturbulence(wave, flux, vmac):
+    wave_conv, flux_conv = None, None
     if vmac == 0:
         pass
     elif vmac < 0:
@@ -74,9 +75,13 @@ def conv_macroturbulence(wave, flux, vmac):
             print(F"Unexpected Vmac={vmac} [km/s]. Stopped.")
             exit(1)
 
+    if wave_conv is None:   # otherwise there was a bug that no wave/flux returned with invalid vmac
+        wave_conv, flux_conv = wave, flux
+
     return wave_conv, flux_conv
 
 def conv_rotation(wave, flux, vrot):
+    wave_conv, flux_conv = None, None
     if vrot == 0:
         pass
     elif not np.isnan(vrot):
@@ -132,8 +137,11 @@ def conv_rotation(wave, flux, vrot):
             rot_kernel = convolution.Model1DKernel(rotation(fwhm), x_size = x_size)
             flux_conv = convolution.convolve(flux, rot_kernel, fill_value=1)
     else:
-        print(F"Unexpected Vrot={self.Vrot} [km/s]. Stopped.")
+        print(F"Unexpected Vrot={vrot} [km/s]. Stopped.")
         exit(1)
+
+    if wave_conv is None:  # otherwise there was a bug that no wave/flux returned with invalid vmac
+        wave_conv, flux_conv = wave, flux
 
     return wave_conv, flux_conv
 

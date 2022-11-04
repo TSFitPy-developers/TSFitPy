@@ -22,6 +22,14 @@ from convolve import *
 from create_window_linelist_function import *
 
 
+def create_dir(directory):
+    if not os.path.exists(directory):
+        try:
+            os.mkdir(directory)
+        except FileNotFoundError:
+            os.makedirs(directory)
+
+
 def calculate_vturb(teff, logg, met):
     """
     Calculates micro turbulence based on the input parameters
@@ -46,58 +54,11 @@ def calculate_vturb(teff, logg, met):
     if teff == 5771 and logg == 4.44:
         v_mturb = 0.9
 
+    if v_mturb <= 0.0:
+        print("error in calculating micro turb, setting it to 1.0")
+        return 1.0
+
     return v_mturb
-
-
-def configure_and_run_ts(ts, abund_name, atmosphere_type, depart_aux_file_list, depart_bin_file_list, item_abund,
-                         ldelta, lmax, lmin, logg, mask_file, met, model_atom_file_list, nlte_flag, segment_file, teff,
-                         temp_directory, vturb):
-    """
-    Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
-    :param ts:
-    :param abund_name:
-    :param atmosphere_type:
-    :param depart_aux_file_list:
-    :param depart_bin_file_list:
-    :param item_abund:
-    :param ldelta:
-    :param lmax:
-    :param lmin:
-    :param logg:
-    :param mask_file:
-    :param met:
-    :param model_atom_file_list:
-    :param nlte_flag: True/False depending if one needs LTE or NLTE
-    :param segment_file:
-    :param teff:
-    :param temp_directory:
-    :param vturb:
-    :return:
-    """
-    if nlte_flag == "False":
-        ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                     turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                     free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=False, verbose=False,
-                     atmosphere_dimension=atmosphere_type, windows_flag=True, segment_file=segment_file,
-                     line_mask_file=mask_file)  # , depart_bin_file=depart_bin_file,
-        # depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
-    elif nlte_flag == "True":
-        depart_bin_file = {}
-        for i in range(len(depart_bin_file_list)):
-            depart_bin_file[abund_name[i]] = depart_bin_file_list[i]
-        depart_aux_file = {}
-        for i in range(len(depart_aux_file_list)):
-            depart_aux_file[abund_name[i]] = depart_aux_file_list[i]
-        model_atom_file = {}
-        for i in range(len(model_atom_file_list)):
-            model_atom_file[abund_name[i]] = model_atom_file_list[i]
-        ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                     turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                     free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=True, verbose=False,
-                     atmosphere_dimension=atmosphere_type, windows_flag=True, segment_file=segment_file,
-                     line_mask_file=mask_file, depart_bin_file=depart_bin_file,
-                     depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
-    ts.run_turbospectrum_and_atmosphere()
 
 
 def get_convolved_spectra(wave_mod_filled, flux_mod_filled, fwhm, macro, rot):
@@ -165,8 +126,8 @@ def calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line
     return chi_square
 
 
-def calc_ts_spectra_all_lines(flux_obs, fwhm, line_begins_sorted, line_ends_sorted, macro, obs_name, rot, seg_begins,
-                              seg_ends, temp_directory, wave_obs):
+def calc_ts_spectra_all_lines(obs_name, temp_directory, output_dir, wave_obs, flux_obs, macro, fwhm, rot, line_begins_sorted,
+                              line_ends_sorted, seg_begins, seg_ends):
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
     :param flux_obs:
@@ -182,8 +143,10 @@ def calc_ts_spectra_all_lines(flux_obs, fwhm, line_begins_sorted, line_ends_sort
     :param wave_obs:
     :return:
     """
-    if os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(f'{temp_directory}/spectrum_00000000.spec').st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec', usecols=(0, 1), unpack=True)
+    if os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(
+            f'{temp_directory}/spectrum_00000000.spec').st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec', usecols=(0, 1),
+                                                  unpack=True)
         wave_mod_filled = np.copy(wave_mod_orig)
         flux_mod_filled = np.copy(flux_mod_orig)
 
@@ -199,12 +162,15 @@ def calc_ts_spectra_all_lines(flux_obs, fwhm, line_begins_sorted, line_ends_sort
         chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
                                                      line_ends_sorted, seg_begins, seg_ends)
 
-        os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
-        out = open(f"../output_files/spectrum_fit_convolved_{obs_name.replace('../input_files/observed_spectra/', '')}", 'w')
+        os.system(
+            f"mv {temp_directory}spectrum_00000000.spec {output_dir}spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
+        out = open(f"{output_dir}spectrum_fit_convolved_{obs_name.replace('../input_files/observed_spectra/', '')}",
+                   'w')
         for l in range(len(wave_mod)):
             print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
         out.close()
-    elif os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(f'{temp_directory}/spectrum_00000000.spec').st_size == 0:
+    elif os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(
+            f'{temp_directory}/spectrum_00000000.spec').st_size == 0:
         chi_square = 999.99
         print("empty spectrum file.")
     else:
@@ -213,100 +179,7 @@ def calc_ts_spectra_all_lines(flux_obs, fwhm, line_begins_sorted, line_ends_sort
     return chi_square
 
 
-def chi_square_broad(param, ts, obs_name, temp_directory, spectrum_count, mask_file, segment_file, depart_bin_file_list,
-                     depart_aux_file_list, model_atom_file_list, atmosphere_type, nlte_flag, doppler, teff, logg, met,
-                     vturb, macro, fwhm, rot, abund_name, ldelta, lmin, lmax, wave_obs, flux_obs,
-                     line_begins_sorted, line_ends_sorted, seg_begins, seg_ends):
-    # teff = param[0]
-    # logg = param[1]
-    # met = param[2]
-
-    abund = param[0]
-    doppler = doppler + param[1]
-    if len(param) > 2:
-        macro = param[2]
-
-    wave_obs = wave_obs / (1 + (doppler / 300000.))
-
-    if met > 0.5 or met < -4.0 or vturb <= 0.0 or macro < 0.0 or abund < -40:
-        chi_square = 9999.9999
-    else:
-        item_abund = {"Fe": met, abund_name[0]: abund + met}
-
-        configure_and_run_ts(ts, abund_name, atmosphere_type, depart_aux_file_list, depart_bin_file_list, item_abund,
-                             ldelta, lmax, lmin, logg, mask_file, met, model_atom_file_list, nlte_flag, segment_file,
-                             teff, temp_directory, vturb)
-
-        chi_square = calc_ts_spectra_all_lines(flux_obs, fwhm, line_begins_sorted, line_ends_sorted, macro, obs_name, rot,
-                                               seg_begins, seg_ends, temp_directory, wave_obs)
-
-    print(abund, doppler, chi_square, macro)
-
-    return chi_square
-
-
-def chi_square_broad_met(param, ts, obs_name, temp_directory, spectrum_count, mask_file, segment_file, depart_bin_file_list,
-                         depart_aux_file_list, model_atom_file_list, atmosphere_type, nlte_flag, doppler, teff, logg,
-                         macro, fwhm, rot, ldelta, lmin, lmax, wave_obs, flux_obs, line_begins_sorted, line_ends_sorted,
-                         seg_begins, seg_ends):
-    met = param[0]
-    doppler = doppler + param[1]
-    if len(param) > 2:
-        macro = param[2]
-
-    wave_obs = wave_obs / (1 + (doppler / 300000.))
-
-    if atmosphere_type == "1D":
-        vturb = calculate_vturb(teff, logg, met)
-    elif atmosphere_type == "3D":
-        vturb = 2.0
-
-    if met > 0.5 or met < -4.0 or vturb <= 0.0 or macro < 0.0:
-        chi_square = 9999.9999
-    else:
-        item_abund = {"Fe": met}
-
-        configure_and_run_ts(ts, ["Fe"], atmosphere_type, depart_aux_file_list, depart_bin_file_list, item_abund,
-                             ldelta, lmax, lmin, logg, mask_file, met, model_atom_file_list, nlte_flag, segment_file,
-                             teff, temp_directory, vturb)
-
-        chi_square = calc_ts_spectra_all_lines(flux_obs, fwhm, line_begins_sorted, line_ends_sorted, macro, obs_name, rot,
-                                               seg_begins, seg_ends, temp_directory, wave_obs)
-
-    print(met, doppler, chi_square, vturb, macro)
-
-    return chi_square
-
-
-def prepar_lbl_calc(atmosphere_type, doppler, fit_microturb, logg, macro, met, param, teff, wave_obs):
-    """
-    Prepares the calculation for "line by line" by extracting and calculating initial parameters
-    :param atmosphere_type:
-    :param doppler:
-    :param fit_microturb:
-    :param logg:
-    :param macro:
-    :param met:
-    :param param:
-    :param teff:
-    :param wave_obs:
-    :return:
-    """
-    abund = param[0]
-    doppler = doppler + param[-1]
-    #if len(param) > 3:  # macro    #TODO add macro calculation
-    #    macro = param[3]
-    wave_obs = wave_obs / (1 + (doppler / 300000.))
-    if atmosphere_type == "1D" and fit_microturb == "No":
-        vturb = calculate_vturb(teff, logg, met)
-    elif atmosphere_type == "1D" and fit_microturb == "Yes":
-        vturb = param[1]
-    elif atmosphere_type == "3D":
-        vturb = 2.0
-    return abund, doppler, macro, vturb, wave_obs
-
-
-def calculate_lbl_chi_squared(flux_obs, fwhm, lmax, lmin, macro, rot, spectrum_count, temp_directory, wave_obs):
+def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, fwhm, lmax, lmin, macro, rot):
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
     :param flux_obs:
@@ -320,10 +193,10 @@ def calculate_lbl_chi_squared(flux_obs, fwhm, lmax, lmin, macro, rot, spectrum_c
     :param wave_obs:
     :return:
     """
-    wave_mod_orig, flux_mod_orig = np.loadtxt('{}/spectrum_00000000.spec'.format(temp_directory),
+    wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
                                               usecols=(0, 1), unpack=True)
     wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, fwhm, macro, rot)
-    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]: #TODO redo chi squared here
+    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:  # TODO redo chi squared here
         flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
         chi_square = 0
         wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
@@ -341,9 +214,9 @@ def calculate_lbl_chi_squared(flux_obs, fwhm, lmax, lmin, macro, rot, spectrum_c
         for j in range(len(wave_line)):
             chi_square += ((flux_line_obs[j] - flux_line_mod[j]) * (flux_line_obs[j] - flux_line_mod[j])) / \
                           flux_line_mod[j]
-    os.system("mv {}spectrum_00000000.spec ../output_files/spectrum_{:08d}.spec".format(temp_directory,
-                                                                                        spectrum_count + 1))
-    out = open("../output_files/spectrum_{:08d}_convolved.spec".format(spectrum_count + 1), 'w')
+    #os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
+
+    out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
 
     for i in range(len(wave_line)):
         print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
@@ -351,386 +224,319 @@ def calculate_lbl_chi_squared(flux_obs, fwhm, lmax, lmin, macro, rot, spectrum_c
     return chi_square
 
 
-def chi_square_broad_lbl(param, ts, obs_name, temp_directory, spectrum_count, depart_bin_file_list,
-                         depart_aux_file_list,
-                         model_atom_file_list, atmosphere_type, nlte_flag, doppler, teff, logg, met, fit_microturb,
-                         macro, fwhm, rot, abund_name, ldelta, lmin, lmax, wave_obs, flux_obs):
-    abund, doppler, macro, vturb, wave_obs = prepar_lbl_calc(atmosphere_type, doppler, fit_microturb, logg, macro, met,
-                                                             param, teff, wave_obs)
+class Spectra:
+    turbospec_path = None
+    interpol_path = None
+    model_atmosphere_grid_path = None
+    model_atmosphere_list = None
+    model_atom_path = None
+    departure_file_path = None
+    linemask_file = None
+    segment_file = None
+    atmosphere_type = None  # "1D" or "3D", string
+    include_molecules = None    # "True" or "False", string
+    nlte_flag = None
+    fit_microturb = "No"
+    fit_macroturb = False
+    fit_teff = None     # does not work atm
+    fit_logg = None     # does not work atm
+    fit_met = None
+    elem_to_fit = None  # only 1 element at a time is support atm, a list otherwise
+    lmin = None
+    lmax = None
+    ldelta = None
+    fwhm = None
+    macroturb = None
+    rot = None
+    fitting_mode = None  # "lbl" = line by line or "all"
+    output_folder = None
 
-    if met > 0.5 or met < -4.0 or vturb <= 0.0:
-        chi_square = 9999.9999
-    elif macro < 0.0:
-        chi_square = 99.9999
-    elif abund < -40:
-        chi_square = 999.999
-    else:
-        item_abund = {"Fe": met, abund_name[0]: abund + met}
+    global_temp_dir = None
+    line_begins_sorted = None
+    line_ends_sorted = None
+    line_centers_sorted = None
 
-        if nlte_flag == "False":    #TODO make it same as other ones?
-            ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                         turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                         free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=False, verbose=False,
-                         atmosphere_dimension=atmosphere_type,
-                         windows_flag=False)  # , depart_bin_file=depart_bin_file,
-            # depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
-        elif nlte_flag == "True":
-            depart_bin_file = {}
-            for i in range(len(depart_bin_file_list)):
-                depart_bin_file[abund_name[i]] = depart_bin_file_list[i]
-            depart_aux_file = {}
-            for i in range(len(depart_aux_file_list)):
-                depart_aux_file[abund_name[i]] = depart_aux_file_list[i]
-            model_atom_file = {}
-            for i in range(len(model_atom_file_list)):
-                model_atom_file[abund_name[i]] = model_atom_file_list[i]
-            ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                         turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                         free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=True, verbose=False,
-                         atmosphere_dimension=atmosphere_type, windows_flag=False, depart_bin_file=depart_bin_file,
-                         depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
+    seg_begins = None
+    seg_ends = None
 
-        # ts.configure(t_eff = teff, log_g = logg, metallicity = met, turbulent_velocity = vturb, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax, free_abundances=item_abund, temp_directory = '/Users/gerber/gitprojects/SAPP/UVES_benchmark_3d_ca/', nlte_flag=False, verbose=False)
+    depart_bin_file_dict = None
+    depart_aux_file_dict = None
+    model_atom_file_dict = None
+    ndimen = None
+    spec_input_path = None
 
-        ts.run_turbospectrum_and_atmosphere()
-
-        # macro = macro + param[2]
-
-        if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
-            chi_square = calculate_lbl_chi_squared(flux_obs, fwhm, lmax, lmin, macro, rot, spectrum_count,
-                                                   temp_directory, wave_obs)
-        elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
-            chi_square = 999.99
-            print("empty spectrum file.")
+    def __init__(self, specname, teff, logg, rv, met, micro, line_list_path_trimmed, init_param_guess):
+        self.spec_name = str(specname)
+        self.spec_path = os.path.join(self.spec_input_path, str(specname))
+        self.teff = float(teff)
+        self.logg = float(logg)
+        self.met = float(met)
+        if Spectra.fit_microturb == "Input":
+            self.vmicro = float(micro)
         else:
-            chi_square = 9999.9999
-            print("didn't generate spectra")
+            self.vmicro = None
+        self.temp_dir = os.path.join(Spectra.global_temp_dir, self.spec_name, '')
+        create_dir(self.temp_dir)  # create temp directory
+        self.rv = float(rv)
+        self.param_guess = None
 
-    print(abund, vturb, macro, doppler, chi_square, macro)
+        self.init_param_guess = None
+        self.initial_simplex_guess = None
+        self.set_param_guess(init_param_guess)
 
-    return chi_square
+        self.line_list_path_trimmed = line_list_path_trimmed
+
+        self.ts = TurboSpectrum(
+            turbospec_path=self.turbospec_path,
+            interpol_path=self.interpol_path,
+            line_list_paths=self.line_list_path_trimmed,
+            marcs_grid_path=self.model_atmosphere_grid_path,
+            marcs_grid_list=self.model_atmosphere_list,
+            model_atom_path=self.model_atom_path,
+            departure_file_path=self.departure_file_path)
+
+        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)
+
+    def set_param_guess(self, init_param_guess):
+        # make an array for initial guess equal to n x ndimen+1
+        initial_guess = np.empty((Spectra.ndimen + 1, Spectra.ndimen))
+
+        # fill the array with input from config file
+        for j in range(Spectra.ndimen):
+            for i in range(j, len(init_param_guess), Spectra.ndimen):
+                initial_guess[int(i / Spectra.ndimen)][j] = float(init_param_guess[i])
+
+        self.init_param_guess = initial_guess[0]
+        self.initial_simplex_guess = initial_guess
+
+    def configure_and_run_ts(self, met, elem_abund, vmicro, lmin, lmax, windows_flag):
+        """
+        Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
+        """
+        if self.nlte_flag:
+            self.ts.configure(t_eff=self.teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
+                              lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
+                              free_abundances=elem_abund, temp_directory=self.temp_dir, nlte_flag=True, verbose=False,
+                              atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
+                              segment_file=self.segment_file, line_mask_file=self.linemask_file,
+                              depart_bin_file=self.depart_bin_file_dict, depart_aux_file=self.depart_aux_file_dict,
+                              model_atom_file=self.model_atom_file_dict)
+        else:
+            self.ts.configure(t_eff=self.teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
+                              lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
+                              free_abundances=elem_abund, temp_directory=self.temp_dir, nlte_flag=False, verbose=False,
+                              atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
+                              segment_file=self.segment_file, line_mask_file=self.linemask_file)
+        self.ts.run_turbospectrum_and_atmosphere()
+
+    def fit_all(self):
+        time_start = time.time()
+
+        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=(self), method='Nelder-Mead',
+                       options={'maxiter': self.ndimen * 50, 'disp': True,
+                                'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05})
+
+        print(res.x)
+
+        if self.fit_macroturb:
+            result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
+        else:
+            result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {self.macroturb}"
+
+        time_end = time.time()
+        print(f"Total runtime was {(time_end - time_start) / 60.:2f} minutes.")
+
+        shutil.rmtree(self.temp_dir)
+        return result
+
+    def fit_lbl(self):
+        result = []
+
+        for j in range(len(Spectra.line_begins_sorted)):
+            time_start = time.time()
+            print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
+
+            for k in range(len(Spectra.seg_begins)):
+                if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
+                    start = k
+            print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
+
+            self.ts.line_list_paths = [get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, j, start)]
+
+            res = minimize(lbl_broad_abund_chi_sqr, self.init_param_guess, args=(self,
+                                                                                 Spectra.line_begins_sorted[j] - 5.,
+                                                                                 Spectra.line_ends_sorted[j] + 5.),
+                           method='Nelder-Mead',
+                           options={'maxiter': Spectra.ndimen * 50, 'disp': True, 'initial_simplex': self.initial_simplex_guess,
+                                    'xatol': 0.05, 'fatol': 0.05})
+
+            print(res.x)
+
+            if self.vmicro is not None:
+                microturb = self.vmicro
+            else:
+                if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
+                    if Spectra.fit_met:
+                        microturb = calculate_vturb(self.teff, self.logg, res.x[0])
+                    else:
+                        microturb = calculate_vturb(self.teff, self.logg, self.met)
+                elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
+                    microturb = res.x[2]
+                else:
+                    microturb = 2.0
+            if Spectra.fit_macroturb:
+                macroturb = res.x[-1]
+            else:
+                macroturb = Spectra.macroturb
+
+            result.append(f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} "
+                          f"{Spectra.line_ends_sorted[j]} {res.x[0]} {res.x[1]} {microturb} {macroturb} {res.fun}") # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+
+            wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec", unpack=True)
+            g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+            for k in range(len(wave_result)):
+                print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
+
+            wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
+            h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
+            for k in range(len(wave_result)):
+                print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
+            #os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
+
+            time_end = time.time()
+            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+
+        g.close()
+        h.close()
+
+        return result
 
 
-def chi_square_broad_met_lbl(param, ts, obs_name, temp_directory, spectrum_count, depart_bin_file_list,
-                             depart_aux_file_list, model_atom_file_list, atmosphere_type, nlte_flag, doppler, teff,
-                             logg, fit_microturb, macro, fwhm, rot, ldelta, lmin, lmax, wave_obs, flux_obs):
-    # metallicity here is param[0]
-    met, doppler, macro, vturb, wave_obs = prepar_lbl_calc(atmosphere_type, doppler, fit_microturb, logg, macro,
-                                                           param[0], param, teff, wave_obs)
+def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
+    # param[0] = met or abund
+    # param[1] = added doppler to rv
+    # param[2] = micro turb
+    # param[-1] = macro turb
 
-    if met > 0.5 or met < -4.0 or vturb <= 0.0:
-        chi_square = 9999.9999
-    elif macro < 0.0:
-        chi_square = 99.9999
+    abund = param[0]
+    doppler = spectra_to_fit.rv + param[1]
+    if spectra_to_fit.vmicro is not None:
+        microturb = spectra_to_fit.vmicro
     else:
-        item_abund = {"Fe": met}
+        if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
+            if Spectra.fit_met:
+                microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, abund)
+            else:
+                microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
+        elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
+            microturb = param[1]
+        else:
+            microturb = 2.0
+        if Spectra.fit_macroturb:
+            macroturb = param[-1]
+        else:
+            macroturb = Spectra.macroturb
 
-        if nlte_flag == "False":
-            ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                         turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                         free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=False, verbose=False,
-                         atmosphere_dimension=atmosphere_type,
-                         windows_flag=False)  # , depart_bin_file=depart_bin_file,
-            # depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
-        elif nlte_flag == "True":
-            depart_bin_file = {}
-            depart_bin_file['Fe'] = depart_bin_file_list[0]
-            depart_aux_file = {}
-            depart_aux_file['Fe'] = depart_aux_file_list[0]
-            model_atom_file = {}
-            model_atom_file['Fe'] = model_atom_file_list[0]
-            ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                         turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                         free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=True, verbose=False,
-                         atmosphere_dimension=atmosphere_type, windows_flag=False, depart_bin_file=depart_bin_file,
-                         depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
+    wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
-        ts.run_turbospectrum_and_atmosphere()
+    if spectra_to_fit.met > 0.5 or spectra_to_fit.met < -4.0 or microturb <= 0.0 or macroturb < 0.0 or \
+            abund < -40 or (Spectra.fit_met and (abund < -4.0 or abund > 0.5)):
+        chi_square = 9999.9999
+    else:
+        if Spectra.fit_met:
+            item_abund = {"Fe": abund}
+            met = abund
+        else:
+            item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit: abund + spectra_to_fit.met}
+            met = spectra_to_fit.met
 
-        if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
-            chi_square = calculate_lbl_chi_squared(flux_obs, fwhm, lmax, lmin, macro, rot, spectrum_count,
-                                                   temp_directory, wave_obs)
-        elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
+        spectra_to_fit.configure_and_run_ts(met, item_abund, microturb, lmin, lmax, False)
+
+        if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
+                '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
+            chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
+                                                   spectra_to_fit.flux_ob, Spectra.fwhm, lmax, lmin, macroturb,
+                                                   Spectra.rot)
+        elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
+                '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
             chi_square = 999.99
             print("empty spectrum file.")
         else:
             chi_square = 9999.9999
             print("didn't generate spectra or atmosphere")
 
-    print(met, vturb, doppler, chi_square, macro)
+    print(abund, microturb, doppler, chi_square, macroturb)
 
     return chi_square
 
 
-def fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element, fit_microturb,
-                    fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta, line_list_path_orig,
-                    line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb, met_fitlist,
-                    model_atmosphere_grid_path, model_atmosphere_list, model_atom_file, model_atom_path, ndimen,
-                    nlte_flag, param0, rot, rv_fitlist, segment_file, specname_fitlist, teff_fitlist, temp_directory,
-                    turbospec_path):
-    # this next step is in case you're only fitting one star
-    if specname_fitlist.size > 1 and (element[0] == "Fe" or element[0] == "fe"):
-        specname = "../input_files/observed_spectra/" + specname_fitlist[i]
-        temp_directory = f"{temp_directory}{specname_fitlist[i]}/"
-        teff = teff_fitlist[i]
-        logg = logg_fitlist[i]
-        rv = rv_fitlist[i]
-    elif specname_fitlist.size > 1:
-        specname = "../input_files/observed_spectra/" + specname_fitlist[i]
-        temp_directory = f"{temp_directory}{specname_fitlist[i]}/"
-        teff = teff_fitlist[i]
-        logg = logg_fitlist[i]
-        rv = rv_fitlist[i]
-        met = met_fitlist[i]
-    elif specname_fitlist.size == 1 and (element[0] == "Fe" or element[0] == "fe"):
-        specname = "../input_files/observed_spectra/" + np.str(specname_fitlist)
-        temp_directory = f"{temp_directory}{np.str(specname_fitlist)}/"
-        teff = teff_fitlist
-        logg = logg_fitlist
-        rv = rv_fitlist
-    elif specname_fitlist.size == 1:
-        specname = "../input_files/observed_spectra/" + np.str(specname_fitlist)
-        temp_directory = f"{temp_directory}{np.str(specname_fitlist)}"
-        teff = teff_fitlist
-        logg = logg_fitlist
-        rv = rv_fitlist
-        met = met_fitlist
-    if not os.path.exists(temp_directory):
-        try:
-            os.mkdir(temp_directory)
-        except FileNotFoundError:
-            os.makedirs(temp_directory)
-    print(f"Fitting {specname}")
-    print(f"Teff = {teff}; logg = {logg}; RV = {rv}")
-    # time_start = time.time() used to evaluate computation time
-    ts = TurboSpectrum(
-        turbospec_path=turbospec_path,
-        interpol_path=interpol_path,
-        line_list_paths=line_list_path_trimmed,
-        marcs_grid_path=model_atmosphere_grid_path,
-        marcs_grid_list=model_atmosphere_list,
-        model_atom_path=model_atom_path,
-        departure_file_path=departure_file_path)
-    wave_ob, flux_ob = np.loadtxt(np.str(specname), usecols=(0, 1), unpack=True)
-    if fitting_mode == "all":
-        line_centers, line_begins, line_ends = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2),
-                                                          unpack=True)
+def get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, j, start):
+    return os.path.join(line_list_path_trimmed,
+                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}", '')
 
-        line_begins_sorted = np.array(sorted(line_begins))
-        line_ends_sorted = np.array(sorted(line_ends))
 
-        seg_begins, seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
+def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
+    abund = param[0]
+    doppler = spectra_to_fit.rv + param[1]
+    if Spectra.fit_macroturb:
+        macroturb = param[2]
+    else:
+        macroturb = Spectra.macroturb
 
-        if element[0] == "Fe" or element[0] == "fe":
-            time_start = time.time()
+    wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
-            res = minimize(chi_square_broad_met, param0, args=(ts,
-                                                               np.str(specname), temp_directory, i, linemask_file,
-                                                               segment_file, depart_bin_file, depart_aux_file,
-                                                               model_atom_file, atmosphere_type, nlte_flag, rv,
-                                                               teff, logg, macroturb, fwhm, rot, ldelta, lmin, lmax,
-                                                               wave_ob, flux_ob, line_begins_sorted,
-                                                               line_ends_sorted, seg_begins, seg_ends),
-                           method='Nelder-Mead',
-                           options={'maxiter': ndimen * 50, 'disp': True, 'initial_simplex': initial_guess,
-                                    'xatol': 0.05, 'fatol': 0.05})
-
-            print(res.x)
-
-            if len(param0) < 3:
-                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"
+    if spectra_to_fit.met > 0.5 or spectra_to_fit.met < -4.0 or macroturb < 0.0 or abund < -40 or (
+            Spectra.fit_met and (abund < -4.0 or abund > 0.5)):
+        chi_square = 9999.9999
+    else:
+        if Spectra.fit_met:
+            item_abund = {"Fe": abund}
+            met = abund
+            if spectra_to_fit.vmicro is not None:
+                vmicro = spectra_to_fit.vmicro
             else:
-                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
-
-            time_end = time.time()
-            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
+                vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
         else:
-            if atmosphere_type == "1D":
-                vturb = calculate_vturb(teff, logg, met)
-            elif atmosphere_type == "3D":
-                vturb = 2.0
-
-            res = minimize(chi_square_broad, param0, args=(ts,
-                                                           np.str(specname), temp_directory, i, linemask_file,
-                                                           segment_file, depart_bin_file, depart_aux_file,
-                                                           model_atom_file, atmosphere_type, nlte_flag, rv, teff,
-                                                           logg, met, vturb, macroturb, fwhm, rot, element,
-                                                           ldelta, lmin, lmax, wave_ob,
-                                                           flux_ob, line_begins_sorted, line_ends_sorted,
-                                                           seg_begins, seg_ends), method='Nelder-Mead',
-                           options={'maxiter': ndimen * 50, 'disp': True, 'initial_simplex': initial_guess,
-                                    'xatol': 0.05, 'fatol': 0.05})
-            print(res.x)
-
-            if len(param0) < 3:
-                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun}"
+            item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit: abund + spectra_to_fit.met}
+            met = spectra_to_fit.met
+            if spectra_to_fit.vmicro is not None:
+                vmicro = spectra_to_fit.vmicro
             else:
-                result = f"{specname.replace('../input_files/observed_spectra/', '')} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
-    elif fitting_mode == "lbl":
-        result = []
-        line_centers, line_begins, line_ends = np.loadtxt(linemask_file, comments=";", usecols=(0, 1, 2),
-                                                          unpack=True)
-        if line_centers.size > 1:
-            line_begins_sorted = sorted(line_begins)
-            line_ends_sorted = sorted(line_ends)
-            line_centers_sorted = sorted(line_centers)
-        elif line_centers.size == 1:
-            line_begins_sorted = [line_begins]
-            line_ends_sorted = [line_ends]
-            line_centers_sorted = [line_centers]
+                vmicro = spectra_to_fit.vmicro
 
-        seg_begins, seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
+        spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
-        """for j in range(len(line_begins_sorted)):
-            for k in range(len(seg_begins)):
-                if line_centers_sorted[j] <= seg_ends[k] and line_centers_sorted[j] > seg_begins[k]:
-                    start = k
-            line_list_path_trimmed_element = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"
-            create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed_element, include_molecules,
-                                   start, start + 1)"""
+        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir, spectra_to_fit.output_folder,
+                                               wave_obs, spectra_to_fit.flux_ob,
+                                               macroturb, Spectra.fwhm, Spectra.rot,
+                                               Spectra.line_begins_sorted, Spectra.line_ends_sorted,
+                                               Spectra.seg_begins, Spectra.seg_ends)
 
-        if element[0] == "Fe" or element[0] == "fe":
-            for j in range(len(line_begins_sorted)):
-                time_start = time.time()
-                print("Fitting line at {} angstroms".format(line_centers_sorted[j]))
+    print(abund, doppler, chi_square, macroturb)
 
-                for k in range(len(seg_begins)):
-                    if line_centers_sorted[j] <= seg_ends[k] and line_centers_sorted[j] > seg_begins[k]:
-                        start = k
-                print(line_centers_sorted[j], seg_begins[start], seg_ends[start])
+    return chi_square
 
-                ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
 
-                if os.path.exists(ts.line_list_paths[0]):
-                    os.system("rm {}*".format(ts.line_list_paths[0]))
+def create_and_fit_spectra(specname, teff, logg, rv, met, microturb, initial_guess_string, line_list_path_trimmed):
+    line_list_path_trimmed = line_list_path_trimmed
 
-                create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
-                                       start, start + 1, lbl=True)    #TODO not recreate window every time here as well
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, line_list_path_trimmed, initial_guess_string)
 
-                res = minimize(chi_square_broad_met_lbl, param0, args=(ts,
-                                                                       np.str(specname), temp_directory, i,
-                                                                       depart_bin_file, depart_aux_file,
-                                                                       model_atom_file,
-                                                                       atmosphere_type,
-                                                                       nlte_flag, rv, teff, logg, fit_microturb,
-                                                                       macroturb, fwhm, rot, ldelta,
-                                                                       line_begins_sorted[j] - 5.,
-                                                                       line_ends_sorted[j] + 5., wave_ob, flux_ob),
-                               method='Nelder-Mead',
-                               options={'maxiter': ndimen * 50, 'disp': True, 'initial_simplex': initial_guess,
-                                        'xatol': 0.05, 'fatol': 0.05})
+    print(f"Fitting {spectra.spec_name}")
+    print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
 
-                print(res.x)
+    if Spectra.fitting_mode == "all":
+        result = spectra.fit_all()
+    elif Spectra.fitting_mode == "lbl":
+        result = spectra.fit_lbl()
+    else:
+        print(f"unknown fitting mode {Spectra.fitting_mode}, need all or lbl")
+        return
 
-                if fit_microturb == "Yes":
-                    vturb = res.x[1]
-                elif fit_microturb == "No":
-                    vturb = calculate_vturb(teff, logg, res.x[0])
-
-                result.append("{} {} {} {} {} {} {} {}".format(specname.replace("../input_files/observed_spectra/", ""),
-                                                       line_centers_sorted[j], line_begins_sorted[j],
-                                                       line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun))
-
-                wave_result, flux_norm_result, flux_result = np.loadtxt(
-                    "../output_files/spectrum_{:08d}.spec".format(i + 1), unpack=True)
-                g = open("../output_files/result_spectrum_{:08d}.spec".format(i), 'a')
-                for k in range(len(wave_result)): #TODO not opening file?
-                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-                os.system("rm ../output_files/spectrum_{:08d}.spec".format(i + 1))
-
-                wave_result, flux_norm_result = np.loadtxt(
-                    "../output_files/spectrum_{:08d}_convolved.spec".format(i + 1), unpack=True)
-                h = open("../output_files/result_spectrum_{:08d}_convolved.spec".format(i), 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
-                os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
-
-                os.system("rm {}*".format(ts.line_list_paths[0]))  #TODO not recreate window every time here as well
-
-                time_end = time.time()
-                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-            g.close()
-            h.close()
-
-        else:
-            for j in range(len(line_begins_sorted)):
-                time_start = time.time()
-                print(f"Fitting line at {line_centers_sorted[j]} angstroms")
-
-                for k in range(len(seg_begins)):
-                    if line_centers_sorted[j] <= seg_ends[k] and line_centers_sorted[j] > seg_begins[k]:
-                        start = k
-                print(line_centers_sorted[j], seg_begins[start], seg_ends[start])
-
-                ts.line_list_paths = [f"{line_list_path_trimmed}_{np.str(specname).replace('/', '_').replace('.', '_')}_{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{include_molecules}_{start}_{start + 1}/"]
-
-                if os.path.exists(ts.line_list_paths[0]):
-                    os.system("rm {}*".format(ts.line_list_paths[0]))
-
-                create_window_linelist(segment_file, line_list_path_orig, ts.line_list_paths[0], include_molecules,
-                                       start, start + 1, lbl=True)  # TODO not recreate window every time here as well
-
-                res = minimize(chi_square_broad_lbl, param0, args=(ts,
-                                                                   np.str(specname), temp_directory, i,
-                                                                   depart_bin_file, depart_aux_file,
-                                                                   model_atom_file,
-                                                                   atmosphere_type,
-                                                                   nlte_flag, rv, teff, logg, met, fit_microturb,
-                                                                   macroturb, fwhm, rot, element,
-                                                                   ldelta, line_begins_sorted[j] - 5.,
-                                                                   line_ends_sorted[j] + 5., wave_ob, flux_ob),
-                               method='Nelder-Mead',
-                               options={'maxiter': ndimen * 50, 'disp': True, 'initial_simplex': initial_guess,
-                                        'xatol': 0.05, 'fatol': 0.05})
-
-                print(res.x)
-
-                if fit_microturb == "Yes":
-                    vturb = res.x[1]
-                elif fit_microturb == "No":
-                    vturb = calculate_vturb(teff, logg, met)
-
-                result.append("{} {} {} {} {} {} {} {}".format(specname.replace("../input_files/observed_spectra/", ""),
-                                                       line_centers_sorted[j], line_begins_sorted[j],
-                                                       line_ends_sorted[j], res.x[0], vturb, res.x[-1], res.fun),
-                )
-
-                wave_result, flux_norm_result, flux_result = np.loadtxt(
-                    "../output_files/spectrum_{:08d}.spec".format(i + 1), unpack=True)
-                g = open("../output_files/result_spectrum_{}.spec".format(
-                    specname.replace("../input_files/observed_spectra/", "")), 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-                os.system("rm ../output_files/spectrum_{:08d}.spec".format(i + 1))
-
-                wave_result, flux_norm_result = np.loadtxt(
-                    "../output_files/spectrum_{:08d}_convolved.spec".format(i + 1), unpack=True)
-                h = open("../output_files/result_spectrum_{}_convolved.spec".format(
-                    specname.replace("../input_files/observed_spectra/", "")), 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
-                os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
-
-                os.system("rm {}/*".format(ts.line_list_paths[0]))  #TODO not recreate window every time here as well
-
-                time_end = time.time()
-                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-            g.close()
-            h.close()
-    shutil.rmtree(temp_directory)
     return result
 
-def run_TSFitPy():
-    # set defaults
-    include_molecules = "True"
 
+def run_TSFitPy():
     depart_bin_file = []
     depart_aux_file = []
     model_atom_file = []
@@ -745,41 +551,61 @@ def run_TSFitPy():
             if len(fields) == 0:
                 line = fp.readline()
                 fields = line.strip().split()
-            # if fields[0] == "turbospec_path":
+            #if fields[0] == "turbospec_path":
             #    turbospec_path = fields[2]
-            #    #line = fp.readline()
-            # if fields[0] == "interpol_path":
-            #    interpol_path = fields[2]
-            # if fields[0] == "line_list_path":
-            #    line_list_path = fields[2]
-            # if fields[0] == "line_list_folder":
+            if fields[0] == "interpol_path":
+                interpol_path = fields[2]
+            if fields[0] == "line_list_path":
+                line_list_path = fields[2]
+            #if fields[0] == "line_list_folder":
             #    linelist_folder = fields[2]
-            # if fields[0] == "model_atmosphere_grid_path":
-            #    model_atmosphere_grid_path = fields[2]
-            # if fields[0] == "model_atmosphere_folder":
+            if fields[0] == "model_atmosphere_grid_path_1D":
+                model_atmosphere_grid_path_1D = fields[2]
+            if fields[0] == "model_atmosphere_grid_path_3D":
+                model_atmosphere_grid_path_3D = fields[2]
+            #if fields[0] == "model_atmosphere_folder":
             #    model_atmosphere_folder = fields[2]
-            # if fields[0] == "model_atmosphere_list":
+            #if fields[0] == "model_atmosphere_list":
             #    model_atmosphere_list = fields[2]
-            # if fields[0] == "model_atom_path":
-            #    model_atom_path = fields[2]
-            # if fields[0] == "departure_file_path":
-            #    departure_file_path = fields[2]
+            if fields[0] == "model_atom_path":
+                model_atom_path = fields[2]
+            if fields[0] == "departure_file_path":
+                departure_file_path = fields[2]
+            if fields[0] == "output_folder":
+                output_folder_og = fields[2]
+            if fields[0] == "linemask_file_folder_location":
+                linemask_file_og = fields[2]
+            if fields[0] == "segment_file_folder_location":
+                segment_file_og = fields[2]
+            if fields[0] == "spec_input_path":
+                spec_input_path = fields[2]
+            if fields[0] == "fitlist_input_folder":
+                fitlist_input_folder = fields[2]
             if fields[0] == "turbospectrum_compiler":
                 ts_compiler = fields[2]
             if fields[0] == "atmosphere_type":
-                atmosphere_type = fields[2]
+                Spectra.atmosphere_type = fields[2]
             if fields[0] == "mode":
-                fitting_mode = fields[2]
+                Spectra.fitting_mode = fields[2]
             if fields[0] == "include_molecules":
-                include_molecules = fields[2]
+                Spectra.include_molecules = fields[2]
             if fields[0] == "nlte":
                 nlte_flag = fields[2]
-            if fields[0] == "fit_microturb":
-                fit_microturb = fields[2]
+                if nlte_flag == "True":
+                    Spectra.nlte_flag = True
+                else:
+                    Spectra.nlte_flag = False
+            if fields[0] == "fit_microturb": # Yes No Input
+                Spectra.fit_microturb = fields[2]
+            if fields[0] == "fit_macroturb": # Yes No Input
+                if fields[2] == "Yes":
+                    Spectra.fit_macroturb = True
+                else:
+                    Spectra.fit_macroturb = False
             if fields[0] == "fit_teff":
-                fit_teff = fields[2]
+                Spectra.fit_teff = fields[2]
             if fields[0] == "fit_logg":
-                fit_logg = fields[2]
+                Spectra.fit_logg = fields[2]
             if fields[0] == "element_number":
                 nelement = int(fields[2])
             if fields[0] == "element":
@@ -792,6 +618,9 @@ def run_TSFitPy():
                 else:
                     element = []
                     element.append(fields[2])
+                Spectra.elem_to_fit = element
+                if element[0] == "Fe" or element[0] == "fe":
+                    Spectra.fit_met = True
             if fields[0] == "linemask_file":
                 linemask_file = fields[2]
             if fields[0] == "segment_file":
@@ -817,21 +646,21 @@ def run_TSFitPy():
                 for i in range(nelement):
                     model_atom_file.append(fields[2 + i])
             if fields[0] == "wavelength_minimum":
-                lmin = float(fields[2])
+                Spectra.lmin = float(fields[2])
             if fields[0] == "wavelength_maximum":
-                lmax = float(fields[2])
+                Spectra.lmax = float(fields[2])
             if fields[0] == "wavelength_delta":
-                ldelta = float(fields[2])
+                Spectra.ldelta = float(fields[2])
             if fields[0] == "resolution":
-                fwhm = float(fields[2])
+                Spectra.fwhm = float(fields[2])
             if fields[0] == "macroturbulence":
-                macroturb = float(fields[2])
+                Spectra.macroturb = float(fields[2])
             if fields[0] == "rotation":
-                rot = float(fields[2])
+                Spectra.rot = float(fields[2])
             if fields[0] == "temporary_directory":
                 temp_directory = fields[2]
-                today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")
-                temp_directory = f"../{temp_directory}{today}/"
+                temp_directory = os.path.join(temp_directory, today, '')
+                Spectra.global_temp_dir = f"../{temp_directory}"
                 if not os.path.exists(temp_directory):
                     try:
                         os.mkdir(temp_directory)
@@ -840,137 +669,164 @@ def run_TSFitPy():
             if fields[0] == "initial_guess_array":
                 initial_guess_string = fields[2].strip().split(",")
             if fields[0] == "ndimen":
-                ndimen = int(fields[2])
+                Spectra.ndimen = int(fields[2])
             if fields[0] == "input_file":
                 fitlist = fields[2]
             if fields[0] == "output_file":
                 output = fields[2]
+            if fields[0] == "workers":
+                workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
             line = fp.readline()
         fp.close()
 
+    if nlte_flag:
+        depart_bin_file_dict = {}
+        for i in range(len(depart_bin_file)):
+            depart_bin_file_dict[element[i]] = depart_bin_file[i]
+        depart_aux_file_dict = {}
+        for i in range(len(depart_aux_file)):
+            depart_aux_file_dict[element[i]] = depart_aux_file[i]
+        model_atom_file_dict = {}
+        for i in range(len(model_atom_file)):
+            model_atom_file_dict[element[i]] = model_atom_file[i]
+
+        Spectra.depart_bin_file_dict = depart_bin_file_dict
+        Spectra.depart_aux_file_dict = depart_aux_file_dict
+        Spectra.model_atom_file_dict = model_atom_file_dict
+
     # set directories
     if ts_compiler == "intel":
-        turbospec_path = "../turbospectrum/exec/"
+        Spectra.turbospec_path = "../turbospectrum/exec/"
     elif ts_compiler == "gnu":
-        turbospec_path = "../turbospectrum/exec-gf/"
-    interpol_path = "./model_interpolators/"
-    line_list_path_orig = "../input_files/linelists/linelist_for_fitting/"
-    line_list_path_trimmed = "../input_files/linelists/linelist_for_fitting_trimmed/"
-    if atmosphere_type == "1D":
-        model_atmosphere_grid_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/1D/"
-        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    elif atmosphere_type == "3D":
-        model_atmosphere_grid_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/3D/"
-        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    model_atom_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/model_atoms/"
-    departure_file_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/"
+        Spectra.turbospec_path = "../turbospectrum/exec-gf/"
+    Spectra.interpol_path = interpol_path
+    line_list_path_orig = line_list_path
+    line_list_path_trimmed = f"{line_list_path}../linelist_for_fitting_trimmed/"
+    if Spectra.atmosphere_type == "1D":
+        Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_1D
+        Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    elif Spectra.atmosphere_type == "3D":
+        Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_3D
+        Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    Spectra.model_atom_path = model_atom_path
+    Spectra.departure_file_path = departure_file_path
+    Spectra.output_folder = f"{output_folder_og}{today}/"
+    Spectra.spec_input_path = spec_input_path
 
-    linemask_file = "../input_files/linemask_files/" + linemask_file
-    segment_file = "../input_files/linemask_files/" + segment_file
-    # continuum_file = "../input_files/linemask_files/"+continuum_file
+    Spectra.linemask_file = f"{linemask_file_og}{linemask_file}"
+    Spectra.segment_file = f"{segment_file_og}{segment_file}"
 
-    # make an array for initial guess equal to n x ndimen+1
-    initial_guess = np.empty((ndimen + 1, ndimen))
+    create_dir(temp_directory)
+    create_dir(Spectra.output_folder)
 
-    # fill the array with input from config file
-    for j in range(ndimen):
-        for i in range(j, len(initial_guess_string), ndimen):
-            initial_guess[int(i / ndimen)][j] = float(initial_guess_string[i])
+    fitlist = f"{fitlist_input_folder}{fitlist}"
 
-    # time_start_tot = time.time() line used for evaluating computation time
-
-    if not os.path.exists(temp_directory):
-        os.makedirs(temp_directory)
-
-    param0 = initial_guess[0]
-
-    fitlist = "../input_files/" + fitlist
-
-    specname_fitlist = np.loadtxt(fitlist, dtype='str', usecols=(0), unpack=True)
-
-    # if fit_teff == "Yes" and fit_logg == "No" and element[0] == "Fe":
-
-    if (element[0] == "Fe" or element[0] == "fe") and fit_teff == "No" and fit_logg == "No":
-        rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, usecols=(1, 2, 3), unpack=True)
-        met_fitlist = None
+    if Spectra.fit_met:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, dtype='str',
+                                                                                           usecols=(0, 1, 2, 3, 4),
+                                                                                           unpack=True)
     else:
-        rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, usecols=(1, 2, 3, 4), unpack=True)
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
+                                                                                           usecols=(0, 1, 2, 3),
+                                                                                           unpack=True)
+        met_fitlist = np.zeros(np.size(specname_fitlist))
 
-    seg_begins, seg_ends = np.loadtxt(segment_file, comments=";", usecols=(0, 1), unpack=True)
+    if Spectra.fit_microturb == "Input":
+        microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)
+    else:
+        microturb_input = np.zeros(np.size(specname_fitlist))
 
-    if fitting_mode == "all":
+    line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2), unpack=True)
+
+    if line_centers.size > 1:
+        Spectra.line_begins_sorted = np.array(sorted(line_begins))
+        Spectra.line_ends_sorted = np.array(sorted(line_ends))
+        Spectra.line_centers_sorted = np.array(sorted(line_centers))
+    elif line_centers.size == 1:
+        Spectra.line_begins_sorted = np.array([line_begins])
+        Spectra.line_ends_sorted = np.array([line_ends])
+        Spectra.line_centers_sorted = np.array([line_centers])
+
+    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
+    Spectra.fitting_mode = "lbl"
+    if Spectra.fitting_mode == "all":
         print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
-        trimmed_end = len(seg_ends)
-        line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{include_molecules}_{trimmed_start}_{trimmed_end}/"
-        create_window_linelist(segment_file, line_list_path_orig, line_list_path_trimmed, include_molecules,
-                               trimmed_start,
-                               trimmed_end)
+        trimmed_end = len(Spectra.seg_ends)
+        line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{Spectra.include_molecules}_{trimmed_start}_{trimmed_end}/"
+        create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed, Spectra.include_molecules,
+                               trimmed_start, trimmed_end)
         print("Finished trimming linelist")
     else:
-        line_list_path_trimmed = line_list_path_trimmed + "lbl/"
-        if not os.path.exists(line_list_path_trimmed):
-            os.makedirs(line_list_path_trimmed)
-
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", '')
+        for j in range(len(Spectra.line_begins_sorted)):
+            for k in range(len(Spectra.seg_begins)):
+                if Spectra.line_centers_sorted[j] <= Spectra.seg_ends[k] and Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
+                    start = k
+            line_list_path_trimmed_new = get_trimmed_lbl_path_name(element, line_list_path_trimmed, Spectra.segment_file, j, start)
+            create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed_new,
+                                   Spectra.include_molecules, start, start + 1)
 
     if workers > 1:
         print("Preparing workers")
-        client = Client(threads_per_worker=1, n_workers=workers)  # if # of threads are not equal to 1, then may break the program
+        client = Client(threads_per_worker=1,
+                        n_workers=workers)  # if # of threads are not equal to 1, then may break the program
         print(client)
 
         host = client.run_on_scheduler(socket.gethostname)
         port = client.scheduler_info()['services']['dashboard']
         print(f"Assuming that the cluster is ran at {login_node_address} (change in code if not the case)")
 
-        #print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
+        # print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
         print(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
 
         print("Worker preparation complete")
 
         futures = []
         for i in range(specname_fitlist.size):
-            future = client.submit(fit_one_spectra, atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element,
-                            fit_microturb, fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta,
-                            line_list_path_orig, line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb,
-                            met_fitlist, model_atmosphere_grid_path, model_atmosphere_list, model_atom_file,
-                            model_atom_path, ndimen, nlte_flag, param0, rot, rv_fitlist, segment_file, specname_fitlist,
-                            teff_fitlist, temp_directory, turbospec_path)
+            specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
+                                                             rv_fitlist[i], met_fitlist[i], microturb_input[i]
 
+            future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1,
+                                   initial_guess_string, line_list_path_trimmed)
             futures.append(future)  # prepares to get values
 
-        print("start gathering")  # use http://localhost:8787/status to check status. the port might be different
+        print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
         futures = np.array(client.gather(futures))  # starts the calculations (takes a long time here)
         results = futures
         print("Worker calculation done")  # when done, save values
     else:
         results = []
         for i in range(specname_fitlist.size):
-            results.append(fit_one_spectra(atmosphere_type, depart_aux_file, depart_bin_file, departure_file_path, element,
-                            fit_microturb, fitting_mode, fwhm, i, include_molecules, initial_guess, interpol_path, ldelta,
-                            line_list_path_orig, line_list_path_trimmed, linemask_file, lmax, lmin, logg_fitlist, macroturb,
-                            met_fitlist, model_atmosphere_grid_path, model_atmosphere_list, model_atom_file,
-                            model_atom_path, ndimen, nlte_flag, param0, rot, rv_fitlist, segment_file, specname_fitlist,
-                            teff_fitlist, temp_directory, turbospec_path))
+            specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
+                                                             rv_fitlist[i], met_fitlist[i], microturb_input[i]
+            results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, initial_guess_string,
+                                                  line_list_path_trimmed))
 
-    shutil.rmtree(temp_directory)   # clean up temp directory
+    shutil.rmtree(temp_directory)  # clean up temp directory
 
-    output = "../output_files/" + output
+    output = Spectra.output_folder + output
 
     f = open(output, 'a')
 
-    if fitting_mode == "all" and (
-            element[0] == "Fe" or element[0] == "fe"):  # TODO add other parameters? macroturbulence?
-        print("#specname        Fe_H     Doppler_Shift_add_to_RV    chi_squared", file=f)
-    elif fitting_mode == "all":
-        print(f"#specname        {element[0]}_Fe     Doppler_Shift_add_to_RV    chi_squared", file=f)
-    elif fitting_mode == "lbl" and (element[0] == "Fe" or element[0] == "fe"):
+    #result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {self.macroturb}"
+    #result.append(f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} "
+    #                      f"{Spectra.line_ends_sorted[j]} {res.x[0]} {res.x[1]} {microturb} {macroturb} {res.fun}")
+
+    if Spectra.fitting_mode == "all" and Spectra.fit_met:
+        print("#specname        Fe_H     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
+    elif Spectra.fitting_mode == "all":
+        print(f"#specname        {Spectra.elem_to_fit[0]}_Fe     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
+    elif Spectra.fitting_mode == "lbl" and (element[0] == "Fe" or element[0] == "fe"):
         print(
-            "#specname        wave_center  wave_start  wave_end  Fe_H    Microturb     Doppler_Shift_add_to_RV    chi_squared", file=f
+            "#specname        wave_center  wave_start  wave_end  Fe_H   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared",
+            file=f
         )
-    elif fitting_mode == "lbl":
+    elif Spectra.fitting_mode == "lbl":
         print(
-            f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Microturb     Doppler_Shift_add_to_RV    chi_squared", file=f)
+            f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared",
+            file=f)
 
     results = np.array(results)
 
@@ -986,6 +842,6 @@ def run_TSFitPy():
 
 
 if __name__ == '__main__':
+    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
-    workers = 1  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
     run_TSFitPy()
