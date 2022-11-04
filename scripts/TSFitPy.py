@@ -219,7 +219,7 @@ def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, fwhm, lmax, lm
     out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
 
     for i in range(len(wave_line)):
-        print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
+        print("{}  {}".format(wave_mod[i], flux_mod[i]), file=out)
     out.close()
     return chi_square
 
@@ -312,6 +312,7 @@ class Spectra:
     def configure_and_run_ts(self, met, elem_abund, vmicro, lmin, lmax, windows_flag):
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
+        :param windows_flag - False for lbl, True for all lines
         """
         if self.nlte_flag:
             self.ts.configure(t_eff=self.teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
@@ -349,8 +350,40 @@ class Spectra:
         shutil.rmtree(self.temp_dir)
         return result
 
+
+    def generate_grid_for_lbl(self):
+        input_abund = self.met
+        grids_amount = 50
+        abund_bound = 0.5
+
+        abund_to_gen = np.linspace(input_abund - abund_bound, input_abund + abund_bound, grids_amount)
+
+        for abund_to_use in abund_to_gen:
+            if self.met > 0.5 or self.met < -4.0 or abund_to_use < -40 or (Spectra.fit_met and (abund_to_use < -4.0 or abund_to_use > 0.5)):
+                chi_square = 9999.9999
+            else:
+                if Spectra.fit_met:
+                    item_abund = {"Fe": abund_to_use}
+                    if self.vmicro is not None:
+                        vmicro = self.vmicro
+                    else:
+                        vmicro = calculate_vturb(self.teff, self.logg, self.met)
+                else:
+                    item_abund = {"Fe": self.met, Spectra.elem_to_fit: abund_to_use + self.met}
+                    met = self.met
+                    if self.vmicro is not None:
+                        vmicro = self.vmicro
+                    else:
+                        vmicro = calculate_vturb(self.teff, self.logg, self.met)
+
+                self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, True)
+
+
     def fit_lbl(self):
         result = []
+
+
+
 
         for j in range(len(Spectra.line_begins_sorted)):
             time_start = time.time()
@@ -502,7 +535,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
             if spectra_to_fit.vmicro is not None:
                 vmicro = spectra_to_fit.vmicro
             else:
-                vmicro = spectra_to_fit.vmicro
+                vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
         spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
