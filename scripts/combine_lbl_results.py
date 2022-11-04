@@ -49,7 +49,7 @@ def combine_lbl(input_location, output_location):
 
 if __name__ == '__main__':
     results_location = None
-    new_output_location = None
+    new_output_location = None 
 
     if results_location is None or new_output_location is None:
         print("Need to set results and new output location textfiles")
