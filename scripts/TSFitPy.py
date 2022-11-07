@@ -364,6 +364,7 @@ class Spectra:
         return result
 
     def generate_grid_for_lbl(self):
+        print("Generating grids")
         if self.fit_met:
             input_abund = self.met
         else:
@@ -390,11 +391,11 @@ class Spectra:
                     vmicro = calculate_vturb(self.teff, self.logg, met)
 
                 temp_dir = os.path.join(self.temp_dir, f"{abund_to_use}", '')
-
+                create_dir(temp_dir)
                 self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, True, temp_dir=temp_dir)
 
                 success.append(True)
-
+        print("Generation successful")
         return success
 
 
@@ -663,8 +664,6 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
 
 
 def create_and_fit_spectra(specname, teff, logg, rv, met, microturb, initial_guess_string, line_list_path_trimmed, input_abundance):
-    line_list_path_trimmed = line_list_path_trimmed
-
     spectra = Spectra(specname, teff, logg, rv, met, microturb, line_list_path_trimmed, initial_guess_string, elem_abund=input_abundance)
 
     print(f"Fitting {spectra.spec_name}")
@@ -689,7 +688,7 @@ def run_TSFitPy():
     model_atom_file = []
 
     # read the configuration file
-    with open("../input_files/tsfitpy_input_configuration.txt") as fp:
+    with open(config_location) as fp:
         line = fp.readline()
         while line:
             fields = line.strip().split()
@@ -808,11 +807,6 @@ def run_TSFitPy():
                 temp_directory = fields[2]
                 temp_directory = os.path.join(temp_directory, today, '')
                 Spectra.global_temp_dir = f"../{temp_directory}"
-                if not os.path.exists(temp_directory):
-                    try:
-                        os.mkdir(temp_directory)
-                    except FileNotFoundError:
-                        os.makedirs(temp_directory)
             if fields[0] == "initial_guess_array":
                 initial_guess_string = fields[2].strip().split(",")
             if fields[0] == "ndimen":
@@ -863,7 +857,7 @@ def run_TSFitPy():
     Spectra.linemask_file = f"{linemask_file_og}{linemask_file}"
     Spectra.segment_file = f"{segment_file_og}{segment_file}"
 
-    create_dir(temp_directory)
+    create_dir(Spectra.global_temp_dir)
     create_dir(Spectra.output_folder)
 
     fitlist = f"{fitlist_input_folder}{fitlist}"
@@ -889,7 +883,7 @@ def run_TSFitPy():
     if np.size(specname_fitlist) == 1:
         microturb_input = np.array([microturb_input])
 
-    if Spectra.fitting_mode == "lbl_quick":
+    if Spectra.fitting_mode == "lbl_quick" and not Spectra.fit_met:
         if Spectra.fit_microturb == "Input":
             use_col = 6
         else:
@@ -898,7 +892,7 @@ def run_TSFitPy():
         if np.size(specname_fitlist) == 1:
             input_abundances = np.array([input_abundances])
     else:
-        input_abundances = None
+        input_abundances = np.zeros(np.size(specname_fitlist))
 
     line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2), unpack=True)
 
@@ -913,8 +907,8 @@ def run_TSFitPy():
         Spectra.line_centers_sorted = np.array([line_centers])
 
     Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
-    Spectra.fitting_mode = "lbl"
-    if Spectra.fitting_mode == "all":
+
+    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
         print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
@@ -923,7 +917,7 @@ def run_TSFitPy():
         create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed, Spectra.include_molecules,
                                trimmed_start, trimmed_end)
         print("Finished trimming linelist")
-    else:
+    elif Spectra.fitting_mode == "lbl":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", '')
         for j in range(len(Spectra.line_begins_sorted)):
             for k in range(len(Spectra.seg_begins)):
@@ -970,7 +964,7 @@ def run_TSFitPy():
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, initial_guess_string,
                                                   line_list_path_trimmed, input_abundance))
 
-    shutil.rmtree(temp_directory)  # clean up temp directory
+    shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
 
     output = Spectra.output_folder + output
 
@@ -1013,6 +1007,10 @@ def run_TSFitPy():
 
 
 if __name__ == '__main__':
+    config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
+
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
+    Spectra.grids_amount = 50    # for lbl quick
+    Spectra.abund_bound = 0.5   # for lbl quick
     run_TSFitPy()
