@@ -179,7 +179,7 @@ def calc_ts_spectra_all_lines(obs_name, temp_directory, output_dir, wave_obs, fl
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, fwhm, lmax, lmin, macro, rot, save_convolved=False):
+def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro, rot, save_convolved=False):
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
     :param flux_obs:
@@ -192,34 +192,32 @@ def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, fwhm, lmax, lm
     :param wave_obs:
     :return:
     """
-    wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
-                                              usecols=(0, 1), unpack=True)
+    indices_to_use_mod = np.where((wave_mod_orig <= lmax) & (wave_mod_orig >= lmin))
+    indices_to_use_obs = np.where((wave_obs <= lmax) & (wave_obs >= lmin))
+
+    wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
+    wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
+
     wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, fwhm, macro, rot)
-    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:  # TODO redo chi squared here
+    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
         flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-        chi_square = 0
-        wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+        wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]   # 5 AA i guess to remove extra edges??
         flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
         flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-        for j in range(len(wave_line)):
-            chi_square += ((flux_line_obs[j] - flux_line_mod[j]) * (flux_line_obs[j] - flux_line_mod[j])) / \
-                          flux_line_mod[j]
+        chi_square = np.sum(((flux_line_obs - flux_line_mod) * (flux_line_obs - flux_line_mod)) / flux_line_mod)
     else:
         flux_obs_interp = np.interp(wave_mod, wave_obs, flux_obs)
-        chi_square = 0
         wave_line = wave_mod[np.where((wave_mod <= lmax - 5.) & (wave_mod >= lmin + 5.))]
         flux_line_obs = flux_obs_interp[np.where((wave_mod <= lmax - 5.) & (wave_mod >= lmin + 5.))]
         flux_line_mod = flux_mod[np.where((wave_mod <= lmax - 5.) & (wave_mod >= lmin + 5.))]
-        for j in range(len(wave_line)):
-            chi_square += ((flux_line_obs[j] - flux_line_mod[j]) * (flux_line_obs[j] - flux_line_mod[j])) / \
-                          flux_line_mod[j]
+        chi_square = np.sum(((flux_line_obs - flux_line_mod) * (flux_line_obs - flux_line_mod)) / flux_line_mod)
     #os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
     if save_convolved:
         out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
 
         for i in range(len(wave_line)):
-            print("{}  {}".format(wave_mod[i], flux_line_mod[i]), file=out)
+            print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
         out.close()
     return chi_square
 
@@ -402,6 +400,18 @@ class Spectra:
     def fit_lbl_quick(self):
         success_grid_gen = self.generate_grid_for_lbl()
         result = []
+        grid_spectra = {}
+
+        for i, (abund, success) in enumerate(zip(self.abund_to_gen, success_grid_gen)):
+            if success:
+                spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
+                if os_path.exists(f"{spectra_grid_path}spectrum_00000000.spec") and os.stat(
+                    f"{spectra_grid_path}spectrum_00000000.spec").st_size != 0:
+                    wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
+                                                              usecols=(0, 1), unpack=True)
+                    grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
+                else:
+                    success_grid_gen[i] = False
 
         for j in range(len(Spectra.line_begins_sorted)):
             time_start = time.time()
@@ -419,11 +429,11 @@ class Spectra:
 
             for abund, success in zip(self.abund_to_gen, success_grid_gen):
                 if success:
-                    spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
+                    wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
                     res = minimize(lbl_broad_abund_chi_sqr_quick, self.init_param_guess, args=(self,
                                                                                          Spectra.line_begins_sorted[j] - 5.,
                                                                                          Spectra.line_ends_sorted[j] + 5.,
-                                                                                               spectra_grid_path, abund),
+                                                                                         abund, wave_abund, flux_abund),
                                    method='Nelder-Mead',
                                    options={'maxiter': Spectra.ndimen * 50, 'disp': True, 'initial_simplex': self.initial_simplex_guess,
                                             'xatol': 0.05, 'fatol': 0.05})
@@ -528,7 +538,7 @@ class Spectra:
         return result
 
 
-def lbl_broad_abund_chi_sqr_quick(param, spectra_to_fit: Spectra, lmin, lmax, spectra_path, abund):
+def lbl_broad_abund_chi_sqr_quick(param, spectra_to_fit: Spectra, lmin, lmax, abund, wave_mod_orig, flux_mod_orig):
     # param[0] = doppler
     # param[1] = macro turb
 
@@ -541,19 +551,12 @@ def lbl_broad_abund_chi_sqr_quick(param, spectra_to_fit: Spectra, lmin, lmax, sp
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
-    if spectra_to_fit.met < -4.0 or macroturb < 0.0:
+    if spectra_to_fit.met < -4.0 or spectra_to_fit.met > 0.5 or macroturb < 0.0:
         chi_square = 9999.9999
     else:
-        if os_path.exists(f"{spectra_path}spectrum_00000000.spec") and os.stat(f"{spectra_path}spectrum_00000000.spec").st_size != 0:
-            chi_square = calculate_lbl_chi_squared(spectra_path, wave_ob,
-                                                   spectra_to_fit.flux_ob, Spectra.fwhm, lmax, lmin, macroturb,
+        chi_square = calculate_lbl_chi_squared(None, wave_ob,
+                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.fwhm, lmax, lmin, macroturb,
                                                    Spectra.rot, save_convolved=False)
-        elif os_path.exists(f"{spectra_path}spectrum_00000000.spec") and os.stat(f"{spectra_path}spectrum_00000000.spec").st_size == 0:
-            chi_square = 999.99
-            print("empty spectrum file.")
-        else:
-            chi_square = 9999.9999
-            print("didn't generate spectra or atmosphere")
 
     print(abund, doppler, chi_square, macroturb)
 
@@ -602,8 +605,10 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
 
         if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
+            wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
+                                                      usecols=(0, 1), unpack=True)
             chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                                   spectra_to_fit.flux_ob, Spectra.fwhm, lmax, lmin, macroturb,
+                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.fwhm, lmax, lmin, macroturb,
                                                    Spectra.rot)
         elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
