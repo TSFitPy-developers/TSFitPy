@@ -878,6 +878,10 @@ def run_TSFitPy():
                                                                                            usecols=(0, 1, 2, 3),
                                                                                            unpack=True)
         met_fitlist = np.zeros(np.size(specname_fitlist))
+        
+           
+    if np.size(specname_fitlist) == 1:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array([rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
 
     if np.size(specname_fitlist) == 1:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array([rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
@@ -889,6 +893,7 @@ def run_TSFitPy():
 
     if np.size(specname_fitlist) == 1:
         microturb_input = np.array([microturb_input])
+
 
     if Spectra.fitting_mode == "lbl_quick" and not Spectra.fit_met:
         if Spectra.fit_microturb == "Input":
