@@ -432,10 +432,10 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
             microturb = param[1]
         else:
             microturb = 2.0
-        if Spectra.fit_macroturb:
-            macroturb = param[-1]
-        else:
-            macroturb = Spectra.macroturb
+    if Spectra.fit_macroturb:
+        macroturb = param[-1]
+    else:
+        macroturb = Spectra.macroturb
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
