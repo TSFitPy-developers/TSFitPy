@@ -447,6 +447,8 @@ class Spectra:
                     result_one_line += f" {abund} {9999} {9999} {9999} {9999}"
                     chi_squares.append(9999)
 
+            result.append(result_one_line)
+
             index_min_chi_square = np.argmin(chi_squares)
             min_chi_sqr_spectra_path = os.path.join(self.temp_dir, f"{self.abund_to_gen[index_min_chi_square]}", 'spectrum_00000000.spec')
 
@@ -988,7 +990,7 @@ def run_TSFitPy():
         )
     elif Spectra.fitting_mode == "lbl_quick": #f" {res.x[0]} {vmicro} {macroturb} {res.fun}"
         output_columns = "#specname\twave_center\twave_start\twave_end"
-        for i in np.range(Spectra.grids_amount):
+        for i in range(Spectra.grids_amount):
             output_columns += f"\tabund_{i}\tdoppler_shift_{i}\tmicroturb_{i}\tmacroturb_{i}\tchi_square_{i}"
         #f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared"
         print(output_columns, file=f)
