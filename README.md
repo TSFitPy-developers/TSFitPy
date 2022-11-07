@@ -3,6 +3,8 @@
 Changes:
 - Multiprocessing support using Dask. Change number of workers to number of requested CPUs (setting to 1 does not turn on multithreading) in the TSFitPy.py (at the bottom). Change login_node_access to your node login. Then check the status of the Dask by checking the output of the slurm script (should be something like ssh -N -L PORT_NUMBER:node03:PORT_NUMBER supercomputer.university.edu), run that command on your local terminal. Now you should be able to connect to Dask dashboard via "localhost:8787/status" (more about it here: https://github.com/dask/dask/discussions/7480).
 - If fitting all lines at the same time: saves trimmed files for the future (so no need to recreate them each time). Based on the element and the segments (i.e. if you change linemasks or specific segment wavelengths you need to delete those files first before recomputing the abundances).
+-- Now also for lbl: saves depending on a line and segment (delete if changing linelists).
+- Ability to fit much quicker at a cost of exact fitting (at least x4-5 times faster). Outputs a long series of chi-squares depending on the input guess for metallicity/abundance. The curve can be plotted to find lowest point -> lowest chi-squared might correspond to the correct metallicity?
 
 
 # Turbospectrum Spectral Fitting with Python (TSFitPy)
