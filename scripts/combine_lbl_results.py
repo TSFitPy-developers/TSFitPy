@@ -48,8 +48,8 @@ def combine_lbl(input_location, output_location):
 
 
 if __name__ == '__main__':
-    results_location = None
-    new_output_location = None 
+    results_location = None #"../../../../../storm/PhD_2022/gaia_eso_mg_y_stuff/Nov-04-2022-09-13-21/output"
+    new_output_location = None #"../../../../../storm/PhD_2022/gaia_eso_mg_y_stuff/Nov-04-2022-09-13-21/new_output2.txt"
 
     if results_location is None or new_output_location is None:
         print("Need to set results and new output location textfiles")
