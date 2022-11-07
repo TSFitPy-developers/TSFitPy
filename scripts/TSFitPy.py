@@ -179,7 +179,7 @@ def calc_ts_spectra_all_lines(obs_name, temp_directory, output_dir, wave_obs, fl
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro, rot, save_convolved=False):
+def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro, rot, save_convolved=True):
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
     :param flux_obs:
