@@ -730,11 +730,18 @@ def run_TSFitPy():
                                                                                            usecols=(0, 1, 2, 3),
                                                                                            unpack=True)
         met_fitlist = np.zeros(np.size(specname_fitlist))
+        
+           
+    if np.size(specname_fitlist) == 1:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array([rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
 
     if Spectra.fit_microturb == "Input":
         microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)
     else:
         microturb_input = np.zeros(np.size(specname_fitlist))
+
+    if np.size(specname_fitlist) == 1:
+        microturb_input = np.array([microturb_input])
 
     line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2), unpack=True)
 
