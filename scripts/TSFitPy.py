@@ -15,6 +15,7 @@ from dask.distributed import Client
 import shutil
 from distributed.scheduler import logger
 import socket
+import asyncio
 
 from solar_abundances import solar_abundances, periodic_table
 
@@ -361,7 +362,7 @@ class Spectra:
         shutil.rmtree(self.temp_dir)
         return result
 
-    def generate_grid_for_lbl(self):
+    def generate_grid_for_lbl(self) -> dict:
         print("Generating grids")
         if self.fit_met:
             input_abund = self.met
@@ -370,11 +371,11 @@ class Spectra:
 
         self.abund_to_gen = np.linspace(input_abund - self.abund_bound, input_abund + self.abund_bound, self.grids_amount)
 
-        success = []
+        success = {}
 
         for abund_to_use in self.abund_to_gen:
             if self.met > 0.5 or self.met < -4.0 or abund_to_use < -40 or (Spectra.fit_met and (abund_to_use < -4.0 or abund_to_use > 0.5)):
-                success.append(False)
+                success[abund_to_use] = False
             else:
                 if Spectra.fit_met:
                     item_abund = {"Fe": abund_to_use}
@@ -392,18 +393,17 @@ class Spectra:
                 create_dir(temp_dir)
                 self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, True, temp_dir=temp_dir)
 
-                success.append(True)
+                success[abund_to_use] = True
         print("Generation successful")
         return success
 
-
     def fit_lbl_quick(self):
-        success_grid_gen = self.generate_grid_for_lbl()
+        success_grid_gen = gen_grids(self)
         result = []
         grid_spectra = {}
 
-        for i, (abund, success) in enumerate(zip(self.abund_to_gen, success_grid_gen)):
-            if success:
+        for abund in success_grid_gen:
+            if success_grid_gen[abund]:
                 spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
                 if os_path.exists(f"{spectra_grid_path}spectrum_00000000.spec") and os.stat(
                     f"{spectra_grid_path}spectrum_00000000.spec").st_size != 0:
@@ -411,7 +411,7 @@ class Spectra:
                                                               usecols=(0, 1), unpack=True)
                     grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
                 else:
-                    success_grid_gen[i] = False
+                    success_grid_gen[abund] = False
 
         for j in range(len(Spectra.line_begins_sorted)):
             time_start = time.time()
@@ -427,8 +427,8 @@ class Spectra:
 
             chi_squares = []
 
-            for abund, success in zip(self.abund_to_gen, success_grid_gen):
-                if success:
+            for abund in success_grid_gen:
+                if success_grid_gen[abund]:
                     wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
                     res = minimize(lbl_broad_abund_chi_sqr_quick, self.init_param_guess, args=(self,
                                                                                          Spectra.line_begins_sorted[j] - 5.,
@@ -537,6 +537,33 @@ class Spectra:
 
         return result
 
+
+async def gen_one_grid(spectra: Spectra, abund_to_use: int) -> tuple:
+    if spectra.met > 0.5 or spectra.met < -4.0 or abund_to_use < -40 or (
+            Spectra.fit_met and (abund_to_use < -4.0 or abund_to_use > 0.5)):
+        return abund_to_use, False
+    else:
+        if Spectra.fit_met:
+            item_abund = {"Fe": abund_to_use}
+            met = abund_to_use
+        else:
+            item_abund = {"Fe": spectra.met, Spectra.elem_to_fit: abund_to_use + spectra.met}
+            met = spectra.met
+
+        if spectra.vmicro is not None:
+            vmicro = spectra.vmicro
+        else:
+            vmicro = calculate_vturb(spectra.teff, spectra.logg, met)
+
+        temp_dir = os.path.join(spectra.temp_dir, f"{abund_to_use}", '')
+        create_dir(temp_dir)
+        spectra.configure_and_run_ts(met, item_abund, vmicro, spectra.lmin, spectra.lmax, True, temp_dir=temp_dir)
+        return abund_to_use, True
+
+
+async def gen_grids(spectra: Spectra) -> tuple:
+    res = await asyncio.gather(*(gen_one_grid(spectra, abund_to_use) for abund_to_use in spectra.abund_to_gen))
+    return res
 
 def lbl_broad_abund_chi_sqr_quick(param, spectra_to_fit: Spectra, lmin, lmax, abund, wave_mod_orig, flux_mod_orig):
     # param[0] = doppler
