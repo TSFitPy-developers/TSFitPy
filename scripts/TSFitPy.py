@@ -369,36 +369,21 @@ class Spectra:
         else:
             input_abund = self.elem_abund
 
-        self.abund_to_gen = np.linspace(input_abund - self.abund_bound, input_abund + self.abund_bound, self.grids_amount)
+        self.abund_to_gen = np.linspace(input_abund - Spectra.abund_bound, input_abund + Spectra.abund_bound,
+                                        Spectra.grids_amount)
 
-        success = {}
+        success_dict = {}
 
-        for abund_to_use in self.abund_to_gen:
-            if self.met > 0.5 or self.met < -4.0 or abund_to_use < -40 or (Spectra.fit_met and (abund_to_use < -4.0 or abund_to_use > 0.5)):
-                success[abund_to_use] = False
-            else:
-                if Spectra.fit_met:
-                    item_abund = {"Fe": abund_to_use}
-                    met = abund_to_use
-                else:
-                    item_abund = {"Fe": self.met, Spectra.elem_to_fit: abund_to_use + self.met}
-                    met = self.met
+        res = asyncio.run(gen_grids(self))
 
-                if self.vmicro is not None:
-                    vmicro = self.vmicro
-                else:
-                    vmicro = calculate_vturb(self.teff, self.logg, met)
+        for one_res in res:
+            success_dict[one_res[0]] = one_res[1]
 
-                temp_dir = os.path.join(self.temp_dir, f"{abund_to_use}", '')
-                create_dir(temp_dir)
-                self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, True, temp_dir=temp_dir)
-
-                success[abund_to_use] = True
         print("Generation successful")
-        return success
+        return success_dict
 
     def fit_lbl_quick(self):
-        success_grid_gen = gen_grids(self)
+        success_grid_gen = self.generate_grid_for_lbl()
         result = []
         grid_spectra = {}
 
