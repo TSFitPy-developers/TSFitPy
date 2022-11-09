@@ -33,21 +33,23 @@ def conv_macroturbulence(wave, flux, vmac):
             if (np.max(wave) - np.min(wave)) % 5 != 0:
                 num_intervals += 1
             i_start = 0
-            i_end = 0
+            wave_delta_diff = (wave[1] - wave[0])
             for i in range(num_intervals):
-                #i_end = i_start
-                while (i_end < len(wave)) and (wave[i_end] < wave[i_start]+5.):
-                    i_end += 1
+                index_split = np.where(wave >= wave[i_start] + 5.)[0]
+                if np.size(index_split) > 0:
+                    i_end = index_split[0]
+                else:
+                    i_end = np.size(wave) - 1
 
-                offset = int(2./(wave[1]-wave[0]))
+                offset = int(2. / wave_delta_diff)
                 if offset % 2 == 1:
                     offset += 1
                 if i_start != 0:
                     i_start = i_start - offset
 
-                fwhm = vmac * np.mean(wave[i_start:i_end]) / speed_of_light_kms / (wave[1]-wave[0])
+                fwhm = vmac * np.mean(wave[i_start:i_end]) / speed_of_light_kms / wave_delta_diff
 
-                x_size = int(30*fwhm)
+                x_size = int(30 * fwhm)
                 if x_size % 2 == 0:
                     x_size += 1
 
@@ -59,8 +61,9 @@ def conv_macroturbulence(wave, flux, vmac):
                     wave_conv = wave_conv_interval
                     flux_conv = flux_conv_interval
                 else:
-                    wave_conv = np.concatenate((wave_conv[:-int(offset/2)], wave_conv_interval[int(offset/2):]), axis=None)
-                    flux_conv = np.concatenate((flux_conv[:-int(offset/2)], flux_conv_interval[int(offset/2):]), axis=None)
+                    half_of_offset = int(offset / 2)
+                    wave_conv = np.concatenate((wave_conv[:-half_of_offset], wave_conv_interval[half_of_offset:]), axis=None)
+                    flux_conv = np.concatenate((flux_conv[:-half_of_offset], flux_conv_interval[half_of_offset:]), axis=None)
                 i_start = i_end
         else:
             # FWHM: km/s --> A --> step
