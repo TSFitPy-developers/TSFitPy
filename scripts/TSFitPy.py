@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from scipy.optimize import minimize
 # from multiprocessing import Pool
@@ -22,15 +23,19 @@ from convolve import *
 from create_window_linelist_function import *
 
 
-def create_dir(directory):
+def create_dir(directory: str):
+    """
+    Creates a directory if it does not exist
+    :param directory: Path to the directory that can be created (relative or not)
+    """
     if not os.path.exists(directory):
         try:
             os.mkdir(directory)
-        except FileNotFoundError:
-            os.makedirs(directory)
+        except FileNotFoundError:   # if need to create folders in-between
+            os.makedirs(directory)  # can't recall why I just don't call this function directly
 
 
-def calculate_vturb(teff, logg, met):
+def calculate_vturb(teff: float, logg: float, met: float) -> float:
     """
     Calculates micro turbulence based on the input parameters
     :param teff: Temperature in kelvin
@@ -61,21 +66,21 @@ def calculate_vturb(teff, logg, met):
     return v_mturb
 
 
-def get_convolved_spectra(wave_mod_filled, flux_mod_filled, fwhm, macro, rot):
+def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, fwhm: float, macro: float, rot: float) -> tuple[np.ndarray, np.ndarray]:
     """
     Convolves spectra with FWHM, macroturbulence or rotation if values are non-zero
-    :param wave_mod_filled:
-    :param flux_mod_filled:
-    :param fwhm:
-    :param macro:
-    :param rot:
+    :param wave: wavelength array, in ascending order
+    :param flux: flux array normalised
+    :param fwhm: FWHM, zero if not required
+    :param macro: Macroturbulence in km/s, zero if not required
+    :param rot: Rotation in km/s, 0 if not required
     :return: 2 arrays, first is convolved wavelength, second is convolved flux
     """
     if fwhm != 0.0:
-        wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, fwhm)
+        wave_mod_conv, flux_mod_conv = conv_res(wave, flux, fwhm)
     else:
-        wave_mod_conv = wave_mod_filled
-        flux_mod_conv = flux_mod_filled
+        wave_mod_conv = wave
+        flux_mod_conv = flux
     if macro != 0.0:
         wave_mod_macro, flux_mod_macro = conv_macroturbulence(wave_mod_conv, flux_mod_conv, macro)
     else:
@@ -89,19 +94,21 @@ def get_convolved_spectra(wave_mod_filled, flux_mod_filled, fwhm, macro, rot):
     return wave_mod, flux_mod
 
 
-def calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted, line_ends_sorted,
-                                    seg_begins, seg_ends):
+def calculate_all_lines_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, wave_mod: np.ndarray,
+                                    flux_mod: np.ndarray, line_begins_sorted: np.ndarray, line_ends_sorted: np.ndarray,
+                                    seg_begins: np.ndarray, seg_ends: np.ndarray) -> float:
     """
-    Calculates chi squared for all lines fitting by comparing two spectra and calculating the chi_squared
-    :param wave_obs:
-    :param flux_obs:
-    :param wave_mod:
-    :param flux_mod:
-    :param line_begins_sorted:
-    :param line_ends_sorted:
-    :param seg_begins:
-    :param seg_ends:
-    :return:
+    Calculates chi squared for all lines fitting by comparing two spectra and calculating the chi_squared based on
+    interpolation between the wavelength points
+    :param wave_obs: Observed wavelength
+    :param flux_obs: Observed normalised flux
+    :param wave_mod: Synthetic wavelength
+    :param flux_mod: Synthetic normalised flux
+    :param line_begins_sorted: Sorted line list, wavelength of a line start
+    :param line_ends_sorted: Sorted line list, wavelength of a line end
+    :param seg_begins: Segment list where it starts, array
+    :param seg_ends: Segment list where it ends, array
+    :return: Calculated chi squared at lines
     """
     if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
         flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
@@ -126,23 +133,26 @@ def calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line
     return chi_square
 
 
-def calc_ts_spectra_all_lines(obs_name, temp_directory, output_dir, wave_obs, flux_obs, macro, fwhm, rot,
-                              line_begins_sorted,
-                              line_ends_sorted, seg_begins, seg_ends):
+def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: str, wave_obs: np.ndarray,
+                              flux_obs: np.ndarray, macro: float, fwhm: float, rot: float,
+                              line_begins_sorted: np.ndarray, line_ends_sorted: np.ndarray,
+                              seg_begins: np.ndarray, seg_ends: np.ndarray) -> float:
     """
-    Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
-    :param flux_obs:
-    :param fwhm:
-    :param line_begins_sorted:
-    :param line_ends_sorted:
-    :param macro:
-    :param obs_name:
-    :param rot:
-    :param seg_begins:
-    :param seg_ends:
-    :param temp_directory:
-    :param wave_obs:
-    :return:
+    Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
+    calculates chi squared. Used for all lines at once within line list
+    :param obs_name: Name of the file where to save the new spectra
+    :param temp_directory: Directory where TS calculated the spectra
+    :param output_dir: Directory where to save the new spectra
+    :param wave_obs: Observed wavelength
+    :param flux_obs: Observed normalised flux
+    :param macro: Macroturbulence in km/s, zero if not required
+    :param fwhm: FWHM, zero if not required
+    :param rot: Rotation in km/s, 0 if not required
+    :param line_begins_sorted: Sorted line list, wavelength of a line start
+    :param line_ends_sorted: Sorted line list, wavelength of a line end
+    :param seg_begins: Segment list where it starts, array
+    :param seg_ends: Segment list where it ends, array
+    :return: chi squared at line (between line start and end). Also creates convolved spectra.
     """
     if os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(
             f'{temp_directory}/spectrum_00000000.spec').st_size != 0:
@@ -180,10 +190,11 @@ def calc_ts_spectra_all_lines(obs_name, temp_directory, output_dir, wave_obs, fl
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro,
+def calculate_lbl_chi_squared(temp_directory: str, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro,
                               rot, save_convolved=True):
     """
-    Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then calculates chi squared
+    Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
+    calculates chi squared. Used for line by line method, by only looking at a specific line.
     :param flux_obs:
     :param fwhm:
     :param lmax:
@@ -249,7 +260,7 @@ class Spectra:
     fwhm = None
     macroturb = None
     rot = None
-    fitting_mode = None  # "lbl" = line by line or "all"
+    fitting_mode = None  # "lbl" = line by line or "all" or "lbl_quick"
     output_folder = None
 
     global_temp_dir = None
@@ -584,7 +595,7 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
 
     abund = param[0]
     doppler = spectra_to_fit.rv + param[1]
-    if spectra_to_fit.vmicro is not None:
+    if spectra_to_fit.vmicro is not None:   # Input given
         microturb = spectra_to_fit.vmicro
     else:
         if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
@@ -594,6 +605,9 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
                 microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
         elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
             microturb = param[1]
+        elif Spectra.fit_microturb == "Input":
+            raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
+                             "a problem in the code?")
         else:
             microturb = 2.0
     if Spectra.fit_macroturb:
@@ -639,11 +653,14 @@ def lbl_broad_abund_chi_sqr(param, spectra_to_fit: Spectra, lmin, lmax):
 
 def get_trimmed_lbl_path_name(element, line_list_path_trimmed, segment_file, j, start):
     return os.path.join(line_list_path_trimmed,
-                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element[0]}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}",
+                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}",
                         '')
 
 
 def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra):
+    # abund = param[0]
+    # dopple = param[1]
+    # macrorurb = param [2] (if needed)
     abund = param[0]
     doppler = spectra_to_fit.rv + param[1]
     if Spectra.fit_macroturb:
@@ -949,7 +966,7 @@ def run_TSFitPy():
             for k in range(len(Spectra.seg_begins)):
                 if Spectra.line_centers_sorted[j] <= Spectra.seg_ends[k] and Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
                     start = k
-            line_list_path_trimmed_new = get_trimmed_lbl_path_name(element, line_list_path_trimmed, Spectra.segment_file, j, start)
+            line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed, Spectra.segment_file, j, start)
             create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed_new,
                                    Spectra.include_molecules, start, start + 1)
 
