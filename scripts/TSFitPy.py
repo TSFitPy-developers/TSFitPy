@@ -571,7 +571,7 @@ def lbl_broad_abund_chi_sqr_quick(param, spectra_to_fit: Spectra, lmin, lmax, ab
                                                lmin, macroturb,
                                                Spectra.rot, save_convolved=False)
 
-    print(abund, doppler, chi_square, macroturb)
+    # print(abund, doppler, chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
 
     return chi_square
 
@@ -789,7 +789,7 @@ def run_TSFitPy():
                 else:
                     element = []
                     element.append(fields[2])
-                Spectra.elem_to_fit = element
+                Spectra.elem_to_fit = element[0] #TODO be able to fit more elements
                 if element[0] == "Fe" or element[0] == "fe":
                     Spectra.fit_met = True
             if fields[0] == "linemask_file":
@@ -898,8 +898,8 @@ def run_TSFitPy():
         met_fitlist = np.zeros(np.size(specname_fitlist))
 
     if np.size(specname_fitlist) == 1:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
-            [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.array([specname_fitlist]), np.array(
+            [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist])
 
     if Spectra.fit_microturb == "Input":
         microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)

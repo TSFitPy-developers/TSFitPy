@@ -6,6 +6,8 @@ from astropy import constants as const
 from astropy.modeling import Fittable1DModel, Parameter
 from scipy import interpolate
 
+speed_of_light_kms = const.c.to('km/s').value
+
 def conv_res(wave, flux, resolution):
     d_lam = (np.mean(wave)/resolution)
     sigma = d_lam / (2.0 * np.sqrt(2. * np.log(2.)))
@@ -21,7 +23,7 @@ def conv_macroturbulence(wave, flux, vmac):
     elif vmac < 0:
         print(F"Macroturbulence <0: {vmac}. Can only be positive (km/s).")
     elif not np.isnan(vmac):
-        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * const.c.to('km/s').value
+        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * speed_of_light_kms
         if (spec_deltaV) > vmac:
             print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vmac={vmac}. No convolution will be done, Vmac = 0.")
             pass
@@ -43,7 +45,7 @@ def conv_macroturbulence(wave, flux, vmac):
                 if i_start != 0:
                     i_start = i_start - offset
 
-                fwhm = vmac * np.mean(wave[i_start:i_end]) / const.c.to('km/s').value / (wave[1]-wave[0])
+                fwhm = vmac * np.mean(wave[i_start:i_end]) / speed_of_light_kms / (wave[1]-wave[0])
 
                 x_size = int(30*fwhm)
                 if x_size % 2 == 0:
@@ -63,7 +65,7 @@ def conv_macroturbulence(wave, flux, vmac):
         else:
             # FWHM: km/s --> A --> step
             # assumes constant step along the whole wavelength range
-            fwhm = vmac * np.mean(wave) / const.c.to('km/s').value / (wave[1]-wave[0])
+            fwhm = vmac * np.mean(wave) / speed_of_light_kms / (wave[1]-wave[0])
 
             # kernel should always have odd size along all axis
             x_size=int(30*fwhm)
@@ -85,7 +87,7 @@ def conv_rotation(wave, flux, vrot):
     if vrot == 0:
         pass
     elif not np.isnan(vrot):
-        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * const.c.to('km/s').value
+        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * speed_of_light_kms
         if (spec_deltaV) > vrot:
             print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vrot={vrot}. No convolution will be done")
             pass
@@ -107,7 +109,7 @@ def conv_rotation(wave, flux, vrot):
                 if i_start != 0:
                     i_start = i_start - offset
 
-                fwhm = vrot * np.mean(wave[i_start:i_end]) / const.c.to('km/s').value / (wave[1]-wave[0])
+                fwhm = vrot * np.mean(wave[i_start:i_end]) / speed_of_light_kms / (wave[1]-wave[0])
 
                 x_size = int(30*fwhm)
                 if x_size % 2 == 0:
@@ -127,7 +129,7 @@ def conv_rotation(wave, flux, vrot):
         else:
             # FWHM: km/s --> A --> step
             # assumes constant step along the whole wavelength range
-            fwhm = vrot * np.mean(wave) / const.c.to('km/s').value / (wave[1]-wave[0])
+            fwhm = vrot * np.mean(wave) / speed_of_light_kms / (wave[1]-wave[0])
 
             #kernel should always have odd size along all axis
             x_size = int(30*fwhm)
