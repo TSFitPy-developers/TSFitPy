@@ -1253,8 +1253,8 @@ class TurboSpectrum:
         turbospec_root = os_path.join(self.turbospec_path, "..")
 
         # Run babsma. This creates an opacity file .opac from the MARCS atmospheric model
-        try:
-            os.chdir(turbospec_root)
+        try:    # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
+            os.chdir(turbospec_root)    # Time wasted trying to make asyncio work here: 6 hours. Halts program halfway
             pr1 = subprocess.Popen([os_path.join(self.turbospec_path, 'babsma_lu')],
                                    stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
             pr1.stdin.write(bytes(babsma_in, 'utf-8'))
