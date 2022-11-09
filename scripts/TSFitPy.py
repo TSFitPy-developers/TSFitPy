@@ -412,7 +412,7 @@ class Spectra:
                 if os_path.exists(f"{spectra_grid_path}spectrum_00000000.spec") and os.stat(
                         f"{spectra_grid_path}spectrum_00000000.spec").st_size != 0:
                     wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                              usecols=(0, 1), unpack=True)
+                                                              usecols=(0, 1), unpack=True)  #TODO asyncio here?
                     grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
                 else:
                     success_grid_gen[i] = False
@@ -471,7 +471,7 @@ class Spectra:
             min_chi_sqr_spectra_path = os.path.join(self.temp_dir, f"{self.abund_to_gen[index_min_chi_square]}",
                                                     'spectrum_00000000.spec')
 
-            wave_result, flux_norm_result, flux_result = np.loadtxt(min_chi_sqr_spectra_path, unpack=True)
+            wave_result, flux_norm_result, flux_result = np.loadtxt(min_chi_sqr_spectra_path, unpack=True)  #TODO asyncio here? or just print at the very end?
             g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
             for k in range(len(wave_result)):
                 print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)

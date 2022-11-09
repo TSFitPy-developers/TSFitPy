@@ -27,7 +27,7 @@ def conv_macroturbulence(wave, flux, vmac):
         if (spec_deltaV) > vmac:
             print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vmac={vmac}. No convolution will be done, Vmac = 0.")
             pass
-        elif np.max(wave) - np.min(wave) > 5.:
+        elif np.max(wave) - np.min(wave) > 5.:  #TODO do we need to split at all? especially in 5 AA chunks?
             #if wavelength is too large, divide and conquer into 5 A windows
             num_intervals = int((np.max(wave) - np.min(wave))/5)
             if (np.max(wave) - np.min(wave)) % 5 != 0:
