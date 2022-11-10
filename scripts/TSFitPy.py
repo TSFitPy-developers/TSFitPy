@@ -15,6 +15,7 @@ import datetime
 from dask.distributed import Client
 import shutil
 import socket
+from typing import Union
 
 from solar_abundances import solar_abundances, periodic_table
 
@@ -192,9 +193,9 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory: str, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin,
-                              macro,
-                              rot, save_convolved=True):
+def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_obs: np.ndarray,
+                              wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, fwhm: float, lmax: float,
+                              lmin: float, macro: float, rot: float, save_convolved=True) -> float:
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
     calculates chi squared. Used for line by line method, by only looking at a specific line.
@@ -258,8 +259,9 @@ class Spectra:
     fit_macroturb: bool = False
     fit_teff: str = None  # does not work atm
     fit_logg: str = None  # does not work atm
+    nelement: int = None  # how many elements to fit (1 to whatever)
     fit_met: bool = None
-    elem_to_fit: str = None  # only 1 element at a time is support atm, a list otherwise
+    elem_to_fit: list = None  # only 1 element at a time is support atm, a list otherwise
     lmin: float = None
     lmax: float = None
     ldelta: float = None
@@ -331,6 +333,7 @@ class Spectra:
         Converts init param guess list to the 2D list for the simplex calculation
         :param init_param_guess: Initial list equal to n x ndimen+1, where ndimen = number of fitted parameters
         """
+        # TODO auto create param guess? depending on required parameters to fit?
         # make an array for initial guess equal to n x ndimen+1
         initial_guess = np.empty((Spectra.ndimen + 1, Spectra.ndimen))
 
@@ -349,8 +352,8 @@ class Spectra:
         :param met: metallicity of star
         :param elem_abund: dictionary with iron and elemental abundances
         :param vmicro: microturbulence parameter
-        :param lmin: minimum wavelength where spectra is computed
-        :param lmax: maximum wavelength where spectra is computed
+        :param lmin: minimum wavelength where spectra are computed
+        :param lmax: maximum wavelength where spectra are computed
         :param windows_flag - False for lbl, True for all lines or lbl quick
         :param temp_dir: Temporary directory where to save, if not given, then self.temp_dir is used
         """
@@ -425,7 +428,7 @@ class Spectra:
                     item_abund = {"Fe": abund_to_use}
                     met = abund_to_use
                 else:
-                    item_abund = {"Fe": self.met, Spectra.elem_to_fit: abund_to_use + self.met}
+                    item_abund = {"Fe": self.met, Spectra.elem_to_fit[0]: abund_to_use + self.met}
                     met = self.met
 
                 if self.vmicro is not None:  # sets microturbulence here
@@ -563,25 +566,50 @@ class Spectra:
 
             print(res.x)
 
-            if self.vmicro is not None:
+            if Spectra.fit_met:
+                met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
+                met = res.x[met_index + 1]  # offset 1: since 0th parameter is always doppler
+            else:
+                met = self.met
+            elem_abund_dict = {"Fe": met}
+
+            for i in range(Spectra.nelement):
+                # Spectra.elem_to_fit[i] = element name
+                # param[1:nelement] = abundance of the element
+                elem_name = Spectra.elem_to_fit[i]
+                if elem_name != "Fe":
+                    elem_abund_dict[elem_name] = res.x[i + 1] + met
+            doppler_fit = res.x[0]
+            if self.vmicro is not None:  # Input given
                 microturb = self.vmicro
             else:
                 if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
-                    if Spectra.fit_met:
-                        microturb = calculate_vturb(self.teff, self.logg, res.x[0])
-                    else:
-                        microturb = calculate_vturb(self.teff, self.logg, self.met)
+                    microturb = calculate_vturb(self.teff, self.logg, met)
                 elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
-                    microturb = res.x[2]
+                    if Spectra.fit_macroturb:
+                        microturb = res.x[-2]  # if macroturb fit, then last param is macroturb
+                    else:
+                        microturb = res.x[-1]  # if no macroturb fit, then last param is microturb
+                elif Spectra.fit_microturb == "Input":  # just for safety's sake, normally should take in the input above anyway
+                    raise ValueError(
+                        "Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
+                        "a problem in the code?")
                 else:
                     microturb = 2.0
             if Spectra.fit_macroturb:
-                macroturb = res.x[-1]
+                macroturb = res.x[-1]  # last is always macroturb, if fitted
             else:
                 macroturb = Spectra.macroturb
 
-            result.append(f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} "
-                          f"{Spectra.line_ends_sorted[j]} {res.x[0]} {res.x[1]} {microturb} {macroturb} {res.fun}")  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+            result_output = f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} " \
+                            f"{Spectra.line_ends_sorted[j]} {doppler_fit}"
+
+            for key in elem_abund_dict:
+                result_output += f" {elem_abund_dict[key]}"
+
+            result_output += f" {microturb} {macroturb} {res.fun}"
+
+            result.append(result_output)  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
 
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
                                                                     unpack=True)
@@ -654,47 +682,62 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     :param lmax: End of the line [AA]
     :return: best fit chi squared
     """
+    # old: ignore this:
     # param[0] = met or abund
     # param[1] = added doppler to rv
     # param[2] = micro turb
     # param[-1] = macro turb
 
-    abund = param[0]
-    doppler = spectra_to_fit.rv + param[1]
+    # new: now includes several elements
+    # param[0] = added doppler to rv
+    # param[1:nelements] = met or abund
+    # param[-1] = macro turb IF MACRO FIT
+    # param[-2] = micro turb IF MACRO FIT
+    # param[-1] = micro turb IF NOT MACRO FIT
+
+    if Spectra.fit_met:
+        met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
+        met = param[met_index + 1]  # offset 1: since 0th parameter is always doppler
+    else:
+        met = spectra_to_fit.met
+    elem_abund_dict = {"Fe": met}
+
+    abundances = []
+
+    for i in range(Spectra.nelement):
+        # Spectra.elem_to_fit[i] = element name
+        # param[1:nelement] = abundance of the element
+        elem_name = Spectra.elem_to_fit[i]
+        if elem_name != "Fe":
+            elem_abund_dict[elem_name] = param[i + 1] + met
+            abundances.append(param[i + 1])
+    doppler = spectra_to_fit.rv + param[0]
     if spectra_to_fit.vmicro is not None:  # Input given
         microturb = spectra_to_fit.vmicro
     else:
         if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
-            if Spectra.fit_met:
-                microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, abund)
-            else:
-                microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
+            microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, met)
         elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
-            microturb = param[1]
+            if Spectra.fit_macroturb:
+                microturb = param[-2]   # if macroturb fit, then last param is macroturb
+            else:
+                microturb = param[-1]   # if no macroturb fit, then last param is microturb
         elif Spectra.fit_microturb == "Input":  # just for safety's sake, normally should take in the input above anyway
             raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
                              "a problem in the code?")
         else:
             microturb = 2.0
     if Spectra.fit_macroturb:
-        macroturb = param[-1]
+        macroturb = param[-1]   # last is always macroturb, if fitted
     else:
         macroturb = Spectra.macroturb
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
-    if spectra_to_fit.met > 0.5 or spectra_to_fit.met < -4.0 or microturb <= 0.0 or macroturb < 0.0 or \
-            abund < -40 or (Spectra.fit_met and (abund < -4.0 or abund > 0.5)):
+    if microturb <= 0.0 or macroturb < 0.0 or min(abundances) < -40 or met < -4.0 or met > 0.5:
         chi_square = 9999.9999
     else:
-        if Spectra.fit_met:
-            item_abund = {"Fe": abund}
-            met = abund
-        else:
-            item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit: abund + spectra_to_fit.met}
-            met = spectra_to_fit.met
-
-        spectra_to_fit.configure_and_run_ts(met, item_abund, microturb, lmin, lmax, False)
+        spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)
 
         if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
@@ -712,12 +755,15 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
             chi_square = 9999.9999
             print("didn't generate spectra or atmosphere")
 
-    print(abund, microturb, doppler, chi_square, macroturb)
+    output_print = f""
+    for key in elem_abund_dict:
+        output_print += f" {key} {elem_abund_dict[key]}"
+    print(output_print, doppler, microturb, macroturb, chi_square)
 
     return chi_square
 
 
-def get_trimmed_lbl_path_name(element: str, line_list_path_trimmed: str, segment_file: str, j: float,
+def get_trimmed_lbl_path_name(element: Union[str, list], line_list_path_trimmed: str, segment_file: str, j: float,
                               start: float) -> os.path:
     """
     Gets the anem for the lbl trimmed path. Consistent algorithm to always get the same folder name. Takes into account
@@ -729,8 +775,14 @@ def get_trimmed_lbl_path_name(element: str, line_list_path_trimmed: str, segment
     :param start: Segment's numbering
     :return: path to the folder where to save/already saved trimmed files can exist.
     """
+    element_to_print = ""
+    if isinstance(element, list):
+        for elem in element:
+            element_to_print += elem
+    else:
+        element_to_print = element
     return os.path.join(line_list_path_trimmed,
-                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}",
+                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element_to_print}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}",
                         '')
 
 
@@ -766,7 +818,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
             else:
                 vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
         else:
-            item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit: abund + spectra_to_fit.met}
+            item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit[0]: abund + spectra_to_fit.met}
             met = spectra_to_fit.met
             if spectra_to_fit.vmicro is not None:
                 vmicro = spectra_to_fit.vmicro
@@ -892,17 +944,13 @@ def run_TSFitPy():
                 Spectra.fit_logg = fields[2]
             if fields[0] == "element_number":
                 nelement = int(fields[2])
+                Spectra.nelement = nelement
             if fields[0] == "element":
-                element = fields[2]
-                if element != "Fe":
-                    element = []
-                    for i in range(nelement):
-                        element.append(fields[2 * (i + 1)])
-                    element.append("Fe")
-                else:
-                    element = [fields[2]]
-                Spectra.elem_to_fit = element[0]  # TODO be able to fit more elements
-                if element[0] == "Fe" or element[0] == "fe":
+                elements_to_fit = []
+                for i in range(nelement):
+                    elements_to_fit.append(fields[2 + i])
+                Spectra.elem_to_fit = elements_to_fit
+                if "Fe" in elements_to_fit:
                     Spectra.fit_met = True
             if fields[0] == "linemask_file":
                 linemask_file = fields[2]
@@ -910,23 +958,14 @@ def run_TSFitPy():
                 segment_file = fields[2]
             # if fields[0] == "continuum_file":
             #    continuum_file = fields[2]
-            if fields[0] == "departure_coefficient_binary" and element[0] != "Fe" and nlte_flag == "True":
-                for i in range(nelement + 1):
+            if fields[0] == "departure_coefficient_binary" and Spectra.nlte_flag:
+                for i in range(2, len(fields)):
                     depart_bin_file.append(fields[2 + i])
-            elif fields[0] == "departure_coefficient_binary" and element[0] == "Fe" and nlte_flag == "True":
-                for i in range(nelement):
-                    depart_bin_file.append(fields[2 + i])
-            if fields[0] == "departure_coefficient_aux" and element[0] != "Fe" and nlte_flag == "True":
-                for i in range(nelement + 1):
+            if fields[0] == "departure_coefficient_aux" and Spectra.nlte_flag:
+                for i in range(2, len(fields)):
                     depart_aux_file.append(fields[2 + i])
-            elif fields[0] == "departure_coefficient_aux" and element[0] == "Fe" and nlte_flag == "True":
-                for i in range(nelement):
-                    depart_aux_file.append(fields[2 + i])
-            if fields[0] == "model_atom_file" and element[0] != "Fe" and nlte_flag == "True":
-                for i in range(nelement + 1):
-                    model_atom_file.append(fields[2 + i])
-            elif fields[0] == "model_atom_file" and element[0] == "Fe" and nlte_flag == "True":
-                for i in range(nelement):
+            if fields[0] == "model_atom_file" and Spectra.nlte_flag:
+                for i in range(2, len(fields)):
                     model_atom_file.append(fields[2 + i])
             if fields[0] == "wavelength_minimum":
                 Spectra.lmin = float(fields[2])
@@ -961,13 +1000,13 @@ def run_TSFitPy():
     if nlte_flag:
         depart_bin_file_dict = {}
         for i in range(len(depart_bin_file)):
-            depart_bin_file_dict[element[i]] = depart_bin_file[i]
+            depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
         depart_aux_file_dict = {}
         for i in range(len(depart_aux_file)):
-            depart_aux_file_dict[element[i]] = depart_aux_file[i]
+            depart_aux_file_dict[elements_to_fit[i]] = depart_aux_file[i]
         model_atom_file_dict = {}
         for i in range(len(model_atom_file)):
-            model_atom_file_dict[element[i]] = model_atom_file[i]
+            model_atom_file_dict[elements_to_fit[i]] = model_atom_file[i]
 
         Spectra.depart_bin_file_dict = depart_bin_file_dict
         Spectra.depart_aux_file_dict = depart_aux_file_dict
@@ -1069,7 +1108,7 @@ def run_TSFitPy():
                                    Spectra.include_molecules, start, start + 1)
 
     if workers > 1:
-        print("Preparing workers")
+        print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         client = Client(threads_per_worker=1,
                         n_workers=workers)  # if # of threads are not equal to 1, then may break the program
         print(client)
@@ -1118,13 +1157,24 @@ def run_TSFitPy():
     if Spectra.fit_met:
         output_elem_column = "Fe_H"
     else:
-        output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
+        if Spectra.fitting_mode == "lbl":
+            output_elem_column = f"Fe_H\t"
+
+            for i in range(Spectra.nelement):
+                # Spectra.elem_to_fit[i] = element name
+                elem_name = Spectra.elem_to_fit[i]
+                if elem_name != "Fe":
+                    output_elem_column += f"\t{elem_name}"
+        else:
+            output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
+
+
 
     if Spectra.fitting_mode == "all":
         print(f"#specname        {output_elem_column}     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
-    elif Spectra.fitting_mode == "lbl" and (element[0] == "Fe" or element[0] == "fe"):
+    elif Spectra.fitting_mode == "lbl":  # TODO several elements: how to print
         print(
-            f"#specname        wave_center  wave_start  wave_end  {output_elem_column}   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared",
+            f"#specname        wave_center  wave_start  wave_end  Doppler_Shift_add_to_RV   {output_elem_column}    Microturb   Macroturb    chi_squared",
             file=f
         )
     elif Spectra.fitting_mode == "lbl_quick":  # f" {res.x[0]} {vmicro} {macroturb} {res.fun}"
