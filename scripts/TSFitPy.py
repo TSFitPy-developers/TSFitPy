@@ -952,6 +952,8 @@ def run_TSFitPy():
                 Spectra.elem_to_fit = np.asarray(elements_to_fit)
                 if "Fe" in elements_to_fit:
                     Spectra.fit_met = True
+                else:
+                    Spectra.fit_met = False
             if fields[0] == "linemask_file":
                 linemask_file = fields[2]
             if fields[0] == "segment_file":
@@ -960,13 +962,13 @@ def run_TSFitPy():
             #    continuum_file = fields[2]
             if fields[0] == "departure_coefficient_binary" and Spectra.nlte_flag:
                 for i in range(2, len(fields)):
-                    depart_bin_file.append(fields[2 + i])
+                    depart_bin_file.append(fields[i])
             if fields[0] == "departure_coefficient_aux" and Spectra.nlte_flag:
                 for i in range(2, len(fields)):
-                    depart_aux_file.append(fields[2 + i])
+                    depart_aux_file.append(fields[i])
             if fields[0] == "model_atom_file" and Spectra.nlte_flag:
                 for i in range(2, len(fields)):
-                    model_atom_file.append(fields[2 + i])
+                    model_atom_file.append(fields[i])
             if fields[0] == "wavelength_minimum":
                 Spectra.lmin = float(fields[2])
             if fields[0] == "wavelength_maximum":
@@ -1040,18 +1042,19 @@ def run_TSFitPy():
     fitlist = f"{fitlist_input_folder}{fitlist}"
 
     if Spectra.fit_met:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
+                                                                                           usecols=(0, 1, 2, 3),
+                                                                                           unpack=True)
+        met_fitlist = np.zeros(np.size(specname_fitlist))
+    else:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, dtype='str',
                                                                                            usecols=(0, 1, 2, 3, 4),
                                                                                            unpack=True)
-    else:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
-                                                                              usecols=(0, 1, 2, 3),
-                                                                              unpack=True)
-        met_fitlist = np.zeros(np.size(specname_fitlist))
 
     if np.size(specname_fitlist) == 1:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.array([specname_fitlist]), np.array(
-            [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist])
+        if np.size(specname_fitlist) == 1:
+            specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
+                [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
 
     if Spectra.fit_microturb == "Input":
         microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)
