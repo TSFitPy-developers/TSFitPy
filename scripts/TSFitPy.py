@@ -1090,7 +1090,10 @@ def run_TSFitPy():
         Spectra.line_centers_sorted = np.array([line_centers])
 
     Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)  # TODO fix when only 1 segment
-
+    if Spectra.seg_begins == 1:
+        Spectra.seg_begins = np.array([Spectra.seg_begins])
+        Spectra.seg_ends = np.array([Spectra.seg_ends])
+                
     if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":  # TODO add explanation of saving trimmed files
         print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
