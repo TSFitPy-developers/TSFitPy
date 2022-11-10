@@ -4,7 +4,7 @@ import glob
 import time
 import numpy as np
 
-def create_window_linelist(segment_file, old_path_name, new_path_name, molecules_flag, start, stop):
+def create_window_linelist(segment_file, old_path_name, new_path_name, molecules_flag, start, stop, lbl=False):
 	line_list_path = old_path_name
 	line_list_files_draft = []
 	line_list_files_draft.extend([i for i in glob.glob(os_path.join(line_list_path, "*")) if not i.endswith(".txt")])
@@ -12,8 +12,15 @@ def create_window_linelist(segment_file, old_path_name, new_path_name, molecules
 
 	seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), unpack=True)
 
-	if not os.path.exists(new_path_name):
-		os.makedirs(new_path_name)
+	if not lbl:
+		if not os.path.exists(new_path_name):
+			os.makedirs(new_path_name)
+		else:
+			print("Trimmed files exist already")
+			return
+	else:
+		if not os.path.exists(new_path_name):
+			os.makedirs(new_path_name)
 
 	line_list_files = []
 	for i in range(len(line_list_files_draft)):
