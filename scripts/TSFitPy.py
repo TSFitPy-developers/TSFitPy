@@ -1054,6 +1054,8 @@ def run_TSFitPy():
     if np.size(specname_fitlist) == 1:
         if np.size(specname_fitlist) == 1:
             specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
+
+            specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
                 [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
 
     if Spectra.fit_microturb == "Input":
@@ -1170,7 +1172,6 @@ def run_TSFitPy():
             output_elem_column = "Fe_H"
         else:
             output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
-
 
 
     if Spectra.fitting_mode == "all":
