@@ -14,7 +14,6 @@ from os import path as os_path
 import datetime
 from dask.distributed import Client
 import shutil
-from distributed.scheduler import logger
 import socket
 
 from solar_abundances import solar_abundances, periodic_table
@@ -31,7 +30,7 @@ def create_dir(directory: str):
     if not os.path.exists(directory):
         try:
             os.mkdir(directory)
-        except FileNotFoundError:   # if need to create folders in-between
+        except FileNotFoundError:  # if one needs to create folders in-between
             os.makedirs(directory)  # can't recall why I just don't call this function directly
 
 
@@ -45,6 +44,8 @@ def calculate_vturb(teff: float, logg: float, met: float) -> float:
     """
     t0 = 5500.
     g0 = 4.
+
+    v_mturb: float = 0
 
     if teff >= 5000.:
         v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
@@ -66,7 +67,8 @@ def calculate_vturb(teff: float, logg: float, met: float) -> float:
     return v_mturb
 
 
-def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, fwhm: float, macro: float, rot: float) -> tuple[np.ndarray, np.ndarray]:
+def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, fwhm: float, macro: float, rot: float) -> tuple[
+    np.ndarray, np.ndarray]:
     """
     Convolves spectra with FWHM, macroturbulence or rotation if values are non-zero
     :param wave: wavelength array, in ascending order
@@ -190,7 +192,8 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory: str, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro,
+def calculate_lbl_chi_squared(temp_directory: str, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin,
+                              macro,
                               rot, save_convolved=True):
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
@@ -205,6 +208,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs, flux_obs, wave_mod_
     :param lmin: Wavelength, end of segment  (will calculate at -5 AA to this)
     :param macro: Macroturbulence in km/s, zero if not required
     :param rot: Rotation in km/s, 0 if not required
+    :param save_convolved: whether to save convolved spectra or not (default True)
     :return: Calculated chi squared for a given line
     """
     indices_to_use_mod = np.where((wave_mod_orig <= lmax) & (wave_mod_orig >= lmin))
@@ -239,8 +243,8 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs, flux_obs, wave_mod_
 
 
 class Spectra:
-    turbospec_path: str = None
-    interpol_path: str = None
+    turbospec_path: str = None  # path to the /exec/ file
+    interpol_path: str = None  # path to the model_interpolators folder with fortran code
     model_atmosphere_grid_path: str = None
     model_atmosphere_list: str = None
     model_atom_path: str = None
@@ -251,7 +255,7 @@ class Spectra:
     include_molecules: str = None  # "True" or "False", string
     nlte_flag: bool = None
     fit_microturb: str = "No"
-    fit_macroturb: str = False
+    fit_macroturb: bool = False
     fit_teff: str = None  # does not work atm
     fit_logg: str = None  # does not work atm
     fit_met: bool = None
@@ -259,7 +263,7 @@ class Spectra:
     lmin: float = None
     lmax: float = None
     ldelta: float = None
-    fwhm: float = None      # FWHM coming from resolution, constant for all stars
+    fwhm: float = None  # FWHM coming from resolution, constant for all stars
     macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
     rot: float = None  # rotation km/s, constant for all stars
     fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
@@ -298,7 +302,8 @@ class Spectra:
             self.vmicro: float = float(micro)  # microturbulence. Set if it is given in input
         else:
             self.vmicro = None
-        self.temp_dir: str = os.path.join(Spectra.global_temp_dir, self.spec_name, '')  # temp directory, including date and name of the star fitted
+        self.temp_dir: str = os.path.join(Spectra.global_temp_dir, self.spec_name,
+                                          '')  # temp directory, including date and name of the star fitted
         create_dir(self.temp_dir)  # create temp directory
 
         self.abund_to_gen = None  # array with generated abundances for lbl quick
@@ -307,7 +312,7 @@ class Spectra:
         self.initial_simplex_guess: list = None
         self.set_param_guess(init_param_guess)
 
-        self.line_list_path_trimmed = line_list_path_trimmed    # location of trimmed files
+        self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
 
         self.ts = TurboSpectrum(
             turbospec_path=self.turbospec_path,
@@ -318,7 +323,8 @@ class Spectra:
             model_atom_path=self.model_atom_path,
             departure_file_path=self.departure_file_path)
 
-        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)   # observed spectra
+        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
+                                                dtype=float)  # observed spectra
 
     def set_param_guess(self, init_param_guess: list):
         """
@@ -376,7 +382,7 @@ class Spectra:
         # timing how long it took
         time_start = time.perf_counter()
 
-        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=(self), method='Nelder-Mead',
+        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=self, method='Nelder-Mead',
                        options={'maxiter': self.ndimen * 50, 'disp': True,
                                 'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05})
         # print final result from minimazation
@@ -384,7 +390,7 @@ class Spectra:
 
         if self.fit_macroturb:  # if fitted macroturbulence, return it
             result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
-        else:   # otherwise return whatever constant macroturbulence was given in the config
+        else:  # otherwise return whatever constant macroturbulence was given in the config
             result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {self.macroturb}"
 
         time_end = time.perf_counter()
@@ -400,7 +406,7 @@ class Spectra:
         :return: List corresponding to self.abund_to_gen with same locations. True: generation success. False: not
         """
         print("Generating grids")
-        if self.fit_met:    # grids generated centered on input metallicity or abundance
+        if self.fit_met:  # grids generated centered on input metallicity or abundance
             input_abund = self.met
         else:
             input_abund = self.elem_abund
@@ -413,7 +419,7 @@ class Spectra:
         for abund_to_use in self.abund_to_gen:
             if self.met > 0.5 or self.met < -4.0 or abund_to_use < -40 or (
                     Spectra.fit_met and (abund_to_use < -4.0 or abund_to_use > 0.5)):
-                success.append(False)   # if metallicity or abundance too weird, then fail
+                success.append(False)  # if metallicity or abundance too weird, then fail
             else:
                 if Spectra.fit_met:
                     item_abund = {"Fe": abund_to_use}
@@ -422,7 +428,7 @@ class Spectra:
                     item_abund = {"Fe": self.met, Spectra.elem_to_fit: abund_to_use + self.met}
                     met = self.met
 
-                if self.vmicro is not None:     # sets microturbulence here
+                if self.vmicro is not None:  # sets microturbulence here
                     vmicro = self.vmicro
                 else:
                     vmicro = calculate_vturb(self.teff, self.logg, met)
@@ -442,7 +448,7 @@ class Spectra:
         fit parameters for each grid point. Also saves spectra for best fit chi squared for corresponding abundances.
         :return: List full of grid parameters with corresponding best fit values and chi squared
         """
-        success_grid_gen = self.generate_grid_for_lbl() # generate grids
+        success_grid_gen = self.generate_grid_for_lbl()  # generate grids
         result = []
         grid_spectra = {}
         # read spectra from generated grids and keep in memory to not waste time reading them each time
@@ -452,7 +458,7 @@ class Spectra:
                 if os_path.exists(f"{spectra_grid_path}spectrum_00000000.spec") and os.stat(
                         f"{spectra_grid_path}spectrum_00000000.spec").st_size != 0:
                     wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                              usecols=(0, 1), unpack=True)  #TODO asyncio here?
+                                                              usecols=(0, 1), unpack=True)  # TODO asyncio here?
                     grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
                 else:
                     success_grid_gen[i] = False
@@ -472,7 +478,7 @@ class Spectra:
             chi_squares = []
 
             for abund, success in zip(self.abund_to_gen, success_grid_gen):
-                if success: # for each successful grid find chi squared with best fit parameters
+                if success:  # for each successful grid find chi squared with best fit parameters
                     wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
                     res = minimize(lbl_broad_abund_chi_sqr_quick, self.init_param_guess, args=(self,
                                                                                                Spectra.line_begins_sorted[
@@ -486,7 +492,7 @@ class Spectra:
                                             'initial_simplex': self.initial_simplex_guess,
                                             'xatol': 0.05, 'fatol': 0.05})
                     print(res.x)
-                    if Spectra.fit_macroturb:   # if fitted macroturbulence
+                    if Spectra.fit_macroturb:  # if fitted macroturbulence
                         macroturb = res.x[1]
                     else:
                         macroturb = Spectra.macroturb
@@ -498,10 +504,10 @@ class Spectra:
                         else:
                             met = self.met
                         vmicro = calculate_vturb(self.teff, self.logg, met)
-                    result_one_line += f" {abund} {res.x[0]} {vmicro} {macroturb} {res.fun}" # saves additionally here
+                    result_one_line += f" {abund} {res.x[0]} {vmicro} {macroturb} {res.fun}"  # saves additionally here
                     chi_squares.append(res.fun)
                 else:
-                    print(f"Abundance {abund} did not manage to generate a grid")   # if no grid was generated
+                    print(f"Abundance {abund} did not manage to generate a grid")  # if no grid was generated
                     result_one_line += f" {abund} {9999} {9999} {9999} {9999}"
                     chi_squares.append(9999)
 
@@ -511,27 +517,34 @@ class Spectra:
             min_chi_sqr_spectra_path = os.path.join(self.temp_dir, f"{self.abund_to_gen[index_min_chi_square]}",
                                                     'spectrum_00000000.spec')
             # appends that best fit spectra to the total output spectra. NOT convolved. separate abundance for each line
-            wave_result, flux_norm_result, flux_result = np.loadtxt(min_chi_sqr_spectra_path, unpack=True)  #TODO asyncio here? or just print at the very end?
+            wave_result, flux_norm_result, flux_result = np.loadtxt(min_chi_sqr_spectra_path,
+                                                                    unpack=True)  # TODO asyncio here? or just print at the very end?
             with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
-                #g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
 
             time_end = time.perf_counter()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
-        #g.close()
+        # g.close()
 
         return result
 
     def fit_lbl(self) -> list:
+        """
+        Fits line by line, by going through each line in the linelist and computing best abundance/met with chi sqr.
+        Also fits doppler shift and can fit micro and macro turbulence
+        :return: List with the results. Each element is a string containing file name, center start and end of the line,
+        Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
+        """
         result = []
 
         for j in range(len(Spectra.line_begins_sorted)):
             time_start = time.perf_counter()
             print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
 
-            for k in range(len(Spectra.seg_begins)):
+            for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
                 if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
                     start = k
             print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
@@ -572,27 +585,40 @@ class Spectra:
 
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
                                                                     unpack=True)
-            g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-            for k in range(len(wave_result)):
-                print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
+            with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+                for k in range(len(wave_result)):
+                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
 
             wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
-            h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-            for k in range(len(wave_result)):
-                print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
+            with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
+                for k in range(len(wave_result)):
+                    print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
             # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
 
             time_end = time.perf_counter()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
-        g.close()
-        h.close()
+        # g.close()
+        # h.close()
 
         return result
 
 
 def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
                                   wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray) -> float:
+    """
+    Line by line quick. Takes precalculated synthetic spectra (i.e. 1 grid) and finds chi-sqr for observed spectra.
+    Also fits doppler shift and can fit macroturbulence if needed.
+    :param param: Parameters list with the current evaluation guess
+    :param spectra_to_fit: Spectra to fit
+    :param lmin: Start of the line [AA]
+    :param lmax: End of the line [AA]
+    :param wave_mod_orig: Wavelength of synthetic spectra
+    :param flux_mod_orig: Flux of synthetic spectra
+    :return: Best fit chi squared
+    """
     # param[0] = doppler
     # param[1] = macro turb
 
@@ -619,6 +645,15 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
 
 
 def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
+    """
+    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
+    shift and if needed micro + macro turbulence
+    :param param: Parameters list with the current evaluation guess
+    :param spectra_to_fit: Spectra to fit
+    :param lmin: Start of the line [AA]
+    :param lmax: End of the line [AA]
+    :return: best fit chi squared
+    """
     # param[0] = met or abund
     # param[1] = added doppler to rv
     # param[2] = micro turb
@@ -626,7 +661,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
 
     abund = param[0]
     doppler = spectra_to_fit.rv + param[1]
-    if spectra_to_fit.vmicro is not None:   # Input given
+    if spectra_to_fit.vmicro is not None:  # Input given
         microturb = spectra_to_fit.vmicro
     else:
         if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
@@ -636,7 +671,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
                 microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
         elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
             microturb = param[1]
-        elif Spectra.fit_microturb == "Input":
+        elif Spectra.fit_microturb == "Input":  # just for safety's sake, normally should take in the input above anyway
             raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
                              "a problem in the code?")
         else:
@@ -682,13 +717,31 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     return chi_square
 
 
-def get_trimmed_lbl_path_name(element: str, line_list_path_trimmed: str, segment_file: str, j: float, start: float) -> os.path:
+def get_trimmed_lbl_path_name(element: str, line_list_path_trimmed: str, segment_file: str, j: float,
+                              start: float) -> os.path:
+    """
+    Gets the anem for the lbl trimmed path. Consistent algorithm to always get the same folder name. Takes into account
+    element, line center, where molecules are used, segment etc.
+    :param element: Name of the element
+    :param line_list_path_trimmed: Path to the trimmed line list
+    :param segment_file: Name of the segment file
+    :param j: center line's numbering
+    :param start: Segment's numbering
+    :return: path to the folder where to save/already saved trimmed files can exist.
+    """
     return os.path.join(line_list_path_trimmed,
                         f"{segment_file.replace('/', '_').replace('.', '_')}_{element}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}",
                         '')
 
 
 def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
+    """
+    Calculates best fit parameters for all lines at once by calling TS and varying abundance/met and doppler shift.
+    Can also vary macroturbulence if needed
+    :param param: Parameter guess
+    :param spectra_to_fit: Spectra to fit
+    :return: Best fit chi squared
+    """
     # abund = param[0]
     # dopple = param[1]
     # macrorurb = param [2] (if needed)
@@ -736,6 +789,19 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
 
 def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            initial_guess_string: list, line_list_path_trimmed: str, input_abundance: float) -> list:
+    """
+    Creates spectra object and fits based on requested fitting mode
+    :param specname: Name of the textfile
+    :param teff: Teff in K
+    :param logg: logg in dex
+    :param rv: radial velocity (km/s)
+    :param met: metallicity (doesn't matter what if fitting for Fe)
+    :param microturb: Microturbulence if given (None is not known or fitted)
+    :param initial_guess_string: initial guess string for simplex fitting minimization method
+    :param line_list_path_trimmed: Path to the root of the trimmed line list
+    :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
+    :return: result of the fit with the best fit parameters and chi squared
+    """
     spectra = Spectra(specname, teff, logg, rv, met, microturb, line_list_path_trimmed, initial_guess_string,
                       elem_abund=input_abundance)
 
@@ -834,9 +900,8 @@ def run_TSFitPy():
                         element.append(fields[2 * (i + 1)])
                     element.append("Fe")
                 else:
-                    element = []
-                    element.append(fields[2])
-                Spectra.elem_to_fit = element[0] #TODO be able to fit more elements
+                    element = [fields[2]]
+                Spectra.elem_to_fit = element[0]  # TODO be able to fit more elements
                 if element[0] == "Fe" or element[0] == "fe":
                     Spectra.fit_met = True
             if fields[0] == "linemask_file":
@@ -888,7 +953,8 @@ def run_TSFitPy():
             if fields[0] == "output_file":
                 output = fields[2]
             if fields[0] == "workers":
-                workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
+                workers = int(fields[
+                                  2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
             line = fp.readline()
         fp.close()
 
@@ -981,22 +1047,24 @@ def run_TSFitPy():
 
     Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
 
-    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
+    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":  # TODO add explanation of saving trimmed files
         print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
         trimmed_end = len(Spectra.seg_ends)
         line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{Spectra.include_molecules}_{trimmed_start}_{trimmed_end}/"
-        create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed, Spectra.include_molecules,
+        create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed,
+                               Spectra.include_molecules,
                                trimmed_start, trimmed_end)
         print("Finished trimming linelist")
     elif Spectra.fitting_mode == "lbl":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", '')
         for j in range(len(Spectra.line_begins_sorted)):
             for k in range(len(Spectra.seg_begins)):
-                if Spectra.line_centers_sorted[j] <= Spectra.seg_ends[k] and Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
+                if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
                     start = k
-            line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed, Spectra.segment_file, j, start)
+            line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
+                                                                   Spectra.segment_file, j, start)
             create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed_new,
                                    Spectra.include_molecules, start, start + 1)
 
@@ -1081,10 +1149,9 @@ def run_TSFitPy():
 
 if __name__ == '__main__':
     config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
-
+    # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     Spectra.grids_amount = 50  # for lbl quick
     Spectra.abund_bound = 0.5  # for lbl quick
     run_TSFitPy()
-    
