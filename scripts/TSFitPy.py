@@ -1118,11 +1118,11 @@ def run_TSFitPy():
     if Spectra.fit_met:
         output_elem_column = "Fe_H"
     else:
-        output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
+        output_elem_column = f"{Spectra.elem_to_fit}_Fe"
 
     if Spectra.fitting_mode == "all":
         print(f"#specname        {output_elem_column}     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
-    elif Spectra.fitting_mode == "lbl" and (element[0] == "Fe" or element[0] == "fe"):
+    elif Spectra.fitting_mode == "lbl":
         print(
             f"#specname        wave_center  wave_start  wave_end  {output_elem_column}   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared",
             file=f
