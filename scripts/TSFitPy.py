@@ -261,7 +261,7 @@ class Spectra:
     fit_logg: str = None  # does not work atm
     nelement: int = None  # how many elements to fit (1 to whatever)
     fit_met: bool = None
-    elem_to_fit: list = None  # only 1 element at a time is support atm, a list otherwise
+    elem_to_fit: np.ndarray = None  # only 1 element at a time is support atm, a list otherwise
     lmin: float = None
     lmax: float = None
     ldelta: float = None
@@ -763,7 +763,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     return chi_square
 
 
-def get_trimmed_lbl_path_name(element: Union[str, list], line_list_path_trimmed: str, segment_file: str, j: float,
+def get_trimmed_lbl_path_name(element: Union[str, np.ndarray], line_list_path_trimmed: str, segment_file: str, j: float,
                               start: float) -> os.path:
     """
     Gets the anem for the lbl trimmed path. Consistent algorithm to always get the same folder name. Takes into account
@@ -776,7 +776,7 @@ def get_trimmed_lbl_path_name(element: Union[str, list], line_list_path_trimmed:
     :return: path to the folder where to save/already saved trimmed files can exist.
     """
     element_to_print = ""
-    if isinstance(element, list):
+    if isinstance(element, np.ndarray):
         for elem in element:
             element_to_print += elem
     else:
@@ -949,7 +949,7 @@ def run_TSFitPy():
                 elements_to_fit = []
                 for i in range(nelement):
                     elements_to_fit.append(fields[2 + i])
-                Spectra.elem_to_fit = elements_to_fit
+                Spectra.elem_to_fit = np.asarray(elements_to_fit)
                 if "Fe" in elements_to_fit:
                     Spectra.fit_met = True
             if fields[0] == "linemask_file":
