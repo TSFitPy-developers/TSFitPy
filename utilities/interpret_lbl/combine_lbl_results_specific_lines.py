@@ -26,30 +26,29 @@ def combine_lbl(input_location, output_location):
     output = np.loadtxt(input_location, dtype=str)
     star_names = output[:, 0]
     wave_center = output[:, 1].astype(float)
-    elem_abund = output[:, 4].astype(float)
-    doppler_shift = output[:, 5].astype(float)
-    microturb = output[:, 6].astype(float)
+    #elem_abund = output[:, 4].astype(float)
+    #doppler_shift = output[:, 5].astype(float)
+    #microturb = output[:, 6].astype(float)
     macroturb = output[:, 7].astype(float)
     chi_squared = output[:, 8].astype(float)
 
-    unique_star_names = np.unique(star_names)
+    unique_lines = np.unique(wave_center)
 
-    lines_amount = np.size(np.where(star_names == unique_star_names[0])[0])
+    #stars_amount = np.size(np.unique(star_names))
 
-    comment_on_top = "# star_name\tmean_abund\tmedian_abund\tst_dev_abund\t" + "wave_center\telem_abund\tdoppler_shift_add_to_rv\tmicroturb\tmacroturb\tchi_squared\t" * lines_amount
+    comment_on_top = "# line_center\tmean_chi_sqr\tmedian_chi_sqr\tst_dev_chi_sqr\tmean_macroturb\tmedian_macroturb\tst_dev_macroturb\t"
     save_in_txt_topcat([comment_on_top], output_location)
 
-    for star_name in unique_star_names:
-        indices = np.where(star_names == star_name)[0]
-        star_output = [star_name, np.mean(elem_abund[indices]), np.median(elem_abund[indices]), np.std(elem_abund[indices])]
-        for index in indices:
-            star_output.append(f"{wave_center[index]}\t{elem_abund[index]}\t{doppler_shift[index]}\t{microturb[index]}\t{macroturb[index]}\t{chi_squared[index]}")
+    for line_center in unique_lines:
+        indices = np.where(wave_center == line_center)[0]
+        star_output = [line_center, np.mean(chi_squared[indices]), np.median(chi_squared[indices]), np.std(chi_squared[indices]), np.mean(macroturb[indices]), np.median(macroturb[indices]), np.std(macroturb[indices])]
         save_in_txt_topcat(star_output, output_location)
 
 
 if __name__ == '__main__':
-    results_location = None #"../../../../../storm/PhD_2022/gaia_eso_mg_y_stuff/Nov-04-2022-09-13-21/output"
-    new_output_location = None #"../../../../../storm/PhD_2022/gaia_eso_mg_y_stuff/Nov-04-2022-09-13-21/new_output2.txt"
+    # TODO resturcture files
+    results_location = None
+    new_output_location = None
 
     if results_location is None or new_output_location is None:
         print("Need to set results and new output location textfiles")

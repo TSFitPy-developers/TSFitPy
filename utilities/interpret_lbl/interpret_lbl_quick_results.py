@@ -390,3 +390,4 @@ def create_new_canvas_for_a_star(canvas_name):
     c.save()
 
 create_new_canvas_for_a_star(f"../../../storm/PhD_2022/gaia_eso_mg_y_stuff/{file_name}_chi.pdf")
+# TODO: restructure file
