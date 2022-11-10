@@ -1,9 +1,10 @@
 import unittest
-import TSFitPy
+from ..scripts import TSFitPy
 import numpy as np
 
 
 class MyTestCase(unittest.TestCase):
+    # TODO: more unittests?
     def test_chi_square_lbl(self):
         wave_obs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_obs = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1])
