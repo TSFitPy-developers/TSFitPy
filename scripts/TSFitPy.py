@@ -1084,7 +1084,7 @@ def run_TSFitPy():
         Spectra.line_ends_sorted = np.array([line_ends])
         Spectra.line_centers_sorted = np.array([line_centers])
 
-    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
+    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)  # TODO fix when only 1 segment
 
     if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":  # TODO add explanation of saving trimmed files
         print("Trimming down the linelist to only lines within segments for faster fitting")
@@ -1154,17 +1154,17 @@ def run_TSFitPy():
     # result.append(f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} "
     #                      f"{Spectra.line_ends_sorted[j]} {res.x[0]} {res.x[1]} {microturb} {macroturb} {res.fun}")
 
-    if Spectra.fit_met:
-        output_elem_column = "Fe_H"
-    else:
-        if Spectra.fitting_mode == "lbl":
-            output_elem_column = f"Fe_H\t"
+    if Spectra.fitting_mode == "lbl":
+        output_elem_column = f"Fe_H"
 
-            for i in range(Spectra.nelement):
-                # Spectra.elem_to_fit[i] = element name
-                elem_name = Spectra.elem_to_fit[i]
-                if elem_name != "Fe":
-                    output_elem_column += f"\t{elem_name}"
+        for i in range(Spectra.nelement):
+            # Spectra.elem_to_fit[i] = element name
+            elem_name = Spectra.elem_to_fit[i]
+            if elem_name != "Fe":
+                output_elem_column += f"\t{elem_name}_Fe"
+    else:
+        if Spectra.fit_met:
+            output_elem_column = "Fe_H"
         else:
             output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
 
@@ -1172,7 +1172,7 @@ def run_TSFitPy():
 
     if Spectra.fitting_mode == "all":
         print(f"#specname        {output_elem_column}     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
-    elif Spectra.fitting_mode == "lbl":  # TODO several elements: how to print
+    elif Spectra.fitting_mode == "lbl":
         print(
             f"#specname        wave_center  wave_start  wave_end  Doppler_Shift_add_to_RV   {output_elem_column}    Microturb   Macroturb    chi_squared",
             file=f
