@@ -6,6 +6,8 @@ from astropy import constants as const
 from astropy.modeling import Fittable1DModel, Parameter
 from scipy import interpolate
 
+speed_of_light_kms = const.c.to('km/s').value
+
 def conv_res(wave, flux, resolution):
     d_lam = (np.mean(wave)/resolution)
     sigma = d_lam / (2.0 * np.sqrt(2. * np.log(2.)))
@@ -21,31 +23,33 @@ def conv_macroturbulence(wave, flux, vmac):
     elif vmac < 0:
         print(F"Macroturbulence <0: {vmac}. Can only be positive (km/s).")
     elif not np.isnan(vmac):
-        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * const.c.to('km/s').value
+        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * speed_of_light_kms
         if (spec_deltaV) > vmac:
             print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vmac={vmac}. No convolution will be done, Vmac = 0.")
             pass
-        elif np.max(wave) - np.min(wave) > 5.:
+        elif np.max(wave) - np.min(wave) > 5.:  #TODO do we need to split at all? especially in 5 AA chunks?
             #if wavelength is too large, divide and conquer into 5 A windows
             num_intervals = int((np.max(wave) - np.min(wave))/5)
             if (np.max(wave) - np.min(wave)) % 5 != 0:
                 num_intervals += 1
             i_start = 0
-            i_end = 0
+            wave_delta_diff = (wave[1] - wave[0])
             for i in range(num_intervals):
-                #i_end = i_start
-                while (i_end < len(wave)) and (wave[i_end] < wave[i_start]+5.):
-                    i_end += 1
+                index_split = np.where(wave >= wave[i_start] + 5.)[0]
+                if np.size(index_split) > 0:
+                    i_end = index_split[0]
+                else:
+                    i_end = np.size(wave) - 1
 
-                offset = int(2./(wave[1]-wave[0]))
+                offset = int(2. / wave_delta_diff)
                 if offset % 2 == 1:
                     offset += 1
                 if i_start != 0:
                     i_start = i_start - offset
 
-                fwhm = vmac * np.mean(wave[i_start:i_end]) / const.c.to('km/s').value / (wave[1]-wave[0])
+                fwhm = vmac * np.mean(wave[i_start:i_end]) / speed_of_light_kms / wave_delta_diff
 
-                x_size = int(30*fwhm)
+                x_size = int(30 * fwhm)
                 if x_size % 2 == 0:
                     x_size += 1
 
@@ -57,13 +61,14 @@ def conv_macroturbulence(wave, flux, vmac):
                     wave_conv = wave_conv_interval
                     flux_conv = flux_conv_interval
                 else:
-                    wave_conv = np.concatenate((wave_conv[:-int(offset/2)], wave_conv_interval[int(offset/2):]), axis=None)
-                    flux_conv = np.concatenate((flux_conv[:-int(offset/2)], flux_conv_interval[int(offset/2):]), axis=None)
+                    half_of_offset = int(offset / 2)
+                    wave_conv = np.concatenate((wave_conv[:-half_of_offset], wave_conv_interval[half_of_offset:]), axis=None)
+                    flux_conv = np.concatenate((flux_conv[:-half_of_offset], flux_conv_interval[half_of_offset:]), axis=None)
                 i_start = i_end
         else:
             # FWHM: km/s --> A --> step
             # assumes constant step along the whole wavelength range
-            fwhm = vmac * np.mean(wave) / const.c.to('km/s').value / (wave[1]-wave[0])
+            fwhm = vmac * np.mean(wave) / speed_of_light_kms / (wave[1]-wave[0])
 
             # kernel should always have odd size along all axis
             x_size=int(30*fwhm)
@@ -85,7 +90,7 @@ def conv_rotation(wave, flux, vrot):
     if vrot == 0:
         pass
     elif not np.isnan(vrot):
-        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * const.c.to('km/s').value
+        spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * speed_of_light_kms
         if (spec_deltaV) > vrot:
             print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vrot={vrot}. No convolution will be done")
             pass
@@ -107,7 +112,7 @@ def conv_rotation(wave, flux, vrot):
                 if i_start != 0:
                     i_start = i_start - offset
 
-                fwhm = vrot * np.mean(wave[i_start:i_end]) / const.c.to('km/s').value / (wave[1]-wave[0])
+                fwhm = vrot * np.mean(wave[i_start:i_end]) / speed_of_light_kms / (wave[1]-wave[0])
 
                 x_size = int(30*fwhm)
                 if x_size % 2 == 0:
@@ -127,7 +132,7 @@ def conv_rotation(wave, flux, vrot):
         else:
             # FWHM: km/s --> A --> step
             # assumes constant step along the whole wavelength range
-            fwhm = vrot * np.mean(wave) / const.c.to('km/s').value / (wave[1]-wave[0])
+            fwhm = vrot * np.mean(wave) / speed_of_light_kms / (wave[1]-wave[0])
 
             #kernel should always have odd size along all axis
             x_size = int(30*fwhm)
