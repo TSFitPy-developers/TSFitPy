@@ -578,7 +578,7 @@ class Spectra:
                 # param[1:nelement] = abundance of the element
                 elem_name = Spectra.elem_to_fit[i]
                 if elem_name != "Fe":
-                    elem_abund_dict[elem_name] = res.x[i + 1] + met
+                    elem_abund_dict[elem_name] = res.x[i + 1]# + met #TODO need metallicity here or not?
             doppler_fit = res.x[0]
             if self.vmicro is not None:  # Input given
                 microturb = self.vmicro
