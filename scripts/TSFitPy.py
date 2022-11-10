@@ -904,6 +904,8 @@ def run_TSFitPy():
                 Spectra.elem_to_fit = element[0]  # TODO be able to fit more elements
                 if element[0] == "Fe" or element[0] == "fe":
                     Spectra.fit_met = True
+                else:
+                    Spectra.fit_met = False
             if fields[0] == "linemask_file":
                 linemask_file = fields[2]
             if fields[0] == "segment_file":
@@ -1001,14 +1003,14 @@ def run_TSFitPy():
     fitlist = f"{fitlist_input_folder}{fitlist}"
 
     if Spectra.fit_met:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
+                                                                                           usecols=(0, 1, 2, 3),
+                                                                                           unpack=True)
+        met_fitlist = np.zeros(np.size(specname_fitlist))
+    else:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, dtype='str',
                                                                                            usecols=(0, 1, 2, 3, 4),
                                                                                            unpack=True)
-    else:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
-                                                                              usecols=(0, 1, 2, 3),
-                                                                              unpack=True)
-        met_fitlist = np.zeros(np.size(specname_fitlist))
 
     if np.size(specname_fitlist) == 1:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.array([specname_fitlist]), np.array(
