@@ -1040,14 +1040,20 @@ def run_TSFitPy():
 
     if nlte_flag:
         depart_bin_file_dict = {}
-        for i in range(len(depart_bin_file)):
+        for i in range(len(Spectra.elem_to_fit)):
             depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
         depart_aux_file_dict = {}
-        for i in range(len(depart_aux_file)):
+        for i in range(len(Spectra.elem_to_fit)):
             depart_aux_file_dict[elements_to_fit[i]] = depart_aux_file[i]
         model_atom_file_dict = {}
-        for i in range(len(model_atom_file)):
+        for i in range(len(Spectra.elem_to_fit)):
             model_atom_file_dict[elements_to_fit[i]] = model_atom_file[i]
+
+        if "Fe" not in elements_to_fit:
+            depart_bin_file_dict["Fe"] = depart_bin_file[-1]
+            depart_aux_file_dict["Fe"] = depart_aux_file[-1]
+            model_atom_file_dict["Fe"] = model_atom_file[-1]
+
 
         Spectra.depart_bin_file_dict = depart_bin_file_dict
         Spectra.depart_aux_file_dict = depart_aux_file_dict
