@@ -378,10 +378,10 @@ class Spectra:
                 abundance_guesses = np.random.uniform(min_abundance, max_abundance, self.ndimen + 1)
             if self.fit_macroturb:
                 initial_guess[:, -1] = macroturb_guesses
-                if self.fit_microturb:
+                if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
                     initial_guess[:, -2] = microturb_guesses
             else:
-                if self.fit_microturb:
+                if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
                     initial_guess[:, -1] = microturb_guesses
         elif self.fitting_mode == "lbl_quick":
             # param[0] = doppler
@@ -732,12 +732,6 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     :param lmax: End of the line [AA]
     :return: best fit chi squared
     """
-    # old: ignore this:
-    # param[0] = met or abund
-    # param[1] = added doppler to rv
-    # param[2] = micro turb
-    # param[-1] = macro turb
-
     # new: now includes several elements
     # param[0] = added doppler to rv
     # param[1:nelements] = met or abund
