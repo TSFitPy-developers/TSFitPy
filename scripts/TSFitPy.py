@@ -282,7 +282,7 @@ class Spectra:
     depart_bin_file_dict: dict = None
     depart_aux_file_dict: dict = None
     model_atom_file_dict: dict = None
-    ndimen: float = None
+    ndimen: int = None
     spec_input_path: str = None
 
     grids_amount: int = 50
@@ -333,14 +333,64 @@ class Spectra:
         Converts init param guess list to the 2D list for the simplex calculation
         :param init_param_guess: Initial list equal to n x ndimen+1, where ndimen = number of fitted parameters
         """
-        # TODO auto create param guess? depending on required parameters to fit?
         # make an array for initial guess equal to n x ndimen+1
-        initial_guess = np.empty((Spectra.ndimen + 1, Spectra.ndimen))
+        initial_guess = np.empty((self.ndimen + 1, self.ndimen))
 
-        # fill the array with input from config file
+        min_microturb = 0.9     # set bounds for all elements here, change later if needed
+        max_microturb = 1.2     # km/s ? cannot be less than 0
+        min_macroturb = 0.2     # km/s; cannot be less than 0
+        max_macroturb = 5.0
+        min_abundance = -3      # either [Fe/H] or [X/Fe] here
+        max_abundance = 0.4     # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
+        min_rv = -1             # km/s i think as well
+        max_rv = 1
+        # TODO: check that not the same value every time? chance of not fitting at all if all values are same
+        microturb_guesses = np.random.uniform(min_microturb, max_microturb, self.ndimen + 1)
+        macroturb_guesses = np.random.uniform(min_macroturb, max_macroturb, self.ndimen + 1)
+        abundance_guesses = np.random.uniform(min_abundance, max_abundance, self.ndimen + 1)
+        rv_guesses = np.random.uniform(min_rv, max_rv, self.ndimen + 1)
+
+        """# fill the array with input from config file # OLD
         for j in range(Spectra.ndimen):
             for i in range(j, len(init_param_guess), Spectra.ndimen):
-                initial_guess[int(i / Spectra.ndimen)][j] = float(init_param_guess[i])
+                initial_guess[int(i / Spectra.ndimen)][j] = float(init_param_guess[i])"""
+
+        # TODO: order depends on the fitting mode. Make more universal?
+
+        if self.fitting_mode == "all":
+            # abund = param[0]
+            # dopple = param[1]
+            # macrorurb = param [2] (if needed)
+            initial_guess[:, 0] = abundance_guesses
+            initial_guess[:, 1] = rv_guesses
+            if self.fit_macroturb:
+                initial_guess[:, 2] = macroturb_guesses
+        elif self.fitting_mode == "lbl":
+            # param[0] = added doppler to rv
+            # param[1:nelements] = met or abund
+            # param[-1] = macro turb IF MACRO FIT
+            # param[-2] = micro turb IF MACRO FIT
+            # param[-1] = micro turb IF NOT MACRO FIT
+            initial_guess[:, 0] = rv_guesses
+            for i in range(1, self.nelement + 1):
+                initial_guess[:, i] = abundance_guesses
+                # to create new abundance guess for every element
+                abundance_guesses = np.random.uniform(min_abundance, max_abundance, self.ndimen + 1)
+            if self.fit_macroturb:
+                initial_guess[:, -1] = macroturb_guesses
+                if self.fit_microturb:
+                    initial_guess[:, -2] = microturb_guesses
+            else:
+                if self.fit_microturb:
+                    initial_guess[:, -1] = microturb_guesses
+        elif self.fitting_mode == "lbl_quick":
+            # param[0] = doppler
+            # param[1] = macro turb
+            initial_guess[:, 0] = rv_guesses
+            if self.fit_macroturb:
+                initial_guess[:, 1] = macroturb_guesses
+        else:
+            ValueError("Unknown fitting mode, choose all or lbl")
 
         self.init_param_guess = initial_guess[0]
         self.initial_simplex_guess = initial_guess
@@ -877,6 +927,8 @@ def run_TSFitPy():
     depart_aux_file = []
     model_atom_file = []
 
+    initial_guess_string = None
+
     # read the configuration file
     with open(config_location) as fp:
         line = fp.readline()
@@ -986,7 +1038,7 @@ def run_TSFitPy():
                 temp_directory = os.path.join(temp_directory, today, '')
                 Spectra.global_temp_dir = f"../{temp_directory}"
             if fields[0] == "initial_guess_array":
-                initial_guess_string = fields[2].strip().split(",")
+                initial_guess_string = fields[2].strip().split(",")     # turned off this functionality; creates auto now
             if fields[0] == "ndimen":
                 Spectra.ndimen = int(fields[2])
             if fields[0] == "input_file":
@@ -1040,6 +1092,18 @@ def run_TSFitPy():
     create_dir(Spectra.output_folder)
 
     fitlist = f"{fitlist_input_folder}{fitlist}"
+
+    Spectra.ndimen = 1  # first dimension is RV fit
+    if Spectra.fit_microturb and (Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "lbl_quick") and not Spectra.atmosphere_type != "3D":
+        Spectra.ndimen += 1     # if fitting micro for lbl, not 3D
+    if Spectra.fitting_mode == "lbl":   # TODO: if several elements fitted for other modes, change here
+        Spectra.ndimen += Spectra.nelement
+        print(f"Fitting {Spectra.nelement} element(s)")
+    else:
+        Spectra.ndimen += 1
+        print(f"Fitting {1} element")
+    if Spectra.fit_macroturb:
+        Spectra.ndimen += 1
 
     if Spectra.fit_met:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
