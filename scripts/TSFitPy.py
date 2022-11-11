@@ -1272,7 +1272,9 @@ if __name__ == '__main__':
     config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
     # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    print(f"Start of the fitting: {today}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     Spectra.grids_amount = 50  # for lbl quick
     Spectra.abund_bound = 0.5  # for lbl quick
     run_TSFitPy()
+    print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")
