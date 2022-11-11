@@ -912,7 +912,7 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
         result = spectra.fit_lbl_quick()
     else:
         raise ValueError(f"unknown fitting mode {Spectra.fitting_mode}, need all or lbl")
-
+    del spectra
     return result
 
 
