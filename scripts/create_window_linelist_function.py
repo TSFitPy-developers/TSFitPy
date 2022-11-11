@@ -4,13 +4,11 @@ import glob
 import time
 import numpy as np
 
-def create_window_linelist(segment_file, old_path_name, new_path_name, molecules_flag, start, stop, lbl=False):
+def create_window_linelist(seg_begins, seg_ends, old_path_name, new_path_name, molecules_flag, start, stop, lbl=False):
 	line_list_path = old_path_name
 	line_list_files_draft = []
 	line_list_files_draft.extend([i for i in glob.glob(os_path.join(line_list_path, "*")) if not i.endswith(".txt")])
 	#print(line_list_files)
-
-	seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), unpack=True)
 
 	if not lbl:
 		if not os.path.exists(new_path_name):

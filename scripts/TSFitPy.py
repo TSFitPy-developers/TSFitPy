@@ -1164,7 +1164,7 @@ def run_TSFitPy():
         trimmed_start = 0
         trimmed_end = len(Spectra.seg_ends)
         line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{Spectra.include_molecules}_{trimmed_start}_{trimmed_end}/"
-        create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed,
+        create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                Spectra.include_molecules,
                                trimmed_start, trimmed_end)
         print("Finished trimming linelist")
@@ -1176,7 +1176,7 @@ def run_TSFitPy():
                     start = k
             line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
                                                                    Spectra.segment_file, j, start)
-            create_window_linelist(Spectra.segment_file, line_list_path_orig, line_list_path_trimmed_new,
+            create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed_new,
                                    Spectra.include_molecules, start, start + 1)
 
     if workers > 1:
