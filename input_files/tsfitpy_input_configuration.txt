@@ -33,10 +33,7 @@ fit_macroturb = No
 fit_teff = No
 fit_logg = No
 #
-#number of elements to fit  # Fits only one element a time right now
-element_number = 1
-#
-#element fit   
+#element fit: which elements to fit. Example: Mg Fe C . One element is faster
 element = Fe
 #
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
@@ -44,7 +41,7 @@ element = Fe
 linemask_file = Fe/fe-lmask.txt
 segment_file = Fe/fe-seg.txt
 #
-#other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte
+#other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte. IRON ALWAYS NEEDED
 #departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
 #departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
 #model_atom_file = atom.fe607
@@ -59,8 +56,6 @@ rotation = 0.0 #in km/s
 temporary_directory = temp_directory/ #where temporary files created during fitting (opacity files, interpolated model atmospheres, etc.) are stored
 #
 #other inputs for fitting
-initial_guess_array = -1.0,0.5,0.4,1.0,-1.5,-0.5 #the length of this list should be ndimen*(ndimen+1) (for example if ndimen is 2 the length will be 6)
-ndimen = 2 #number of variables being fit
 input_file = fitlist #list of observation spectra (textfiles) and atmospheric parameters needed (teff, logg, met)
 output_file = output
 #Multiprocessing: workers is the requested amount of CPUs

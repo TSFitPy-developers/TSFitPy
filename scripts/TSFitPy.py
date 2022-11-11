@@ -988,18 +988,16 @@ def run_TSFitPy():
                 Spectra.fit_teff = fields[2]
             if fields[0] == "fit_logg":
                 Spectra.fit_logg = fields[2]
-            if fields[0] == "element_number":
-                nelement = int(fields[2])
-                Spectra.nelement = nelement
             if fields[0] == "element":
                 elements_to_fit = []
-                for i in range(nelement):
+                for i in range(len(fields) - 2):
                     elements_to_fit.append(fields[2 + i])
                 Spectra.elem_to_fit = np.asarray(elements_to_fit)
                 if "Fe" in elements_to_fit:
                     Spectra.fit_met = True
                 else:
                     Spectra.fit_met = False
+                Spectra.nelement = len(Spectra.elem_to_fit)
             if fields[0] == "linemask_file":
                 linemask_file = fields[2]
             if fields[0] == "segment_file":
@@ -1031,17 +1029,12 @@ def run_TSFitPy():
                 temp_directory = fields[2]
                 temp_directory = os.path.join(temp_directory, today, '')
                 Spectra.global_temp_dir = f"../{temp_directory}"
-            if fields[0] == "initial_guess_array":
-                initial_guess_string = fields[2].strip().split(",")     # turned off this functionality; creates auto now
-            if fields[0] == "ndimen":
-                Spectra.ndimen = int(fields[2])
             if fields[0] == "input_file":
                 fitlist = fields[2]
             if fields[0] == "output_file":
                 output = fields[2]
             if fields[0] == "workers":
-                workers = int(fields[
-                                  2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
+                workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
             line = fp.readline()
         fp.close()
 
