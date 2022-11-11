@@ -752,7 +752,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
         met = spectra_to_fit.met
     elem_abund_dict = {"Fe": met}
 
-    abundances = []
+    abundances = [met]
 
     for i in range(Spectra.nelement):
         # Spectra.elem_to_fit[i] = element name
