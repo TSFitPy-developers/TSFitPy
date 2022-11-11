@@ -1090,7 +1090,7 @@ def run_TSFitPy():
         Spectra.line_centers_sorted = np.array([line_centers])
 
     Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)  # TODO fix when only 1 segment
-    if Spectra.seg_begins == 1:
+    if Spectra.seg_begins.size == 1:
         Spectra.seg_begins = np.array([Spectra.seg_begins])
         Spectra.seg_ends = np.array([Spectra.seg_ends])
                 
