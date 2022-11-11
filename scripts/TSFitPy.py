@@ -1045,25 +1045,25 @@ def run_TSFitPy():
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
                                                                                            usecols=(0, 1, 2, 3),
                                                                                            unpack=True)
-        met_fitlist = np.zeros(np.size(specname_fitlist))
+        if np.size(specname_fitlist) == 1:  # TODO: ugly solution to split met loading as array
+            met_fitlist = 0.0
+        else:
+            met_fitlist = np.zeros(np.size(specname_fitlist))
     else:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, dtype='str',
                                                                                            usecols=(0, 1, 2, 3, 4),
                                                                                            unpack=True)
 
     if np.size(specname_fitlist) == 1:
-        if np.size(specname_fitlist) == 1:
-            specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
+            [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
 
-            specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
-                [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
-
-    if Spectra.fit_microturb == "Input":
+    if Spectra.fit_microturb == "Input":    # TODO: what if no met is given (met is fitted?) change usecols to 4 in that case?
         microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)
     else:
         microturb_input = np.zeros(np.size(specname_fitlist))
 
-    if np.size(specname_fitlist) == 1:
+    if np.size(microturb_input) == 1:
         microturb_input = np.array([microturb_input])
 
     if Spectra.fitting_mode == "lbl_quick" and not Spectra.fit_met:
@@ -1089,8 +1089,8 @@ def run_TSFitPy():
         Spectra.line_ends_sorted = np.array([line_ends])
         Spectra.line_centers_sorted = np.array([line_centers])
 
-    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)  # TODO fix when only 1 segment
-    if Spectra.seg_begins.size == 1:
+    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
+    if Spectra.seg_begins == 1:
         Spectra.seg_begins = np.array([Spectra.seg_begins])
         Spectra.seg_ends = np.array([Spectra.seg_ends])
                 
