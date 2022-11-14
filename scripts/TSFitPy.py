@@ -1056,8 +1056,8 @@ def run_TSFitPy():
             model_atom_file_dict["Fe"] = model_atom_file[-1]
 
         print("NLTE loaded. Please check that elements correspond to their correct binary files:")
-        for key in depart_bin_file:
-            print(f"{key}: {depart_bin_file[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
+        for key in depart_bin_file_dict:
+            print(f"{key}: {depart_bin_file_dict[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
 
         print("If files do not correspond, please check config file. Fitted elements should go in the same order as "
               "the NLTE file locations. If Fe is not fitted, then it should be added last to the NLTE file location. "
