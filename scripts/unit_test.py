@@ -12,7 +12,7 @@ class MyTestCase(unittest.TestCase):
         flux_mod_orig = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1])
         fwhm, macro, rot = 0, 0, 0
         lmax, lmin = 5000, -10
-        res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro, rot)
+        res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax, lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(0, res)
 
         wave_obs = np.array([1, 2, 3, 4, 5,])
@@ -20,7 +20,7 @@ class MyTestCase(unittest.TestCase):
         wave_mod_orig = np.array([1, 2, 3, 4, 5,])
         flux_obs = np.array([17, 25, 39, 42, 32])   # observed
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
-                                                lmin, macro, rot)
+                                                lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(3.314, res, places=3)    # done by hand to check
 
         wave_obs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -28,7 +28,7 @@ class MyTestCase(unittest.TestCase):
         wave_mod_orig = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_mod_orig = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1])
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
-                                                lmin, macro, rot)
+                                                lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(0.01 / 1.0, res)
 
         wave_obs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -36,7 +36,7 @@ class MyTestCase(unittest.TestCase):
         wave_mod_orig = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_mod_orig = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1.1])
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
-                                                lmin, macro, rot)
+                                                lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(0.01 / 1.1, res)
 
         wave_obs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -44,7 +44,7 @@ class MyTestCase(unittest.TestCase):
         wave_mod_orig = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_mod_orig = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1.1])
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
-                                                lmin, macro, rot)
+                                                lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(0.3838131313131312, res)
 
         rot = 100000
@@ -53,7 +53,7 @@ class MyTestCase(unittest.TestCase):
         wave_mod_orig = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_mod_orig = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1.1])
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
-                                                lmin, macro, rot)
+                                                lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(0.3674679979008318, res)
 
         rot = 200000
@@ -62,7 +62,7 @@ class MyTestCase(unittest.TestCase):
         wave_mod_orig = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_mod_orig = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1.1])
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
-                                                lmin, macro, rot)
+                                                lmin, macro, rot, save_convolved=False)
         self.assertAlmostEqual(0.386082941394771, res)
 
     def test_load_nlte_files_in_dict(self):
