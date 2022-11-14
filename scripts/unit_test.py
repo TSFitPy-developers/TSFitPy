@@ -1,5 +1,5 @@
 import unittest
-from ..scripts import TSFitPy
+import TSFitPy
 import numpy as np
 
 
@@ -64,6 +64,87 @@ class MyTestCase(unittest.TestCase):
         res = TSFitPy.calculate_lbl_chi_squared(None, wave_obs, flux_obs, wave_mod_orig, flux_mod_orig, fwhm, lmax,
                                                 lmin, macro, rot)
         self.assertAlmostEqual(0.386082941394771, res)
+
+    def test_load_nlte_files_in_dict(self):
+        elems = ["Eu", "Fe"]
+        files1 = ["Eu1", "Fe1"]
+        files2 = ["Eu2", "Fe2"]
+        files3 = ["Eu3", "Fe3"]
+
+        expec_dict1 = {"Eu": "Eu1", "Fe": "Fe1"}
+        expec_dict2 = {"Eu": "Eu2", "Fe": "Fe2"}
+        expec_dict3 = {"Eu": "Eu3", "Fe": "Fe3"}
+
+        TSFitPy.Spectra.fit_met = True
+
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        self.assertDictEqual(expec_dict1, dict1)
+        self.assertDictEqual(expec_dict2, dict2)
+        self.assertDictEqual(expec_dict3, dict3)
+
+        elems = ["Fe", "Eu"]
+        files1 = ["Fe1", "Eu1"]
+        files2 = ["Fe2", "Eu2"]
+        files3 = ["Fe3", "Eu3"]
+
+        expec_dict1 = {"Fe": "Fe1", "Eu": "Eu1"}
+        expec_dict2 = {"Fe": "Fe2", "Eu": "Eu2"}
+        expec_dict3 = {"Fe": "Fe3", "Eu": "Eu3"}
+
+        TSFitPy.Spectra.fit_met = True
+
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        self.assertDictEqual(expec_dict1, dict1)
+        self.assertDictEqual(expec_dict2, dict2)
+        self.assertDictEqual(expec_dict3, dict3)
+
+        elems = ["Eu", "Fe5"]
+        files1 = ["Eu1", "Fe1", "Fe01"]
+        files2 = ["Eu2", "Fe2", "Fe02"]
+        files3 = ["Eu3", "Fe3", "Fe03"]
+
+        expec_dict1 = {"Eu": "Eu1", "Fe5": "Fe1", "Fe": "Fe01"}
+        expec_dict2 = {"Eu": "Eu2", "Fe5": "Fe2", "Fe": "Fe02"}
+        expec_dict3 = {"Eu": "Eu3", "Fe5": "Fe3", "Fe": "Fe03"}
+
+        TSFitPy.Spectra.fit_met = False
+
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        self.assertDictEqual(expec_dict1, dict1)
+        self.assertDictEqual(expec_dict2, dict2)
+        self.assertDictEqual(expec_dict3, dict3)
+
+        elems = ["Fe5", "Eu"]
+        files1 = ["Fe1", "Eu1", "Fe01"]
+        files2 = ["Fe2", "Eu2", "Fe02"]
+        files3 = ["Fe3", "Eu3", "Fe03"]
+
+        expec_dict1 = {"Fe5": "Fe1", "Eu": "Eu1", "Fe": "Fe01"}
+        expec_dict2 = {"Fe5": "Fe2", "Eu": "Eu2", "Fe": "Fe02"}
+        expec_dict3 = {"Fe5": "Fe3", "Eu": "Eu3", "Fe": "Fe03"}
+
+        TSFitPy.Spectra.fit_met = False
+
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        self.assertDictEqual(expec_dict1, dict1)
+        self.assertDictEqual(expec_dict2, dict2)
+        self.assertDictEqual(expec_dict3, dict3)
+
+        elems = ["Fe5", "Eu"]
+        files1 = ["Fe1", "Fe01"]
+        files2 = ["Fe2", "Fe02"]
+        files3 = ["Fe3", "Fe03"]
+
+        expec_dict1 = {"Fe5": "Fe1", "Eu": "", "Fe": "Fe01"}
+        expec_dict2 = {"Fe5": "Fe2", "Eu": "", "Fe": "Fe02"}
+        expec_dict3 = {"Fe5": "Fe3", "Eu": "", "Fe": "Fe03"}
+
+        TSFitPy.Spectra.fit_met = False
+
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        self.assertDictEqual(expec_dict1, dict1)
+        self.assertDictEqual(expec_dict2, dict2)
+        self.assertDictEqual(expec_dict3, dict3)
 
 
 if __name__ == '__main__':

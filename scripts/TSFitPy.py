@@ -916,6 +916,39 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     return result
 
 
+def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart_aux_file: list, model_atom_file: list) -> tuple[dict, dict, dict]:
+    """
+    Loads and sorts NLTE elements to fit into respective dictionaries
+    :param elements_to_fit: Array of elements to fit
+    :param depart_bin_file: Departure binary file location (Fe last if not fitted)
+    :param depart_aux_file: Departure aux file location (Fe last if not fitted)
+    :param model_atom_file: Model atom file location (Fe last if not fitted)
+    :return: 3 dictionaries: NLTE location of elements that exist with keys as element names
+    """
+    depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
+    if Spectra.fit_met:
+        iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
+    else:
+        iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
+    for i in range(iterations_for_nlte_elem):
+        depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
+    depart_aux_file_dict = {}
+    for i in range(iterations_for_nlte_elem):
+        depart_aux_file_dict[elements_to_fit[i]] = depart_aux_file[i]
+    model_atom_file_dict = {}
+    for i in range(iterations_for_nlte_elem):
+        model_atom_file_dict[elements_to_fit[i]] = model_atom_file[i]
+    for i in range(iterations_for_nlte_elem, len(elements_to_fit)):
+        depart_bin_file_dict[elements_to_fit[i]] = ""
+        depart_aux_file_dict[elements_to_fit[i]] = ""
+        model_atom_file_dict[elements_to_fit[i]] = ""
+    if "Fe" not in elements_to_fit:  # if Fe is not fitted, then the last NLTE element should be
+        depart_bin_file_dict["Fe"] = depart_bin_file[-1]
+        depart_aux_file_dict["Fe"] = depart_aux_file[-1]
+        model_atom_file_dict["Fe"] = model_atom_file[-1]
+    return depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
+
+
 def run_TSFitPy():
     depart_bin_file = []
     depart_aux_file = []
@@ -1039,24 +1072,10 @@ def run_TSFitPy():
         fp.close()
 
     if Spectra.nlte_flag:
-        depart_bin_file_dict = {}   # assume that element locations are in the same order as the element to fit
-        if Spectra.fit_met:
-            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
-        else:
-            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
-        for i in range(iterations_for_nlte_elem):
-            depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
-        depart_aux_file_dict = {}
-        for i in range(iterations_for_nlte_elem):
-            depart_aux_file_dict[elements_to_fit[i]] = depart_aux_file[i]
-        model_atom_file_dict = {}
-        for i in range(iterations_for_nlte_elem):
-            model_atom_file_dict[elements_to_fit[i]] = model_atom_file[i]
-
-        if "Fe" not in elements_to_fit:  # if Fe is not fitted, then the last NLTE element should be
-            depart_bin_file_dict["Fe"] = depart_bin_file[-1]
-            depart_aux_file_dict["Fe"] = depart_aux_file[-1]
-            model_atom_file_dict["Fe"] = model_atom_file[-1]
+        depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(elements_to_fit,
+                                                                                                   depart_bin_file,
+                                                                                                   depart_aux_file,
+                                                                                                   model_atom_file)
 
         print("NLTE loaded. Please check that elements correspond to their correct binary files:")
         for key in depart_bin_file_dict:
