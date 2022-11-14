@@ -1040,7 +1040,10 @@ def run_TSFitPy():
 
     if Spectra.nlte_flag:
         depart_bin_file_dict = {}   # assume that element locations are in the same order as the element to fit
-        iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
+        if Spectra.fit_met:
+            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
+        else:
+            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
         for i in range(iterations_for_nlte_elem):
             depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
         depart_aux_file_dict = {}
