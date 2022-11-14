@@ -336,13 +336,13 @@ class Spectra:
         # make an array for initial guess equal to n x ndimen+1
         initial_guess = np.empty((self.ndimen + 1, self.ndimen))
 
-        min_microturb = 0.9     # set bounds for all elements here, change later if needed
-        max_microturb = 1.2     # km/s ? cannot be less than 0
-        min_macroturb = 0.2     # km/s; cannot be less than 0
+        min_microturb = 0.9  # set bounds for all elements here, change later if needed
+        max_microturb = 1.2  # km/s ? cannot be less than 0
+        min_macroturb = 0.2  # km/s; cannot be less than 0
         max_macroturb = 5.0
-        min_abundance = -3      # either [Fe/H] or [X/Fe] here
-        max_abundance = 0.4     # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
-        min_rv = -1             # km/s i think as well
+        min_abundance = -3  # either [Fe/H] or [X/Fe] here
+        max_abundance = 0.4  # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
+        min_rv = -1  # km/s i think as well
         max_rv = 1
         # TODO: check that not the same value every time? chance of not fitting at all if all values are same
         microturb_guesses = np.random.uniform(min_microturb, max_microturb, self.ndimen + 1)
@@ -628,7 +628,7 @@ class Spectra:
                 # param[1:nelement] = abundance of the element
                 elem_name = Spectra.elem_to_fit[i]
                 if elem_name != "Fe":
-                    elem_abund_dict[elem_name] = res.x[i + 1]# + met #TODO need metallicity here or not?
+                    elem_abund_dict[elem_name] = res.x[i + 1]  # + met #TODO need metallicity here or not?
             doppler_fit = res.x[0]
             if self.vmicro is not None:  # Input given
                 microturb = self.vmicro
@@ -763,16 +763,16 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
             microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, met)
         elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
             if Spectra.fit_macroturb:
-                microturb = param[-2]   # if macroturb fit, then last param is macroturb
+                microturb = param[-2]  # if macroturb fit, then last param is macroturb
             else:
-                microturb = param[-1]   # if no macroturb fit, then last param is microturb
+                microturb = param[-1]  # if no macroturb fit, then last param is microturb
         elif Spectra.fit_microturb == "Input":  # just for safety's sake, normally should take in the input above anyway
             raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
                              "a problem in the code?")
         else:
             microturb = 2.0
     if Spectra.fit_macroturb:
-        macroturb = param[-1]   # last is always macroturb, if fitted
+        macroturb = param[-1]  # last is always macroturb, if fitted
     else:
         macroturb = Spectra.macroturb
 
@@ -861,7 +861,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
                 vmicro = spectra_to_fit.vmicro
             else:
                 vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
-        else:
+        else:   # Fe: [Fe/H]. X: [X/Fe]. But TS takes [X/H]. Thus convert [X/H] = [X/Fe] + [Fe/H]
             item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit[0]: abund + spectra_to_fit.met}
             met = spectra_to_fit.met
             if spectra_to_fit.vmicro is not None:
@@ -1038,22 +1038,30 @@ def run_TSFitPy():
             line = fp.readline()
         fp.close()
 
-    if nlte_flag:
-        depart_bin_file_dict = {}
-        for i in range(len(Spectra.elem_to_fit)):
+    if Spectra.nlte_flag:
+        depart_bin_file_dict = {}   # assume that element locations are in the same order as the element to fit
+        iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
+        for i in range(iterations_for_nlte_elem):
             depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
         depart_aux_file_dict = {}
-        for i in range(len(Spectra.elem_to_fit)):
+        for i in range(iterations_for_nlte_elem):
             depart_aux_file_dict[elements_to_fit[i]] = depart_aux_file[i]
         model_atom_file_dict = {}
-        for i in range(len(Spectra.elem_to_fit)):
+        for i in range(iterations_for_nlte_elem):
             model_atom_file_dict[elements_to_fit[i]] = model_atom_file[i]
 
-        if "Fe" not in elements_to_fit:
+        if "Fe" not in elements_to_fit:  # if Fe is not fitted, then the last NLTE element should be
             depart_bin_file_dict["Fe"] = depart_bin_file[-1]
             depart_aux_file_dict["Fe"] = depart_aux_file[-1]
             model_atom_file_dict["Fe"] = model_atom_file[-1]
 
+        print("NLTE loaded. Please check that elements correspond to their correct binary files:")
+        for key in depart_bin_file:
+            print(f"{key}: {depart_bin_file[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
+
+        print("If files do not correspond, please check config file. Fitted elements should go in the same order as "
+              "the NLTE file locations. If Fe is not fitted, then it should be added last to the NLTE file location. "
+              "Elements without NLTE binary files do not need them.")
 
         Spectra.depart_bin_file_dict = depart_bin_file_dict
         Spectra.depart_aux_file_dict = depart_aux_file_dict
@@ -1087,40 +1095,58 @@ def run_TSFitPy():
     fitlist = f"{fitlist_input_folder}{fitlist}"
 
     Spectra.ndimen = 1  # first dimension is RV fit
-    if Spectra.fit_microturb and (Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "lbl_quick") and not Spectra.atmosphere_type != "3D":
-        Spectra.ndimen += 1     # if fitting micro for lbl, not 3D
-    if Spectra.fitting_mode == "lbl":   # TODO: if several elements fitted for other modes, change here
+    if Spectra.fit_microturb and (
+            Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "lbl_quick") and not Spectra.atmosphere_type != "3D":
+        Spectra.ndimen += 1  # if fitting micro for lbl, not 3D
+    if Spectra.fitting_mode == "lbl":  # TODO: if several elements fitted for other modes, change here
         Spectra.ndimen += Spectra.nelement
-        print(f"Fitting {Spectra.nelement} element(s)")
+        print(f"Fitting {Spectra.nelement} element(s): {Spectra.elem_to_fit}")
     else:
         Spectra.ndimen += 1
-        print(f"Fitting {1} element")
+        print(f"Fitting {1} element: {Spectra.elem_to_fit[0]}")
     if Spectra.fit_macroturb:
         Spectra.ndimen += 1
 
-    if Spectra.fit_met:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = np.loadtxt(fitlist, dtype='str',
-                                                                                           usecols=(0, 1, 2, 3),
-                                                                                           unpack=True)
+    fitlist_data = np.loadtxt(fitlist, dtype='str')
+
+    if fitlist_data.ndim == 1:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = fitlist_data[0], fitlist_data[1], \
+                                                                   fitlist_data[2], fitlist_data[3]
+    else:
+        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = fitlist_data[:, 0], fitlist_data[:, 1], \
+                                                                   fitlist_data[:, 2], fitlist_data[:, 3]
+
+    if Spectra.fit_met:  # fitting metallicity: just give it 0
         if np.size(specname_fitlist) == 1:  # TODO: ugly solution to split met loading as array
             met_fitlist = 0.0
         else:
             met_fitlist = np.zeros(np.size(specname_fitlist))
     else:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.loadtxt(fitlist, dtype='str',
-                                                                                           usecols=(0, 1, 2, 3, 4),
-                                                                                           unpack=True)
+        if fitlist_data.ndim == 1:
+            met_fitlist = fitlist_data[4]   # metallicity [Fe/H], scaled to solar
+        else:
+            met_fitlist = fitlist_data[:, 4]  # not fitting metallicity: load it
+
+    if Spectra.fit_microturb == "Input":
+        if fitlist_data.ndim == 1:
+            if Spectra.fit_met:
+                microturb_input = fitlist_data[4]
+            else:
+                microturb_input = fitlist_data[5]
+        else:
+            if Spectra.fit_met:
+                microturb_input = fitlist_data[:, 4]
+            else:
+                microturb_input = fitlist_data[:, 5]
+    else:
+        if np.size(specname_fitlist) == 1:  # TODO: ugly solution to split microturb loading as array
+            microturb_input = 0.0
+        else:
+            microturb_input = np.zeros(np.size(specname_fitlist))
 
     if np.size(specname_fitlist) == 1:
         specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
             [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
-
-    if Spectra.fit_microturb == "Input":    # TODO: what if no met is given (met is fitted?) change usecols to 4 in that case?
-        microturb_input = np.loadtxt(fitlist, dtype='str', usecols=5, unpack=True)
-    else:
-        microturb_input = np.zeros(np.size(specname_fitlist))
-
-    if np.size(microturb_input) == 1:
         microturb_input = np.array([microturb_input])
 
     if Spectra.fitting_mode == "lbl_quick" and not Spectra.fit_met:
@@ -1128,9 +1154,9 @@ def run_TSFitPy():
             use_col = 6
         else:
             use_col = 5
-        input_abundances = np.loadtxt(fitlist, dtype='str', usecols=use_col, unpack=True)
+        input_abundances = fitlist_data[:, use_col]
         if np.size(specname_fitlist) == 1:
-            input_abundances = np.array([input_abundances])
+            input_abundances = np.array([input_abundances])  # guess for abundance for lbl quick, [X/Fe]
     else:
         input_abundances = np.zeros(np.size(specname_fitlist))
 
@@ -1150,9 +1176,9 @@ def run_TSFitPy():
     if Spectra.seg_begins.size == 1:
         Spectra.seg_begins = np.array([Spectra.seg_begins])
         Spectra.seg_ends = np.array([Spectra.seg_ends])
-                
+
+    print("Trimming down the linelist to only lines within segments for faster fitting")
     if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":  # TODO add explanation of saving trimmed files
-        print("Trimming down the linelist to only lines within segments for faster fitting")
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
         trimmed_end = len(Spectra.seg_ends)
@@ -1160,7 +1186,6 @@ def run_TSFitPy():
         create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                Spectra.include_molecules,
                                trimmed_start, trimmed_end)
-        print("Finished trimming linelist")
     elif Spectra.fitting_mode == "lbl":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", '')
         for j in range(len(Spectra.line_begins_sorted)):
@@ -1169,8 +1194,10 @@ def run_TSFitPy():
                     start = k
             line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
                                                                    Spectra.segment_file, j, start)
-            create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed_new,
+            create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig,
+                                   line_list_path_trimmed_new,
                                    Spectra.include_molecules, start, start + 1)
+    print("Finished trimming linelist")
 
     if workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
@@ -1232,7 +1259,6 @@ def run_TSFitPy():
             output_elem_column = "Fe_H"
         else:
             output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
-
 
     if Spectra.fitting_mode == "all":
         print(f"#specname        {output_elem_column}     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
