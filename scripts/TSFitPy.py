@@ -1029,10 +1029,10 @@ def run_TSFitPy():
                     Spectra.fit_macroturb = True
                 else:
                     Spectra.fit_macroturb = False
-                    if fields[2] == "Input":
-                        input_macro = True
-                    else:
-                        input_macro = False
+                if fields[2] == "Input":
+                    input_macro = True
+                else:
+                    input_macro = False
             if fields[0] == "fit_teff":
                 Spectra.fit_teff = fields[2]
             if fields[0] == "fit_logg":
