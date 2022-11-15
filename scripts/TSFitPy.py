@@ -17,6 +17,7 @@ import shutil
 import socket
 from typing import Union
 from sys import argv
+import collections
 
 from solar_abundances import solar_abundances, periodic_table
 
@@ -267,7 +268,7 @@ class Spectra:
     lmax: float = None
     ldelta: float = None
     fwhm: float = None  # FWHM coming from resolution, constant for all stars
-    macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
+    #macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
     rot: float = None  # rotation km/s, constant for all stars
     fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
     output_folder: str = None
@@ -289,7 +290,9 @@ class Spectra:
     grids_amount: int = 50
     abund_bound: float = 0.5
 
-    def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float,
+    init_guess_dict: dict = None    # initial guess for elements, if given
+
+    def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  line_list_path_trimmed: str, init_param_guess: list, elem_abund=None):
         self.spec_name: str = str(specname)
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
@@ -305,6 +308,7 @@ class Spectra:
             self.vmicro: float = float(micro)  # microturbulence. Set if it is given in input
         else:
             self.vmicro = None
+        self.macroturb: float = macro  # macroturbulence km/s, constant for all stars if not fitted
         self.temp_dir: str = os.path.join(Spectra.global_temp_dir, self.spec_name,
                                           '')  # temp directory, including date and name of the star fitted
         create_dir(self.temp_dir)  # create temp directory
@@ -374,8 +378,14 @@ class Spectra:
             # param[-1] = micro turb IF NOT MACRO FIT
             initial_guess[:, 0] = rv_guesses
             for i in range(1, self.nelement + 1):
-                initial_guess[:, i] = abundance_guesses
-                # to create new abundance guess for every element
+                if self.elem_to_fit[i - 1] in self.init_guess_dict[self.spec_name]:
+                    abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i - 1]]
+                    abundance_guesses = np.random.uniform(abund_guess - 0.1, abund_guess + 0.1, self.ndimen + 1)
+                    initial_guess[:, i] = abundance_guesses
+                    print(abundance_guesses)
+                else:
+                    initial_guess[:, i] = abundance_guesses
+                    # to create new abundance guess for every element
                 abundance_guesses = np.random.uniform(min_abundance, max_abundance, self.ndimen + 1)
             if self.fit_macroturb:
                 initial_guess[:, -1] = macroturb_guesses
@@ -535,10 +545,8 @@ class Spectra:
                 if success:  # for each successful grid find chi squared with best fit parameters
                     wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
                     res = minimize(lbl_broad_abund_chi_sqr_quick, self.init_param_guess, args=(self,
-                                                                                               Spectra.line_begins_sorted[
-                                                                                                   j] - 5.,
-                                                                                               Spectra.line_ends_sorted[
-                                                                                                   j] + 5.,
+                                                                                               Spectra.line_begins_sorted[j] - 5.,
+                                                                                               Spectra.line_ends_sorted[j] + 5.,
                                                                                                wave_abund,
                                                                                                flux_abund),
                                    method='Nelder-Mead',
@@ -549,7 +557,7 @@ class Spectra:
                     if Spectra.fit_macroturb:  # if fitted macroturbulence
                         macroturb = res.x[1]
                     else:
-                        macroturb = Spectra.macroturb
+                        macroturb = self.macroturb
                     if self.vmicro is not None:  # if microturbulence was given or finds whatever input was used
                         vmicro = self.vmicro
                     else:
@@ -650,7 +658,7 @@ class Spectra:
             if Spectra.fit_macroturb:
                 macroturb = res.x[-1]  # last is always macroturb, if fitted
             else:
-                macroturb = Spectra.macroturb
+                macroturb = self.macroturb
 
             result_output = f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} " \
                             f"{Spectra.line_ends_sorted[j]} {doppler_fit}"
@@ -706,7 +714,7 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     if Spectra.fit_macroturb:
         macroturb = param[1]
     else:
-        macroturb = Spectra.macroturb
+        macroturb = spectra_to_fit.macroturb
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
@@ -775,7 +783,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     if Spectra.fit_macroturb:
         macroturb = param[-1]  # last is always macroturb, if fitted
     else:
-        macroturb = Spectra.macroturb
+        macroturb = spectra_to_fit.macroturb
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
@@ -847,7 +855,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
     if Spectra.fit_macroturb:
         macroturb = param[2]
     else:
-        macroturb = Spectra.macroturb
+        macroturb = spectra_to_fit.macroturb
 
     wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 300000.))
 
@@ -885,6 +893,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
 
 
 def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
+                           macroturb: float,
                            initial_guess_string: list, line_list_path_trimmed: str, input_abundance: float) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
@@ -894,12 +903,13 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     :param rv: radial velocity (km/s)
     :param met: metallicity (doesn't matter what if fitting for Fe)
     :param microturb: Microturbulence if given (None is not known or fitted)
+    :param macroturb: Macroturbulence if given (None is not known or fitted)
     :param initial_guess_string: initial guess string for simplex fitting minimization method
     :param line_list_path_trimmed: Path to the root of the trimmed line list
     :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
     :return: result of the fit with the best fit parameters and chi squared
     """
-    spectra = Spectra(specname, teff, logg, rv, met, microturb, line_list_path_trimmed, initial_guess_string,
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, line_list_path_trimmed, initial_guess_string,
                       elem_abund=input_abundance)
 
     print(f"Fitting {spectra.spec_name}")
@@ -954,6 +964,7 @@ def run_TSFitPy():
     depart_bin_file = []
     depart_aux_file = []
     model_atom_file = []
+    init_guess_elements = []
 
     initial_guess_string = None
 
@@ -1018,6 +1029,10 @@ def run_TSFitPy():
                     Spectra.fit_macroturb = True
                 else:
                     Spectra.fit_macroturb = False
+                    if fields[2] == "Input":
+                        input_macro = True
+                    else:
+                        input_macro = False
             if fields[0] == "fit_teff":
                 Spectra.fit_teff = fields[2]
             if fields[0] == "fit_logg":
@@ -1056,7 +1071,7 @@ def run_TSFitPy():
             if fields[0] == "resolution":
                 Spectra.fwhm = float(fields[2])
             if fields[0] == "macroturbulence":
-                Spectra.macroturb = float(fields[2])
+                macroturb_input = float(fields[2])
             if fields[0] == "rotation":
                 Spectra.rot = float(fields[2])
             if fields[0] == "temporary_directory":
@@ -1069,6 +1084,16 @@ def run_TSFitPy():
                 output = fields[2]
             if fields[0] == "workers":
                 workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
+            if fields[0] == "init_guess_elem":
+                init_guess_elements = []
+                for i in range(len(fields) - 2):
+                    init_guess_elements.append(fields[2 + i])
+                init_guess_elements = np.asarray(init_guess_elements)
+            if fields[0] == "init_guess_elem_location":
+                init_guess_elements_location = []
+                for i in range(len(init_guess_elements)):
+                    init_guess_elements_location.append(fields[2 + i])
+                init_guess_elements_location = np.asarray(init_guess_elements_location)
             line = fp.readline()
         fp.close()
 
@@ -1133,55 +1158,55 @@ def run_TSFitPy():
     fitlist_data = np.loadtxt(fitlist, dtype='str')
 
     if fitlist_data.ndim == 1:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = fitlist_data[0], fitlist_data[1], \
-                                                                   fitlist_data[2], fitlist_data[3]
-    else:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = fitlist_data[:, 0], fitlist_data[:, 1], \
-                                                                   fitlist_data[:, 2], fitlist_data[:, 3]
+        fitlist_data = np.array([fitlist_data])
 
-    if Spectra.fit_met:  # fitting metallicity: just give it 0
-        if np.size(specname_fitlist) == 1:  # TODO: ugly solution to split met loading as array
-            met_fitlist = 0.0
+    specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = fitlist_data[:, 0], fitlist_data[:, 1], \
+                                                               fitlist_data[:, 2], fitlist_data[:, 3]
+
+    fitlist_next_column = 4     # next loaded column #TODO not perfect solution? what if user gives metal but fits it too?
+
+    input_abundances = np.zeros(fitlist_data.shape[0])  # if lbl_quick they will be used as center guess, otherwise means nothing
+    if not Spectra.fitting_mode == "lbl_quick":
+        if Spectra.fit_met:
+            met_fitlist = np.zeros(fitlist_data.shape[0])  # fitting metallicity: just give it 0
         else:
-            met_fitlist = np.zeros(np.size(specname_fitlist))
+            met_fitlist = fitlist_data[:, fitlist_next_column]  # metallicity [Fe/H], scaled to solar; not fitting metallicity: load it
+            fitlist_next_column += 1
     else:
-        if fitlist_data.ndim == 1:
-            met_fitlist = fitlist_data[4]   # metallicity [Fe/H], scaled to solar
-        else:
-            met_fitlist = fitlist_data[:, 4]  # not fitting metallicity: load it
+        met_fitlist = fitlist_data[:, fitlist_next_column]
+        fitlist_next_column += 1
+        if not Spectra.fit_met:
+            input_abundances = fitlist_data[:, fitlist_next_column]  # guess for abundance for lbl quick, [X/Fe]
+            fitlist_next_column += 1
 
     if Spectra.fit_microturb == "Input":
-        if fitlist_data.ndim == 1:
-            if Spectra.fit_met:
-                microturb_input = fitlist_data[4]
-            else:
-                microturb_input = fitlist_data[5]
-        else:
-            if Spectra.fit_met:
-                microturb_input = fitlist_data[:, 4]
-            else:
-                microturb_input = fitlist_data[:, 5]
+        microturb_input = fitlist_data[:, fitlist_next_column]
+        fitlist_next_column += 1
     else:
-        if np.size(specname_fitlist) == 1:  # TODO: ugly solution to split microturb loading as array
-            microturb_input = 0.0
-        else:
-            microturb_input = np.zeros(np.size(specname_fitlist))
+        microturb_input = np.zeros(fitlist_data.shape[0])
 
-    if np.size(specname_fitlist) == 1:
-        specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist, met_fitlist = np.array([specname_fitlist]), np.array(
-            [rv_fitlist]), np.array([teff_fitlist]), np.array([logg_fitlist]), np.array([met_fitlist])
-        microturb_input = np.array([microturb_input])
-
-    if Spectra.fitting_mode == "lbl_quick" and not Spectra.fit_met:
-        if Spectra.fit_microturb == "Input":
-            use_col = 6
-        else:
-            use_col = 5
-        input_abundances = fitlist_data[:, use_col]
-        if np.size(specname_fitlist) == 1:
-            input_abundances = np.array([input_abundances])  # guess for abundance for lbl quick, [X/Fe]
+    if input_macro:
+        macroturb1 = fitlist_data[:, fitlist_next_column]  # input macroturbulence in km/s
+        fitlist_next_column += 1
     else:
-        input_abundances = np.zeros(np.size(specname_fitlist))
+        macroturb1 = np.ones(fitlist_data.shape[0]) * macroturb_input
+
+    if np.size(init_guess_elements) > 0:
+        init_guess_spectra_dict = collections.defaultdict(dict)
+
+        for init_guess_elem, init_guess_loc in zip(init_guess_elements, init_guess_elements_location):
+            init_guess_data = np.loadtxt(init_guess_loc, dtype=str)
+            if init_guess_data.ndim == 1:
+                init_guess_data = np.array([init_guess_data])
+            init_guess_spectra_names, init_guess_values = init_guess_data[:, 0], init_guess_data[:, 1].astype(float)
+
+            for spectra in specname_fitlist:
+                spectra_loc_index = np.where(init_guess_spectra_names == spectra)[0][0]
+                init_guess_spectra_dict[spectra][init_guess_elem] = init_guess_values[spectra_loc_index]
+
+        Spectra.init_guess_dict = dict(init_guess_spectra_dict)
+
+        print(Spectra.init_guess_dict)
 
     line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
@@ -1242,7 +1267,7 @@ def run_TSFitPy():
             specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
                                                              rv_fitlist[i], met_fitlist[i], microturb_input[i]
             input_abundance = input_abundances[i]
-            future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1,
+            future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                    initial_guess_string, line_list_path_trimmed, input_abundance)
             futures.append(future)  # prepares to get values
 
@@ -1257,7 +1282,7 @@ def run_TSFitPy():
                                                              rv_fitlist[i], met_fitlist[i], microturb_input[i]
             input_abundance = input_abundances[i]
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, initial_guess_string,
-                                                  line_list_path_trimmed, input_abundance))
+                                                  macroturb1, line_list_path_trimmed, input_abundance))
 
     shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
 

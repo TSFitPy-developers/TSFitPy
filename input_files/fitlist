@@ -1,1 +1,1 @@
-# put the information about observed spectra to fit here. see fitlist_example for formatting   
+#name_of_spectrum_to_fit     rv      teff  logg  [Fe/H] (skip if not fitting Fe)    [X/H] (for lbl quick ONLY, skip otherwise)  Input_vmicroturb Input_vmacroturb
