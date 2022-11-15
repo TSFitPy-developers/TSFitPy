@@ -16,6 +16,7 @@ from dask.distributed import Client
 import shutil
 import socket
 from typing import Union
+from sys import argv
 
 from solar_abundances import solar_abundances, periodic_table
 
@@ -518,12 +519,12 @@ class Spectra:
 
         for j in range(len(Spectra.line_begins_sorted)):
             time_start = time.perf_counter()
-            print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
+            #print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
             # TODO: improve next 3 lines of code.
             for k in range(len(Spectra.seg_begins)):
                 if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
                     start = k
-            print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
+            #print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
             # each line contains spectra name and fitted line. then to the right of it abundance with chi-sqr are added
             result_one_line = f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} " \
                               f"{Spectra.line_ends_sorted[j]}"
@@ -544,7 +545,7 @@ class Spectra:
                                    options={'maxiter': Spectra.ndimen * 50, 'disp': True,
                                             'initial_simplex': self.initial_simplex_guess,
                                             'xatol': 0.05, 'fatol': 0.05})
-                    print(res.x)
+                    #print(res.x)
                     if Spectra.fit_macroturb:  # if fitted macroturbulence
                         macroturb = res.x[1]
                     else:
@@ -560,7 +561,7 @@ class Spectra:
                     result_one_line += f" {abund} {res.x[0]} {vmicro} {macroturb} {res.fun}"  # saves additionally here
                     chi_squares.append(res.fun)
                 else:
-                    print(f"Abundance {abund} did not manage to generate a grid")  # if no grid was generated
+                    #print(f"Abundance {abund} did not manage to generate a grid")  # if no grid was generated
                     result_one_line += f" {abund} {9999} {9999} {9999} {9999}"
                     chi_squares.append(9999)
 
@@ -578,7 +579,7 @@ class Spectra:
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
 
             time_end = time.perf_counter()
-            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+            #print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
         # g.close()
 
@@ -802,7 +803,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" {key} {elem_abund_dict[key]}"
-    print(output_print, doppler, microturb, macroturb, chi_square)
+    #print(output_print, doppler, microturb, macroturb, chi_square)
 
     return chi_square
 
@@ -878,7 +879,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
                                                Spectra.line_begins_sorted, Spectra.line_ends_sorted,
                                                Spectra.seg_begins, Spectra.seg_ends)
 
-    print(abund, doppler, chi_square, macroturb)
+    #print(abund, doppler, chi_square, macroturb)
 
     return chi_square
 
@@ -1310,12 +1311,14 @@ def run_TSFitPy():
 
 
 if __name__ == '__main__':
-    config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
+    if len(argv) > 1:
+        config_location = argv[1]
+    else:
+        config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
+    print(config_location)
     # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     print(f"Start of the fitting: {today}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
-    Spectra.grids_amount = 50  # for lbl quick
-    Spectra.abund_bound = 0.5  # for lbl quick
     run_TSFitPy()
     print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")
