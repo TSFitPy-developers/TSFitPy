@@ -378,11 +378,11 @@ class Spectra:
             # param[-1] = micro turb IF NOT MACRO FIT
             initial_guess[:, 0] = rv_guesses
             for i in range(1, self.nelement + 1):
-                if self.elem_to_fit[i - 1] in self.init_guess_dict[self.spec_name]:
+                if self.init_guess_dict is not None and self.elem_to_fit[i - 1] in self.init_guess_dict[self.spec_name]:
                     abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i - 1]]
-                    abundance_guesses = np.random.uniform(abund_guess - 0.1, abund_guess + 0.1, self.ndimen + 1)
+                    abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, self.ndimen + 1)
                     initial_guess[:, i] = abundance_guesses
-                    print(abundance_guesses)
+                    # if initial abundance is given, then linearly give guess +/- 0.1 dex
                 else:
                     initial_guess[:, i] = abundance_guesses
                     # to create new abundance guess for every element
@@ -1205,8 +1205,6 @@ def run_TSFitPy():
                 init_guess_spectra_dict[spectra][init_guess_elem] = init_guess_values[spectra_loc_index]
 
         Spectra.init_guess_dict = dict(init_guess_spectra_dict)
-
-        print(Spectra.init_guess_dict)
 
     line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
