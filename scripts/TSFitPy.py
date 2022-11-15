@@ -450,7 +450,7 @@ class Spectra:
         time_end = time.perf_counter()
         print(f"Total runtime was {(time_end - time_start) / 60.:2f} minutes.")
         # remove all temporary files
-        shutil.rmtree(self.temp_dir)
+        #shutil.rmtree(self.temp_dir)
         return result
 
     def generate_grid_for_lbl(self) -> list:
