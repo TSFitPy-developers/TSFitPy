@@ -1186,10 +1186,10 @@ def run_TSFitPy():
         microturb_input = np.zeros(fitlist_data.shape[0])
 
     if input_macro:
-        macroturb1 = fitlist_data[:, fitlist_next_column]  # input macroturbulence in km/s
+        macroturb = fitlist_data[:, fitlist_next_column]  # input macroturbulence in km/s
         fitlist_next_column += 1
     else:
-        macroturb1 = np.ones(fitlist_data.shape[0]) * macroturb_input
+        macroturb = np.ones(fitlist_data.shape[0]) * macroturb_input
 
     if np.size(init_guess_elements) > 0:
         init_guess_spectra_dict = collections.defaultdict(dict)
@@ -1264,6 +1264,7 @@ def run_TSFitPy():
         for i in range(specname_fitlist.size):
             specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
                                                              rv_fitlist[i], met_fitlist[i], microturb_input[i]
+            macroturb1 = macroturb[i]
             input_abundance = input_abundances[i]
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                    initial_guess_string, line_list_path_trimmed, input_abundance)
@@ -1279,6 +1280,7 @@ def run_TSFitPy():
             specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
                                                              rv_fitlist[i], met_fitlist[i], microturb_input[i]
             input_abundance = input_abundances[i]
+            macroturb1 = macroturb[i]
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, initial_guess_string,
                                                   macroturb1, line_list_path_trimmed, input_abundance))
 
