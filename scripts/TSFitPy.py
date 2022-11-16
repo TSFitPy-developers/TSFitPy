@@ -292,6 +292,18 @@ class Spectra:
 
     init_guess_dict: dict = None    # initial guess for elements, if given
 
+    # bounds for the minimization
+    bound_min_macro = 0
+    bound_max_macro = 100
+    bound_min_micro = 0
+    bound_max_micro = 10
+    bound_min_abund = -40
+    bound_max_abund = 100
+    bound_min_met = -4
+    bound_max_met = 0.5
+    bound_min_doppler = -5
+    bound_max_doppler = 5
+
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  line_list_path_trimmed: str, init_param_guess: list, elem_abund=None):
         self.spec_name: str = str(specname)
@@ -317,6 +329,7 @@ class Spectra:
 
         self.init_param_guess: list = None  # guess for minimzation
         self.initial_simplex_guess: list = None
+        self.minim_bounds: list = []
         self.set_param_guess(init_param_guess)
 
         self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
@@ -367,9 +380,15 @@ class Spectra:
             # dopple = param[1]
             # macrorurb = param [2] (if needed)
             initial_guess[:, 0] = abundance_guesses
+            if self.fit_met:
+                self.minim_bounds.append((self.bound_min_met, self.bound_max_met))
+            else:
+                self.minim_bounds.append((self.bound_min_abund, self.bound_max_abund))
             initial_guess[:, 1] = rv_guesses
+            self.minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
             if self.fit_macroturb:
                 initial_guess[:, 2] = macroturb_guesses
+                self.minim_bounds.append((self.bound_min_macro, self.bound_max_macro))
         elif self.fitting_mode == "lbl":
             # param[0] = added doppler to rv
             # param[1:nelements] = met or abund
@@ -377,6 +396,7 @@ class Spectra:
             # param[-2] = micro turb IF MACRO FIT
             # param[-1] = micro turb IF NOT MACRO FIT
             initial_guess[:, 0] = rv_guesses
+            self.minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
             for i in range(1, self.nelement + 1):
                 if self.init_guess_dict is not None and self.elem_to_fit[i - 1] in self.init_guess_dict[self.spec_name]:
                     abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i - 1]]
@@ -387,24 +407,36 @@ class Spectra:
                     initial_guess[:, i] = abundance_guesses
                     # to create new abundance guess for every element
                 abundance_guesses = np.random.uniform(min_abundance, max_abundance, self.ndimen + 1)
+                if self.elem_to_fit[i - 1] == "Fe":
+                    self.minim_bounds.append((self.bound_min_met, self.bound_max_met))
+                else:
+                    self.minim_bounds.append((self.bound_min_abund, self.bound_max_abund))
             if self.fit_macroturb:
                 initial_guess[:, -1] = macroturb_guesses
                 if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
                     initial_guess[:, -2] = microturb_guesses
+                    self.minim_bounds.append((self.bound_min_micro, self.bound_max_micro))  # first adding micro
+                self.minim_bounds.append((self.bound_min_macro, self.bound_max_macro))  # last one macro
             else:
                 if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
                     initial_guess[:, -1] = microturb_guesses
+                    self.minim_bounds.append((self.bound_min_micro, self.bound_max_micro))
         elif self.fitting_mode == "lbl_quick":
             # param[0] = doppler
             # param[1] = macro turb
             initial_guess[:, 0] = rv_guesses
+            self.minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
             if self.fit_macroturb:
                 initial_guess[:, 1] = macroturb_guesses
+                self.minim_bounds.append((self.bound_min_macro, self.bound_max_macro))
         else:
             ValueError("Unknown fitting mode, choose all or lbl")
 
         self.init_param_guess = initial_guess[0]
         self.initial_simplex_guess = initial_guess
+        print(self.init_param_guess)
+        print(self.minim_bounds)
+        print(self.initial_simplex_guess)
 
     def configure_and_run_ts(self, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
                              windows_flag: bool, temp_dir=None):
@@ -446,7 +478,7 @@ class Spectra:
         # timing how long it took
         time_start = time.perf_counter()
 
-        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=self, method='Nelder-Mead',
+        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=self, method='Nelder-Mead', bounds=self.minim_bounds,
                        options={'maxiter': self.ndimen * 50, 'disp': True,
                                 'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05})
         # print final result from minimazation
@@ -549,6 +581,7 @@ class Spectra:
                                                                                                Spectra.line_ends_sorted[j] + 5.,
                                                                                                wave_abund,
                                                                                                flux_abund),
+                                   bounds=self.minim_bounds,
                                    method='Nelder-Mead',
                                    options={'maxiter': Spectra.ndimen * 50, 'disp': True,
                                             'initial_simplex': self.initial_simplex_guess,
@@ -618,6 +651,7 @@ class Spectra:
             res = minimize(lbl_broad_abund_chi_sqr, self.init_param_guess, args=(self,
                                                                                  Spectra.line_begins_sorted[j] - 5.,
                                                                                  Spectra.line_ends_sorted[j] + 5.),
+                           bounds=self.minim_bounds,
                            method='Nelder-Mead',
                            options={'maxiter': Spectra.ndimen * 50, 'disp': True,
                                     'initial_simplex': self.initial_simplex_guess,
@@ -811,7 +845,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" {key} {elem_abund_dict[key]}"
-    #print(output_print, doppler, microturb, macroturb, chi_square)
+    print(output_print, doppler, microturb, macroturb, chi_square)
 
     return chi_square
 
@@ -1143,8 +1177,8 @@ def run_TSFitPy():
     fitlist = f"{fitlist_input_folder}{fitlist}"
 
     Spectra.ndimen = 1  # first dimension is RV fit
-    if Spectra.fit_microturb and (
-            Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "lbl_quick") and not Spectra.atmosphere_type != "3D":
+    if Spectra.fit_microturb == "Yes" and (
+            Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "lbl_quick") and not Spectra.atmosphere_type == "3D":
         Spectra.ndimen += 1  # if fitting micro for lbl, not 3D
     if Spectra.fitting_mode == "lbl":  # TODO: if several elements fitted for other modes, change here
         Spectra.ndimen += Spectra.nelement
