@@ -308,7 +308,7 @@ class Spectra:
             self.vmicro: float = float(micro)  # microturbulence. Set if it is given in input
         else:
             self.vmicro = None
-        self.macroturb: float = macro  # macroturbulence km/s, constant for all stars if not fitted
+        self.macroturb: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
         self.temp_dir: str = os.path.join(Spectra.global_temp_dir, self.spec_name,
                                           '')  # temp directory, including date and name of the star fitted
         create_dir(self.temp_dir)  # create temp directory
