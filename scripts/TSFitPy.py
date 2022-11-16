@@ -288,21 +288,21 @@ class Spectra:
     spec_input_path: str = None
 
     grids_amount: int = 50
-    abund_bound: float = 0.5
+    abund_bound: float = 1.0
 
     init_guess_dict: dict = None    # initial guess for elements, if given
 
     # bounds for the minimization
-    bound_min_macro = 0
+    bound_min_macro = 0         # km/s
     bound_max_macro = 100
-    bound_min_micro = 0
+    bound_min_micro = 0         # km/s
     bound_max_micro = 10
-    bound_min_abund = -40
+    bound_min_abund = -40       # [X/Fe]
     bound_max_abund = 100
-    bound_min_met = -4
+    bound_min_met = -4          # [Fe/H]
     bound_max_met = 0.5
-    bound_min_doppler = -5
-    bound_max_doppler = 5
+    bound_min_doppler = -3      # km/s
+    bound_max_doppler = 3
 
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  line_list_path_trimmed: str, init_param_guess: list, elem_abund=None):
@@ -434,9 +434,6 @@ class Spectra:
 
         self.init_param_guess = initial_guess[0]
         self.initial_simplex_guess = initial_guess
-        print(self.init_param_guess)
-        print(self.minim_bounds)
-        print(self.initial_simplex_guess)
 
     def configure_and_run_ts(self, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
                              windows_flag: bool, temp_dir=None):
