@@ -1281,8 +1281,8 @@ def run_TSFitPy():
                                                              rv_fitlist[i], met_fitlist[i], microturb_input[i]
             input_abundance = input_abundances[i]
             macroturb1 = macroturb[i]
-            results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, initial_guess_string,
-                                                  macroturb1, line_list_path_trimmed, input_abundance))
+            results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
+                                                  initial_guess_string, line_list_path_trimmed, input_abundance))
 
     shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
 
