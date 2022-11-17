@@ -353,7 +353,8 @@ class Spectra:
         """
         # make an array for initial guess equal to n x ndimen+1
         initial_guess = np.empty((self.ndimen + 1, self.ndimen))
-
+        # 17.11.2022: Tried random guesses. But they DO affect the result if the random guesses are way off.
+        # Trying with linspace. Should be better I hope
         min_microturb = 0.9  # set bounds for all elements here, change later if needed
         max_microturb = 1.3  # km/s ? cannot be less than 0
         min_macroturb = 0.2  # km/s; cannot be less than 0
