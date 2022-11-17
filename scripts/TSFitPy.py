@@ -355,18 +355,18 @@ class Spectra:
         initial_guess = np.empty((self.ndimen + 1, self.ndimen))
 
         min_microturb = 0.9  # set bounds for all elements here, change later if needed
-        max_microturb = 1.2  # km/s ? cannot be less than 0
+        max_microturb = 1.3  # km/s ? cannot be less than 0
         min_macroturb = 0.2  # km/s; cannot be less than 0
-        max_macroturb = 5.0
-        min_abundance = -3  # either [Fe/H] or [X/Fe] here
+        max_macroturb = 15.0
+        min_abundance = -1  # either [Fe/H] or [X/Fe] here
         max_abundance = 0.4  # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
         min_rv = -1  # km/s i think as well
         max_rv = 1
         # TODO: check that not the same value every time? chance of not fitting at all if all values are same
-        microturb_guesses = np.random.uniform(min_microturb, max_microturb, self.ndimen + 1)
-        macroturb_guesses = np.random.uniform(min_macroturb, max_macroturb, self.ndimen + 1)
-        abundance_guesses = np.random.uniform(min_abundance, max_abundance, self.ndimen + 1)
-        rv_guesses = np.random.uniform(min_rv, max_rv, self.ndimen + 1)
+        microturb_guesses = np.linspace(min_microturb, max_microturb, self.ndimen + 1)
+        macroturb_guesses = np.linspace(min_macroturb, max_macroturb, self.ndimen + 1)
+        abundance_guesses = np.linspace(min_abundance, max_abundance, self.ndimen + 1)
+        rv_guesses = np.linspace(min_rv, max_rv, self.ndimen + 1)
 
         """# fill the array with input from config file # OLD
         for j in range(Spectra.ndimen):
