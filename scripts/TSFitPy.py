@@ -358,7 +358,7 @@ class Spectra:
         min_microturb = 0.9  # set bounds for all elements here, change later if needed
         max_microturb = 1.3  # km/s ? cannot be less than 0
         min_macroturb = 0.2  # km/s; cannot be less than 0
-        max_macroturb = 15.0
+        max_macroturb = 8.0
         min_abundance = -1  # either [Fe/H] or [X/Fe] here
         max_abundance = 0.4  # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
         min_rv = -1  # km/s i think as well
@@ -493,24 +493,15 @@ class Spectra:
         #shutil.rmtree(self.temp_dir)
         return result
 
-    def generate_grid_for_lbl(self) -> list:
+    def generate_grid_for_lbl(self, abund_to_gen) -> list:
         """
         Generates grids for lbl quick method. Grids are centered at input metallicity/abundance. Number of grids and
         bounds depend on self.abund_bound, self.grids_amount
         :return: List corresponding to self.abund_to_gen with same locations. True: generation success. False: not
         """
-        print("Generating grids")
-        if self.fit_met:  # grids generated centered on input metallicity or abundance
-            input_abund = self.met
-        else:
-            input_abund = self.elem_abund
-
-        self.abund_to_gen = np.linspace(input_abund - self.abund_bound, input_abund + self.abund_bound,
-                                        self.grids_amount)
-
         success = []
 
-        for abund_to_use in self.abund_to_gen:
+        for abund_to_use in abund_to_gen:
             if self.met > 0.5 or self.met < -4.0 or abund_to_use < -40 or (
                     Spectra.fit_met and (abund_to_use < -4.0 or abund_to_use > 0.5)):
                 success.append(False)  # if metallicity or abundance too weird, then fail
@@ -531,8 +522,11 @@ class Spectra:
                 create_dir(temp_dir)
                 self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, True, temp_dir=temp_dir)
 
-                success.append(True)
-        print("Generation successful")
+                if os_path.exists(f"{temp_dir}spectrum_00000000.spec") and \
+                        os.stat(f"{temp_dir}spectrum_00000000.spec").st_size != 0:
+                    success.append(True)
+                else:
+                    success.append(False)
         return success
 
     def fit_lbl_quick(self) -> list:
@@ -542,20 +536,24 @@ class Spectra:
         fit parameters for each grid point. Also saves spectra for best fit chi squared for corresponding abundances.
         :return: List full of grid parameters with corresponding best fit values and chi squared
         """
-        success_grid_gen = self.generate_grid_for_lbl()  # generate grids
+        print("Generating grids")
+        if self.fit_met:  # grids generated centered on input metallicity or abundance
+            input_abund = self.met
+        else:
+            input_abund = self.elem_abund
+        self.abund_to_gen = np.linspace(input_abund - self.abund_bound, input_abund + self.abund_bound,
+                                        self.grids_amount)
+        success_grid_gen = self.generate_grid_for_lbl(self.abund_to_gen)  # generate grids
+        print("Generation successful")
         result = []
         grid_spectra = {}
         # read spectra from generated grids and keep in memory to not waste time reading them each time
-        for i, (abund, success) in enumerate(zip(self.abund_to_gen, success_grid_gen)):
+        for abund, success in zip(self.abund_to_gen, success_grid_gen):
             if success:
                 spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
-                if os_path.exists(f"{spectra_grid_path}spectrum_00000000.spec") and os.stat(
-                        f"{spectra_grid_path}spectrum_00000000.spec").st_size != 0:
-                    wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                              usecols=(0, 1), unpack=True)  # TODO asyncio here?
-                    grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
-                else:
-                    success_grid_gen[i] = False
+                wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
+                                                          usecols=(0, 1), unpack=True)  # TODO asyncio here?
+                grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
 
         for j in range(len(Spectra.line_begins_sorted)):
             time_start = time.perf_counter()
@@ -623,6 +621,25 @@ class Spectra:
         # g.close()
 
         return result
+
+    def fit_lbl_v3(self):
+
+        abund_to_gen = np.array([-0.2, 0.0, 0.2])
+        success_grid_gen = self.generate_grid_for_lbl(abund_to_gen)  # generate grids
+
+        result = []
+        grid_spectra = {}
+        # read spectra from generated grids and keep in memory to not waste time reading them each time
+        for abund, success in zip(self.abund_to_gen, success_grid_gen):
+            if success:
+                spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
+                wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
+                                                          usecols=(0, 1), unpack=True)  # TODO asyncio here?
+                grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
+
+
+
+
 
     def fit_lbl(self) -> list:
         """
@@ -1181,6 +1198,8 @@ def run_TSFitPy():
     if Spectra.fitting_mode == "lbl":  # TODO: if several elements fitted for other modes, change here
         Spectra.ndimen += Spectra.nelement
         print(f"Fitting {Spectra.nelement} element(s): {Spectra.elem_to_fit}")
+    elif Spectra.fitting_mode == "lbl_quick":
+        pass    # element is not fitted using minimization, no need for ndimen
     else:
         Spectra.ndimen += 1
         print(f"Fitting {1} element: {Spectra.elem_to_fit[0]}")
