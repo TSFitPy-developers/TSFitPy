@@ -143,7 +143,7 @@ class TurboSpectrum:
         self.marcs_value_keys.sort()
         self.marcs_models = {}
 
-        marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))
+        #marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))
         marcs_nlte_models = np.loadtxt(self.marcs_grid_list, dtype='str', usecols=(0,), unpack=True)
         #marcs_nlte_models = np.loadtxt("/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt", dtype='str', usecols=(0,), unpack=True)
         spud_models = []
@@ -1330,3 +1330,97 @@ class TurboSpectrum:
     def run_turbospectrum_and_atmosphere(self):
         self.calculate_atmosphere()
         self.run_turbospectrum()
+
+def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
+    """
+    Get a list of all of the MARCS models we have.
+
+    :return:
+        None
+    """
+    counter_marcs = 0
+    marcs_model_name = "default"
+    counter_spectra = 0
+    marcs_values = None
+    marcs_value_keys = []
+    marcs_models = {}
+
+    pattern = r"([sp])(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
+              r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....).mod"
+
+    marcs_values = {
+        "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
+        "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []
+    }
+
+    marcs_value_keys = [i for i in list(marcs_values.keys()) if i not in TurboSpectrum.marcs_parameters_to_ignore]
+    marcs_value_keys.sort()
+    marcs_models = {}
+
+    marcs_models = glob.glob(os_path.join(marcs_grid_path, "*"))
+    marcs_nlte_models = np.loadtxt(marcs_grid_list, dtype='str', usecols=(0,), unpack=True)
+    # marcs_nlte_models = np.loadtxt("/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt", dtype='str', usecols=(0,), unpack=True)
+    spud_models = []
+    for i in range(len(marcs_nlte_models)):
+        aux_pattern = r"(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
+                      r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....)"
+        re_test_aux = re.match(aux_pattern, marcs_nlte_models[i])
+        mass = float(re_test_aux.group(3))
+        if mass == 0.0:
+            spud = "p" + marcs_nlte_models[i] + ".mod"
+        else:
+            spud = "s" + marcs_nlte_models[i] + ".mod"
+        spud_models.append(spud)
+
+    marcs_nlte_models = spud_models
+
+    for item in marcs_nlte_models:
+
+        # Extract model parameters from .mod filename
+        filename = os_path.split(item)[1]
+        # filename = item
+        re_test = re.match(pattern, filename)
+        assert re_test is not None, "Could not parse MARCS model filename <{}>".format(filename)
+
+        try:
+            model = {
+                "spherical": re_test.group(1),
+                "temperature": float(re_test.group(2)),
+                "log_g": float(re_test.group(3)),
+                "mass": float(re_test.group(4)),
+                "turbulence": float(re_test.group(5)),  # micro turbulence assumed in MARCS atmosphere, km/s
+                "model_type": re_test.group(6),
+                "metallicity": float(re_test.group(7)),
+                "a": float(re_test.group(8)),
+                "c": float(re_test.group(9)),
+                "n": float(re_test.group(10)),
+                "o": float(re_test.group(11)),
+                "r": float(re_test.group(12)),
+                "s": float(re_test.group(13))
+            }
+        except ValueError:
+            # logging.info("Could not parse MARCS model filename <{}>".format(filename))
+            raise
+
+        # Keep a list of all of the parameter values we've seen
+        for parameter, value in model.items():
+            if value not in marcs_values[parameter]:
+                marcs_values[parameter].append(value)
+
+        # Keep a list of all the models we've got in the grid
+        dict_iter = marcs_models
+        # print(dict_iter)
+        for parameter in marcs_value_keys:
+            value = model[parameter]
+            if value not in dict_iter:
+                dict_iter[value] = {}
+            dict_iter = dict_iter[value]
+        # if "filename" in dict_iter:
+        # logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
+        dict_iter["filename"] = item
+
+    # Sort model parameter values into order
+    for parameter in marcs_value_keys:
+        marcs_values[parameter].sort()
+
+    return marcs_values, marcs_value_keys, marcs_models
