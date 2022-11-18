@@ -294,15 +294,15 @@ class Spectra:
 
     # bounds for the minimization
     bound_min_macro = 0         # km/s
-    bound_max_macro = 100
-    bound_min_micro = 0         # km/s
-    bound_max_micro = 10
+    bound_max_macro = 30
+    bound_min_micro = 0.01         # km/s
+    bound_max_micro = 5
     bound_min_abund = -40       # [X/Fe]
     bound_max_abund = 100
     bound_min_met = -4          # [Fe/H]
     bound_max_met = 0.5
-    bound_min_doppler = -3      # km/s
-    bound_max_doppler = 3
+    bound_min_doppler = -1      # km/s
+    bound_max_doppler = 1
 
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  line_list_path_trimmed: str, init_param_guess: list, elem_abund=None):
@@ -365,9 +365,9 @@ class Spectra:
         max_rv = 1
         # TODO: check that not the same value every time? chance of not fitting at all if all values are same
         microturb_guesses = np.linspace(min_microturb, max_microturb, self.ndimen + 1)
-        macroturb_guesses = np.linspace(min_macroturb, max_macroturb, self.ndimen + 1)
-        abundance_guesses = np.linspace(min_abundance, max_abundance, self.ndimen + 1)
-        rv_guesses = np.linspace(min_rv, max_rv, self.ndimen + 1)
+        macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2, max_macroturb + np.random.random(1)[0] / 2, self.ndimen + 1)
+        abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10, max_abundance + np.random.random(1)[0] / 10, self.ndimen + 1)
+        rv_guesses = np.linspace(min_rv + np.random.random(1)[0] / 10, max_rv + np.random.random(1)[0] / 10, self.ndimen + 1)
 
         """# fill the array with input from config file # OLD
         for j in range(Spectra.ndimen):
@@ -623,23 +623,124 @@ class Spectra:
         return result
 
     def fit_lbl_v3(self):
-
-        abund_to_gen = np.array([-0.2, 0.0, 0.2])
-        success_grid_gen = self.generate_grid_for_lbl(abund_to_gen)  # generate grids
-
         result = []
+
+        for j in range(len(Spectra.line_begins_sorted)):
+            time_start = time.perf_counter()
+            print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
+
+            result.append(self.fit_one_line_v3_better_guess(j))
+
+            time_end = time.perf_counter()
+            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+
+        # g.close()
+        # h.close()
+
+        return result
+
+    def fit_one_line_v3_better_guess(self, j):
+        if self.fit_macroturb:
+            ndimen = 2
+        else:
+            ndimen = 1
+        initial_guess_quick = np.empty((ndimen + 1, ndimen))
+        min_macroturb = 0.2  # km/s; cannot be less than 0
+        max_macroturb = 8.0
+        min_rv = -1  # km/s i think as well
+        max_rv = 1
+
+        macroturb_guesses = np.linspace(min_macroturb, max_macroturb, ndimen + 1)
+        rv_guesses = np.linspace(min_rv, max_rv, ndimen + 1)
+        minim_bounds = []
+
+        # param[0] = doppler
+        # param[1] = macro turb
+        initial_guess_quick[:, 0] = rv_guesses
+        minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
+        if self.fit_macroturb:
+            initial_guess_quick[:, 1] = macroturb_guesses
+            minim_bounds.append((self.bound_min_macro, self.bound_max_macro))
+
+        for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
+            if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
+                start = k
+        print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
+        self.ts.line_list_paths = [
+            get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, j,
+                                      start)]
+        grids_for_func = 3
+        delta_abund = 0.3
+        abund_to_gen_center = 0.0
+        min_limit_abund = -2.5
+        abund_to_gen = np.linspace(abund_to_gen_center - delta_abund, abund_to_gen_center + delta_abund, grids_for_func)
+        success_grid_gen = self.generate_grid_for_lbl(abund_to_gen)  # generate grids
+        abund_to_gen = abund_to_gen[success_grid_gen]
+        while np.size(abund_to_gen) < grids_for_func:
+            success_grid_gen = np.asarray(success_grid_gen)[success_grid_gen]
+            min_abund_to_gen = min_abund_to_gen - delta_abund
+            if min_abund_to_gen < min_limit_abund:
+                return self.fit_one_line(j, self.init_param_guess, self.initial_simplex_guess)
+            abund_to_gen = np.append(min_abund_to_gen)
+            success_grid_gen_new = self.generate_grid_for_lbl(abund_to_gen)  # generate grids
+            success_grid_gen = np.insert(success_grid_gen, 0, success_grid_gen_new[0], axis=0)
+            abund_to_gen = abund_to_gen[success_grid_gen]
         grid_spectra = {}
         # read spectra from generated grids and keep in memory to not waste time reading them each time
-        for abund, success in zip(self.abund_to_gen, success_grid_gen):
-            if success:
-                spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
-                wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                          usecols=(0, 1), unpack=True)  # TODO asyncio here?
-                grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
+        for abund in abund_to_gen:
+            spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
+            wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
+                                                      usecols=(0, 1), unpack=True)  # TODO asyncio here?
+            grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
+        chi_squares = []
+        macroturbs = []
+        doppler_shifts = []
+        for abund in abund_to_gen:
+            wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
+            res = minimize(lbl_broad_abund_chi_sqr_quick, initial_guess_quick[0], args=(self,
+                                                                                       Spectra.line_begins_sorted[
+                                                                                           j] - 5.,
+                                                                                       Spectra.line_ends_sorted[
+                                                                                           j] + 5.,
+                                                                                       wave_abund,
+                                                                                       flux_abund),
+                           bounds=minim_bounds,
+                           method='Nelder-Mead',
+                           options={'maxiter': Spectra.ndimen * 50, 'disp': True,
+                                    'initial_simplex': initial_guess_quick,
+                                    'xatol': 0.05, 'fatol': 0.05})
 
+            chi_squares.append(res.fun)
+            doppler_shifts.append(res.x[0])
+            if self.fit_macroturb:
+                macroturbs.append(res.x[1])
+        a, b, c = get_second_degree_polynomial(abund_to_gen, chi_squares)
+        if a <= 0:
+            return self.fit_one_line(j, self.init_param_guess, self.initial_simplex_guess)
+        chi_sqr_func = lambda t: a * t * t + b * t + c
+        min_abund = minimize(chi_sqr_func, [0]).x[0]
+        min_chi_sqr = chi_sqr_func(min_abund)
+        print(min_abund, min_chi_sqr)
 
+        initial_guess = np.empty((self.ndimen + 1, self.ndimen))
 
+        if self.fit_macroturb:
+            macroturb_guesses = np.linspace(min(macroturbs), max(macroturbs), self.ndimen + 1)
+        abundance_guesses = np.linspace(min_abund - 0.1, min_abund + 0.1, self.ndimen + 1)
+        rv_guesses = np.linspace(min(doppler_shifts), max(doppler_shifts), self.ndimen + 1)
 
+        initial_guess[:, 0] = rv_guesses
+        initial_guess[:, 1] = abundance_guesses
+
+        if self.fit_macroturb:
+            initial_guess[:, -1] = macroturb_guesses
+            if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
+                initial_guess[:, -2] = self.initial_simplex_guess[:, -2]
+
+        else:
+            if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
+                initial_guess[:, -1] = self.initial_simplex_guess[:, -1]
+        return self.fit_one_line(j, initial_guess[0], initial_guess)
 
     def fit_lbl(self) -> list:
         """
@@ -650,88 +751,11 @@ class Spectra:
         """
         result = []
 
-        for j in range(len(Spectra.line_begins_sorted)):
+        for line_number in range(len(Spectra.line_begins_sorted)):
             time_start = time.perf_counter()
-            print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
+            print(f"Fitting line at {Spectra.line_centers_sorted[line_number]} angstroms")
 
-            for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
-                if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
-                    start = k
-            print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
-
-            self.ts.line_list_paths = [
-                get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, j,
-                                          start)]
-
-            res = minimize(lbl_broad_abund_chi_sqr, self.init_param_guess, args=(self,
-                                                                                 Spectra.line_begins_sorted[j] - 5.,
-                                                                                 Spectra.line_ends_sorted[j] + 5.),
-                           bounds=self.minim_bounds,
-                           method='Nelder-Mead',
-                           options={'maxiter': Spectra.ndimen * 50, 'disp': True,
-                                    'initial_simplex': self.initial_simplex_guess,
-                                    'xatol': 0.05, 'fatol': 0.05})
-
-            print(res.x)
-
-            if Spectra.fit_met:
-                met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
-                met = res.x[met_index + 1]  # offset 1: since 0th parameter is always doppler
-            else:
-                met = self.met
-            elem_abund_dict = {"Fe": met}
-
-            for i in range(Spectra.nelement):
-                # Spectra.elem_to_fit[i] = element name
-                # param[1:nelement] = abundance of the element
-                elem_name = Spectra.elem_to_fit[i]
-                if elem_name != "Fe":
-                    elem_abund_dict[elem_name] = res.x[i + 1]  # + met #TODO need metallicity here or not?
-            doppler_fit = res.x[0]
-            if self.vmicro is not None:  # Input given
-                microturb = self.vmicro
-            else:
-                if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
-                    microturb = calculate_vturb(self.teff, self.logg, met)
-                elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
-                    if Spectra.fit_macroturb:
-                        microturb = res.x[-2]  # if macroturb fit, then last param is macroturb
-                    else:
-                        microturb = res.x[-1]  # if no macroturb fit, then last param is microturb
-                elif Spectra.fit_microturb == "Input":  # just for safety's sake, normally should take in the input above anyway
-                    raise ValueError(
-                        "Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
-                        "a problem in the code?")
-                else:
-                    microturb = 2.0
-            if Spectra.fit_macroturb:
-                macroturb = res.x[-1]  # last is always macroturb, if fitted
-            else:
-                macroturb = self.macroturb
-
-            result_output = f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} " \
-                            f"{Spectra.line_ends_sorted[j]} {doppler_fit}"
-
-            for key in elem_abund_dict:
-                result_output += f" {elem_abund_dict[key]}"
-
-            result_output += f" {microturb} {macroturb} {res.fun}"
-
-            result.append(result_output)  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
-
-            wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
-                                                                    unpack=True)
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
-                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-
-            wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
-                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
-            # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
+            result.append(self.fit_one_line(line_number, self.init_param_guess, self.initial_simplex_guess))
 
             time_end = time.perf_counter()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -741,6 +765,90 @@ class Spectra:
 
         return result
 
+    def fit_one_line(self, line_number, init_param_guess, initial_simplex_guess):
+        for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
+            if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[line_number] > Spectra.seg_begins[k]:
+                start = k
+        print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
+        self.ts.line_list_paths = [
+            get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
+                                      start)]
+        res = minimize(lbl_broad_abund_chi_sqr, init_param_guess, args=(self,
+                                                                             Spectra.line_begins_sorted[line_number] - 5.,
+                                                                             Spectra.line_ends_sorted[line_number] + 5.),
+                       bounds=self.minim_bounds,
+                       method='Nelder-Mead',
+                       options={'maxiter': Spectra.ndimen * 50, 'disp': True,
+                                'initial_simplex': initial_simplex_guess,
+                                'xatol': 0.05, 'fatol': 0.05})
+        print(res.x)
+        if Spectra.fit_met:
+            met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
+            met = res.x[met_index + 1]  # offset 1: since 0th parameter is always doppler
+        else:
+            met = self.met
+        elem_abund_dict = {"Fe": met}
+        for i in range(Spectra.nelement):
+            # Spectra.elem_to_fit[i] = element name
+            # param[1:nelement] = abundance of the element
+            elem_name = Spectra.elem_to_fit[i]
+            if elem_name != "Fe":
+                elem_abund_dict[elem_name] = res.x[i + 1]  # + met #TODO need metallicity here or not?
+        doppler_fit = res.x[0]
+        if self.vmicro is not None:  # Input given
+            microturb = self.vmicro
+        else:
+            if Spectra.fit_microturb == "No" and Spectra.atmosphere_type == "1D":
+                microturb = calculate_vturb(self.teff, self.logg, met)
+            elif Spectra.fit_microturb == "Yes" and Spectra.atmosphere_type == "1D":
+                if Spectra.fit_macroturb:
+                    microturb = res.x[-2]  # if macroturb fit, then last param is macroturb
+                else:
+                    microturb = res.x[-1]  # if no macroturb fit, then last param is microturb
+            elif Spectra.fit_microturb == "Input":  # just for safety's sake, normally should take in the input above anyway
+                raise ValueError(
+                    "Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
+                    "a problem in the code?")
+            else:
+                microturb = 2.0
+        if Spectra.fit_macroturb:
+            macroturb = res.x[-1]  # last is always macroturb, if fitted
+        else:
+            macroturb = self.macroturb
+        result_output = f"{self.spec_name} {Spectra.line_centers_sorted[line_number]} {Spectra.line_begins_sorted[line_number]} " \
+                        f"{Spectra.line_ends_sorted[line_number]} {doppler_fit}"
+        for key in elem_abund_dict:
+            result_output += f" {elem_abund_dict[key]}"
+        result_output += f" {microturb} {macroturb} {res.fun}"
+        one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+        wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
+                                                                unpack=True)
+        with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+            # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+            for k in range(len(wave_result)):
+                print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
+        wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
+        with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+            # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
+            for k in range(len(wave_result)):
+                print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
+        # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
+        return one_result
+
+
+def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
+    x1 = x[0]
+    x2 = x[1]
+    x3 = x[2]
+    y1 = y[0]
+    y2 = y[1]
+    y3 = y[2]
+
+    a = (x1 * (y3 - y2) + x2 * (y1 - y3) + x3 * (y2 - y1)) / ((x1 - x2) * (x1 - x3) * (x2 - x3))
+    b = (y2 - y1) / (x2 - x1) - a * (x1 + x2)
+    c = y1 - a * x1 * x1 - b * x2
+
+    return a, b, c
 
 def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
                                   wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray) -> float:
@@ -967,7 +1075,10 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     if Spectra.fitting_mode == "all":
         result = spectra.fit_all()
     elif Spectra.fitting_mode == "lbl":
-        result = spectra.fit_lbl()
+        if new_lbl_version:
+            result = spectra.fit_lbl_v3()
+        else:
+            result = spectra.fit_lbl()
     elif Spectra.fitting_mode == "lbl_quick":
         result = spectra.fit_lbl_quick()
     else:
@@ -1387,6 +1498,7 @@ def run_TSFitPy():
 
 
 if __name__ == '__main__':
+    new_lbl_version = False
     if len(argv) > 1:
         config_location = argv[1]
     else:

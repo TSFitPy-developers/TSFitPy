@@ -146,6 +146,17 @@ class MyTestCase(unittest.TestCase):
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
 
+    def test_second_degree(self):
+        a, b, c = TSFitPy.get_second_degree_polynomial([1, 2, 3], [1, 4, 9])
+        func = lambda t: a * t * t + b * t + c
+        self.assertEqual(25, func(5))
+        self.assertEqual(25, func(-5))
+
+        a, b, c = TSFitPy.get_second_degree_polynomial([1, 2, 3], [2, 5, 10])
+        func = lambda t: a * t * t + b * t + c
+        self.assertEqual(26, func(5))
+        self.assertEqual(26, func(-5))
+
 
 if __name__ == '__main__':
     unittest.main()
