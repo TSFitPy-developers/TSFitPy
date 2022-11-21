@@ -605,7 +605,7 @@ class Spectra:
 
                 temp_dir = os.path.join(self.temp_dir, f"{abund_to_use}", '')
                 create_dir(temp_dir)
-                self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, True, temp_dir=temp_dir)
+                self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, False, temp_dir=temp_dir)
 
                 if os_path.exists(f"{temp_dir}spectrum_00000000.spec") and \
                         os.stat(f"{temp_dir}spectrum_00000000.spec").st_size != 0:
@@ -641,12 +641,12 @@ class Spectra:
                 grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
 
         for j in range(len(Spectra.line_begins_sorted)):
-            time_start = time.perf_counter()
+            #time_start = time.perf_counter()
             #print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
             # TODO: improve next 3 lines of code.
-            for k in range(len(Spectra.seg_begins)):
-                if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
-                    start = k
+            #for k in range(len(Spectra.seg_begins)):
+            #    if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
+            #        start = k
             #print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
             # each line contains spectra name and fitted line. then to the right of it abundance with chi-sqr are added
             result_one_line = f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} " \
@@ -700,7 +700,7 @@ class Spectra:
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
 
-            time_end = time.perf_counter()
+            #time_end = time.perf_counter()
             #print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
         # g.close()
