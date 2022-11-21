@@ -257,7 +257,7 @@ class Spectra:
     atmosphere_type: str = None  # "1D" or "3D", string
     include_molecules: str = None  # "True" or "False", string
     nlte_flag: bool = None
-    fit_microturb: str = "No"
+    fit_microturb: str = "No"   # TODO: redo as bool. It expects, "Yes", "No" or "Input". Add extra variable if input?
     fit_macroturb: bool = False
     fit_teff: str = None  # does not work atm
     fit_logg: str = None  # does not work atm
@@ -292,7 +292,7 @@ class Spectra:
 
     init_guess_dict: dict = None    # initial guess for elements, if given
 
-    # bounds for the minimization
+    # bounds for the minimization   #TODO: move to outside config?
     bound_min_macro = 0         # km/s
     bound_max_macro = 30
     bound_min_micro = 0.01         # km/s
@@ -416,7 +416,7 @@ class Spectra:
                              max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
-
+        # TODO: check that guess within bound
         initial_guess = np.empty((length + 1, length))
 
         microturb_guesses = np.linspace(min_microturb, max_microturb, length + 1)
@@ -454,7 +454,7 @@ class Spectra:
         # param[-1] = macro turb IF MACRO FIT
         # param[-2] = micro turb IF MACRO FIT
         # param[-1] = micro turb IF NOT MACRO FIT
-
+        # TODO: check that guess within bound
         initial_guess = np.empty((length + 1, length))
 
         microturb_guesses = np.linspace(min_microturb, max_microturb, length + 1)
@@ -498,8 +498,18 @@ class Spectra:
 
     def get_rv_macro_guess(self, length: int, min_rv: float, max_rv: float, min_macroturb: float,
                            max_macroturb: float) -> tuple[np.ndarray, list[tuple]]:
+        """
+        Gets rv and macroturbulence guess if it is fitted for simplex guess
+        :param length: number of dimensions (output length+1 x length array)
+        :param min_rv: minimum RV for guess (not bounds)
+        :param max_rv: maximum RV for guess (not bounds)
+        :param min_macroturb: minimum macro for guess (not bounds)
+        :param max_macroturb: maximum macro for guess (not bounds)
+        :return: Initial guess and minimum bound
+        """
         # param[0] = doppler
         # param[1] = macro turb
+        # TODO: improve the function
         initial_guess = np.empty((length + 1, length))
         minim_bounds = [(self.bound_min_doppler, self.bound_max_doppler)]
 
@@ -530,7 +540,7 @@ class Spectra:
         :param vmicro: microturbulence parameter
         :param lmin: minimum wavelength where spectra are computed
         :param lmax: maximum wavelength where spectra are computed
-        :param windows_flag - False for lbl, True for all lines or lbl quick
+        :param windows_flag - False for lbl, True for all lines. TODO: uh does windows flag remove calculation of specific elements/molecules from the spectra?
         :param temp_dir: Temporary directory where to save, if not given, then self.temp_dir is used
         """
         if temp_dir is None:
@@ -553,7 +563,7 @@ class Spectra:
                               segment_file=self.segment_file, line_mask_file=self.linemask_file)
         self.ts.run_turbospectrum_and_atmosphere()
 
-    def fit_all(self):
+    def fit_all(self) -> str:
         """
         Fit all lines at once, trying to minimise chi squared
         :return: Result is a string containing Fitted star name, abundance, RV, chi squared and macroturbulence
@@ -578,7 +588,7 @@ class Spectra:
         #shutil.rmtree(self.temp_dir)
         return result
 
-    def generate_grid_for_lbl(self, abund_to_gen) -> list:
+    def generate_grid_for_lbl(self, abund_to_gen: np.ndarray) -> list:
         """
         Generates grids for lbl quick method. Grids are centered at input metallicity/abundance. Number of grids and
         bounds depend on self.abund_bound, self.grids_amount
@@ -707,7 +717,12 @@ class Spectra:
 
         return result
 
-    def fit_lbl_v3(self):
+    def fit_lbl_v3(self) -> list:
+        """
+        Attempt to improve v1 by getting a better guess. It does by trying to find parabola of chi sqr VS abundance.
+        The minimum -> best fit guess. Doesn't work too well. Delete?
+        :return list of best fit abundances
+        """
         result = []
 
         for j in range(len(Spectra.line_begins_sorted)):
@@ -724,7 +739,13 @@ class Spectra:
 
         return result
 
-    def fit_one_line_v3_better_guess(self, j):
+    def fit_one_line_v3_better_guess(self, j: int) -> str:
+        """
+        Attempt to improve v1 by getting a better guess. It does by trying to find parabola of chi sqr VS abundance.
+        The minimum -> best fit guess. Doesn't work too well. Delete?
+        :param j: list number index
+        :return: string with the best fit
+        """
         if self.fit_macroturb:
             ndimen = 2
         else:
@@ -853,7 +874,7 @@ class Spectra:
     def fit_lbl_v2(self) -> list:
         """
         Fits line by line, by going through each line in the linelist and computing best abundance/met with chi sqr.
-        Also fits doppler shift and can fit micro and macro turbulence
+        Also fits doppler shift and can fit micro and macro turbulence. New method, faster and more accurate TM.
         :return: List with the results. Each element is a string containing file name, center start and end of the line,
         Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
         """
@@ -876,7 +897,14 @@ class Spectra:
 
         return result
 
-    def fit_one_line(self, line_number, init_param_guess, initial_simplex_guess):
+    def fit_one_line(self, line_number: int, init_param_guess: list, initial_simplex_guess: list) -> str:
+        """
+        Fits one line by fitting all paramters at once using minimization
+        :param line_number: Which line number/index in line_center_sorted is being fitted
+        :param init_param_guess: Initial parameter guess list
+        :param initial_simplex_guess: simplex guess for Nelder-Mead
+        :return: best fit result string for that line
+        """
         for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
             if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[line_number] > Spectra.seg_begins[k]:
                 start = k
@@ -904,7 +932,7 @@ class Spectra:
             # param[1:nelement] = abundance of the element
             elem_name = Spectra.elem_to_fit[i]
             if elem_name != "Fe":
-                elem_abund_dict[elem_name] = res.x[i + 1]  # + met #TODO need metallicity here or not?
+                elem_abund_dict[elem_name] = res.x[i + 1]
         doppler_fit = res.x[0]
         if self.vmicro is not None:  # Input given
             microturb = self.vmicro
@@ -946,7 +974,12 @@ class Spectra:
         # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
         return one_result
 
-    def fit_one_line_v2(self, line_number):
+    def fit_one_line_v2(self, line_number: int) -> str:
+        """
+        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
+        :param line_number: Which line number/index in line_center_sorted is being fitted
+        :return: best fit result string for that line
+        """
         for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
             if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[line_number] > Spectra.seg_begins[k]:
                 start = k
@@ -1018,6 +1051,13 @@ class Spectra:
 
 
 def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
+    """
+    Takes a list of x and y of length 3 each and calculates perfectly fitted second degree polynomial through it.
+    Returns a, b, c that are related to the function ax^2+bx+c = y
+    :param x: x values, length 3
+    :param y: y values, length 3
+    :return a,b,c -> ax^2+bx+c = y 2nd degree polynomial
+    """
     x1 = x[0]
     x2 = x[1]
     x3 = x[2]
@@ -1157,7 +1197,8 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
 def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
-    shift and if needed micro + macro turbulence
+    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
+    doppker inside
     :param param: Parameters list with the current evaluation guess
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
@@ -1170,7 +1211,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
 
     if Spectra.fit_met:
         met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
-        met = param[met_index]  # no offset
+        met = param[met_index]  # no offset, first is always element
     else:
         met = spectra_to_fit.met
     elem_abund_dict = {"Fe": met}
@@ -1179,7 +1220,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
 
     for i in range(Spectra.nelement):
         # Spectra.elem_to_fit[i] = element name
-        # param[1:nelement] = abundance of the element
+        # param[0:nelement - 1] = abundance of the element
         elem_name = Spectra.elem_to_fit[i]
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param[i] + met
@@ -1202,7 +1243,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
     if microturb <= 0.0 or min(abundances) < -40 or met < -4.0 or met > 0.5:
         chi_square = 9999.9999
     else:
-        spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)
+        spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)     # generates spectra
 
         if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
@@ -1216,11 +1257,9 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
                                                                         spectra_to_fit.rv + 0.5,
                                                                         spectra_to_fit.macroturb - 3,
                                                                         spectra_to_fit.macroturb + 3)
-            #print("guesses", param_guess, min_bounds)
-            #min_bounds = [(-1, 1)]
-            #if spectra_to_fit.fit_macroturb:
-            #    min_bounds.append((spectra_to_fit.bound_min_macro, spectra_to_fit.bound_max_macro))
-
+            # now for the generated abundance it tries to fit best fit macro + doppler shift.
+            # Thus macro should not be dependent on the abundance directly, hopefully
+            # Seems to work way better
             res = minimize(lbl_broad_abund_chi_sqr_quick, param_guess[0], args=(spectra_to_fit, lmin, lmax,
                                                                                 wave_mod_orig, flux_mod_orig),
                            bounds=min_bounds,
@@ -1356,7 +1395,7 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
 
     if Spectra.fitting_mode == "all":
         result = spectra.fit_all()
-    elif Spectra.fitting_mode == "lbl":
+    elif Spectra.fitting_mode == "lbl":     # calls specific lbl version. remove next 5 lines to revert to original
         if new_lbl_version == 3:
             result = spectra.fit_lbl_v3()
         elif new_lbl_version == 2:
@@ -1782,15 +1821,19 @@ def run_TSFitPy():
 
 
 if __name__ == '__main__':
+    # lbl version.
+    # 1: original version.
+    # 2: for each generated abundance, fits doppler shift + macroturbulence separately. much faster! reduced tolerance as well
+    # 3: similar to 1, but tries to find a good guess for an initial abundance and then fits using version 1. To remove? Works, but not as good as I hoped.
     new_lbl_version = 2
-    if len(argv) > 1:
+    if len(argv) > 1:   # when calling the program, can now add extra argument with location of config file, easier to call
         config_location = argv[1]
     else:
         config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
     print(config_location)
     # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
-    today = f"{today}_{np.random.random(1)[0]}"
+    today = f"{today}_{np.random.random(1)[0]}"     # in case if someone calls the function several times per second
     print(f"Start of the fitting: {today}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     run_TSFitPy()

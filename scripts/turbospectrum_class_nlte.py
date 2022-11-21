@@ -130,7 +130,7 @@ class TurboSpectrum:
         :return:
             None
         """
-
+        #TODO: calling it every time. But we only need to run once.
         pattern = r"([sp])(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
                   r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....).mod"
 
@@ -143,9 +143,8 @@ class TurboSpectrum:
         self.marcs_value_keys.sort()
         self.marcs_models = {}
 
-        #marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))
+        #marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))  # 18.11.22 NS: Takes several seconds here per star, is not used anywhere though? Uncommented for now at least
         marcs_nlte_models = np.loadtxt(self.marcs_grid_list, dtype='str', usecols=(0,), unpack=True)
-        #marcs_nlte_models = np.loadtxt("/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt", dtype='str', usecols=(0,), unpack=True)
         spud_models = []
         for i in range(len(marcs_nlte_models)):
             aux_pattern = r"(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
