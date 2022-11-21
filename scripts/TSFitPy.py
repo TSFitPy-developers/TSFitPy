@@ -965,9 +965,9 @@ class Spectra:
                                                                              Spectra.line_ends_sorted[line_number] + 5.),
                        bounds=min_bounds,
                        method='Nelder-Mead',
-                       options={'maxiter': Spectra.ndimen * 50, 'disp': True,
+                       options={'maxfev': Spectra.nelement * 50, 'disp': True,
                                 'initial_simplex': param_guess,
-                                'xatol': 0.05, 'fatol': 0.05})
+                                'xatol': 0.01, 'fatol': 0.01})
         print(res.x)
         if Spectra.fit_met:
             met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
@@ -1216,7 +1216,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
                                                                         spectra_to_fit.rv + 0.5,
                                                                         spectra_to_fit.macroturb - 3,
                                                                         spectra_to_fit.macroturb + 3)
-            print("guesses", param_guess, min_bounds)
+            #print("guesses", param_guess, min_bounds)
             #min_bounds = [(-1, 1)]
             #if spectra_to_fit.fit_macroturb:
             #    min_bounds.append((spectra_to_fit.bound_min_macro, spectra_to_fit.bound_max_macro))
@@ -1790,6 +1790,7 @@ if __name__ == '__main__':
     print(config_location)
     # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    today = f"{today}_{np.random.random(1)[0]}"
     print(f"Start of the fitting: {today}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     run_TSFitPy()
