@@ -10,6 +10,23 @@ import math
 from solar_abundances import solar_abundances, periodic_table
 from solar_isotopes import solar_isotopes
 
+
+def closest_available_value(target: float, options: list[float]) -> float:
+    """
+    Return the option from a list which most closely matches some target value.
+
+    :param target:
+        The target value that we're trying to match.
+    :param options:
+        The list of possible values that we can try to match to target.
+    :return:
+        The option value which is closest to <target>.
+    """
+    options = np.asarray(options)
+    idx = (np.abs(options - target)).argmin()
+    return options[idx]
+
+
 class TurboSpectrum:
     """
     A class which wraps Turbospectrum.
@@ -30,41 +47,17 @@ class TurboSpectrum:
     # This includes interpolating between models with different values of these settings
     marcs_parameters_to_ignore = ["a", "c", "n", "o", "r", "s"]
 
-    def __init__(self,
-                 turbospec_path="/Users/gerber/iwg7_pipeline/turbospectrum-19.1/exec-gf-v19.1/",
-                 interpol_path="/Users/gerber/iwg7_pipeline/interpol_marcs/",
-                 line_list_paths="/Users/gerber/iwg7_pipeline/turbospectrum-19.1/COM-v19.1/linelists/",
-                 marcs_grid_path="/Users/gerber/iwg7_pipeline/fromBengt/marcs_my_search/plane_and_sphere/",
-                 marcs_grid_list="/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_MARCSfullGrid.txt",
-                 model_atom_path = "/Users/gerber/gitprojects/SAPP_gitversion/SAPP-SS/input_files/nlte_data/Ca/",
-                 departure_file_path = "/Users/gerber/gitprojects/SAPP_gitversion/SAPP-SS/input_files/nlte_data/Ca/"):
+    def __init__(self, turbospec_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
+                 marcs_grid_list: str, model_atom_path: str, departure_file_path: str):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
-        :param turbospec_path:
-            Path where the turbospectrum binaries 'babsma' and 'bsyn' can be found.
-
-        :type turbospec_path:
-            str
-
-        :param interpol_path:
-            Path where the compiled interpol_modeles.f binary can be found.
-
-        :type interpol_path:
-            str
-
-        :param line_list_paths:
-            Path(s) where line lists for synthetic spectra can be found. Specify as either a string, or a list of
-            strings.
-
-        :type line_list_paths:
-            list or str
-
-        :param marcs_grid_path:
-            Path where a grid of MARCS .mod files can be found. These contain the model atmospheres we use.
-
-        :type marcs_grid_path:
-            str
+        :param turbospec_path: Path where the turbospectrum binaries 'babsma' and 'bsyn' can be found.
+        :param interpol_path: Path where the compiled interpol_modeles.f binary can be found.
+        :param line_list_paths: Path(s) where line lists for synthetic spectra can be found. Specify as either a string, or a list of strings.
+        :param marcs_grid_path: Path where a grid of MARCS .mod files can be found. These contain the model atmospheres we use.
+        :param model_atom_path: Path to the model atom paths
+        :param departure_file_path: Path to the NLTE departure file paths
         """
 
         if not isinstance(line_list_paths, (list, tuple)):
@@ -79,27 +72,27 @@ class TurboSpectrum:
         self.departure_file_path = departure_file_path
 
         # Default spectrum parameters
-        self.lambda_min = 5100  # Angstrom
-        self.lambda_max = 5200
-        self.lambda_delta = 0.05
-        self.metallicity = -1.5
-        self.stellar_mass = 1
-        self.log_g = 2.0
-        self.t_eff = 5100.0
-        self.turbulent_velocity = 2.0  # micro turbulence, km/s
-        self.free_abundances = None
-        self.free_isotopes = None
-        self.sphere = None
-        self.alpha = None
-        self.s_process = 0
-        self.r_process = 0
-        self.verbose = False
+        self.lambda_min: float = 5100  # Angstrom
+        self.lambda_max: float = 5200
+        self.lambda_delta: float = 0.05
+        self.metallicity: float = -1.5
+        self.stellar_mass: float = 1
+        self.log_g: float = 2.0
+        self.t_eff: float = 5100.0
+        self.turbulent_velocity: float = 2.0  # micro turbulence, km/s
+        self.free_abundances: dict = None
+        self.free_isotopes: dict = None
+        self.sphere: bool = None
+        self.alpha = None   # not used?
+        self.s_process = 0  # not used?
+        self.r_process = 0  # not used?
+        self.verbose: bool = False
         self.line_list_files = None
 
-        #parameters needed for nlte and <3D> calculations
-        self.nlte_flag = False
-        self.atmosphere_dimension = "1D"
-        self.windows_flag = False
+        # parameters needed for nlte and <3D> calculations
+        self.nlte_flag: bool = False
+        self.atmosphere_dimension: str = "1D"
+        self.windows_flag: bool = False
         self.depart_bin_file = None
         self.depart_aux_file = None
         self.model_atom_file = None
@@ -158,7 +151,7 @@ class TurboSpectrum:
             spud_models.append(spud)
 
         marcs_nlte_models = spud_models
-        
+
         for item in marcs_nlte_models:
 
             # Extract model parameters from .mod filename
@@ -319,26 +312,6 @@ class TurboSpectrum:
             self.turbulent_velocity = 2.0
             print("turbulent_velocity is not used since model atmosphere is 3D")
 
-    def closest_available_value(self, target, options):
-        """
-        Return the option from a list which most closely matches some target value.
-
-        :param target:
-            The target value that we're trying to match.
-        :param options:
-            The list of possible values that we can try to match to target.
-        :return:
-            The option value which is closest to <target>.
-        """
-        mismatch_best = np.inf
-        option_best = None
-        for item in options:
-            mismatch = abs(target - item)
-            if mismatch < mismatch_best:
-                mismatch_best = mismatch
-                option_best = item
-        return option_best
-
     def _generate_model_atmosphere(self):
         """
         Generates an interpolated model atmosphere from the MARCS grid using the interpol.f routine developed by
@@ -357,7 +330,7 @@ class TurboSpectrum:
 #            stderr = subprocess.STDOUT
 
         # Defines default point at which plane-parallel vs spherical model atmosphere models are used
-        spherical = self.sphere
+        spherical: bool = self.sphere
         if spherical is None:
             spherical = (self.log_g < 3)
 
@@ -367,7 +340,7 @@ class TurboSpectrum:
         #print(marcs_parameters)
         if spherical:
             marcs_parameters['spherical'] = "s"
-            marcs_parameters['mass'] = self.closest_available_value(self.stellar_mass, self.marcs_values['mass'])
+            marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 2.0
             #print(marcs_parameters['mass'])
@@ -377,6 +350,7 @@ class TurboSpectrum:
             marcs_parameters['mass'] = 0  # All plane-parallel models have mass set to zero
 
         #quick setting to reduce temperature in case temperature is higher than grid allows, will give warning that it has happened
+        # TODO: logg == 4.0? should be inequality sign maybe?
         if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":
             print("warning temp was {} and the highest value available is 6500. setting temp to 6500 to interpolate model atmosphere. will be {:.2f} for spectrum generation".format(self.t_eff, self.t_eff))
             temp_teff = self.t_eff
@@ -389,11 +363,11 @@ class TurboSpectrum:
                                          "log_g": self.log_g,
                                          "metallicity": self.metallicity,
                                          }
-
+        # go through each value that is interpolated
         for key in interpolate_parameters:
             value = interpolate_parameters_around[key]
-            options = self.marcs_values[key]
-            if (value < options[0]) or (value > options[-1]):
+            options = self.marcs_values[key]    # get what values exist in marcs values
+            if (value < options[0]) or (value > options[-1]):   # checks that the value is within the marcs possible values
                 return {
                     "errors": "Value of parameter <{}> needs to be in range {} to {}. You requested {}.".
                         format(key, options[0], options[-1], value)
@@ -440,7 +414,7 @@ class TurboSpectrum:
                         dict_iter = dict_iter[value]
 
                     # Success -- we've found a model which matches all requested parameter.
-                    # Extract filename of model we've found. 
+                    # Extract filename of model we've found.
                     dict_iter = dict_iter['filename']
 
                 except KeyError:
@@ -569,7 +543,7 @@ class TurboSpectrum:
                     interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
                     interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
                     interpol_config += "'{}'\n".format(model_test)
-            
+
                     # Now we run the FORTRAN model interpolator
                     #print(self.free_abundances["Ba"])
                     try:
@@ -619,7 +593,7 @@ class TurboSpectrum:
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
             interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
             interpol_config += "'{}'\n".format(model_test)
-    
+
             # Now we run the FORTRAN model interpolator
             #print(self.free_abundances["Ba"])
             try:
@@ -642,7 +616,7 @@ class TurboSpectrum:
             #print("spud")
             if spherical:
                 self.turbulent_velocity = microturbulence
-
+        # TODO: equality with logg 4.0 here again?
         if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D": #reset temp to what it was before
             self.t_eff = temp_teff
 
@@ -750,21 +724,21 @@ class TurboSpectrum:
                 f_low = open(low_model_name, 'r')
                 lines_low = f_low.read().splitlines()
                 t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
-    
+
                 f_high = open(high_model_name, 'r')
                 lines_high = f_high.read().splitlines()
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
-    
+
                 fxhigh = microturbulence - turbulence_low
                 fxlow = 1.0 - fxhigh
-    
+
                 t_interp = t_low*fxlow + t_high*fxhigh
                 temp_interp = temp_low*fxlow + temp_high*fxhigh
                 pe_interp = pe_low*fxlow + pe_high*fxhigh
                 pt_interp = pt_low*fxlow + pt_high*fxhigh
                 lum_interp = lum_low*fxlow + lum_high*fxhigh
                 spud_interp = spud_low*fxlow + spud_high*fxhigh
-    
+
                 interp_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 interp_model_name += '.interpol'
                 #print(interp_model_name)
@@ -781,14 +755,14 @@ class TurboSpectrum:
                 print(lines_low[-2], file=g)
                 print(lines_low[-1], file=g)
                 g.close()
-    
+
                 #atmosphere_properties = atmosphere_properties_low
                 #atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], element)
-        
+
                     #print(atmosphere_properties)
-        
+
                     #os.system("mv /Users/gerber/iwg7_pipeline/4most-4gp-scripts/files_from_synthesis/current_run/files_for_micro_interp/* ../")
-    
+
 
                 for element, abundance in self.free_abundances.items():
                     if self.model_atom_file[element] != "":
@@ -799,19 +773,19 @@ class TurboSpectrum:
                         f_coef_low = open(low_coef_dat_name, 'r')
                         lines_coef_low = f_coef_low.read().splitlines()
                         f_coef_low.close()
-        
+
                         high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                         high_coef_dat_name += '_{}_coef.dat'.format(element)
                         high_coef_dat_name = high_model_name.replace('.interpol','_{}_coef.dat'.format(element))
                         f_coef_high = open(high_coef_dat_name, 'r')
                         lines_coef_high = f_coef_high.read().splitlines()
                         f_coef_high.close()
-            
+
                         interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                         interp_coef_dat_name += '_{}_coef.dat'.format(element)
-            
+
                         num_lines = np.loadtxt(low_coef_dat_name, unpack = True, skiprows=9, max_rows = 1)
-            
+
                         g = open(interp_coef_dat_name, 'w')
                         for i in range(11):
                             print(lines_coef_low[i], file=g)
@@ -842,30 +816,30 @@ class TurboSpectrum:
                 high_model_name += '.interpol'
                 if atmosphere_properties_high['errors']:
                     return atmosphere_properties_high
-    
+
                 self.turbulent_velocity = microturbulence
                 #self.tmp_dir = temp_dir
-    
+
                 #interpolate and find a model atmosphere for the microturbulence
                 self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g, self.metallicity, self.turbulent_velocity)
                 f_low = open(low_model_name, 'r')
                 lines_low = f_low.read().splitlines()
                 t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
-    
+
                 f_high = open(high_model_name, 'r')
                 lines_high = f_high.read().splitlines()
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
-    
+
                 fxhigh = microturbulence - turbulence_low
                 fxlow = 1.0 - fxhigh
-    
+
                 t_interp = t_low*fxlow + t_high*fxhigh
                 temp_interp = temp_low*fxlow + temp_high*fxhigh
                 pe_interp = pe_low*fxlow + pe_high*fxhigh
                 pt_interp = pt_low*fxlow + pt_high*fxhigh
                 lum_interp = lum_low*fxlow + lum_high*fxhigh
                 spud_interp = spud_low*fxlow + spud_high*fxhigh
-    
+
                 interp_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 interp_model_name += '.interpol'
                 #print(interp_model_name)
@@ -882,7 +856,7 @@ class TurboSpectrum:
                 print(lines_low[-2], file=g)
                 print(lines_low[-1], file=g)
                 g.close()
-    
+
                 #atmosphere_properties = atmosphere_properties_low
                 atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], 'Fe')
 
@@ -896,7 +870,7 @@ class TurboSpectrum:
             self.turbulent_velocity = microturbulence
 
         elif flag_dont_interp_microturb == 0 and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.: #not enough models to interp if lower than 1 and t_eff > 3900
-            microturbulence = self.turbulent_velocity                          
+            microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 1.0
             atmosphere_properties = self._generate_model_atmosphere()
             if atmosphere_properties['errors']:
@@ -906,7 +880,7 @@ class TurboSpectrum:
 
         elif flag_dont_interp_microturb == 1:
             if self.log_g < 3:
-                microturbulence = self.turbulent_velocity  
+                microturbulence = self.turbulent_velocity
                 self.turbulent_velocity = 2.0
             atmosphere_properties = self._generate_model_atmosphere()
             if self.log_g < 3:
@@ -931,8 +905,8 @@ class TurboSpectrum:
         #if len(self.free_abundances.items()) == 1:
         #    nlte_fe = nlte
         #else:
-        #    nlte_fe = 
-        
+        #    nlte_fe =
+
         file = open("{}/SPECIES_LTE_NLTE_{:08d}.dat".format(data_path,self.counter_spectra), 'w')
         #print("# This file controls which species are treated in LTE/NLTE", file=file)
         #print("# It also gives the path to the model atom and the departure files", file=file)
@@ -1017,7 +991,7 @@ class TurboSpectrum:
         #print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
-        
+
         individual_isotopes = "'ISOTOPES : ' '149'\n"
         if self.free_isotopes is None:
             for isotope, ratio in solar_isotopes.items():
@@ -1200,7 +1174,7 @@ class TurboSpectrum:
            pure_lte=pure_lte_boolean_code,
            xifix=xifix_boolean_code
            )
-        
+
         #print(babsma_config)
         #print(bsyn_config)
         return babsma_config, bsyn_config

@@ -1,6 +1,7 @@
 import unittest
 import TSFitPy
 import numpy as np
+import turbospectrum_class_nlte
 
 
 class MyTestCase(unittest.TestCase):
@@ -156,6 +157,14 @@ class MyTestCase(unittest.TestCase):
         func = lambda t: a * t * t + b * t + c
         self.assertEqual(26, func(5))
         self.assertEqual(26, func(-5))
+
+    def test_closest_available_value(self):
+        self.assertEqual(turbospectrum_class_nlte.closest_available_value(1, [0, 2.5, 5, 10]), 0)
+        self.assertEqual(turbospectrum_class_nlte.closest_available_value(5, [0, 2.5, 5, 10]), 5)
+        self.assertEqual(turbospectrum_class_nlte.closest_available_value(-10, [0, 2.5, 5, 10]), 0)
+        self.assertEqual(turbospectrum_class_nlte.closest_available_value(100, [0, 2.5, 5, 10]), 10)
+        self.assertEqual(turbospectrum_class_nlte.closest_available_value(7, [0, 2.5, 5, 10]), 5)
+        self.assertEqual(turbospectrum_class_nlte.closest_available_value(8, [0, 2.5, 5, 10]), 10)
 
 
 if __name__ == '__main__':
