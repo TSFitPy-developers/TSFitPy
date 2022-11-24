@@ -989,7 +989,7 @@ class Spectra:
                                       start)]
 
         ndimen = self.nelement
-        if self.fit_microturb:
+        if self.fit_microturb == "Yes":
             ndimen += 1
         param_guess, min_bounds = self.get_elem_micro_guess(ndimen, 0.9, 1.3, -1, 0.4)
 
@@ -1035,18 +1035,21 @@ class Spectra:
             result_output += f" {elem_abund_dict[key]}"
         result_output += f" {microturb} {macroturb} {res.fun}"
         one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
-        wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
-                                                                unpack=True)
-        with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
-            # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-            for k in range(len(wave_result)):
-                print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-        wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
-        with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
-            # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-            for k in range(len(wave_result)):
-                print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
-        # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
+        try:
+            wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
+                                                                    unpack=True)
+            with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+                for k in range(len(wave_result)):
+                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
+            wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
+            with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
+                for k in range(len(wave_result)):
+                    print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
+            # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
+        except OSError:
+            print("Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         return one_result
 
 

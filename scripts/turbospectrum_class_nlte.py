@@ -1302,7 +1302,10 @@ class TurboSpectrum:
 
     def run_turbospectrum_and_atmosphere(self):
         self.calculate_atmosphere()
-        self.run_turbospectrum()
+        try:
+            self.run_turbospectrum()
+        except AttributeError:
+            print("No attribute, fail of generation?")
 
 def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
     """
