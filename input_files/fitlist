@@ -1,1 +1,4 @@
-#name_of_spectrum_to_fit     rv      teff  logg  [Fe/H] (skip if not fitting Fe)    [X/H] (for lbl quick ONLY, skip otherwise)  Input_vmicroturb Input_vmacroturb
+#name_of_spectrum_to_fit     rv      teff  logg  [Fe/H] (skip if not fitting Fe)  Input_vmicroturb Input_vmacroturb
+00001298-5954125.txt	0	4740	1.55	-2.28
+00001298-5954125.txt	76.31	4000	2	-2
+00001298-5954125.txt	76.31	5848.454933720059	4.4091328215542	-0.5299823148453688
