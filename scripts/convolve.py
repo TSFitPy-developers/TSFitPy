@@ -7,10 +7,10 @@ from astropy.modeling import Fittable1DModel, Parameter
 from scipy import interpolate
 
 speed_of_light_kms = const.c.to('km/s').value
-
+conv_res_const_twos = (2.0 * np.sqrt(2. * np.log(2.)))  # just not to call it every time
 def conv_res(wave, flux, resolution):
-    d_lam = (np.mean(wave)/resolution)
-    sigma = d_lam / (2.0 * np.sqrt(2. * np.log(2.)))
+    fwhm = (np.mean(wave)/resolution)   # 30.11.2022 NS: renamed "d_lam" to FWHM, because that's what it is supposed to be
+    sigma = fwhm / conv_res_const_twos
     kernel = convolution.Gaussian1DKernel(sigma/(wave[1]-wave[0]))
     flux_conv = convolution.convolve(flux, kernel, fill_value=1)
     wave_conv = np.array(wave)

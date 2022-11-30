@@ -340,8 +340,12 @@ class TurboSpectrum:
         marcs_parameters['turbulence'] = self.turbulent_velocity #JMG line to make microturbulence an adjustable variable
         #print(marcs_parameters)
         if spherical:
-            marcs_parameters['spherical'] = "s"
-            marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
+            if self.atmosphere_dimension == "1D":
+                marcs_parameters['spherical'] = "s"
+                marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
+            else:
+                marcs_parameters['spherical'] = "p"
+                marcs_parameters['mass'] = 0
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 2.0
             #print(marcs_parameters['mass'])
@@ -421,7 +425,7 @@ class TurboSpectrum:
                 except KeyError:
                     # We get a KeyError if there is no model matching the parameter combination we tried
                     failed_on_parameter = (parameter, value, list(dict_iter.keys()))
-                    #print(failed_on_parameter)
+                    print(failed_on_parameter)
                     dict_iter = None
                     failures += 1
                 marcs_model_list.append(dict_iter)

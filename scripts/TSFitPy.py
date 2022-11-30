@@ -70,19 +70,19 @@ def calculate_vturb(teff: float, logg: float, met: float) -> float:
     return v_mturb
 
 
-def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, fwhm: float, macro: float, rot: float) -> tuple[
+def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, resolution: float, macro: float, rot: float) -> tuple[
     np.ndarray, np.ndarray]:
     """
-    Convolves spectra with FWHM, macroturbulence or rotation if values are non-zero
+    Convolves spectra with resolution, macroturbulence or rotation if values are non-zero
     :param wave: wavelength array, in ascending order
     :param flux: flux array normalised
-    :param fwhm: FWHM, zero if not required
+    :param resolution: resolution, zero if not required
     :param macro: Macroturbulence in km/s, zero if not required
     :param rot: Rotation in km/s, 0 if not required
     :return: 2 arrays, first is convolved wavelength, second is convolved flux
     """
-    if fwhm != 0.0:
-        wave_mod_conv, flux_mod_conv = conv_res(wave, flux, fwhm)
+    if resolution != 0.0:
+        wave_mod_conv, flux_mod_conv = conv_res(wave, flux, resolution)
     else:
         wave_mod_conv = wave
         flux_mod_conv = flux
@@ -139,7 +139,7 @@ def calculate_all_lines_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, 
 
 
 def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: str, wave_obs: np.ndarray,
-                              flux_obs: np.ndarray, macro: float, fwhm: float, rot: float,
+                              flux_obs: np.ndarray, macro: float, resolution: float, rot: float,
                               line_begins_sorted: np.ndarray, line_ends_sorted: np.ndarray,
                               seg_begins: np.ndarray, seg_ends: np.ndarray) -> float:
     """
@@ -151,7 +151,7 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
     :param wave_obs: Observed wavelength
     :param flux_obs: Observed normalised flux
     :param macro: Macroturbulence in km/s, zero if not required
-    :param fwhm: FWHM, zero if not required
+    :param resolution: resolution, zero if not required
     :param rot: Rotation in km/s, 0 if not required
     :param line_begins_sorted: Sorted line list, wavelength of a line start
     :param line_ends_sorted: Sorted line list, wavelength of a line end
@@ -173,7 +173,7 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
         wave_mod_filled = np.array(wave_mod_filled)
         flux_mod_filled = np.array(flux_mod_filled)
 
-        wave_mod, flux_mod = get_convolved_spectra(wave_mod_filled, flux_mod_filled, fwhm, macro, rot)
+        wave_mod, flux_mod = get_convolved_spectra(wave_mod_filled, flux_mod_filled, resolution, macro, rot)
 
         chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
                                                      line_ends_sorted, seg_begins, seg_ends)
@@ -196,7 +196,7 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
 
 
 def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_obs: np.ndarray,
-                              wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, fwhm: float, lmax: float,
+                              wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, resolution: float, lmax: float,
                               lmin: float, macro: float, rot: float, save_convolved=True) -> float:
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
@@ -206,7 +206,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     :param flux_obs: Observed normalised flux
     :param wave_mod_orig: Synthetic wavelength
     :param flux_mod_orig: Synthetic normalised flux
-    :param fwhm: FWHM, zero if not required
+    :param resolution: resolution, zero if not required
     :param lmax: Wavelength, start of segment (will calculate at +5 AA to this)
     :param lmin: Wavelength, end of segment  (will calculate at -5 AA to this)
     :param macro: Macroturbulence in km/s, zero if not required
@@ -220,7 +220,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
 
-    wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, fwhm, macro, rot)
+    wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
     if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
         flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
         wave_line = wave_obs[
@@ -267,7 +267,7 @@ class Spectra:
     lmin: float = None
     lmax: float = None
     ldelta: float = None
-    fwhm: float = None  # FWHM coming from resolution, constant for all stars
+    resolution: float = None  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
     #macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
     rot: float = None  # rotation km/s, constant for all stars
     fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
@@ -1103,7 +1103,7 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
         chi_square = 9999.9999
     else:
         chi_square = calculate_lbl_chi_squared(None, wave_ob,
-                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.fwhm, lmax,
+                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax,
                                                lmin, macroturb,
                                                Spectra.rot, save_convolved=False)
 
@@ -1178,7 +1178,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
             wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
                                                       usecols=(0, 1), unpack=True)
             chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.fwhm,
+                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
                                                    lmax, lmin, macroturb,
                                                    Spectra.rot)
         elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
@@ -1278,7 +1278,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
             macroturb = spectra_to_fit.macroturb
 
             chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.fwhm,
+                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
                                                    lmax, lmin, macroturb,
                                                    Spectra.rot)
         elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
@@ -1364,7 +1364,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
         chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
                                                spectra_to_fit.output_folder,
                                                wave_obs, spectra_to_fit.flux_ob,
-                                               macroturb, Spectra.fwhm, Spectra.rot,
+                                               macroturb, Spectra.resolution, Spectra.rot,
                                                Spectra.line_begins_sorted, Spectra.line_ends_sorted,
                                                Spectra.seg_begins, Spectra.seg_ends)
 
@@ -1555,7 +1555,7 @@ def run_TSFitPy():
             if fields[0] == "wavelength_delta":
                 Spectra.ldelta = float(fields[2])
             if fields[0] == "resolution":
-                Spectra.fwhm = float(fields[2])
+                Spectra.resolution = float(fields[2])
             if fields[0] == "macroturbulence":
                 macroturb_input = float(fields[2])
             if fields[0] == "rotation":
