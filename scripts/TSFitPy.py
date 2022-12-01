@@ -699,7 +699,8 @@ class Spectra:
 
             result.append(result_one_line)
             # finds best fit chi squared for the line and corresponding abundance
-            index_min_chi_square = np.argmin(chi_squares)
+            # 01.12.2022 NS: removed the next few lines, because takes 10 MB/star, which is quite a bit
+            """index_min_chi_square = np.argmin(chi_squares)
             min_chi_sqr_spectra_path = os.path.join(self.temp_dir, f"{self.abund_to_gen[index_min_chi_square]}",
                                                     'spectrum_00000000.spec')
             # appends that best fit spectra to the total output spectra. NOT convolved. separate abundance for each line
@@ -709,7 +710,7 @@ class Spectra:
                 # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-
+            """
             #time_end = time.perf_counter()
             #print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
@@ -1492,6 +1493,8 @@ def run_TSFitPy():
                 segment_file_og = fields[2]
             if fields[0] == "spec_input_path":
                 spec_input_path = fields[2]
+                if obs_location is not None:
+                    spec_input_path = obs_location
             if fields[0] == "fitlist_input_folder":
                 fitlist_input_folder = fields[2]
             if fields[0] == "turbospectrum_compiler":
@@ -1582,6 +1585,8 @@ def run_TSFitPy():
                 init_guess_elements_location = np.asarray(init_guess_elements_location)
             line = fp.readline()
         fp.close()
+
+    print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rot}")
 
     if Spectra.nlte_flag:
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(elements_to_fit,
@@ -1833,6 +1838,10 @@ if __name__ == '__main__':
         config_location = argv[1]
     else:
         config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
+    if len(argv) > 2:  # when calling the program, can now add extra argument with location of config file, easier to call
+        obs_location = argv[2]
+    else:
+        obs_location = None  # location of config file
     print(config_location)
     # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
