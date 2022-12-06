@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import collections
 import subprocess
 import os
 from os import path as os_path
@@ -513,17 +515,19 @@ class TurboSpectrum:
 
                     interpolate_parameters = ("temperature", "log_g", "metallicity")
 
-                    def get_args(value_to_search, array):
+                    def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> tuple[int, int]:
                         uniq_array = np.unique(array)
                         if value_to_search in uniq_array:
                             args_to_use_first = np.where(array == value_to_search)[0]
                             args_to_use_second = args_to_use_first
                         else:
                             new_uniq_array = uniq_array[np.where(uniq_array < value_to_search)[0]]
+                            new_uniq_array = new_uniq_array[np.isin(new_uniq_array, values_to_dlt, invert=True)]
                             first_closest_value = new_uniq_array[
                                 (np.abs(new_uniq_array - value_to_search)).argmin()]
 
                             new_uniq_array = uniq_array[np.where(uniq_array > value_to_search)[0]]
+                            new_uniq_array = new_uniq_array[np.isin(new_uniq_array, values_to_dlt, invert=True)]
                             second_closest_value = new_uniq_array[
                                 (np.abs(new_uniq_array - value_to_search)).argmin()]
 
@@ -532,81 +536,132 @@ class TurboSpectrum:
                         # print(args_to_use_first, args_to_use_second)
                         return args_to_use_first, args_to_use_second
 
-                    def find_interp_indices(value, options):
+                    def find_interp_indices(value: float, options: np.ndarray[float], values_to_ignore: np.ndarray[float]) -> tuple[int, int, list[float, float]]:
                         # value = interpolate_parameters_around[key]
                         # options = marcs_values[key]
                         # options = options[args_to_use]
-                        if (value < np.min(options)) or (
-                                value > np.max(options)):  # checks that the value is within the marcs possible values
+                        if (value < np.min(options[np.isin(options, values_to_ignore, invert=True)])) or (
+                                value > np.max(options[np.isin(options, values_to_ignore, invert=True)])):  # checks that the value is within the marcs possible values
                             return None, None, {
-                                "errors": f"Value of parameter  needs to be in range {np.min(options)} to {np.max(options)}. You requested {value}."
+                                "errors": f"Value of parameter  needs to be in range {np.min(options)} to {np.max(options)}. You requested {value}. OR the other parameters are not within the range"
                             }
-                        args_to_use_first, args_to_use_second = get_args(value, options)
+                        args_to_use_first, args_to_use_second = get_args(value, options, values_to_ignore)
                         return args_to_use_first, args_to_use_second, [options[args_to_use_first][0],
                                                                        options[args_to_use_second][0]]
 
-                    # temperature
-                    value_temp = interpolate_parameters_around[interpolate_parameters[0]]
-                    options_temp = marcs_values_new[interpolate_parameters[0]]
-                    args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                            options_temp)
+                    temperatures_to_ignore = np.array([])
+                    loggs_to_ignore = np.array([])
+                    metallicities_to_ignore = np.array([])
 
-                    # logg
-                    value_logg = interpolate_parameters_around[interpolate_parameters[1]]
-                    options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                    args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                  options_logg_first)
-                    options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                    args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                  options_logg_second)
-
-                    """if args_to_use_first_1 is None:
-                        #options_temp = marcs_values_new[interpolate_parameters[0]]
-                        options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[0]), axis=0)
+                    def find_new_marcs_models(temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore):
+                        # temperature
+                        value_temp = interpolate_parameters_around[interpolate_parameters[0]]
+                        options_temp = marcs_values_new[interpolate_parameters[0]]
                         args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                     options_temp)
+                                                                                                     options_temp,
+                                                                                                     temperatures_to_ignore)
 
                         # logg
+                        value_logg = interpolate_parameters_around[interpolate_parameters[1]]
                         options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
                         args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                           options_logg_first)
+                                                                                                           options_logg_first,
+                                                                                                           loggs_to_ignore)
+
+                        if args_to_use_first_1 is None:
+                            return np.append(temperatures_to_ignore, out_values_temp[0]), loggs_to_ignore, metallicities_to_ignore, False
 
                         options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
                         args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                           options_logg_second)
+                                                                                                           options_logg_second,
+                                                                                                           loggs_to_ignore)
 
-                    if args_to_use_first_2 is None:
-                        #options_temp = marcs_values_new[interpolate_parameters[0]]
-                        options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[1]), axis=0)
-                        args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                     options_temp)
+                        if args_to_use_first_2 is None:
+                            return np.append(temperatures_to_ignore, out_values_temp[1]), loggs_to_ignore, metallicities_to_ignore, False
 
-                        # logg
-                        options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                        args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                           options_logg_first)
+                        """if args_to_use_first_1 is None:
+                            #options_temp = marcs_values_new[interpolate_parameters[0]]
+                            options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[0]), axis=0)
+                            args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
+                                                                                                         options_temp)
 
-                        options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                        args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                           options_logg_second)"""
+                            # logg
+                            options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
+                            args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
+                                                                                                               options_logg_first)
 
-                    # metallicity
-                    value_met = interpolate_parameters_around[interpolate_parameters[2]]
-                    options_met_11 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][args_to_use_first_1]
-                    args_to_use_first_10, args_to_use_second_10, out_values_met_10 = find_interp_indices(value_met,
-                                                                                                     options_met_11)
-                    options_met_12 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
-                        args_to_use_second_1]
-                    args_to_use_first_20, args_to_use_second_20, out_values_met_20 = find_interp_indices(value_met,
-                                                                                                     options_met_12)
-                    options_met_21 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
-                        args_to_use_first_2]
-                    args_to_use_first_30, args_to_use_second_30, out_values_met_30 = find_interp_indices(value_met,
-                                                                                                     options_met_21)
-                    options_met_22 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
-                        args_to_use_second_2]
-                    args_to_use_first_40, args_to_use_second_40, out_values_met_40 = find_interp_indices(value_met,
-                                                                                                     options_met_22)
+                            options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
+                            args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
+                                                                                                               options_logg_second)
+
+                        if args_to_use_first_2 is None:
+                            #options_temp = marcs_values_new[interpolate_parameters[0]]
+                            options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[1]), axis=0)
+                            args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
+                                                                                                         options_temp)
+
+                            # logg
+                            options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
+                            args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
+                                                                                                               options_logg_first)
+
+                            options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
+                            args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
+                                                                                                               options_logg_second)"""
+
+                        # metallicity
+                        value_met = interpolate_parameters_around[interpolate_parameters[2]]
+                        options_met_11 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
+                            args_to_use_first_1]
+                        args_to_use_first_10, args_to_use_second_10, out_values_met_10 = find_interp_indices(value_met,
+                                                                                                             options_met_11,
+                                                                                                             metallicities_to_ignore)
+
+                        if args_to_use_first_10 is None:
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[0]), metallicities_to_ignore, False
+
+                        options_met_12 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
+                            args_to_use_second_1]
+                        args_to_use_first_20, args_to_use_second_20, out_values_met_20 = find_interp_indices(value_met,
+                                                                                                             options_met_12,
+                                                                                                             metallicities_to_ignore)
+
+                        if args_to_use_first_20 is None:
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[1]), metallicities_to_ignore, False
+
+                        options_met_21 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
+                            args_to_use_first_2]
+                        args_to_use_first_30, args_to_use_second_30, out_values_met_30 = find_interp_indices(value_met,
+                                                                                                             options_met_21,
+                                                                                                             metallicities_to_ignore)
+
+                        if args_to_use_first_30 is None:
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[0]), metallicities_to_ignore, False
+
+                        options_met_22 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
+                            args_to_use_second_2]
+                        args_to_use_first_40, args_to_use_second_40, out_values_met_40 = find_interp_indices(value_met,
+                                                                                                             options_met_22,
+                                                                                                             metallicities_to_ignore)
+
+                        if args_to_use_first_40 is None:
+                            return temperatures_to_ignore, np.append(loggs_to_ignore,out_values_logg_2[1]), metallicities_to_ignore, False
+
+                        return [out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10, out_values_met_20, out_values_met_30, out_values_met_40], None, None, True
+
+                    while True:
+                        temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore, completed = find_new_marcs_models(temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore)
+                        if completed:
+                            out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10, \
+                                out_values_met_20, out_values_met_30, out_values_met_40 = temperatures_to_ignore[0], temperatures_to_ignore[1], temperatures_to_ignore[2], temperatures_to_ignore[3], temperatures_to_ignore[4], temperatures_to_ignore[5], temperatures_to_ignore[6]
+                            break
+                        else:
+                            if collections.Counter(temperatures_to_ignore) == collections.Counter(marcs_values_new[interpolate_parameters[0]]) \
+                                    or np.min(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore \
+                                    or np.max(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore:
+                                return {"errors": "Could not find the models for interpolation"}
+
+
 
                     def get_marcs_model_atmosphere(model):
                         dict_iter = self.marcs_models
@@ -733,8 +788,8 @@ class TurboSpectrum:
                         self.turbulent_velocity = microturbulence
         elif self.nlte_flag == False:
             if self.verbose:
-                    stdout = None
-                    stderr = subprocess.STDOUT
+                stdout = None
+                stderr = subprocess.STDOUT
             else:
                 stdout = open('/dev/null', 'w')
                 stderr = subprocess.STDOUT
@@ -1393,10 +1448,7 @@ class TurboSpectrum:
         # Run babsma. This creates an opacity file .opac from the MARCS atmospheric model
         try:    # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
             os.chdir(turbospec_root)    # Time wasted trying to make asyncio work here: 6 hours. Halts program halfway
-            pr1 = subprocess.Popen([os_path.join(self.turbospec_path, 'babsma_lu')],
-                                   stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-            pr1.stdin.write(bytes(babsma_in, 'utf-8'))
-            stdout_bytes, stderr_bytes = pr1.communicate()
+            pr1, stderr_bytes = self.run_babsma(babsma_in, stderr, stdout)
         except subprocess.CalledProcessError:
             output["errors"] = "babsma failed with CalledProcessError"
             return output
@@ -1412,11 +1464,7 @@ class TurboSpectrum:
 
         # Run bsyn. This synthesizes the spectrum
         try:
-            os.chdir(turbospec_root)
-            pr = subprocess.Popen([os_path.join(self.turbospec_path, 'bsyn_lu')],
-                                  stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-            pr.stdin.write(bytes(bsyn_in, 'utf-8'))
-            stdout_bytes, stderr_bytes = pr.communicate()
+            pr, stderr_bytes = self.run_bsyn(bsyn_in, stderr, stderr_bytes, stdout, turbospec_root)
         except subprocess.CalledProcessError:
             output["errors"] = "bsyn failed with CalledProcessError"
             return output
@@ -1434,6 +1482,21 @@ class TurboSpectrum:
         output["return_code"] = pr.returncode
         output["output_file"] = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(self.counter_spectra))
         return output
+
+    def run_bsyn(self, bsyn_in, stderr, stderr_bytes, stdout, turbospec_root):
+        os.chdir(turbospec_root)
+        pr = subprocess.Popen([os_path.join(self.turbospec_path, 'bsyn_lu')],
+                              stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+        pr.stdin.write(bytes(bsyn_in, 'utf-8'))
+        stdout_bytes, stderr_bytes = pr.communicate()
+        return pr, stderr_bytes
+
+    def run_babsma(self, babsma_in, stderr, stdout):
+        pr1 = subprocess.Popen([os_path.join(self.turbospec_path, 'babsma_lu')],
+                               stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+        pr1.stdin.write(bytes(babsma_in, 'utf-8'))
+        stdout_bytes, stderr_bytes = pr1.communicate()
+        return pr1, stderr_bytes
 
     def run_turbospectrum(self):
         lmin_orig = self.lambda_min
