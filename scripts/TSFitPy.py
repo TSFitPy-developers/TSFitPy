@@ -992,7 +992,7 @@ class Spectra:
         ndimen = self.nelement
         if self.fit_microturb == "Yes":
             ndimen += 1
-        param_guess, min_bounds = self.get_elem_micro_guess(ndimen, 0.9, 1.3, -1, 0.4)
+        param_guess, min_bounds = self.get_elem_micro_guess(ndimen, 0.9, 1.3, -1, 0.4)  # TODO put outside in config
 
         res = minimize(lbl_broad_abund_chi_sqr_v2, param_guess[0], args=(self,
                                                                              Spectra.line_begins_sorted[line_number] - 5.,
@@ -1049,7 +1049,7 @@ class Spectra:
                 for k in range(len(wave_result)):
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
             # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
-        except OSError:
+        except (OSError, ValueError) as error:
             print("Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         return one_result
 
@@ -1423,6 +1423,7 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
     :param model_atom_file: Model atom file location (Fe last if not fitted)
     :return: 3 dictionaries: NLTE location of elements that exist with keys as element names
     """
+    #TODO check if files exist
     depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
     if Spectra.fit_met:
         iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
@@ -1838,10 +1839,10 @@ if __name__ == '__main__':
         config_location = argv[1]
     else:
         config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
-    if len(argv) > 2:  # when calling the program, can now add extra argument with location of config file, easier to call
+    if len(argv) > 2:  # when calling the program, can now add extra argument with location of observed spectra, easier to call
         obs_location = argv[2]
     else:
-        obs_location = None  # location of config file
+        obs_location = None  # otherwise defaults to the input one
     print(config_location)
     # TODO explain lbl quick
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits

@@ -1306,11 +1306,15 @@ class TurboSpectrum:
             self.synthesize()
 
     def run_turbospectrum_and_atmosphere(self):
-        self.calculate_atmosphere()
         try:
-            self.run_turbospectrum()
-        except AttributeError:
-            print("No attribute, fail of generation?")
+            self.calculate_atmosphere()
+            try:
+                self.run_turbospectrum()
+            except AttributeError:
+                print("No attribute, fail of generation?")
+        except FileNotFoundError as error:
+            print(f"Interpolation failed? {error}")
+
 
 def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
     """
