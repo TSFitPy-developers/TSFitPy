@@ -3,9 +3,9 @@ turbospectrum_compiler = intel
 #Main paths, please with / at the end
 interpol_path = ./model_interpolators/
 line_list_path = ../input_files/linelists/linelist_for_fitting/
-model_atmosphere_grid_path_1D = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/1D/
-model_atmosphere_grid_path_3D = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/TSFitPy_input_model_atmospheres/model_atmospheres/3D/
-model_atom_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/model_atoms/
+model_atmosphere_grid_path_1D = ../input_files/model_atmospheres/1D/
+model_atmosphere_grid_path_3D = ../input_files/model_atmospheres/3D/
+model_atom_path = ../input_files/nlte_data/model_atoms/
 departure_file_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/
 output_folder = ../output_files/
 linemask_file_folder_location = ../input_files/linemask_files/
@@ -13,10 +13,10 @@ segment_file_folder_location = ../input_files/linemask_files/
 spec_input_path = ../input_files/observed_spectra/
 fitlist_input_folder = ../input_files/
 #type of atmosphere (1D or 3D). current models tested are 1D MARCS model textfiles and average 3D Stagger grid textfiles in MULTI format.
-atmosphere_type = 1D
+atmosphere_type = 3D
 #
 #mode for fitting. Types are all or lbl, where lbl stands for line by line.
-mode = all
+mode = lbl
 #
 #whether or not molecules are included in the trimmed linelist ('True' or 'False')
 include_molecules = True
@@ -27,30 +27,30 @@ nlte = False
 #whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode # or "Input" if one adds a column to the fitlist
 fit_microturb = No
 #whether or not macroturbulence is fit as a parameter or taken from the value below ('Yes' / "No" / "Input")
-fit_macroturb = No
+fit_macroturb = Yes
 #
 #whether Teff and logg are fit or read from input file ('Yes' or 'No')  # Does not fit anything atm
 fit_teff = No
 fit_logg = No
 #
 #element fit: which elements to fit. Example: Mg Fe C . One element is faster
-element = Fe
+element = Mg
 #
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
 #TS will only generate spectra in the given segments to reduce calculation time.
-linemask_file = Fe/fe-lmask.txt
-segment_file = Fe/fe-seg.txt
+linemask_file = Mg/mg-lmask.txt
+segment_file = Mg/mg-seg.txt
 #
 #other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte. IRON ALWAYS NEEDED
 #departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
 #departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
-#model_atom_file = atom.fe607
+model_atom_file = atom.mg86b atom.fe607
 #
 #spectrum parameters (wavelength in angstrom)
-wavelength_minimum = 4800
-wavelength_maximum = 6800
-wavelength_delta = 0.005
-resolution = 0 #R (lambda_center/delta_lambda), 0 means no convolution based on resolution
+wavelength_minimum = 5300
+wavelength_maximum = 5700
+wavelength_delta = 0.01
+resolution = 0 #R (lambda_center/FWHM), 0 means no convolution based on resolution
 macroturbulence = 0.0 #in km/s
 rotation = 0.0 #in km/s
 temporary_directory = temp_directory/ #where temporary files created during fitting (opacity files, interpolated model atmospheres, etc.) are stored
@@ -61,6 +61,6 @@ output_file = output
 #Multiprocessing: workers is the requested amount of CPUs
 workers = 1
 #if want to give initial guess to the element, list those elements here
-init_guess_elem =
+#init_guess_elem =
 #location to files that give the initial guess to the abundance of elements (same order sa the element)
-init_guess_elem_location = 
+#init_guess_elem_location =
