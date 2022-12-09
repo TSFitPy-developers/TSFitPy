@@ -22,8 +22,7 @@ import collections
 from solar_abundances import solar_abundances, periodic_table
 
 from convolve import *
-from create_window_linelist_function import *
-
+from create_window_linelist_function import create_window_linelist
 
 def create_dir(directory: str):
     """
@@ -365,7 +364,7 @@ class Spectra:
         min_rv = -1  # km/s i think as well
         max_rv = 1
         # TODO: check that not the same value every time? chance of not fitting at all if all values are same
-        microturb_guesses = np.linspace(min_microturb, max_microturb, self.ndimen + 1)
+        #microturb_guesses = np.linspace(min_microturb, max_microturb, self.ndimen + 1)
         macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2, max_macroturb + np.random.random(1)[0] / 2, self.ndimen + 1)
         abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10, max_abundance + np.random.random(1)[0] / 10, self.ndimen + 1)
         rv_guesses = np.linspace(min_rv + np.random.random(1)[0] / 10, max_rv + np.random.random(1)[0] / 10, self.ndimen + 1)
@@ -419,7 +418,7 @@ class Spectra:
         # TODO: check that guess within bound
         initial_guess = np.empty((length + 1, length))
 
-        microturb_guesses = np.linspace(min_microturb, max_microturb, length + 1)
+        microturb_guesses = np.geomspace(min_microturb, max_microturb, length + 1)
         abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10,
                                         max_abundance + np.random.random(1)[0] / 10, length + 1)
 
@@ -457,7 +456,7 @@ class Spectra:
         # TODO: check that guess within bound
         initial_guess = np.empty((length + 1, length))
 
-        microturb_guesses = np.linspace(min_microturb, max_microturb, length + 1)
+        microturb_guesses = np.geomspace(min_microturb, max_microturb, length + 1)
         macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2,
                                         max_macroturb + np.random.random(1)[0] / 2, length + 1)
         abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10,
