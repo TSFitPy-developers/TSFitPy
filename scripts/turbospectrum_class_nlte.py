@@ -517,7 +517,8 @@ class TurboSpectrum:
 
                     def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> tuple[int, int]:
                         uniq_array = np.unique(array)
-                        if value_to_search in uniq_array:
+                        new_uniq_array = uniq_array[np.isin(uniq_array, values_to_dlt, invert=True)]
+                        if value_to_search in new_uniq_array:
                             args_to_use_first = np.where(array == value_to_search)[0]
                             args_to_use_second = args_to_use_first
                         else:
@@ -661,19 +662,33 @@ class TurboSpectrum:
                                     or np.max(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore:
                                 return {"errors": "Could not find the models for interpolation"}
 
-
-
                     def get_marcs_model_atmosphere(model):
                         dict_iter = self.marcs_models
 
                         for parameter in self.marcs_value_keys:
-                            value = model[parameter]
-                            dict_iter = dict_iter[value]
+                            if parameter == "spherical":
+                                try:
+                                    value = 'p'
+                                    dict_iter = dict_iter[value]
+                                except KeyError:
+                                    value = 's'
+                                    dict_iter = dict_iter[value]
+                            elif parameter == "mass":
+                                try:
+                                    value = 1.0
+                                    dict_iter = dict_iter[value]
+                                except KeyError:
+                                    value = 0.0
+                                    dict_iter = dict_iter[value]
+                            else:
+                                value = model[parameter]
+                                dict_iter = dict_iter[value]
 
                         dict_iter = dict_iter['filename']
                         return dict_iter
 
                     marcs_models = []
+
 
                     try:
                         model = {"temperature": out_values_temp[0], "log_g": out_values_logg_1[0], "metallicity": out_values_met_10[0],
