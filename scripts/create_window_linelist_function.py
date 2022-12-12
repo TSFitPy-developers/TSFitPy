@@ -12,8 +12,8 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 	line_list_files_draft.extend([i for i in glob.glob(os_path.join(line_list_path, "*")) if not i.endswith(".txt")])
 	#print(line_list_files)
 
-	segment_to_use_begins: np.ndarray = np.asarray(seg_begins)[start:stop+1]
-	segment_to_use_ends: np.ndarray = np.asarray(seg_ends)[start:stop+1]
+	segment_to_use_begins: np.ndarray = np.asarray(seg_begins)[start:stop]
+	segment_to_use_ends: np.ndarray = np.asarray(seg_ends)[start:stop]
 
 	segment_index_order: np.ndarray = np.argsort(segment_to_use_begins)
 	segment_to_use_begins: np.ndarray = segment_to_use_begins[segment_index_order]
@@ -106,7 +106,7 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 								wavelength_current_line: float = element_wavelength_dictionary[index_seg_start]
 								line_stripped: str = lines_file[line_number_read_file + index_seg_start].strip()
 								line_number_read_for_element: int = index_seg_start + line_number_read_file
-								while wavelength_current_line <= seg_end and line_number_read_for_element <= number_of_lines_element + line_number_read_file:
+								while wavelength_current_line <= seg_end and line_number_read_for_element < number_of_lines_element + line_number_read_file - 1:
 									all_lines_to_write.append(f"{line_stripped} \n")
 									line_number_read_for_element += 1
 									line_stripped: str = lines_file[line_number_read_for_element].strip()
