@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from os import path as os_path
 import glob
