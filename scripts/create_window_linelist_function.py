@@ -112,10 +112,10 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 									line_stripped: str = lines_file[line_number_read_for_element].strip()
 									wavelength_current_line: float = float(line_stripped.split()[0])
 					else:
-						while line_number_read_for_element <= number_of_lines_element:
+						while line_number_read_for_element < number_of_lines_element:
+							line_stripped: str = lines_file[line_number_read_for_element + line_number_read_file].strip()
 							all_lines_to_write.append(f"{line_stripped} \n")
 							line_number_read_for_element += 1
-							line_stripped: str = lines_file[line_number_read_for_element].strip()
 
 					line_number_read_file: int = number_of_lines_element + line_number_read_file
 

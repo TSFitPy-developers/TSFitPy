@@ -1717,18 +1717,18 @@ def run_TSFitPy():
         Spectra.seg_ends = np.array([Spectra.seg_ends])
 
     print("Trimming down the linelist to only lines within segments for faster fitting")
-    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":  # TODO add explanation of saving trimmed files
+    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
         # os.system("rm {}/*".format(line_list_path_trimmed))
         trimmed_start = 0
         trimmed_end = len(Spectra.seg_ends)
-        line_list_path_trimmed = f"{line_list_path_trimmed}_{segment_file.replace('/', '_')}_{Spectra.include_molecules}_{trimmed_start}_{trimmed_end}/"
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, f"{segment_file.replace('/', '_').replace('.', '_')}_{Spectra.include_molecules}_{trimmed_end}", "")
         create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                Spectra.include_molecules,
                                trimmed_start, trimmed_end)
     elif Spectra.fitting_mode == "lbl":
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", '')
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", today, '')
         for j in range(len(Spectra.line_begins_sorted)):
-            for k in range(len(Spectra.seg_begins)):
+            for k in range(len(Spectra.seg_begins)):    # TODO: redo, ugly
                 if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
                     start = k
             line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
@@ -1778,6 +1778,7 @@ def run_TSFitPy():
                                                   initial_guess_string, line_list_path_trimmed, input_abundance))
 
     shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
+    shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
 
     output = Spectra.output_folder + output
 
