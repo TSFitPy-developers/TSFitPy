@@ -436,8 +436,8 @@ class TurboSpectrum:
 
                 except KeyError:
                     # We get a KeyError if there is no model matching the parameter combination we tried
-                    failed_on_parameter = (parameter, value, list(dict_iter.keys()))
-                    print(failed_on_parameter)
+                    #failed_on_parameter = (parameter, value, list(dict_iter.keys()))
+                    #print(failed_on_parameter)
                     dict_iter = None
                     failures += 1
                 marcs_model_list.append(dict_iter)
@@ -476,7 +476,7 @@ class TurboSpectrum:
                 options = self.marcs_values[parameter_to_move]
                 parameter_descriptor = marcs_parameters[parameter_to_move]
 
-                if self.atmosphere_dimension == "1D":
+                if self.atmosphere_dimension == "1D" or self.atmosphere_dimension == "3D":
                     if option_no == 0:
                         parameter_descriptor[2] -= 1
                         if parameter_descriptor[2] < 0:
@@ -508,6 +508,10 @@ class TurboSpectrum:
                         #                    options[parameter_descriptor[3]], failure_count))
                         parameter_descriptor[1] = options[parameter_descriptor[3]]
                 elif self.atmosphere_dimension == "3D":
+                    # TODO: remove? refactor?
+                    # This part was written to be able to interpolate 3D models when they are not at equal vertices.
+                    # Now it seems like it is not needed? Not removing, but this part of the code will currently
+                    # never run.
                     marcs_values_new = {}
                     marcs_values_new["temperature"] = self.model_temperatures
                     marcs_values_new["log_g"] = self.model_logs
