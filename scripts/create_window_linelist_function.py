@@ -101,8 +101,8 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 						# check that ANY wavelengths are within the range at all
 						if not (wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
 							for seg_begin, seg_end in zip(segment_to_use_begins, segment_to_use_ends):  # wavelength lines write here
-								index_seg_start, element_wavelength_dictionary = binary_search_within_tolerance(lines_file[line_number_read_file:number_of_lines_element + line_number_read_file],
-															   element_wavelength_dictionary, 0, number_of_lines_element - 1, seg_begin)
+								index_seg_start, element_wavelength_dictionary = binary_search_lower_bound(lines_file[line_number_read_file:number_of_lines_element + line_number_read_file],
+																										   element_wavelength_dictionary, 0, number_of_lines_element - 1, seg_begin)
 								wavelength_current_line: float = element_wavelength_dictionary[index_seg_start]
 								line_stripped: str = lines_file[line_number_read_file + index_seg_start].strip()
 								line_number_read_for_element: int = index_seg_start + line_number_read_file
@@ -125,7 +125,7 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 				if not file_not_empty:
 					os.system(f"rm {new_linelist}")
 
-def binary_search_within_tolerance(array_to_search: list[str], dict_array_values: dict, low: int, high: int, element_to_search: float) -> tuple[int, dict]:
+def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int, element_to_search: float) -> tuple[int, dict]:
 	"""
 	Gives out the lower index where the value is located between the ranges. For example, given array [12, 20, 32, 40, 52]
 	Value search: 5, result: 0
