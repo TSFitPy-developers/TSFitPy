@@ -292,7 +292,7 @@ class Spectra:
 
     init_guess_dict: dict = None    # initial guess for elements, if given
 
-    # bounds for the minimization   #TODO: move to outside config?
+    # bounds for the minimization
     bound_min_macro = 0         # km/s
     bound_max_macro = 30
     bound_min_micro = 0.01         # km/s
@@ -671,13 +671,6 @@ class Spectra:
                 grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
 
         for j in range(len(Spectra.line_begins_sorted)):
-            #time_start = time.perf_counter()
-            #print(f"Fitting line at {Spectra.line_centers_sorted[j]} angstroms")
-            # TODO: improve next 3 lines of code.
-            #for k in range(len(Spectra.seg_begins)):
-            #    if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
-            #        start = k
-            #print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
             # each line contains spectra name and fitted line. then to the right of it abundance with chi-sqr are added
             result_one_line = f"{self.spec_name} {Spectra.line_centers_sorted[j]} {Spectra.line_begins_sorted[j]} " \
                               f"{Spectra.line_ends_sorted[j]}"
@@ -789,9 +782,8 @@ class Spectra:
             initial_guess_quick[:, 1] = macroturb_guesses
             minim_bounds.append((self.bound_min_macro, self.bound_max_macro))
 
-        for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
-            if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
-                start = k
+        start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[j],
+                                        Spectra.line_centers_sorted[j] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[j], Spectra.seg_begins[start], Spectra.seg_ends[start])
         self.ts.line_list_paths = [
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, j,
@@ -951,9 +943,8 @@ class Spectra:
         :param line_number: Which line number/index in line_center_sorted is being fitted
         :return: best fit result string for that line
         """
-        for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
-            if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[line_number] > Spectra.seg_begins[k]:
-                start = k
+        start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
+                                        Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
         self.ts.line_list_paths = [
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
@@ -1011,9 +1002,8 @@ class Spectra:
         :param initial_simplex_guess: simplex guess for Nelder-Mead
         :return: best fit result string for that line
         """
-        for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
-            if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[line_number] > Spectra.seg_begins[k]:
-                start = k
+        start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
+                                        Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
         self.ts.line_list_paths = [
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
@@ -1086,9 +1076,8 @@ class Spectra:
         :param line_number: Which line number/index in line_center_sorted is being fitted
         :return: best fit result string for that line
         """
-        for k in range(len(Spectra.seg_begins)):  # TODO redo this one, very ugly
-            if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[line_number] > Spectra.seg_begins[k]:
-                start = k
+        start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
+                                        Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
         self.ts.line_list_paths = [
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
@@ -1203,7 +1192,7 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     else:
         macroturb = spectra_to_fit.macroturb
 
-    wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
+    wave_ob = apply_doppler_correction(spectra_to_fit, doppler)
 
     if spectra_to_fit.met < -4.0 or spectra_to_fit.met > 0.5 or macroturb < 0.0:
         chi_square = 9999.9999
@@ -1219,6 +1208,10 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
 
     return chi_square
+
+
+def apply_doppler_correction(spectra_to_fit, doppler):
+    return spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
 
 
 def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
@@ -1365,8 +1358,8 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
             if spectra_to_fit.fit_macroturb:
                 ndimen += 1
             param_guess, min_bounds = spectra_to_fit.get_rv_macro_guess(ndimen,
-                                                                        spectra_to_fit.rv - 0.5,
-                                                                        spectra_to_fit.rv + 0.5,
+                                                                        spectra_to_fit.guess_min_doppler,
+                                                                        spectra_to_fit.guess_max_doppler,
                                                                         spectra_to_fit.macroturb - 3,
                                                                         spectra_to_fit.macroturb + 3)
             # now for the generated abundance it tries to fit best fit macro + doppler shift.
@@ -1439,8 +1432,8 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
         if spectra_to_fit.fit_macroturb:
             ndimen += 1
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_guess(ndimen,
-                                                                    spectra_to_fit.rv - 0.5,
-                                                                    spectra_to_fit.rv + 0.5,
+                                                                    spectra_to_fit.guess_min_doppler,
+                                                                    spectra_to_fit.guess_max_doppler,
                                                                     spectra_to_fit.macroturb - 3,
                                                                     spectra_to_fit.macroturb + 3)
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
@@ -1478,7 +1471,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
 
 
 def get_trimmed_lbl_path_name(element: Union[str, np.ndarray], line_list_path_trimmed: str, segment_file: str, j: float,
-                              start: float) -> os.path:
+                              segment_index: float) -> os.path:
     """
     Gets the anem for the lbl trimmed path. Consistent algorithm to always get the same folder name. Takes into account
     element, line center, where molecules are used, segment etc.
@@ -1486,9 +1479,11 @@ def get_trimmed_lbl_path_name(element: Union[str, np.ndarray], line_list_path_tr
     :param line_list_path_trimmed: Path to the trimmed line list
     :param segment_file: Name of the segment file
     :param j: center line's numbering
-    :param start: Segment's numbering
+    :param segment_index: Segment's numbering
     :return: path to the folder where to save/already saved trimmed files can exist.
     """
+    return os.path.join(line_list_path_trimmed, f"{segment_index}", '')
+
     element_to_print = ""
     if isinstance(element, np.ndarray):
         for elem in element:
@@ -1496,8 +1491,9 @@ def get_trimmed_lbl_path_name(element: Union[str, np.ndarray], line_list_path_tr
     else:
         element_to_print = element
     return os.path.join(line_list_path_trimmed,
-                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element_to_print}_{Spectra.include_molecules}_{j}_{j + 1}_{str(Spectra.line_centers_sorted[j]).replace('.', '_')}_{str(Spectra.seg_begins[start]).replace('.', '_')}_{str(Spectra.seg_ends[start]).replace('.', '_')}",
-                        '')
+                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element_to_print}_"
+                        f"{Spectra.include_molecules}_{str(Spectra.seg_begins[segment_index]).replace('.', '_')}_"
+                        f"{str(Spectra.seg_ends[segment_index]).replace('.', '_')}", '')
 
 
 def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
@@ -1946,23 +1942,21 @@ def run_TSFitPy():
     print("Trimming down the linelist to only lines within segments for faster fitting")
     if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
         # os.system("rm {}/*".format(line_list_path_trimmed))
-        trimmed_start = 0
-        trimmed_end = len(Spectra.seg_ends)
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, f"{segment_file.replace('/', '_').replace('.', '_')}_{Spectra.include_molecules}_{trimmed_end}", "")
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, f"{segment_file.replace('/', '_').replace('.', '_')}_{Spectra.include_molecules}", "")
         create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
-                               Spectra.include_molecules,
-                               trimmed_start, trimmed_end)
+                               Spectra.include_molecules, lbl=False)
     elif Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "teff":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", today, '')
-        for j in range(len(Spectra.line_begins_sorted)):
-            for k in range(len(Spectra.seg_begins)):    # TODO: redo, ugly
-                if Spectra.seg_ends[k] >= Spectra.line_centers_sorted[j] > Spectra.seg_begins[k]:
-                    start = k
+        """for j in range(len(Spectra.line_begins_sorted)):
+            start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[j],
+                                            Spectra.line_centers_sorted[j] <= Spectra.seg_ends))[0][0]
             line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
-                                                                   Spectra.segment_file, j, start)
-            create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig,
-                                   line_list_path_trimmed_new,
-                                   Spectra.include_molecules, start, start + 1)
+                                                                   Spectra.segment_file, j, start)"""
+        #line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
+        #                                                       Spectra.segment_file, j, start)
+        create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig,
+                               line_list_path_trimmed,
+                               Spectra.include_molecules, lbl=True)
     print("Finished trimming linelist")
 
     if workers > 1:
@@ -2063,8 +2057,9 @@ if __name__ == '__main__':
     major_version_scipy, minor_version_scipy, patch_version_scipy = scipy.__version__.split(".")
     if int(major_version_scipy) < 1 or (int(major_version_scipy) == 1 and int(minor_version_scipy) < 7) or (
             int(major_version_scipy) == 1 and int(minor_version_scipy) == 7 and int(patch_version_scipy) == 0):
-        raise ImportError("Scipy has to be at least version 1.7.1, otherwise bounds are not considered in mimisation. "
-                          "That will lead to bad fits. Please update to scipy 1.7.1 OR higher.")
+        raise ImportError(f"Scipy has to be at least version 1.7.1, otherwise bounds are not considered in mimisation. "
+                          f"That will lead to bad fits. Please update to scipy 1.7.1 OR higher. Your version: "
+                          f"{scipy.__version__}")
 
     # lbl version.
     # 1: original version.
