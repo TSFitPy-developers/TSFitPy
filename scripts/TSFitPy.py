@@ -1700,13 +1700,13 @@ def run_TSFitPy():
                     input_macro = True
                 else:
                     input_macro = False
-            if fields[0] == "fit_teff":
+            """if fields[0] == "fit_teff":
                 if fields[2].lower() == "true":
                     Spectra.fit_teff = True
                 else:
                     Spectra.fit_teff = False
             if fields[0] == "fit_logg":
-                Spectra.fit_logg = fields[2]
+                Spectra.fit_logg = fields[2]"""
             if fields[0] == "element":
                 elements_to_fit = []
                 for i in range(len(fields) - 2):
@@ -1789,8 +1789,8 @@ def run_TSFitPy():
                 Spectra.guess_min_macro = min(float(fields[2]), float(fields[3]))
                 Spectra.guess_max_macro = max(float(fields[2]), float(fields[3]))
             if fields[0] == "guess_range_abundance":
-                Spectra.guess_min_abundance = min(float(fields[2]), float(fields[3]))
-                Spectra.guess_max_abundance = max(float(fields[2]), float(fields[3]))
+                Spectra.guess_min_abund = min(float(fields[2]), float(fields[3]))
+                Spectra.guess_max_abund = max(float(fields[2]), float(fields[3]))
             if fields[0] == "guess_range_rv":
                 Spectra.guess_min_doppler = min(float(fields[2]), float(fields[3]))
                 Spectra.guess_max_doppler = max(float(fields[2]), float(fields[3]))
@@ -1847,6 +1847,8 @@ def run_TSFitPy():
 
     if Spectra.fitting_mode == "teff":
         Spectra.fit_teff = True
+    else:
+        Spectra.fit_teff = False
 
     if Spectra.fit_teff:
         Spectra.fit_met = False
@@ -1958,6 +1960,58 @@ def run_TSFitPy():
                                line_list_path_trimmed,
                                Spectra.include_molecules, lbl=True)
     print("Finished trimming linelist")
+
+
+    # check inputs
+
+    print("\n\nChecking inputs\n")
+
+    if np.size(Spectra.seg_begins) != np.size(Spectra.seg_ends):
+        print("Segment beginning and end are not the same length")
+    if np.size(Spectra.line_centers_sorted) != np.size(Spectra.line_begins_sorted) or np.size(Spectra.line_centers_sorted) != np.size(Spectra.line_ends_sorted):
+        print("Line center, beginning and end are not the same length")
+    if workers < np.size(specname_fitlist.size):
+        print(f"You requested {workers}, but you only need to fit {specname_fitlist.size} stars. Requesting more CPUs "
+              f"(=workers) than the spectra will just result in idle workers.")
+    if Spectra.guess_plus_minus_neg_teff > 0:
+        print(f"You requested your {Spectra.guess_plus_minus_neg_teff} to be positive. That will result in the lower "
+              f"guess value to be bigger than the expected star temperature. Consider changing the number to negative.")
+    if Spectra.guess_plus_minus_pos_teff < 0:
+        print(f"You requested your {Spectra.guess_plus_minus_pos_teff} to be negative. That will result in the upper "
+              f"guess value to be smaller than the expected star temperature. Consider changing the number to positive.")
+    if Spectra.guess_min_macro < Spectra.bound_min_macro or Spectra.bound_max_macro < Spectra.guess_max_macro:
+        print(f"You requested your macro bounds as {Spectra.bound_min_macro} {Spectra.bound_max_macro}, but guesses"
+              f"are {Spectra.guess_min_macro} {Spectra.guess_max_macro}, which is outside hard bound range. Consider"
+              f"changing bounds or guesses.")
+    if Spectra.guess_min_micro < Spectra.bound_min_micro or Spectra.bound_max_micro < Spectra.guess_max_micro:
+        print(f"You requested your micro bounds as {Spectra.bound_min_micro} {Spectra.bound_max_micro}, but guesses"
+              f"are {Spectra.guess_min_micro} {Spectra.guess_max_micro}, which is outside hard bound range. Consider"
+              f"changing bounds or guesses.")
+    if Spectra.guess_min_abund < Spectra.bound_min_abund or Spectra.bound_max_abund < Spectra.guess_max_abund:
+        print(f"You requested your abundance bounds as {Spectra.bound_min_abund} {Spectra.bound_max_abund}, but guesses"
+              f"are {Spectra.guess_min_abund} {Spectra.guess_max_abund}, which is outside hard bound range. Consider"
+              f"changing bounds or guesses if you fit elements except for Fe.")
+    if Spectra.guess_min_abund < Spectra.bound_min_met or Spectra.bound_max_met < Spectra.guess_max_abund:
+        print(f"You requested your metallicity bounds as {Spectra.bound_min_met} {Spectra.bound_max_met}, but guesses"
+              f"are {Spectra.guess_min_abund} {Spectra.guess_max_abund}, which is outside hard bound range. Consider"
+              f"changing bounds or guesses if you fit metallicity.")
+    if Spectra.guess_min_doppler < Spectra.bound_min_doppler or Spectra.bound_max_doppler < Spectra.guess_max_doppler:
+        print(f"You requested your macro bounds as {Spectra.bound_min_doppler} {Spectra.bound_max_doppler}, but guesses"
+              f"are {Spectra.guess_min_doppler} {Spectra.guess_max_doppler}, which is outside hard bound range. Consider"
+              f"changing bounds or guesses.")
+    if Spectra.rot < 0:
+        print(f"Requested rotation of {Spectra.rot}, which is less than 0. Consider changing it.")
+    if Spectra.resolution < 0:
+        print(f"Requested resolution of {Spectra.resolution}, which is less than 0. Consider changing it.")
+    if macroturb_input < 0:
+        print(f"Requested macroturbulence input of {macroturb_input}, which is less than 0. Consider changing it if "
+              f"you fit it.")
+    if ts_compiler not in ["intel", "gnu"]:
+        print(f"Expected compiler intel or gnu, but got {ts_compiler} instead.")
+
+    print("\nDone doing some basic checks. Consider reading the messages above, if there are any. Can be useful if it "
+          "crashes.\n\n")
+
 
     if workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
