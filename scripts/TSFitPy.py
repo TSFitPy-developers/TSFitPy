@@ -1144,7 +1144,7 @@ class Spectra:
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
             # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
         except (OSError, ValueError) as error:
-            print("Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+            print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         return one_result
 
 
@@ -1397,8 +1397,8 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
 
     output_print = f""
     for key in elem_abund_dict:
-        output_print += f" {key} {elem_abund_dict[key]}"
-    print(output_print, spectra_to_fit.doppler_shift, microturb, macroturb, chi_square)
+        output_print += f" [{key}/H]={elem_abund_dict[key]}"
+    print(f"{output_print} rv={spectra_to_fit.doppler_shift} vmic={microturb} vmac={macroturb} chisqr={chi_square}")
 
     return chi_square
 
@@ -1421,7 +1421,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(spectra_to_fit.met, {"H": 12, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
@@ -2134,5 +2134,9 @@ if __name__ == '__main__':
     today = f"{today}_{np.random.random(1)[0]}"     # in case if someone calls the function several times per second
     print(f"Start of the fitting: {today}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
-    run_TSFitPy()
-    print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")
+    try:
+        run_TSFitPy()
+    except KeyboardInterrupt:
+        print(f"KeyboardInterrupt detected. Terminating job.")
+    finally:
+        print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")
