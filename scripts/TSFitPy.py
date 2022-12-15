@@ -1421,7 +1421,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(spectra_to_fit.met, {"H": 12, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
@@ -1941,27 +1941,6 @@ def run_TSFitPy():
         Spectra.seg_begins = np.array([Spectra.seg_begins])
         Spectra.seg_ends = np.array([Spectra.seg_ends])
 
-    print("Trimming down the linelist to only lines within segments for faster fitting")
-    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
-        # os.system("rm {}/*".format(line_list_path_trimmed))
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, f"{segment_file.replace('/', '_').replace('.', '_')}_{Spectra.include_molecules}", "")
-        create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
-                               Spectra.include_molecules, lbl=False)
-    elif Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "teff":
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", today, '')
-        """for j in range(len(Spectra.line_begins_sorted)):
-            start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[j],
-                                            Spectra.line_centers_sorted[j] <= Spectra.seg_ends))[0][0]
-            line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
-                                                                   Spectra.segment_file, j, start)"""
-        #line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
-        #                                                       Spectra.segment_file, j, start)
-        create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig,
-                               line_list_path_trimmed,
-                               Spectra.include_molecules, lbl=True)
-    print("Finished trimming linelist")
-
-
     # check inputs
 
     print("\n\nChecking inputs\n")
@@ -2008,9 +1987,33 @@ def run_TSFitPy():
               f"you fit it.")
     if ts_compiler not in ["intel", "gnu"]:
         print(f"Expected compiler intel or gnu, but got {ts_compiler} instead.")
+    if Spectra.fitting_mode not in ["all", "lbl", "lbl_quick", "teff"]:
+        print(f"Expected fitting mode 'all', 'lbl', 'lbl_quick', 'teff', but got {Spectra.fitting_mode} instead")
 
     print("\nDone doing some basic checks. Consider reading the messages above, if there are any. Can be useful if it "
           "crashes.\n\n")
+
+    print("Trimming down the linelist to only lines within segments for faster fitting")
+    if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
+        # os.system("rm {}/*".format(line_list_path_trimmed))
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, f"{segment_file.replace('/', '_').replace('.', '_')}_{Spectra.include_molecules}", "")
+        create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
+                               Spectra.include_molecules, lbl=False)
+    elif Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "teff":
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", today, '')
+        """for j in range(len(Spectra.line_begins_sorted)):
+            start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[j],
+                                            Spectra.line_centers_sorted[j] <= Spectra.seg_ends))[0][0]
+            line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
+                                                                   Spectra.segment_file, j, start)"""
+        #line_list_path_trimmed_new = get_trimmed_lbl_path_name(Spectra.elem_to_fit, line_list_path_trimmed,
+        #                                                       Spectra.segment_file, j, start)
+        create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig,
+                               line_list_path_trimmed,
+                               Spectra.include_molecules, lbl=True)
+    print("Finished trimming linelist")
+
+
 
 
     if workers > 1:
