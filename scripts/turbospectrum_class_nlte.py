@@ -352,12 +352,8 @@ class TurboSpectrum:
         marcs_parameters['turbulence'] = self.turbulent_velocity #JMG line to make microturbulence an adjustable variable
         #print(marcs_parameters)
         if spherical:
-            if self.atmosphere_dimension == "1D":
-                marcs_parameters['spherical'] = "s"
-                marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
-            else:
-                marcs_parameters['spherical'] = "p"
-                marcs_parameters['mass'] = 0
+            marcs_parameters['spherical'] = "s"
+            marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 2.0
             #print(marcs_parameters['mass'])
