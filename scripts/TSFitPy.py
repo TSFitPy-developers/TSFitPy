@@ -12,7 +12,7 @@ import os
 from os import path as os_path
 # import glob
 import datetime
-from dask.distributed import Client
+from dask.distributed import Client, get_client, secede, rejoin
 import shutil
 import socket
 from typing import Union
@@ -242,7 +242,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
         for i in range(len(wave_line)):
             print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
         out.close()
-    return chi_square
+    return chi_square * 1000
 
 
 class Spectra:
@@ -272,6 +272,8 @@ class Spectra:
     rot: float = None  # rotation km/s, constant for all stars
     fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
     output_folder: str = None
+
+    dask_workers: int = None  # workers, i.e. CPUs for multiprocessing
 
     global_temp_dir: str = None
     line_begins_sorted: np.ndarray = None
@@ -321,7 +323,7 @@ class Spectra:
     guess_plus_minus_pos_teff = 1000
 
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
-                 line_list_path_trimmed: str, init_param_guess: list, elem_abund=None):
+                 line_list_path_trimmed: str, init_param_guess: list, index_temp_dir: float, elem_abund=None):
         self.spec_name: str = str(specname)
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
         self.teff: float = float(teff)
@@ -338,7 +340,7 @@ class Spectra:
         else:
             self.vmicro = None
         self.macroturb: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
-        self.temp_dir: str = os.path.join(Spectra.global_temp_dir, self.spec_name,
+        self.temp_dir: str = os.path.join(Spectra.global_temp_dir, self.spec_name + str(index_temp_dir),
                                           '')  # temp directory, including date and name of the star fitted
         create_dir(self.temp_dir)  # create temp directory
 
@@ -896,14 +898,29 @@ class Spectra:
 
         result = []
 
-        for line_number in range(len(Spectra.line_begins_sorted)):
-            time_start = time.perf_counter()
-            print(f"Fitting line at {Spectra.line_centers_sorted[line_number]} angstroms")
+        if False:
+            #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
+            # Maybe Dask will break this in the future? Then remove whatever within this if statement
+            # And just leave the part in the else behind
+            # Broken ATM because each client will go into the star's folder and mess with each other
+            client = get_client()
+            for line_number in range(len(Spectra.line_begins_sorted)):
 
-            result.append(self.fit_one_line_v2(line_number))
+                res1 = client.submit(self.fit_one_line_v2, line_number)
+                result.append(res1)
 
-            time_end = time.perf_counter()
-            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+            secede()
+            result = client.gather(result)
+            rejoin()
+        else:
+            for line_number in range(len(Spectra.line_begins_sorted)):
+                time_start = time.perf_counter()
+                print(f"Fitting line at {Spectra.line_centers_sorted[line_number]} angstroms")
+
+                result.append(self.fit_one_line_v2(line_number))
+
+                time_end = time.perf_counter()
+                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
         # g.close()
         # h.close()
@@ -1551,7 +1568,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
 
 def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float,
-                           initial_guess_string: list, line_list_path_trimmed: str, input_abundance: float) -> list:
+                           initial_guess_string: list, line_list_path_trimmed: str, input_abundance: float, index: float) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param specname: Name of the textfile
@@ -1567,7 +1584,7 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     :return: result of the fit with the best fit parameters and chi squared
     """
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, line_list_path_trimmed, initial_guess_string,
-                      elem_abund=input_abundance)
+                      index, elem_abund=input_abundance)
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
@@ -1754,6 +1771,7 @@ def run_TSFitPy():
                 output = fields[2]
             if fields[0] == "workers":
                 workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
+                Spectra.dask_workers = workers
             if fields[0] == "init_guess_elem":
                 init_guess_elements = []
                 for i in range(len(fields) - 2):
@@ -1949,9 +1967,9 @@ def run_TSFitPy():
         print("Segment beginning and end are not the same length")
     if np.size(Spectra.line_centers_sorted) != np.size(Spectra.line_begins_sorted) or np.size(Spectra.line_centers_sorted) != np.size(Spectra.line_ends_sorted):
         print("Line center, beginning and end are not the same length")
-    if workers < np.size(specname_fitlist.size):
+    """if workers < np.size(specname_fitlist.size):
         print(f"You requested {workers}, but you only need to fit {specname_fitlist.size} stars. Requesting more CPUs "
-              f"(=workers) than the spectra will just result in idle workers.")
+              f"(=workers) than the spectra will just result in idle workers.")"""
     if Spectra.guess_plus_minus_neg_teff > 0:
         print(f"You requested your {Spectra.guess_plus_minus_neg_teff} to be positive. That will result in the lower "
               f"guess value to be bigger than the expected star temperature. Consider changing the number to negative.")
@@ -2016,10 +2034,10 @@ def run_TSFitPy():
 
 
 
-    if workers > 1:
+    if Spectra.dask_workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         client = Client(threads_per_worker=1,
-                        n_workers=workers)  # if # of threads are not equal to 1, then may break the program
+                        n_workers=Spectra.dask_workers)  # if # of threads are not equal to 1, then may break the program
         print(client)
 
         host = client.run_on_scheduler(socket.gethostname)
@@ -2038,7 +2056,7 @@ def run_TSFitPy():
             macroturb1 = macroturb[i]
             input_abundance = input_abundances[i]
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   initial_guess_string, line_list_path_trimmed, input_abundance)
+                                   initial_guess_string, line_list_path_trimmed, input_abundance, i)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -2053,7 +2071,7 @@ def run_TSFitPy():
             input_abundance = input_abundances[i]
             macroturb1 = macroturb[i]
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                                  initial_guess_string, line_list_path_trimmed, input_abundance))
+                                                  initial_guess_string, line_list_path_trimmed, input_abundance, i))
 
     shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
     shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
@@ -2140,6 +2158,6 @@ if __name__ == '__main__':
     try:
         run_TSFitPy()
     except KeyboardInterrupt:
-        print(f"KeyboardInterrupt detected. Terminating job.")
+        print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")
