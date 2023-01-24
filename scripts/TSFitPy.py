@@ -242,7 +242,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
         for i in range(len(wave_line)):
             print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
         out.close()
-    return chi_square * 1000
+    return chi_square
 
 
 class Spectra:
@@ -259,6 +259,7 @@ class Spectra:
     nlte_flag: bool = None
     fit_microturb: str = "No"   # TODO: redo as bool. It expects, "Yes", "No" or "Input". Add extra variable if input?
     fit_macroturb: bool = False
+    fit_rotation: bool = False
     fit_teff: bool = None
     fit_logg: str = None  # does not work atm
     nelement: int = None  # how many elements to fit (1 to whatever)
@@ -269,7 +270,7 @@ class Spectra:
     ldelta: float = None
     resolution: float = None  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
     #macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
-    rot: float = None  # rotation km/s, constant for all stars
+    rotation: float = None  # rotation km/s, constant for all stars
     fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
     output_folder: str = None
 
@@ -1187,7 +1188,7 @@ def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
     return a, b, c
 
 def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
-                                  wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray) -> float:
+                                  wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray) -> float: #TODO go through all functions that use this and add rotation
     """
     Line by line quick. Takes precalculated synthetic spectra (i.e. 1 grid) and finds chi-sqr for observed spectra.
     Also fits doppler shift and can fit macroturbulence if needed.
@@ -1201,6 +1202,7 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     """
     # param[0] = doppler
     # param[1] = macro turb
+    # param[-1] = rotation fit
 
     doppler = spectra_to_fit.rv + param[0]
 
@@ -1209,16 +1211,21 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     else:
         macroturb = spectra_to_fit.macroturb
 
+    if Spectra.fit_rotation:
+        rotation = param[-1]
+    else:
+        rotation = spectra_to_fit.rotation
+
     wave_ob = apply_doppler_correction(spectra_to_fit, doppler)
 
-    if spectra_to_fit.met < -4.0 or spectra_to_fit.met > 0.5 or macroturb < 0.0:
+    if spectra_to_fit.met < -5.0 or spectra_to_fit.met > 0.5 or macroturb < 0.0:
         chi_square = 9999.9999
     else:
         try:
             chi_square = calculate_lbl_chi_squared(None, wave_ob,
                                                    spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax,
                                                    lmin, macroturb,
-                                                   Spectra.rot, save_convolved=False)
+                                                   rotation, save_convolved=False)
         except IndexError as e:
             chi_square = 9999.99
             print(f"{e} Is your segment seen in the observed spectra?")
@@ -1299,7 +1306,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
             chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
                                                    spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
                                                    lmax, lmin, macroturb,
-                                                   Spectra.rot)
+                                                   Spectra.rotation)
         elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
                 '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
             chi_square = 999.99
@@ -1362,6 +1369,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
             microturb = 2.0
 
     macroturb = 9999    # for printing only here, in case not fitted
+    rotation = 9999
     if microturb <= 0.0 or min(abundances) < -40 or met < -4.0 or met > 0.5:
         chi_square = 9999.9999
     else:
@@ -1378,7 +1386,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
                                                                         spectra_to_fit.guess_min_doppler,
                                                                         spectra_to_fit.guess_max_doppler,
                                                                         spectra_to_fit.macroturb - 3,
-                                                                        spectra_to_fit.macroturb + 3)
+                                                                        spectra_to_fit.macroturb + 3) # TODO add rotation here
             # now for the generated abundance it tries to fit best fit macro + doppler shift.
             # Thus macro should not be dependent on the abundance directly, hopefully
             # Seems to work way better
@@ -1395,12 +1403,14 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
             if spectra_to_fit.fit_macroturb:
                 spectra_to_fit.macroturb = res.x[1]
             macroturb = spectra_to_fit.macroturb
-
+            if spectra_to_fit.fit_rotation:
+                spectra_to_fit.rotation = res.x[-1]
+            rotation = spectra_to_fit.rotation
             try:
                 chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
                                                        spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
                                                        lmax, lmin, macroturb,
-                                                       Spectra.rot)
+                                                       rotation)
             except IndexError as e:
                 chi_square = 9999.99
                 print(f"{e} Is your segment seen in the observed spectra?")
@@ -1415,7 +1425,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={spectra_to_fit.doppler_shift} vmic={microturb} vmac={macroturb} chisqr={chi_square}")
+    print(f"{output_print} rv={spectra_to_fit.doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
 
     return chi_square
 
@@ -1473,7 +1483,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
         chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
                                                spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
                                                lmax, lmin, macroturb,
-                                               Spectra.rot)
+                                               Spectra.rotation)
     elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
         chi_square = 999.99
@@ -1557,7 +1567,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
         chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
                                                spectra_to_fit.output_folder,
                                                wave_obs, spectra_to_fit.flux_ob,
-                                               macroturb, Spectra.resolution, Spectra.rot,
+                                               macroturb, Spectra.resolution, Spectra.rotation,
                                                Spectra.line_begins_sorted, Spectra.line_ends_sorted,
                                                Spectra.seg_begins, Spectra.seg_ends)
 
@@ -1760,7 +1770,7 @@ def run_TSFitPy():
             if fields[0] == "macroturbulence":
                 macroturb_input = float(fields[2])
             if fields[0] == "rotation":
-                Spectra.rot = float(fields[2])
+                Spectra.rotation = float(fields[2])
             if fields[0] == "temporary_directory":
                 temp_directory = fields[2]
                 temp_directory = os.path.join(temp_directory, today, '')
@@ -1818,7 +1828,7 @@ def run_TSFitPy():
             line = fp.readline()
         fp.close()
 
-    print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rot}")
+    print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
 
     if Spectra.nlte_flag:
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(elements_to_fit,
@@ -1996,8 +2006,8 @@ def run_TSFitPy():
         print(f"You requested your macro bounds as {Spectra.bound_min_doppler} {Spectra.bound_max_doppler}, but guesses"
               f"are {Spectra.guess_min_doppler} {Spectra.guess_max_doppler}, which is outside hard bound range. Consider"
               f"changing bounds or guesses.")
-    if Spectra.rot < 0:
-        print(f"Requested rotation of {Spectra.rot}, which is less than 0. Consider changing it.")
+    if Spectra.rotation < 0:
+        print(f"Requested rotation of {Spectra.rotation}, which is less than 0. Consider changing it.")
     if Spectra.resolution < 0:
         print(f"Requested resolution of {Spectra.resolution}, which is less than 0. Consider changing it.")
     if macroturb_input < 0:
