@@ -92,7 +92,7 @@ def conv_rotation(wave, flux, vrot):
     elif not np.isnan(vrot):
         spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * speed_of_light_kms
         if (spec_deltaV) > vrot:
-            print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vrot={vrot}. No convolution will be done")
+            #print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vrot={vrot}. No convolution will be done")
             pass
         elif np.max(wave) - np.min(wave) > 5.:
             #if wavelength is too large, divide and conquer into 5 A windows

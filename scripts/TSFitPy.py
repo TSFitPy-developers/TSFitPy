@@ -298,6 +298,8 @@ class Spectra:
     # bounds for the minimization
     bound_min_macro = 0         # km/s
     bound_max_macro = 30
+    bound_min_rotation = 0         # km/s
+    bound_max_rotation = 30
     bound_min_micro = 0.01         # km/s
     bound_max_micro = 5
     bound_min_abund = -40       # [X/Fe]
@@ -310,6 +312,8 @@ class Spectra:
     # guess bounds for the minimization
     guess_min_macro = 0.2  # km/s
     guess_max_macro = 8
+    guess_min_rotation = 0.2  # km/s
+    guess_max_rotation = 2
     guess_min_micro = 0.8  # km/s
     guess_max_micro = 1.5
     guess_min_abund = -1  # [X/Fe] or [Fe/H]
@@ -416,14 +420,14 @@ class Spectra:
             # param[-1] = macro turb IF MACRO FIT
             # param[-2] = micro turb IF MACRO FIT
             # param[-1] = micro turb IF NOT MACRO FIT
-            initial_guess, self.minim_bounds = self.get_rv_elem_micro_macro_guess(self.ndimen, min_rv, max_rv,
+            initial_guess, self.minim_bounds = self.get_rv_elem_micro_macro_guess(min_rv, max_rv,
                                                                                   min_macroturb, max_macroturb,
                                                                                   min_microturb, max_microturb,
                                                                                   min_abundance, max_abundance)
         elif self.fitting_mode == "lbl_quick":
             # param[0] = doppler
             # param[1] = macro turb
-            initial_guess, self.minim_bounds = self.get_rv_macro_guess(self.ndimen, min_rv, max_rv, min_macroturb, max_macroturb)
+            initial_guess, self.minim_bounds = self.get_rv_macro_rotation_guess()
         else:
             ValueError("Unknown fitting mode, choose all or lbl")
 
@@ -431,41 +435,50 @@ class Spectra:
         self.initial_simplex_guess = initial_guess
 
 
-    def get_elem_micro_guess(self, length: int, min_microturb: float, max_microturb: float, min_abundance: float,
+    def get_elem_micro_guess(self, min_microturb: float, max_microturb: float, min_abundance: float,
                              max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
-        # TODO: check that guess within bound
-        initial_guess = np.empty((length + 1, length))
 
-        microturb_guesses = np.geomspace(min_microturb, max_microturb, length + 1)
-        abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10,
-                                        max_abundance + np.random.random(1)[0] / 10, length + 1)
+        guess_length = self.nelement
+        if self.fit_microturb == "Yes" and self.atmosphere_type != "3D":
+            guess_length += 1
 
-        minim_bounds = []
+        bounds = []
+
+        guesses = np.array([])
 
         for i in range(0, self.nelement):
+            if self.elem_to_fit[i] == "Fe":
+                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
+                                                                self.bound_min_met, self.bound_max_met)
+            else:
+                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
+                                                                self.bound_min_abund, self.bound_max_abund)
             if self.init_guess_dict is not None and self.elem_to_fit[i] in self.init_guess_dict[self.spec_name]:
                 abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i]]
-                abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, length + 1)
-                initial_guess[:, i] = abundance_guesses
+                abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, guess_length + 1)
+                if np.size(guesses) == 0:
+                    guesses = np.array([abundance_guesses])
+                else:
+                    guesses = np.append(guesses, [abundance_guesses], axis=0)
                 # if initial abundance is given, then linearly give guess +/- 0.1 dex
             else:
-                initial_guess[:, i] = abundance_guesses
-                # to create new abundance guess for every element
-            abundance_guesses = np.random.uniform(min_abundance, max_abundance, length + 1)
-            if self.elem_to_fit[i] == "Fe":
-                minim_bounds.append((self.bound_min_met, self.bound_max_met))
-            else:
-                minim_bounds.append((self.bound_min_abund, self.bound_max_abund))
+                if np.size(guesses) == 0:
+                    guesses = np.array([guess_elem])
+                else:
+                    guesses = np.append(guesses, [guess_elem], axis=0)
+            bounds.append(bound_elem)
+        if self.fit_microturb == "Yes" and self.atmosphere_type != "3D":  # last is micro
+            micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_microturb, max_microturb, self.bound_min_micro, self.bound_max_micro)
+            guesses = np.append(guesses, [micro_guess], axis=0)
+            bounds.append(micro_bounds)
 
-        if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
-            initial_guess[:, -1] = microturb_guesses
-            minim_bounds.append((self.bound_min_micro, self.bound_max_micro))  # micro
+        guesses = np.transpose(guesses)
 
-        return initial_guess, minim_bounds
+        return guesses, bounds
 
-    def get_rv_elem_micro_macro_guess(self, length: int, min_rv: float, max_rv: float, min_macroturb: float,
+    def get_rv_elem_micro_macro_guess(self, min_rv: float, max_rv: float, min_macroturb: float,
                            max_macroturb: float, min_microturb: float, max_microturb: float, min_abundance: float,
                            max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
         # param[0] = added doppler to rv
@@ -473,50 +486,70 @@ class Spectra:
         # param[-1] = macro turb IF MACRO FIT
         # param[-2] = micro turb IF MACRO FIT
         # param[-1] = micro turb IF NOT MACRO FIT
-        # TODO: check that guess within bound
-        initial_guess = np.empty((length + 1, length))
 
-        microturb_guesses = np.geomspace(min_microturb, max_microturb, length + 1)
-        macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2,
-                                        max_macroturb + np.random.random(1)[0] / 2, length + 1)
-        abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10,
-                                        max_abundance + np.random.random(1)[0] / 10, length + 1)
-        rv_guesses = np.linspace(min_rv + np.random.random(1)[0] / 10, max_rv + np.random.random(1)[0] / 10,
-                                 length + 1)
+        guess_length = self.ndimen
+        bounds = []
 
-        minim_bounds = []
-
-        initial_guess[:, 0] = rv_guesses
-        minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
+        rv_guess, rv_bounds = self.get_simplex_guess(guess_length, min_rv, max_rv, self.bound_min_doppler, self.bound_max_doppler)
+        guesses = np.array([rv_guess])
+        bounds.append(rv_bounds)
         for i in range(1, self.nelement + 1):
+            if self.elem_to_fit[i - 1] == "Fe":
+                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
+                                                                self.bound_min_met, self.bound_max_met)
+            else:
+                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
+                                                                self.bound_min_abund, self.bound_max_abund)
             if self.init_guess_dict is not None and self.elem_to_fit[i - 1] in self.init_guess_dict[self.spec_name]:
                 abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i - 1]]
-                abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, length + 1)
-                initial_guess[:, i] = abundance_guesses
+                abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, guess_length + 1)
+                guesses = np.append(guesses, [abundance_guesses], axis=0)
                 # if initial abundance is given, then linearly give guess +/- 0.1 dex
             else:
-                initial_guess[:, i] = abundance_guesses
-                # to create new abundance guess for every element
-            abundance_guesses = np.random.uniform(min_abundance, max_abundance, length + 1)
-            if self.elem_to_fit[i - 1] == "Fe":
-                minim_bounds.append((self.bound_min_met, self.bound_max_met))
-            else:
-                minim_bounds.append((self.bound_min_abund, self.bound_max_abund))
-        if self.fit_macroturb:
-            initial_guess[:, -1] = macroturb_guesses
-            if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
-                initial_guess[:, -2] = microturb_guesses
-                minim_bounds.append((self.bound_min_micro, self.bound_max_micro))  # first adding micro
-            minim_bounds.append((self.bound_min_macro, self.bound_max_macro))  # last one macro
-        else:
-            if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":
-                initial_guess[:, -1] = microturb_guesses
-                minim_bounds.append((self.bound_min_micro, self.bound_max_micro))
+                guesses = np.append(guesses, [guess_elem], axis=0)
+            bounds.append(bound_elem)
+        if self.fit_microturb == "Yes" and not self.atmosphere_type == "3D":  # first adding micro
+            micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_microturb, max_microturb, self.bound_min_micro, self.bound_max_micro)
+            guesses = np.append(guesses, [micro_guess], axis=0)
+            bounds.append(micro_bounds)
+        if self.fit_macroturb:  # last is macro
+            macro_guess, macro_bounds = self.get_simplex_guess(guess_length, min_macroturb, max_macroturb, self.bound_min_macro, self.bound_max_macro)
+            guesses = np.append(guesses, [macro_guess], axis=0)
+            bounds.append(macro_bounds)
+
+        guesses = np.transpose(guesses)
+
+        return guesses, bounds
+
+    @staticmethod
+    def get_simplex_guess(length: int, min_guess: float, max_guess: float, min_bound: float, max_bound: float) -> tuple[
+        np.ndarray, tuple]:
+        """
+        Gets guess if it is fitted for simplex guess
+        :param length: number of dimensions (output length+1 array)
+        :param min_guess: minimum guess
+        :param max_guess: maximum guess
+        :param min_bound: minimum bound
+        :param max_bound: maximum bound
+        :return: Initial guess and minimum bound
+        """
+        percentage_of_difference_to_add = 10  # basically adds a bit of randomness to the guess up to this % of the diff of guesses
+
+        if min_guess < min_bound:
+            min_guess = min_bound
+        if max_guess > max_bound:
+            max_guess = max_bound
+
+        minim_bounds = (min_bound, max_bound)
+
+        guess_difference = np.abs(max_guess - min_guess) / percentage_of_difference_to_add
+
+        initial_guess = np.linspace(min_guess + np.random.random() * guess_difference,
+                                    max_guess - np.random.random() * guess_difference, length + 1)
 
         return initial_guess, minim_bounds
 
-    def get_rv_macro_guess(self, length: int, min_rv: float, max_rv: float, min_macroturb: float,
-                           max_macroturb: float) -> tuple[np.ndarray, list[tuple]]:
+    def get_rv_macro_rotation_guess(self, min_rv=None, max_rv=None, min_macroturb=None, max_macroturb=None, min_rotation=None, max_rotation=None) -> tuple[np.ndarray, list[tuple]]:
         """
         Gets rv and macroturbulence guess if it is fitted for simplex guess
         :param length: number of dimensions (output length+1 x length array)
@@ -524,31 +557,50 @@ class Spectra:
         :param max_rv: maximum RV for guess (not bounds)
         :param min_macroturb: minimum macro for guess (not bounds)
         :param max_macroturb: maximum macro for guess (not bounds)
+        :param min_rotation: minimum rotation for guess (not bounds)
+        :param max_rotation: maximum rotation for guess (not bounds)
         :return: Initial guess and minimum bound
         """
-        # param[0] = doppler
-        # param[1] = macro turb
-        # TODO: improve the function
-        initial_guess = np.empty((length + 1, length))
-        minim_bounds = [(self.bound_min_doppler, self.bound_max_doppler)]
+        # param[0] = rv
+        # param[1] = macro IF FITTED
+        # param[-1] = rotation IF FITTED
 
-        rv_guesses = np.linspace(min_rv + np.random.random(1)[0] / 10, max_rv - np.random.random(1)[0] / 10, length + 1)
-        if np.max(rv_guesses) > self.bound_max_doppler or np.min(rv_guesses) < self.bound_min_doppler:
-            rv_guesses = np.linspace(self.bound_min_doppler + np.random.random(1)[0] / 10,
-                                     self.bound_max_doppler - np.random.random(1)[0] / 10, length + 1)
-        initial_guess[:, 0] = rv_guesses
+        if min_rv is None:
+            min_rv = self.guess_min_doppler  # km/s
+        if max_rv is None:
+            max_rv = self.guess_max_doppler
+        if min_macroturb is None:
+            min_macroturb = self.guess_min_macro
+        if max_macroturb is None:
+            max_macroturb = self.guess_max_macro
+        if min_rotation is None:
+            min_rotation = self.guess_min_rotation
+        if max_rotation is None:
+            max_rotation = self.guess_max_rotation
 
+        guess_length = 1
         if self.fit_macroturb:
-            macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2,
-                                            max_macroturb + np.random.random(1)[0] / 2, length + 1)
-            minim_bounds.append((self.bound_min_macro, self.bound_max_macro))
-            if np.max(macroturb_guesses) > self.bound_max_macro or np.min(macroturb_guesses) < self.bound_min_macro:
-                macroturb_guesses = np.linspace(self.bound_min_macro + np.random.random(1)[0] / 2,
-                                                self.bound_max_macro - np.random.random(1)[0] / 2, length + 1)
+            guess_length += 1
+        if self.fit_rotation:
+            guess_length += 1
 
-            initial_guess[:, 1] = macroturb_guesses
+        bounds = []
 
-        return initial_guess, minim_bounds
+        rv_guess, rv_bounds = self.get_simplex_guess(guess_length, min_rv, max_rv, self.bound_min_doppler, self.bound_max_doppler)
+        guesses = np.array([rv_guess])
+        bounds.append(rv_bounds)
+        if self.fit_macroturb:
+            macro_guess, macro_bounds = self.get_simplex_guess(guess_length, min_macroturb, max_macroturb, self.bound_min_macro, self.bound_max_macro)
+            guesses = np.append(guesses, [macro_guess], axis=0)
+            bounds.append(macro_bounds)
+        if self.fit_rotation:
+            rotation_guess, rotation_bounds = self.get_simplex_guess(guess_length, min_rotation, max_rotation, self.bound_min_rotation, self.bound_max_rotation)
+            guesses = np.append(guesses, [rotation_guess], axis=0)
+            bounds.append(rotation_bounds)
+
+        guesses = np.transpose(guesses)
+
+        return guesses, bounds
 
     def configure_and_run_ts(self, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
                              windows_flag: bool, temp_dir=None, teff=None):
@@ -1101,10 +1153,7 @@ class Spectra:
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
                                       start)]
 
-        ndimen = self.nelement
-        if self.fit_microturb == "Yes":
-            ndimen += 1
-        param_guess, min_bounds = self.get_elem_micro_guess(ndimen, self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
+        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
 
         res = minimize(lbl_broad_abund_chi_sqr_v2, param_guess[0], args=(self,
                                                                              Spectra.line_begins_sorted[line_number] - 5.,
@@ -1142,11 +1191,12 @@ class Spectra:
             else:
                 microturb = 2.0
         macroturb = self.macroturb
+        rotation = self.rotation
         result_output = f"{self.spec_name} {Spectra.line_centers_sorted[line_number]} {Spectra.line_begins_sorted[line_number]} " \
                         f"{Spectra.line_ends_sorted[line_number]} {doppler_fit}"
         for key in elem_abund_dict:
             result_output += f" {elem_abund_dict[key]}"
-        result_output += f" {microturb} {macroturb} {res.fun}"
+        result_output += f" {microturb} {macroturb} {rotation} {res.fun}"
         one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
@@ -1218,17 +1268,15 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
 
     wave_ob = apply_doppler_correction(spectra_to_fit, doppler)
 
-    if spectra_to_fit.met < -5.0 or spectra_to_fit.met > 0.5 or macroturb < 0.0:
-        chi_square = 9999.9999
-    else:
-        try:
-            chi_square = calculate_lbl_chi_squared(None, wave_ob,
-                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax,
-                                                   lmin, macroturb,
-                                                   rotation, save_convolved=False)
-        except IndexError as e:
-            chi_square = 9999.99
-            print(f"{e} Is your segment seen in the observed spectra?")
+
+    try:
+        chi_square = calculate_lbl_chi_squared(None, wave_ob,
+                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax,
+                                               lmin, macroturb,
+                                               rotation, save_convolved=False)
+    except IndexError as e:
+        chi_square = 9999.99
+        print(f"{e} Is your segment seen in the observed spectra?")
     #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
 
     return chi_square
@@ -1294,26 +1342,24 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
 
-    if microturb <= 0.0 or macroturb < 0.0 or min(abundances) < -40 or met < -4.0 or met > 0.5:
-        chi_square = 9999.9999
-    else:
-        spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)
 
-        if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
-            wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
-                                                      usecols=(0, 1), unpack=True)
-            chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                                   spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
-                                                   lmax, lmin, macroturb,
-                                                   Spectra.rotation)
-        elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
-            chi_square = 999.99
-            print("empty spectrum file.")
-        else:
-            chi_square = 9999.9999
-            print("didn't generate spectra or atmosphere")
+    spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)
+
+    if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
+            '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
+                                                  usecols=(0, 1), unpack=True)
+        chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
+                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
+                                               lmax, lmin, macroturb,
+                                               Spectra.rotation)
+    elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
+            '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
+        chi_square = 999.99
+        print("empty spectrum file.")
+    else:
+        chi_square = 9999.9999
+        print("didn't generate spectra or atmosphere")
 
     output_print = f""
     for key in elem_abund_dict:
@@ -1370,57 +1416,47 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
 
     macroturb = 9999    # for printing only here, in case not fitted
     rotation = 9999
-    if microturb <= 0.0 or min(abundances) < -40 or met < -4.0 or met > 0.5:
-        chi_square = 9999.9999
+
+    spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)     # generates spectra
+
+    if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
+            '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
+                                                  usecols=(0, 1), unpack=True)
+        param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.macroturb - 3, max_macroturb=spectra_to_fit.macroturb + 3)
+        # now for the generated abundance it tries to fit best fit macro + doppler shift.
+        # Thus, macro should not be dependent on the abundance directly, hopefully
+        # Seems to work way better
+        res = minimize(lbl_broad_abund_chi_sqr_quick, param_guess[0], args=(spectra_to_fit, lmin, lmax,
+                                                                            wave_mod_orig, flux_mod_orig),
+                       bounds=min_bounds,
+                       method='Nelder-Mead',
+                       options={'maxiter': Spectra.ndimen * 50, 'disp': True,
+                                'initial_simplex': param_guess,
+                                'xatol': 0.05, 'fatol': 0.05})
+
+        spectra_to_fit.doppler_shift = res.x[0]
+        wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
+        if spectra_to_fit.fit_macroturb:
+            spectra_to_fit.macroturb = res.x[1]
+        macroturb = spectra_to_fit.macroturb
+        if spectra_to_fit.fit_rotation:
+            spectra_to_fit.rotation = res.x[-1]
+        rotation = spectra_to_fit.rotation
+        try:
+            chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob, spectra_to_fit.flux_ob,
+                                                   wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax, lmin,
+                                                   macroturb, rotation)
+        except IndexError as e:
+            chi_square = 9999.99
+            print(f"{e} Is your segment seen in the observed spectra?")
+    elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
+            '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
+        chi_square = 999.99
+        print("empty spectrum file.")
     else:
-        spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)     # generates spectra
-
-        if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
-            wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
-                                                      usecols=(0, 1), unpack=True)
-            ndimen = 1
-            if spectra_to_fit.fit_macroturb:
-                ndimen += 1
-            param_guess, min_bounds = spectra_to_fit.get_rv_macro_guess(ndimen,
-                                                                        spectra_to_fit.guess_min_doppler,
-                                                                        spectra_to_fit.guess_max_doppler,
-                                                                        spectra_to_fit.macroturb - 3,
-                                                                        spectra_to_fit.macroturb + 3) # TODO add rotation here
-            # now for the generated abundance it tries to fit best fit macro + doppler shift.
-            # Thus macro should not be dependent on the abundance directly, hopefully
-            # Seems to work way better
-            res = minimize(lbl_broad_abund_chi_sqr_quick, param_guess[0], args=(spectra_to_fit, lmin, lmax,
-                                                                                wave_mod_orig, flux_mod_orig),
-                           bounds=min_bounds,
-                           method='Nelder-Mead',
-                           options={'maxiter': Spectra.ndimen * 50, 'disp': True,
-                                    'initial_simplex': param_guess,
-                                    'xatol': 0.05, 'fatol': 0.05})
-
-            spectra_to_fit.doppler_shift = res.x[0]
-            wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
-            if spectra_to_fit.fit_macroturb:
-                spectra_to_fit.macroturb = res.x[1]
-            macroturb = spectra_to_fit.macroturb
-            if spectra_to_fit.fit_rotation:
-                spectra_to_fit.rotation = res.x[-1]
-            rotation = spectra_to_fit.rotation
-            try:
-                chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                                       spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
-                                                       lmax, lmin, macroturb,
-                                                       rotation)
-            except IndexError as e:
-                chi_square = 9999.99
-                print(f"{e} Is your segment seen in the observed spectra?")
-        elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
-                '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
-            chi_square = 999.99
-            print("empty spectrum file.")
-        else:
-            chi_square = 9999.9999
-            print("didn't generate spectra or atmosphere")
+        chi_square = 9999.9999
+        print("didn't generate spectra or atmosphere")
 
     output_print = f""
     for key in elem_abund_dict:
@@ -1451,6 +1487,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
     spectra_to_fit.configure_and_run_ts(spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
 
     macroturb = 9999  # for printing if fails
+    rotation = 9999
     if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
@@ -1458,11 +1495,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
         ndimen = 1
         if spectra_to_fit.fit_macroturb:
             ndimen += 1
-        param_guess, min_bounds = spectra_to_fit.get_rv_macro_guess(ndimen,
-                                                                    spectra_to_fit.guess_min_doppler,
-                                                                    spectra_to_fit.guess_max_doppler,
-                                                                    spectra_to_fit.macroturb - 3,
-                                                                    spectra_to_fit.macroturb + 3)
+        param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.macroturb - 3, max_macroturb=spectra_to_fit.macroturb + 3)
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
@@ -1479,11 +1512,14 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
         if spectra_to_fit.fit_macroturb:
             spectra_to_fit.macroturb = res.x[1]
         macroturb = spectra_to_fit.macroturb
+        if spectra_to_fit.fit_macroturb:
+            spectra_to_fit.rotation = res.x[-1]
+        rotation = spectra_to_fit.rotation
 
         chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
                                                spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
                                                lmax, lmin, macroturb,
-                                               Spectra.rotation)
+                                               rotation)
     elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
         chi_square = 999.99
@@ -1492,7 +1528,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
         chi_square = 9999.9999
         print("didn't generate spectra or atmosphere")
 
-    print(teff, spectra_to_fit.doppler_shift, microturb, macroturb, chi_square)
+    print(f"Teff={teff}, RV={spectra_to_fit.doppler_shift}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
     return chi_square
 
@@ -1543,33 +1579,29 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
 
     wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
 
-    if spectra_to_fit.met > 0.5 or spectra_to_fit.met < -4.0 or macroturb < 0.0 or abund < -40 or (
-            Spectra.fit_met and (abund < -4.0 or abund > 0.5)):
-        chi_square = 9999.9999
-    else:
-        if Spectra.fit_met:
-            item_abund = {"Fe": abund}
-            met = abund
-            if spectra_to_fit.vmicro is not None:
-                vmicro = spectra_to_fit.vmicro
-            else:
-                vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
-        else:   # Fe: [Fe/H]. X: [X/Fe]. But TS takes [X/H]. Thus convert [X/H] = [X/Fe] + [Fe/H]
-            item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit[0]: abund + spectra_to_fit.met}
-            met = spectra_to_fit.met
-            if spectra_to_fit.vmicro is not None:
-                vmicro = spectra_to_fit.vmicro
-            else:
-                vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
+    if Spectra.fit_met:
+        item_abund = {"Fe": abund}
+        met = abund
+        if spectra_to_fit.vmicro is not None:
+            vmicro = spectra_to_fit.vmicro
+        else:
+            vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
+    else:   # Fe: [Fe/H]. X: [X/Fe]. But TS takes [X/H]. Thus convert [X/H] = [X/Fe] + [Fe/H]
+        item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit[0]: abund + spectra_to_fit.met}
+        met = spectra_to_fit.met
+        if spectra_to_fit.vmicro is not None:
+            vmicro = spectra_to_fit.vmicro
+        else:
+            vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-        spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
+    spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
-        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
-                                               spectra_to_fit.output_folder,
-                                               wave_obs, spectra_to_fit.flux_ob,
-                                               macroturb, Spectra.resolution, Spectra.rotation,
-                                               Spectra.line_begins_sorted, Spectra.line_ends_sorted,
-                                               Spectra.seg_begins, Spectra.seg_ends)
+    chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
+                                           spectra_to_fit.output_folder,
+                                           wave_obs, spectra_to_fit.flux_ob,
+                                           macroturb, Spectra.resolution, Spectra.rotation,
+                                           Spectra.line_begins_sorted, Spectra.line_ends_sorted,
+                                           Spectra.seg_begins, Spectra.seg_ends)
 
     #print(abund, doppler, chi_square, macroturb)
 
@@ -1727,6 +1759,11 @@ def run_TSFitPy():
                     input_macro = True
                 else:
                     input_macro = False
+            if fields[0] == "fit_rotation":
+                if fields[2] == "Yes":
+                    Spectra.fit_rotation = True
+                else:
+                    Spectra.fit_rotation = False
             """if fields[0] == "fit_teff":
                 if fields[2].lower() == "true":
                     Spectra.fit_teff = True
@@ -2018,6 +2055,13 @@ def run_TSFitPy():
     if Spectra.fitting_mode not in ["all", "lbl", "lbl_quick", "teff"]:
         print(f"Expected fitting mode 'all', 'lbl', 'lbl_quick', 'teff', but got {Spectra.fitting_mode} instead")
 
+    for line_start, line_end in zip(Spectra.line_begins_sorted, Spectra.line_ends_sorted):
+        index_location = np.where(np.logical_and(Spectra.seg_begins <= line_start, line_end <= Spectra.seg_ends))[0]
+        if np.size(index_location) > 1:
+            print(f"{line_start} {line_end} linemask has more than 1 segment!")
+        if np.size(index_location) == 0:
+            print(f"{line_start} {line_end} linemask does not have any corresponding segment")
+
     print("\nDone doing some basic checks. Consider reading the messages above, if there are any. Can be useful if it "
           "crashes.\n\n")
 
@@ -2112,9 +2156,8 @@ def run_TSFitPy():
         print(f"#specname        {output_elem_column}     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
     elif Spectra.fitting_mode == "lbl":
         print(
-            f"#specname        wave_center  wave_start  wave_end  Doppler_Shift_add_to_RV   {output_elem_column}    Microturb   Macroturb    chi_squared",
-            file=f
-        )
+            f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared",
+            file=f)
     elif Spectra.fitting_mode == "lbl_quick":  # f" {res.x[0]} {vmicro} {macroturb} {res.fun}"
         output_columns = "#specname\twave_center\twave_start\twave_end"
         for i in range(Spectra.grids_amount):
