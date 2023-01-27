@@ -342,7 +342,10 @@ class Spectra:
         if self.input_elem_abundance is None:  # input abundance - NOT fitted, but just accepted as a constant abund for spectra
             self.input_abund: dict = {}
         else:
-            self.input_abund = self.input_elem_abundance[self.spec_name]
+            try:
+                self.input_abund: dict = self.input_elem_abundance[self.spec_name]
+            except KeyError:
+                self.input_abund: dict = {}
         if Spectra.fit_microturb == "Input":
             self.vmicro: float = float(micro)  # microturbulence. Set if it is given in input
         else:
