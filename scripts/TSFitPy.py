@@ -1832,6 +1832,9 @@ def run_TSFitPy():
             if fields[0] == "bounds_macro":
                 Spectra.bound_min_macro = min(float(fields[2]), float(fields[3]))
                 Spectra.bound_max_macro = max(float(fields[2]), float(fields[3]))
+            if fields[0] == "bounds_rotation":
+                Spectra.bound_min_rotation = min(float(fields[2]), float(fields[3]))
+                Spectra.bound_max_rotation = max(float(fields[2]), float(fields[3]))
             if fields[0] == "bounds_micro":
                 Spectra.bound_min_micro = min(float(fields[2]), float(fields[3]))
                 Spectra.bound_max_micro = max(float(fields[2]), float(fields[3]))
@@ -1853,6 +1856,9 @@ def run_TSFitPy():
             if fields[0] == "guess_range_macroturb":
                 Spectra.guess_min_macro = min(float(fields[2]), float(fields[3]))
                 Spectra.guess_max_macro = max(float(fields[2]), float(fields[3]))
+            if fields[0] == "guess_range_rotation":
+                Spectra.guess_min_rotation = min(float(fields[2]), float(fields[3]))
+                Spectra.guess_max_rotation = max(float(fields[2]), float(fields[3]))
             if fields[0] == "guess_range_abundance":
                 Spectra.guess_min_abund = min(float(fields[2]), float(fields[3]))
                 Spectra.guess_max_abund = max(float(fields[2]), float(fields[3]))
