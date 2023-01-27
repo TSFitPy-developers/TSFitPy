@@ -19,9 +19,6 @@ from typing import Union
 from sys import argv
 import collections
 import scipy
-
-from solar_abundances import solar_abundances, periodic_table
-
 from convolve import *
 from create_window_linelist_function import create_window_linelist
 
@@ -294,6 +291,7 @@ class Spectra:
     abund_bound: float = 1.0
 
     init_guess_dict: dict = None    # initial guess for elements, if given
+    input_elem_abundance: dict = None  # input elemental abundance for a spectra, not fitted, just used for TS
 
     # bounds for the minimization
     bound_min_macro = 0         # km/s
@@ -328,7 +326,8 @@ class Spectra:
     guess_plus_minus_pos_teff = 1000
 
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
-                 line_list_path_trimmed: str, init_param_guess: list, index_temp_dir: float, elem_abund=None):
+                 line_list_path_trimmed: str, init_param_guess: list, index_temp_dir: float,
+                 elem_abund=None):
         self.spec_name: str = str(specname)
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
         self.teff: float = float(teff)
@@ -337,9 +336,13 @@ class Spectra:
         self.rv: float = float(rv)  # RV of star (given, but is fitted with extra doppler shift)
         self.doppler_shift: float = 0.0  # doppler shift; added to RV (fitted)
         if elem_abund is not None:
-            self.elem_abund: float = float(elem_abund)  # initial abundance of element as a guess if lbl quick
+            self.elem_abund_input: float = float(elem_abund)  # initial abundance of element as a guess if lbl quick
         else:
-            self.elem_abund = None
+            self.elem_abund_input = None
+        if self.input_elem_abundance is None:  # input abundance - NOT fitted, but just accepted as a constant abund for spectra
+            self.input_abund: dict = {}
+        else:
+            self.input_abund = self.input_elem_abundance[self.spec_name]
         if Spectra.fit_microturb == "Input":
             self.vmicro: float = float(micro)  # microturbulence. Set if it is given in input
         else:
@@ -552,7 +555,6 @@ class Spectra:
     def get_rv_macro_rotation_guess(self, min_rv=None, max_rv=None, min_macroturb=None, max_macroturb=None, min_rotation=None, max_rotation=None) -> tuple[np.ndarray, list[tuple]]:
         """
         Gets rv and macroturbulence guess if it is fitted for simplex guess
-        :param length: number of dimensions (output length+1 x length array)
         :param min_rv: minimum RV for guess (not bounds)
         :param max_rv: maximum RV for guess (not bounds)
         :param min_macroturb: minimum macro for guess (not bounds)
@@ -710,7 +712,7 @@ class Spectra:
         if self.fit_met:  # grids generated centered on input metallicity or abundance
             input_abund = self.met
         else:
-            input_abund = self.elem_abund
+            input_abund = self.elem_abund_input
         self.abund_to_gen = np.linspace(input_abund - self.abund_bound, input_abund + self.abund_bound,
                                         self.grids_amount)
         success_grid_gen = self.generate_grid_for_lbl(self.abund_to_gen)  # generate grids
@@ -1391,7 +1393,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
         met = spectra_to_fit.met
     elem_abund_dict = {"Fe": met}
 
-    abundances = [met]
+    #abundances = [met]
 
     for i in range(Spectra.nelement):
         # Spectra.elem_to_fit[i] = element name
@@ -1399,7 +1401,10 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
         elem_name = Spectra.elem_to_fit[i]
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param[i] + met
-            abundances.append(param[i])
+            #abundances.append(param[i])
+
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met
 
     if spectra_to_fit.vmicro is not None:  # Input given
         microturb = spectra_to_fit.vmicro
@@ -1650,21 +1655,25 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     return result
 
 
-def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart_aux_file: list, model_atom_file: list) -> tuple[dict, dict, dict]:
+def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart_aux_file: list, model_atom_file: list, load_fe=True) -> tuple[dict, dict, dict]:
     """
     Loads and sorts NLTE elements to fit into respective dictionaries
     :param elements_to_fit: Array of elements to fit
     :param depart_bin_file: Departure binary file location (Fe last if not fitted)
     :param depart_aux_file: Departure aux file location (Fe last if not fitted)
     :param model_atom_file: Model atom file location (Fe last if not fitted)
+    :param load_fe: loads Fe in the dict as well with it being the last element even if not fitted
     :return: 3 dictionaries: NLTE location of elements that exist with keys as element names
     """
     #TODO check if files exist
     depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
-    if Spectra.fit_met:
-        iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
+    if load_fe:
+        if Spectra.fit_met:
+            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
+        else:
+            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
     else:
-        iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
+        iterations_for_nlte_elem = len(elements_to_fit)
     for i in range(iterations_for_nlte_elem):
         depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
     depart_aux_file_dict = {}
@@ -1677,10 +1686,11 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
         depart_bin_file_dict[elements_to_fit[i]] = ""
         depart_aux_file_dict[elements_to_fit[i]] = ""
         model_atom_file_dict[elements_to_fit[i]] = ""
-    if "Fe" not in elements_to_fit:  # if Fe is not fitted, then the last NLTE element should be
-        depart_bin_file_dict["Fe"] = depart_bin_file[-1]
-        depart_aux_file_dict["Fe"] = depart_aux_file[-1]
-        model_atom_file_dict["Fe"] = model_atom_file[-1]
+    if load_fe:
+        if "Fe" not in elements_to_fit:  # if Fe is not fitted, then the last NLTE element should be
+            depart_bin_file_dict["Fe"] = depart_bin_file[-1]
+            depart_aux_file_dict["Fe"] = depart_aux_file[-1]
+            model_atom_file_dict["Fe"] = model_atom_file[-1]
     return depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
 
 
@@ -1689,6 +1699,10 @@ def run_TSFitPy():
     depart_aux_file = []
     model_atom_file = []
     init_guess_elements = []
+    input_elem_abundance = []
+    depart_bin_file_input_elem = []
+    depart_aux_file_input_elem = []
+    model_atom_file_input_elem = []
 
     initial_guess_string = None
 
@@ -1796,6 +1810,15 @@ def run_TSFitPy():
             if fields[0] == "model_atom_file" and Spectra.nlte_flag:
                 for i in range(2, len(fields)):
                     model_atom_file.append(fields[i])
+            if fields[0] == "input_elem_departure_coefficient_binary" and Spectra.nlte_flag:
+                for i in range(2, len(fields)):
+                    depart_bin_file_input_elem.append(fields[i])
+            if fields[0] == "input_elem_departure_coefficient_aux" and Spectra.nlte_flag:
+                for i in range(2, len(fields)):
+                    depart_aux_file_input_elem.append(fields[i])
+            if fields[0] == "input_elem_model_atom_file" and Spectra.nlte_flag:
+                for i in range(2, len(fields)):
+                    model_atom_file_input_elem.append(fields[i])
             if fields[0] == "wavelength_minimum":
                 Spectra.lmin = float(fields[2])
             if fields[0] == "wavelength_maximum":
@@ -1829,6 +1852,16 @@ def run_TSFitPy():
                 for i in range(len(init_guess_elements)):
                     init_guess_elements_location.append(fields[2 + i])
                 init_guess_elements_location = np.asarray(init_guess_elements_location)
+            if fields[0] == "input_elem_abundance":
+                input_elem_abundance = []
+                for i in range(len(fields) - 2):
+                    input_elem_abundance.append(fields[2 + i])
+                input_elem_abundance = np.asarray(input_elem_abundance)
+            if fields[0] == "input_elem_abundance_location":
+                input_elem_abundance_location = []
+                for i in range(len(input_elem_abundance)):
+                    input_elem_abundance_location.append(fields[2 + i])
+                input_elem_abundance_location = np.asarray(input_elem_abundance_location)
             if fields[0] == "bounds_macro":
                 Spectra.bound_min_macro = min(float(fields[2]), float(fields[3]))
                 Spectra.bound_max_macro = max(float(fields[2]), float(fields[3]))
@@ -1878,6 +1911,15 @@ def run_TSFitPy():
                                                                                                    depart_bin_file,
                                                                                                    depart_aux_file,
                                                                                                    model_atom_file)
+
+        input_elem_depart_bin_file_dict, input_elem_depart_aux_file_dict, input_elem_model_atom_file_dict = load_nlte_files_in_dict(input_elem_abundance,
+                                                                                                   depart_bin_file_input_elem,
+                                                                                                   depart_aux_file_input_elem,
+                                                                                                   model_atom_file_input_elem, load_fe=False)
+
+        depart_bin_file_dict = {**depart_bin_file_dict, **input_elem_depart_bin_file_dict}
+        depart_aux_file_dict = {**depart_aux_file_dict, **input_elem_depart_aux_file_dict}
+        model_atom_file_dict = {**model_atom_file_dict, **input_elem_model_atom_file_dict}
 
         print("NLTE loaded. Please check that elements correspond to their correct binary files:")
         for key in depart_bin_file_dict:
@@ -1984,7 +2026,7 @@ def run_TSFitPy():
         init_guess_spectra_dict = collections.defaultdict(dict)
 
         for init_guess_elem, init_guess_loc in zip(init_guess_elements, init_guess_elements_location):
-            init_guess_data = np.loadtxt(init_guess_loc, dtype=str)
+            init_guess_data = np.loadtxt(init_guess_loc, dtype=str, usecols=(0, 1))
             if init_guess_data.ndim == 1:
                 init_guess_data = np.array([init_guess_data])
             init_guess_spectra_names, init_guess_values = init_guess_data[:, 0], init_guess_data[:, 1].astype(float)
@@ -1994,6 +2036,22 @@ def run_TSFitPy():
                 init_guess_spectra_dict[spectra][init_guess_elem] = init_guess_values[spectra_loc_index]
 
         Spectra.init_guess_dict = dict(init_guess_spectra_dict)
+
+
+    if np.size(input_elem_abundance) > 0:
+        input_elem_abundance_dict = collections.defaultdict(dict)
+
+        for input_elem, init_elem_loc in zip(input_elem_abundance, input_elem_abundance_location):
+            input_abund_data = np.loadtxt(init_elem_loc, dtype=str, usecols=(0, 1))
+            if input_abund_data.ndim == 1:
+                input_abund_data = np.array([input_abund_data])
+            input_abund_data_spectra_names, input_abund_data_values = input_abund_data[:, 0], input_abund_data[:, 1].astype(float)
+
+            for spectra in specname_fitlist:
+                spectra_loc_index = np.where(input_abund_data_spectra_names == spectra)[0][0]
+                input_elem_abundance_dict[spectra][input_elem] = input_abund_data_values[spectra_loc_index]
+
+        Spectra.input_elem_abundance = dict(input_elem_abundance_dict)
 
     line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)

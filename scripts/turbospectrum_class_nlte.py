@@ -742,6 +742,8 @@ class TurboSpectrum:
                 #print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
                 #print("*******************")
                 #print(element,self.model_atom_file[element])
+                if element not in self.model_atom_file:
+                    self.model_atom_file[element] = ""
                 if self.model_atom_file[element] != "":
                     if self.verbose:
                         stdout = None
@@ -1000,6 +1002,8 @@ class TurboSpectrum:
 
 
                 for element, abundance in self.free_abundances.items():
+                    if element not in self.model_atom_file:
+                        self.model_atom_file[element] = ""
                     if self.model_atom_file[element] != "":
                         atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], element)
                         #low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
@@ -1164,6 +1168,8 @@ class TurboSpectrum:
         if self.nlte_flag == True:
             for element, abundance in self.free_abundances.items():
                 atomic_number = periodic_table.index(element)
+                if element not in self.model_atom_file:
+                    self.model_atom_file[element] = ""
                 if self.model_atom_file[element] == "":
                     file.write("{}  '{}'  'lte'  ''   '' 'ascii'\n".format(atomic_number,element,nlte,self.model_atom_file[element],self.marcs_model_name, element))
                 else:
