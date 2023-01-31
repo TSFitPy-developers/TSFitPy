@@ -287,8 +287,8 @@ class Spectra:
     ndimen: int = None
     spec_input_path: str = None
 
-    grids_amount: int = 50
-    abund_bound: float = 1.0
+    grids_amount: int = 25
+    abund_bound: float = 0.2
 
     init_guess_dict: dict = None    # initial guess for elements, if given
     input_elem_abundance: dict = None  # input elemental abundance for a spectra, not fitted, just used for TS
@@ -2138,6 +2138,7 @@ def run_TSFitPy():
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
         create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                Spectra.include_molecules, lbl=False)
+        line_list_path_trimmed =  os.path.join(line_list_path_trimmed, "0", "")
     elif Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "teff":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", today, '')
         """for j in range(len(Spectra.line_begins_sorted)):
