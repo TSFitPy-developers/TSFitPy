@@ -2135,7 +2135,7 @@ def run_TSFitPy():
     print("Trimming down the linelist to only lines within segments for faster fitting")
     if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
         # os.system("rm {}/*".format(line_list_path_trimmed))
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, f"{segment_file.replace('/', '_').replace('.', '_')}_{Spectra.include_molecules}", "")
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
         create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                Spectra.include_molecules, lbl=False)
     elif Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "teff":
