@@ -52,8 +52,6 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 		new_linelist_name: str = f"{new_path_name}" #f"linelist-{line_list_number}.bsyn"
 		#new_linelist: str = os_path.join(f"{new_path_name}", f"linelist-{i}.bsyn")
 		#with open(new_linelist, "w") as new_file_to_write:
-		if not lbl:
-			line_list_number = 0
 		with open(line_list_file) as fp:
 			lines_file: list[str] = fp.readlines()
 			all_lines_to_write: dict = {}
