@@ -1435,13 +1435,11 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
-        res = minimize(lbl_broad_abund_chi_sqr_quick, param_guess[0], args=(spectra_to_fit, lmin, lmax,
+        res = minimize(lbl_broad_abund_chi_sqr_quick, np.median(param_guess, axis=0), args=(spectra_to_fit, lmin, lmax,
                                                                             wave_mod_orig, flux_mod_orig),
                        bounds=min_bounds,
-                       method='Nelder-Mead',
-                       options={'maxiter': Spectra.ndimen * 50, 'disp': True,
-                                'initial_simplex': param_guess,
-                                'xatol': 0.05, 'fatol': 0.05})
+                       method='L-BFGS-B',
+                       options={'maxiter': Spectra.ndimen * 50, 'disp': False})
 
         spectra_to_fit.doppler_shift = res.x[0]
         wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
