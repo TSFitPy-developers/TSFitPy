@@ -2105,7 +2105,7 @@ def run_TSFitPy():
               f"are {Spectra.guess_min_abund} {Spectra.guess_max_abund}, which is outside hard bound range. Consider"
               f"changing bounds or guesses if you fit metallicity.")
     if Spectra.guess_min_doppler < Spectra.bound_min_doppler or Spectra.bound_max_doppler < Spectra.guess_max_doppler:
-        print(f"You requested your macro bounds as {Spectra.bound_min_doppler} {Spectra.bound_max_doppler}, but guesses"
+        print(f"You requested your RV bounds as {Spectra.bound_min_doppler} {Spectra.bound_max_doppler}, but guesses"
               f"are {Spectra.guess_min_doppler} {Spectra.guess_max_doppler}, which is outside hard bound range. Consider"
               f"changing bounds or guesses.")
     if Spectra.rotation < 0:
