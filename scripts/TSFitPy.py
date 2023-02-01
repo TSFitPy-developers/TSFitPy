@@ -746,10 +746,8 @@ class Spectra:
                                                                                                wave_abund,
                                                                                                flux_abund),
                                    bounds=self.minim_bounds,
-                                   method='Nelder-Mead',
-                                   options={'maxiter': Spectra.ndimen * 50, 'disp': True,
-                                            'initial_simplex': self.initial_simplex_guess,
-                                            'xatol': 0.05, 'fatol': 0.05})
+                                   method='L-BFGS-B',
+                                   options={'maxiter': Spectra.ndimen * 50, 'disp': False})
                     #print(res.x)
                     if Spectra.fit_macroturb:  # if fitted macroturbulence
                         macroturb = res.x[1]
@@ -884,10 +882,8 @@ class Spectra:
                                                                                        wave_abund,
                                                                                        flux_abund),
                            bounds=minim_bounds,
-                           method='Nelder-Mead',
-                           options={'maxiter': Spectra.ndimen * 50, 'disp': True,
-                                    'initial_simplex': initial_guess_quick,
-                                    'xatol': 0.05, 'fatol': 0.05})
+                           method='L-BFGS-B',
+                           options={'maxiter': Spectra.ndimen * 50, 'disp': False})
 
             chi_squares.append(res.fun)
             doppler_shifts.append(res.x[0])
@@ -1508,10 +1504,8 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
         res = minimize(lbl_broad_abund_chi_sqr_quick, param_guess[0], args=(spectra_to_fit, lmin, lmax,
                                                                             wave_mod_orig, flux_mod_orig),
                        bounds=min_bounds,
-                       method='Nelder-Mead',
-                       options={'maxiter': Spectra.ndimen * 50, 'disp': True,
-                                'initial_simplex': param_guess,
-                                'xatol': 0.05, 'fatol': 0.05})
+                       method='L-BFGS-B',
+                       options={'maxiter': Spectra.ndimen * 50, 'disp': False})
 
         spectra_to_fit.doppler_shift = res.x[0]
         wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
