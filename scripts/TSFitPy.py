@@ -1689,7 +1689,7 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
     return depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
 
 
-def run_TSFitPy():
+def run_TSFitPy(output_folder_title):
     depart_bin_file = []
     depart_aux_file = []
     model_atom_file = []
@@ -1713,6 +1713,8 @@ def run_TSFitPy():
                 fields = line.strip().split()
             # if fields[0] == "turbospec_path":
             #    turbospec_path = fields[2]
+            if fields[0] == "title":
+                output_folder_title = fields[2]
             if fields[0] == "interpol_path":
                 interpol_path = fields[2]
             if fields[0] == "line_list_path":
@@ -1828,7 +1830,7 @@ def run_TSFitPy():
                 Spectra.rotation = float(fields[2])
             if fields[0] == "temporary_directory":
                 temp_directory = fields[2]
-                temp_directory = os.path.join(temp_directory, today, '')
+                temp_directory = os.path.join(temp_directory, output_folder_title, '')
                 Spectra.global_temp_dir = f"../{temp_directory}"
             if fields[0] == "input_file":
                 fitlist = fields[2]
@@ -1944,12 +1946,18 @@ def run_TSFitPy():
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
     Spectra.model_atom_path = model_atom_path
     Spectra.departure_file_path = departure_file_path
-    Spectra.output_folder = f"{output_folder_og}{today}/"
+    Spectra.output_folder = f"{output_folder_og}{output_folder_title}/"
     Spectra.spec_input_path = spec_input_path
+
+    #prevent overwriting
+    if os.path.exists(Spectra.output_folder):
+        print("Error: output folder already exists. Run was stopped to prevent overwriting")
+        return
 
     Spectra.linemask_file = f"{linemask_file_og}{linemask_file}"
     Spectra.segment_file = f"{segment_file_og}{segment_file}"
 
+    print(f"Temporary directory name: {Spectra.global_temp_dir}")
     create_dir(Spectra.global_temp_dir)
     create_dir(Spectra.output_folder)
 
@@ -2127,12 +2135,12 @@ def run_TSFitPy():
     print("Trimming down the linelist to only lines within segments for faster fitting")
     if Spectra.fitting_mode == "all" or Spectra.fitting_mode == "lbl_quick":
         # os.system("rm {}/*".format(line_list_path_trimmed))
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", output_folder_title, '')
         create_window_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                Spectra.include_molecules, lbl=False)
         line_list_path_trimmed =  os.path.join(line_list_path_trimmed, "0", "")
     elif Spectra.fitting_mode == "lbl" or Spectra.fitting_mode == "teff":
-        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", today, '')
+        line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", output_folder_title, '')
         """for j in range(len(Spectra.line_begins_sorted)):
             start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[j],
                                             Spectra.line_centers_sorted[j] <= Spectra.seg_ends))[0][0]
@@ -2150,8 +2158,12 @@ def run_TSFitPy():
 
     if Spectra.dask_workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
-        client = Client(threads_per_worker=1,
-                        n_workers=Spectra.dask_workers)  # if # of threads are not equal to 1, then may break the program
+        if dask_mpi_installed:
+            print("Ignoring requested number of CPUs in the config file and launching based on CPUs requested in the slurm script")
+            dask_mpi_initialize()
+            client = Client(threads_per_worker=1)  # if # of threads are not equal to 1, then may break the program
+        else:
+            client = Client(n_workers=Spectra.dask_workers)
         print(client)
 
         host = client.run_on_scheduler(socket.gethostname)
@@ -2249,6 +2261,14 @@ if __name__ == '__main__':
                           f"That will lead to bad fits. Please update to scipy 1.7.1 OR higher. Your version: "
                           f"{scipy.__version__}")
 
+    try:
+        raise ModuleNotFoundError
+        from dask_mpi import initialize as dask_mpi_initialize
+        dask_mpi_installed = True
+    except ModuleNotFoundError:
+        print("Dask MPI not installed. Job launching only on 1 node. Ignore if not using a cluster.")
+        dask_mpi_installed = False
+
     # lbl version.
     # 1: original version.
     # 2: for each generated abundance, fits doppler shift + macroturbulence separately. much faster! reduced tolerance as well
@@ -2264,12 +2284,12 @@ if __name__ == '__main__':
         obs_location = None  # otherwise defaults to the input one
     print(config_location)
     # TODO explain lbl quick
-    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
-    today = f"{today}_{np.random.random(1)[0]}"     # in case if someone calls the function several times per second
-    print(f"Start of the fitting: {today}")
+    output_folder_title_date = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    output_folder_title_date = f"{output_folder_title_date}_{np.random.random(1)[0]}"     # in case if someone calls the function several times per second
+    print(f"Start of the fitting: {output_folder_title_date}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     try:
-        run_TSFitPy()
+        run_TSFitPy(output_folder_title_date)
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
