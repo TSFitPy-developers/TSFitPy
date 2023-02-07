@@ -2163,7 +2163,7 @@ def run_TSFitPy(output_folder_title):
             dask_mpi_initialize()
             client = Client(threads_per_worker=1)  # if # of threads are not equal to 1, then may break the program
         else:
-            client = Client(n_workers=Spectra.dask_workers)
+            client = Client(threads_per_worker=1, n_workers=Spectra.dask_workers)
         print(client)
 
         host = client.run_on_scheduler(socket.gethostname)
@@ -2266,7 +2266,7 @@ if __name__ == '__main__':
         from dask_mpi import initialize as dask_mpi_initialize
         dask_mpi_installed = True
     except ModuleNotFoundError:
-        print("Dask MPI not installed. Job launching only on 1 node. Ignore if not using a cluster.")
+        #print("Dask MPI not installed. Job launching only on 1 node. Ignore if not using a cluster.")
         dask_mpi_installed = False
 
     # lbl version.
