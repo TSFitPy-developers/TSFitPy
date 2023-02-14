@@ -352,12 +352,8 @@ class TurboSpectrum:
         marcs_parameters['turbulence'] = self.turbulent_velocity #JMG line to make microturbulence an adjustable variable
         #print(marcs_parameters)
         if spherical:
-            if self.atmosphere_dimension == "1D":
-                marcs_parameters['spherical'] = "s"
-                marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
-            else:
-                marcs_parameters['spherical'] = "p"
-                marcs_parameters['mass'] = 0
+            marcs_parameters['spherical'] = "s"
+            marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 2.0
             #print(marcs_parameters['mass'])
@@ -436,8 +432,8 @@ class TurboSpectrum:
 
                 except KeyError:
                     # We get a KeyError if there is no model matching the parameter combination we tried
-                    failed_on_parameter = (parameter, value, list(dict_iter.keys()))
-                    print(failed_on_parameter)
+                    #failed_on_parameter = (parameter, value, list(dict_iter.keys()))
+                    #print(failed_on_parameter)
                     dict_iter = None
                     failures += 1
                 marcs_model_list.append(dict_iter)
@@ -476,7 +472,7 @@ class TurboSpectrum:
                 options = self.marcs_values[parameter_to_move]
                 parameter_descriptor = marcs_parameters[parameter_to_move]
 
-                if self.atmosphere_dimension == "1D":
+                if self.atmosphere_dimension == "1D" or self.atmosphere_dimension == "3D":
                     if option_no == 0:
                         parameter_descriptor[2] -= 1
                         if parameter_descriptor[2] < 0:
@@ -508,6 +504,10 @@ class TurboSpectrum:
                         #                    options[parameter_descriptor[3]], failure_count))
                         parameter_descriptor[1] = options[parameter_descriptor[3]]
                 elif self.atmosphere_dimension == "3D":
+                    # TODO: remove? refactor?
+                    # This part was written to be able to interpolate 3D models when they are not at equal vertices.
+                    # Now it seems like it is not needed? Not removing, but this part of the code will currently
+                    # never run.
                     marcs_values_new = {}
                     marcs_values_new["temperature"] = self.model_temperatures
                     marcs_values_new["log_g"] = self.model_logs
@@ -517,7 +517,8 @@ class TurboSpectrum:
 
                     def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> tuple[int, int]:
                         uniq_array = np.unique(array)
-                        if value_to_search in uniq_array:
+                        new_uniq_array = uniq_array[np.isin(uniq_array, values_to_dlt, invert=True)]
+                        if value_to_search in new_uniq_array:
                             args_to_use_first = np.where(array == value_to_search)[0]
                             args_to_use_second = args_to_use_first
                         else:
@@ -661,19 +662,33 @@ class TurboSpectrum:
                                     or np.max(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore:
                                 return {"errors": "Could not find the models for interpolation"}
 
-
-
                     def get_marcs_model_atmosphere(model):
                         dict_iter = self.marcs_models
 
                         for parameter in self.marcs_value_keys:
-                            value = model[parameter]
-                            dict_iter = dict_iter[value]
+                            if parameter == "spherical":
+                                try:
+                                    value = 'p'
+                                    dict_iter = dict_iter[value]
+                                except KeyError:
+                                    value = 's'
+                                    dict_iter = dict_iter[value]
+                            elif parameter == "mass":
+                                try:
+                                    value = 1.0
+                                    dict_iter = dict_iter[value]
+                                except KeyError:
+                                    value = 0.0
+                                    dict_iter = dict_iter[value]
+                            else:
+                                value = model[parameter]
+                                dict_iter = dict_iter[value]
 
                         dict_iter = dict_iter['filename']
                         return dict_iter
 
                     marcs_models = []
+
 
                     try:
                         model = {"temperature": out_values_temp[0], "log_g": out_values_logg_1[0], "metallicity": out_values_met_10[0],
@@ -727,6 +742,8 @@ class TurboSpectrum:
                 #print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
                 #print("*******************")
                 #print(element,self.model_atom_file[element])
+                if element not in self.model_atom_file:
+                    self.model_atom_file[element] = ""
                 if self.model_atom_file[element] != "":
                     if self.verbose:
                         stdout = None
@@ -985,6 +1002,8 @@ class TurboSpectrum:
 
 
                 for element, abundance in self.free_abundances.items():
+                    if element not in self.model_atom_file:
+                        self.model_atom_file[element] = ""
                     if self.model_atom_file[element] != "":
                         atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], element)
                         #low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
@@ -1149,6 +1168,8 @@ class TurboSpectrum:
         if self.nlte_flag == True:
             for element, abundance in self.free_abundances.items():
                 atomic_number = periodic_table.index(element)
+                if element not in self.model_atom_file:
+                    self.model_atom_file[element] = ""
                 if self.model_atom_file[element] == "":
                     file.write("{}  '{}'  'lte'  ''   '' 'ascii'\n".format(atomic_number,element,nlte,self.model_atom_file[element],self.marcs_model_name, element))
                 else:
@@ -1202,7 +1223,8 @@ class TurboSpectrum:
         else:
             item_abund = {}
             item_abund['H'] = 12.00
-            for i in range(2,len(periodic_table)):
+            item_abund[periodic_table[2]] = float(solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+            for i in range(3,len(periodic_table)):
                 item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity),2)
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance),2)
@@ -1529,11 +1551,15 @@ class TurboSpectrum:
             self.synthesize()
 
     def run_turbospectrum_and_atmosphere(self):
-        self.calculate_atmosphere()
         try:
-            self.run_turbospectrum()
-        except AttributeError:
-            print("No attribute, fail of generation?")
+            self.calculate_atmosphere()
+            try:
+                self.run_turbospectrum()
+            except AttributeError:
+                print("No attribute, fail of generation?")
+        except FileNotFoundError as error:
+            print(f"Interpolation failed? {error}")
+
 
 def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
     """
