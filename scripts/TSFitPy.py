@@ -4,7 +4,7 @@ from scipy.optimize import minimize
 # from multiprocessing import Pool
 # import h5py
 # import matplotlib.pyplot as plt
-from turbospectrum_class_nlte import TurboSpectrum
+from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 # from turbospectrum_class_3d import TurboSpectrum_3D
 import time
 # import math
@@ -364,14 +364,14 @@ class Spectra:
 
         self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
 
-        self.ts = TurboSpectrum(
+        """self.ts = TurboSpectrum(
             turbospec_path=self.turbospec_path,
             interpol_path=self.interpol_path,
             line_list_paths=self.line_list_path_trimmed,
             marcs_grid_path=self.model_atmosphere_grid_path,
             marcs_grid_list=self.model_atmosphere_list,
             model_atom_path=self.model_atom_path,
-            departure_file_path=self.departure_file_path)
+            departure_file_path=self.departure_file_path)"""
 
         self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
                                                 dtype=float)  # observed spectra
@@ -607,7 +607,7 @@ class Spectra:
 
         return guesses, bounds
 
-    def configure_and_run_ts(self, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
+    def configure_and_run_ts(self, ts:TurboSpectrum, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
                              windows_flag: bool, temp_dir=None, teff=None):
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
@@ -623,12 +623,13 @@ class Spectra:
             temp_dir = self.temp_dir
         else:
             temp_dir = temp_dir
+        create_dir(temp_dir)
         if teff is None:
             teff = self.teff
         else:
             teff = teff
         if self.nlte_flag:
-            self.ts.configure(t_eff=teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
+            ts.configure(t_eff=teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
                               lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                               free_abundances=elem_abund, temp_directory=temp_dir, nlte_flag=True, verbose=False,
                               atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
@@ -636,12 +637,12 @@ class Spectra:
                               depart_bin_file=self.depart_bin_file_dict, depart_aux_file=self.depart_aux_file_dict,
                               model_atom_file=self.model_atom_file_dict)
         else:
-            self.ts.configure(t_eff=teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
+            ts.configure(t_eff=teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
                               lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                               free_abundances=elem_abund, temp_directory=temp_dir, nlte_flag=False, verbose=False,
                               atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
                               segment_file=self.segment_file, line_mask_file=self.linemask_file)
-        self.ts.run_turbospectrum_and_atmosphere()
+        ts.run_turbospectrum_and_atmosphere()
 
     def fit_all(self) -> str:
         """
@@ -651,7 +652,16 @@ class Spectra:
         # timing how long it took
         time_start = time.perf_counter()
 
-        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=self, method='Nelder-Mead', bounds=self.minim_bounds,
+        ts = TurboSpectrum(
+            turbospec_path=self.turbospec_path,
+            interpol_path=self.interpol_path,
+            line_list_paths=self.line_list_path_trimmed,
+            marcs_grid_path=self.model_atmosphere_grid_path,
+            marcs_grid_list=self.model_atmosphere_list,
+            model_atom_path=self.model_atom_path,
+            departure_file_path=self.departure_file_path)
+
+        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=(ts, self), method='Nelder-Mead', bounds=self.minim_bounds,
                        options={'maxiter': self.ndimen * 50, 'disp': True,
                                 'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05})
         # print final result from minimazation
@@ -693,9 +703,18 @@ class Spectra:
                 else:
                     vmicro = calculate_vturb(self.teff, self.logg, met)
 
+                ts = TurboSpectrum(
+                    turbospec_path=self.turbospec_path,
+                    interpol_path=self.interpol_path,
+                    line_list_paths=self.line_list_path_trimmed,
+                    marcs_grid_path=self.model_atmosphere_grid_path,
+                    marcs_grid_list=self.model_atmosphere_list,
+                    model_atom_path=self.model_atom_path,
+                    departure_file_path=self.departure_file_path)
+
                 temp_dir = os.path.join(self.temp_dir, f"{abund_to_use}", '')
-                create_dir(temp_dir)
-                self.configure_and_run_ts(met, item_abund, vmicro, self.lmin, self.lmax, False, temp_dir=temp_dir)
+                #create_dir(temp_dir)
+                self.configure_and_run_ts(ts, met, item_abund, vmicro, self.lmin, self.lmax, False, temp_dir=temp_dir)
 
                 if os_path.exists(f"{temp_dir}spectrum_00000000.spec") and \
                         os.stat(f"{temp_dir}spectrum_00000000.spec").st_size != 0:
@@ -1017,14 +1036,24 @@ class Spectra:
         start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
                                         Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
-        self.ts.line_list_paths = [
-            get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
-                                      start)]
 
         param_guess = np.array([[self.teff + self.guess_plus_minus_neg_teff], [self.teff + self.guess_plus_minus_pos_teff]])
         min_bounds = [(self.bound_min_teff, self.bound_max_teff)]
 
-        res = minimize(lbl_teff_chi_sqr, param_guess[0], args=(self, Spectra.line_begins_sorted[line_number] - 5.,
+        ts = TurboSpectrum(
+            turbospec_path=self.turbospec_path,
+            interpol_path=self.interpol_path,
+            line_list_paths=self.line_list_path_trimmed,
+            marcs_grid_path=self.model_atmosphere_grid_path,
+            marcs_grid_list=self.model_atmosphere_list,
+            model_atom_path=self.model_atom_path,
+            departure_file_path=self.departure_file_path)
+
+        ts.line_list_paths = [
+            get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
+                                      start)]
+
+        res = minimize(lbl_teff_chi_sqr, param_guess[0], args=(ts, self, Spectra.line_begins_sorted[line_number] - 5.,
                                                                      Spectra.line_ends_sorted[line_number] + 5.),
                        bounds=min_bounds,
                        method='Nelder-Mead',
@@ -1076,10 +1105,18 @@ class Spectra:
         start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
                                         Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
-        self.ts.line_list_paths = [
+        ts = TurboSpectrum(
+            turbospec_path=self.turbospec_path,
+            interpol_path=self.interpol_path,
+            line_list_paths=self.line_list_path_trimmed,
+            marcs_grid_path=self.model_atmosphere_grid_path,
+            marcs_grid_list=self.model_atmosphere_list,
+            model_atom_path=self.model_atom_path,
+            departure_file_path=self.departure_file_path)
+        ts.line_list_paths = [
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
                                       start)]
-        res = minimize(lbl_broad_abund_chi_sqr, init_param_guess, args=(self,
+        res = minimize(lbl_broad_abund_chi_sqr, init_param_guess, args=(ts, self,
                                                                              Spectra.line_begins_sorted[line_number] - 5.,
                                                                              Spectra.line_ends_sorted[line_number] + 5.),
                        bounds=self.minim_bounds,
@@ -1147,16 +1184,25 @@ class Spectra:
         :param line_number: Which line number/index in line_center_sorted is being fitted
         :return: best fit result string for that line
         """
+        ts = TurboSpectrum(
+            turbospec_path=self.turbospec_path,
+            interpol_path=self.interpol_path,
+            line_list_paths=self.line_list_path_trimmed,
+            marcs_grid_path=self.model_atmosphere_grid_path,
+            marcs_grid_list=self.model_atmosphere_list,
+            model_atom_path=self.model_atom_path,
+            departure_file_path=self.departure_file_path)
+
         start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
                                         Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
-        self.ts.line_list_paths = [
+        ts.line_list_paths = [
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
                                       start)]
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
 
-        res = minimize(lbl_broad_abund_chi_sqr_v2, param_guess[0], args=(self,
+        res = minimize(lbl_broad_abund_chi_sqr_v2, param_guess[0], args=(ts, self,
                                                                              Spectra.line_begins_sorted[line_number] - 5.,
                                                                              Spectra.line_ends_sorted[line_number] + 5.),
                        bounds=min_bounds,
@@ -1287,7 +1333,7 @@ def apply_doppler_correction(spectra_to_fit, doppler):
     return spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
 
 
-def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
+def lbl_broad_abund_chi_sqr(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence
@@ -1343,8 +1389,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
 
     wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
 
-
-    spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False)
 
     if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
@@ -1370,7 +1415,7 @@ def lbl_broad_abund_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, l
     return chi_square
 
 
-def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
+def lbl_broad_abund_chi_sqr_v2(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1421,7 +1466,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
     macroturb = 9999    # for printing only here, in case not fitted
     rotation = 9999
 
-    spectra_to_fit.configure_and_run_ts(met, elem_abund_dict, microturb, lmin, lmax, False)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False)     # generates spectra
 
     if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
@@ -1467,7 +1512,7 @@ def lbl_broad_abund_chi_sqr_v2(param: list, spectra_to_fit: Spectra, lmin: float
 
     return chi_square
 
-def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
+def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: teff.
     Calls macro + doppler inside
@@ -1486,7 +1531,7 @@ def lbl_teff_chi_sqr(param: list, spectra_to_fit: Spectra, lmin: float, lmax: fl
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     rotation = 9999
@@ -1559,7 +1604,7 @@ def get_trimmed_lbl_path_name(element: Union[str, np.ndarray], line_list_path_tr
                         f"{str(Spectra.seg_ends[segment_index]).replace('.', '_')}", '')
 
 
-def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
+def all_broad_abund_chi_sqr(param, ts, spectra_to_fit: Spectra) -> float:
     """
     Calculates best fit parameters for all lines at once by calling TS and varying abundance/met and doppler shift.
     Can also vary macroturbulence if needed
@@ -1594,7 +1639,7 @@ def all_broad_abund_chi_sqr(param, spectra_to_fit: Spectra) -> float:
         else:
             vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
+    spectra_to_fit.configure_and_run_ts(ts, met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
     chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
                                            spectra_to_fit.output_folder,
@@ -2153,8 +2198,13 @@ def run_TSFitPy(output_folder_title):
                                Spectra.include_molecules, lbl=True)
     print("Finished trimming linelist")
 
-
-
+    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(Spectra.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore, TurboSpectrum.marcs_values)
+    TurboSpectrum.model_temperatures = model_temperatures
+    TurboSpectrum.model_logs = model_logs
+    TurboSpectrum.model_mets = model_mets
+    TurboSpectrum.marcs_value_keys = marcs_value_keys
+    TurboSpectrum.marcs_models = marcs_models
+    TurboSpectrum.marcs_values = marcs_values
 
     if Spectra.dask_workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?

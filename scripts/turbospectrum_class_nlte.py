@@ -50,6 +50,17 @@ class TurboSpectrum:
     # This includes interpolating between models with different values of these settings
     marcs_parameters_to_ignore = ["a", "c", "n", "o", "r", "s"]
 
+    marcs_values = {
+        "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
+        "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []
+    }
+
+    marcs_value_keys = []
+    marcs_models = {}
+    model_temperatures = []
+    model_logs = []
+    model_mets = []
+
     def __init__(self, turbospec_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
                  marcs_grid_list: str, model_atom_path: str, departure_file_path: str):
         """
@@ -75,14 +86,14 @@ class TurboSpectrum:
         self.departure_file_path = departure_file_path
 
         # Default spectrum parameters
-        self.lambda_min: float = 5100  # Angstrom
-        self.lambda_max: float = 5200
-        self.lambda_delta: float = 0.05
-        self.metallicity: float = -1.5
-        self.stellar_mass: float = 1
-        self.log_g: float = 2.0
-        self.t_eff: float = 5100.0
-        self.turbulent_velocity: float = 2.0  # micro turbulence, km/s
+        self.lambda_min: float = None  # Angstrom
+        self.lambda_max: float = None
+        self.lambda_delta: float = None
+        self.metallicity: float = None
+        self.stellar_mass: float = None
+        self.log_g: float = None
+        self.t_eff: float = None
+        self.turbulent_velocity: float = None  # micro turbulence, km/s
         self.free_abundances: dict = None
         self.free_isotopes: dict = None
         self.sphere: bool = None
@@ -94,32 +105,31 @@ class TurboSpectrum:
 
         # parameters needed for nlte and <3D> calculations
         self.nlte_flag: bool = False
-        self.atmosphere_dimension: str = "1D"
+        self.atmosphere_dimension: str = None
         self.windows_flag: bool = False
         self.depart_bin_file = None
         self.depart_aux_file = None
         self.model_atom_file = None
-        self.segment_file = "spud.txt"
-        self.cont_mask_file = "spud.txt"
-        self.line_mask_file = "spud.txt"
+        self.segment_file = None
+        self.cont_mask_file = None
+        self.line_mask_file = None
 
         # Create temporary directory
-        self.id_string = "turbospec_{:d}".format(os.getpid())
-        self.tmp_dir = os_path.join("/tmp", self.id_string)
+        self.id_string = None
+        self.tmp_dir = None
         #self.tmp_dir = os_path.join("/Users/gerber/gitprojects/SAPP/tests/", "current_run")
-        os.system("mkdir -p {}".format(self.tmp_dir))
+        #os.system("mkdir -p {}".format(self.tmp_dir))
 
         # Look up what MARCS models we have
         #self.counter_marcs = 0
-        self.marcs_model_name = "default"
+        self.marcs_model_name = None
         self.counter_spectra = 0
-        self.marcs_values = None
-        self.marcs_value_keys = []
+        """self.marcs_value_keys = []
         self.marcs_models = {}
         self.model_temperatures = []
         self.model_logs = []
-        self.model_mets = []
-        self._fetch_marcs_grid()
+        self.model_mets = []"""
+        #self._fetch_marcs_grid()
 
 
     def _fetch_marcs_grid(self):
@@ -133,10 +143,7 @@ class TurboSpectrum:
         pattern = r"([sp])(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
                   r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....).mod"
 
-        self.marcs_values = {
-            "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
-            "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []
-        }
+
 
         self.marcs_value_keys = [i for i in list(self.marcs_values.keys()) if i not in self.marcs_parameters_to_ignore]
         self.marcs_value_keys.sort()
@@ -1561,35 +1568,28 @@ class TurboSpectrum:
             print(f"Interpolation failed? {error}")
 
 
-def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
+def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, marcs_values: dict):
     """
     Get a list of all of the MARCS models we have.
 
     :return:
         None
     """
-    counter_marcs = 0
-    marcs_model_name = "default"
-    counter_spectra = 0
-    marcs_values = None
-    marcs_value_keys = []
-    marcs_models = {}
+    #TODO: calling it every time. But we only need to run once.
+    model_temperatures = []
+    model_logs = []
+    model_mets = []
 
     pattern = r"([sp])(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
               r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....).mod"
 
-    marcs_values = {
-        "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
-        "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []
-    }
 
-    marcs_value_keys = [i for i in list(marcs_values.keys()) if i not in TurboSpectrum.marcs_parameters_to_ignore]
+    marcs_value_keys = [i for i in list(marcs_values.keys()) if i not in marcs_parameters_to_ignore]
     marcs_value_keys.sort()
     marcs_models = {}
 
-    marcs_models = glob.glob(os_path.join(marcs_grid_path, "*"))
+    #marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))  # 18.11.22 NS: Takes several seconds here per star, is not used anywhere though? Uncommented for now at least
     marcs_nlte_models = np.loadtxt(marcs_grid_list, dtype='str', usecols=(0,), unpack=True)
-    # marcs_nlte_models = np.loadtxt("/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt", dtype='str', usecols=(0,), unpack=True)
     spud_models = []
     for i in range(len(marcs_nlte_models)):
         aux_pattern = r"(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
@@ -1597,9 +1597,9 @@ def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
         re_test_aux = re.match(aux_pattern, marcs_nlte_models[i])
         mass = float(re_test_aux.group(3))
         if mass == 0.0:
-            spud = "p" + marcs_nlte_models[i] + ".mod"
+            spud = "p"+marcs_nlte_models[i]+".mod"
         else:
-            spud = "s" + marcs_nlte_models[i] + ".mod"
+            spud = "s"+marcs_nlte_models[i]+".mod"
         spud_models.append(spud)
 
     marcs_nlte_models = spud_models
@@ -1608,7 +1608,7 @@ def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
 
         # Extract model parameters from .mod filename
         filename = os_path.split(item)[1]
-        # filename = item
+        #filename = item
         re_test = re.match(pattern, filename)
         assert re_test is not None, "Could not parse MARCS model filename <{}>".format(filename)
 
@@ -1628,8 +1628,11 @@ def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
                 "r": float(re_test.group(12)),
                 "s": float(re_test.group(13))
             }
+            model_temperatures.append(model["temperature"])
+            model_logs.append(model["log_g"])
+            model_mets.append(model["metallicity"])
         except ValueError:
-            # logging.info("Could not parse MARCS model filename <{}>".format(filename))
+            #logging.info("Could not parse MARCS model filename <{}>".format(filename))
             raise
 
         # Keep a list of all of the parameter values we've seen
@@ -1639,18 +1642,22 @@ def fetch_marcs_grid(marcs_grid_path, marcs_grid_list):
 
         # Keep a list of all the models we've got in the grid
         dict_iter = marcs_models
-        # print(dict_iter)
+        #print(dict_iter)
         for parameter in marcs_value_keys:
             value = model[parameter]
             if value not in dict_iter:
                 dict_iter[value] = {}
             dict_iter = dict_iter[value]
-        # if "filename" in dict_iter:
-        # logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
+        #if "filename" in dict_iter:
+            #logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
         dict_iter["filename"] = item
+
+    model_temperatures = np.asarray(model_temperatures)
+    model_logs = np.asarray(model_logs)
+    model_mets = np.asarray(model_mets)
 
     # Sort model parameter values into order
     for parameter in marcs_value_keys:
         marcs_values[parameter].sort()
 
-    return marcs_values, marcs_value_keys, marcs_models
+    return model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
