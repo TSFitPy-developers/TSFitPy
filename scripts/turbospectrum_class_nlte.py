@@ -44,25 +44,16 @@ class TurboSpectrum:
     # match the micro turbulence value passed to babsma below.
     marcs_parameters = {"turbulence": 1, "model_type": "st",
                         "a": 0, "c": 0, "n": 0, "o": 0, "r": 0, "s": 0}
-    marcs_model_list_global = [] #needed for microturbulence interpolation
 
     # It is safe to ignore these parameters in MARCS model descriptions
     # This includes interpolating between models with different values of these settings
     marcs_parameters_to_ignore = ["a", "c", "n", "o", "r", "s"]
 
-    marcs_values = {
-        "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
-        "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []
-    }
-
-    marcs_value_keys = []
-    marcs_models = {}
-    model_temperatures = []
-    model_logs = []
-    model_mets = []
 
     def __init__(self, turbospec_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
-                 marcs_grid_list: str, model_atom_path: str, departure_file_path: str):
+                 marcs_grid_list: str, model_atom_path: str, departure_file_path: str, aux_file_length_dict: dict,
+                 marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
+                 model_logs: np.ndarray, model_mets: np.ndarray):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -84,6 +75,7 @@ class TurboSpectrum:
         self.marcs_grid_list = marcs_grid_list
         self.model_atom_path = model_atom_path
         self.departure_file_path = departure_file_path
+        self.aux_file_length_dict = aux_file_length_dict
 
         # Default spectrum parameters
         self.lambda_min: float = None  # Angstrom
@@ -97,7 +89,7 @@ class TurboSpectrum:
         self.free_abundances: dict = None
         self.free_isotopes: dict = None
         self.sphere: bool = None
-        self.alpha = None   # not used?
+        self.alpha = None  # not used?
         self.s_process = 0  # not used?
         self.r_process = 0  # not used?
         self.verbose: bool = False
@@ -117,20 +109,24 @@ class TurboSpectrum:
         # Create temporary directory
         self.id_string = None
         self.tmp_dir = None
-        #self.tmp_dir = os_path.join("/Users/gerber/gitprojects/SAPP/tests/", "current_run")
-        #os.system("mkdir -p {}".format(self.tmp_dir))
+        # self.tmp_dir = os_path.join("/Users/gerber/gitprojects/SAPP/tests/", "current_run")
+        # os.system("mkdir -p {}".format(self.tmp_dir))
 
         # Look up what MARCS models we have
-        #self.counter_marcs = 0
+        # self.counter_marcs = 0
         self.marcs_model_name = None
         self.counter_spectra = 0
-        """self.marcs_value_keys = []
-        self.marcs_models = {}
-        self.model_temperatures = []
-        self.model_logs = []
-        self.model_mets = []"""
-        #self._fetch_marcs_grid()
-
+        self.marcs_value_keys = marcs_value_keys
+        self.marcs_values = {
+        "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
+        "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []}
+        self.marcs_values = marcs_values
+        self.marcs_models = marcs_models
+        self.model_temperatures = model_temperatures
+        self.model_logs = model_logs
+        self.model_mets = model_mets
+        self.marcs_model_list_global = []  # needed for microturbulence interpolation
+        # self._fetch_marcs_grid()
 
     def _fetch_marcs_grid(self):
         """
@@ -139,17 +135,15 @@ class TurboSpectrum:
         :return:
             None
         """
-        #TODO: calling it every time. But we only need to run once.
+        # TODO: calling it every time. But we only need to run once.
         pattern = r"([sp])(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
                   r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....).mod"
-
-
 
         self.marcs_value_keys = [i for i in list(self.marcs_values.keys()) if i not in self.marcs_parameters_to_ignore]
         self.marcs_value_keys.sort()
         self.marcs_models = {}
 
-        #marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))  # 18.11.22 NS: Takes several seconds here per star, is not used anywhere though? Uncommented for now at least
+        # marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))  # 18.11.22 NS: Takes several seconds here per star, is not used anywhere though? Uncommented for now at least
         marcs_nlte_models = np.loadtxt(self.marcs_grid_list, dtype='str', usecols=(0,), unpack=True)
         spud_models = []
         for i in range(len(marcs_nlte_models)):
@@ -158,9 +152,9 @@ class TurboSpectrum:
             re_test_aux = re.match(aux_pattern, marcs_nlte_models[i])
             mass = float(re_test_aux.group(3))
             if mass == 0.0:
-                spud = "p"+marcs_nlte_models[i]+".mod"
+                spud = "p" + marcs_nlte_models[i] + ".mod"
             else:
-                spud = "s"+marcs_nlte_models[i]+".mod"
+                spud = "s" + marcs_nlte_models[i] + ".mod"
             spud_models.append(spud)
 
         marcs_nlte_models = spud_models
@@ -169,7 +163,7 @@ class TurboSpectrum:
 
             # Extract model parameters from .mod filename
             filename = os_path.split(item)[1]
-            #filename = item
+            # filename = item
             re_test = re.match(pattern, filename)
             assert re_test is not None, "Could not parse MARCS model filename <{}>".format(filename)
 
@@ -193,7 +187,7 @@ class TurboSpectrum:
                 self.model_logs.append(model["log_g"])
                 self.model_mets.append(model["metallicity"])
             except ValueError:
-                #logging.info("Could not parse MARCS model filename <{}>".format(filename))
+                # logging.info("Could not parse MARCS model filename <{}>".format(filename))
                 raise
 
             # Keep a list of all of the parameter values we've seen
@@ -203,14 +197,14 @@ class TurboSpectrum:
 
             # Keep a list of all the models we've got in the grid
             dict_iter = self.marcs_models
-            #print(dict_iter)
+            # print(dict_iter)
             for parameter in self.marcs_value_keys:
                 value = model[parameter]
                 if value not in dict_iter:
                     dict_iter[value] = {}
                 dict_iter = dict_iter[value]
-            #if "filename" in dict_iter:
-                #logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
+            # if "filename" in dict_iter:
+            # logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
             dict_iter["filename"] = item
 
         self.model_temperatures = np.asarray(self.model_temperatures)
@@ -226,7 +220,8 @@ class TurboSpectrum:
                   turbulent_velocity=None, free_abundances=None, free_isotopes=None,
                   sphere=None, alpha=None, s_process=None, r_process=None,
                   line_list_paths=None, line_list_files=None,
-                  verbose=None, counter_spectra=None, temp_directory=None, nlte_flag=None, atmosphere_dimension=None, windows_flag=None,
+                  verbose=None, counter_spectra=None, temp_directory=None, nlte_flag=None, atmosphere_dimension=None,
+                  windows_flag=None,
                   depart_bin_file=None, depart_aux_file=None, model_atom_file=None,
                   segment_file=None, cont_mask_file=None, line_mask_file=None):
         """
@@ -337,17 +332,19 @@ class TurboSpectrum:
         Generates an interpolated model atmosphere from the MARCS grid using the interpol.f routine developed by
         T. Masseron (Masseron, PhD Thesis, 2006). This is a python wrapper for that fortran code.
         """
-        #self.counter_marcs += 1
-        #self.marcs_model_name = "marcs_{:08d}".format(self.counter_marcs)
-        self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g, self.metallicity, self.turbulent_velocity)
-        global marcs_model_list_global
+        # self.counter_marcs += 1
+        # self.marcs_model_name = "marcs_{:08d}".format(self.counter_marcs)
+        self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                   self.metallicity,
+                                                                                   self.turbulent_velocity)
+        #global marcs_model_list_global
 
-#        if self.verbose:
-#            stdout = None
-#            stderr = subprocess.STDOUT
-#        else:
-#            stdout = open('/dev/null', 'w')
-#            stderr = subprocess.STDOUT
+        #        if self.verbose:
+        #            stdout = None
+        #            stderr = subprocess.STDOUT
+        #        else:
+        #            stdout = open('/dev/null', 'w')
+        #            stderr = subprocess.STDOUT
 
         # Defines default point at which plane-parallel vs spherical model atmosphere models are used
         spherical: bool = self.sphere
@@ -356,23 +353,26 @@ class TurboSpectrum:
 
         # Create dictionary of the MARCS model parameters we're looking for in grid
         marcs_parameters = self.marcs_parameters.copy()
-        marcs_parameters['turbulence'] = self.turbulent_velocity #JMG line to make microturbulence an adjustable variable
-        #print(marcs_parameters)
+        marcs_parameters[
+            'turbulence'] = self.turbulent_velocity  # JMG line to make microturbulence an adjustable variable
+        # print(marcs_parameters)
         if spherical:
             marcs_parameters['spherical'] = "s"
             marcs_parameters['mass'] = closest_available_value(self.stellar_mass, self.marcs_values['mass'])
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 2.0
-            #print(marcs_parameters['mass'])
-            #marcs_parameters['mass'] = self.closest_available_value(self.marcs_values['mass'])
+            # print(marcs_parameters['mass'])
+            # marcs_parameters['mass'] = self.closest_available_value(self.marcs_values['mass'])
         else:
             marcs_parameters['spherical'] = "p"
             marcs_parameters['mass'] = 0  # All plane-parallel models have mass set to zero
 
-        #quick setting to reduce temperature in case temperature is higher than grid allows, will give warning that it has happened
+        # quick setting to reduce temperature in case temperature is higher than grid allows, will give warning that it has happened
         # TODO: logg == 4.0? should be inequality sign maybe?
         if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":
-            print("warning temp was {} and the highest value available is 6500. setting temp to 6500 to interpolate model atmosphere. will be {:.2f} for spectrum generation".format(self.t_eff, self.t_eff))
+            print(
+                "warning temp was {} and the highest value available is 6500. setting temp to 6500 to interpolate model atmosphere. will be {:.2f} for spectrum generation".format(
+                    self.t_eff, self.t_eff))
             temp_teff = self.t_eff
             self.t_eff = 6499
 
@@ -386,19 +386,20 @@ class TurboSpectrum:
         # go through each value that is interpolated
         for key in interpolate_parameters:
             value = interpolate_parameters_around[key]
-            options = self.marcs_values[key]    # get what values exist in marcs values
-            if (value < options[0]) or (value > options[-1]):   # checks that the value is within the marcs possible values
+            options = self.marcs_values[key]  # get what values exist in marcs values
+            if (value < options[0]) or (
+                    value > options[-1]):  # checks that the value is within the marcs possible values
                 return {
                     "errors": "Value of parameter <{}> needs to be in range {} to {}. You requested {}.".
-                        format(key, options[0], options[-1], value)
+                    format(key, options[0], options[-1], value)
                 }
             for index in range(len(options) - 1):
                 if value < options[index + 1]:
                     break
-            #Mar. 11, 2022 added if statement for what to do if parameter is on the vertex. model interpolator needs the value for both models to be on that vertex or else will falsely think it's extrapolating
+            # Mar. 11, 2022 added if statement for what to do if parameter is on the vertex. model interpolator needs the value for both models to be on that vertex or else will falsely think it's extrapolating
             if value == options[index]:
                 marcs_parameters[key] = [options[index], options[index], index, index]
-            elif value == options[index+1]:
+            elif value == options[index + 1]:
                 marcs_parameters[key] = [options[index + 1], options[index + 1], index + 1, index + 1]
             else:
                 marcs_parameters[key] = [options[index], options[index + 1], index, index + 1]
@@ -439,22 +440,22 @@ class TurboSpectrum:
 
                 except KeyError:
                     # We get a KeyError if there is no model matching the parameter combination we tried
-                    #failed_on_parameter = (parameter, value, list(dict_iter.keys()))
-                    #print(failed_on_parameter)
+                    # failed_on_parameter = (parameter, value, list(dict_iter.keys()))
+                    # print(failed_on_parameter)
                     dict_iter = None
                     failures += 1
                 marcs_model_list.append(dict_iter)
                 model_description = "<" + ", ".join(model_description) + ">"
 
                 # Produce debugging information about how we did finding models, but only if we want to be verbose
-                #if False:
+                # if False:
                 #    if not failures:
                 #        logging.info("Tried {}. Success.".format(model_description))
                 #    else:
                 #        logging.info("Tried {}. Failed on <{}>. Wanted {}, but only options were: {}.".
                 #                     format(model_description, failed_on_parameter[0],
                 #                            failed_on_parameter[1], failed_on_parameter[2]))
-            #logging.info("Found {:d}/{:d} model atmospheres.".format(n_vertices - failures, n_vertices))
+            # logging.info("Found {:d}/{:d} model atmospheres.".format(n_vertices - failures, n_vertices))
 
             # If there are MARCS models missing from the corners of the cuboid we tried, see which face had the most
             # corners missing, and move that face out by one grid row
@@ -490,7 +491,7 @@ class TurboSpectrum:
                                         format(parameter_to_move, options[0], options[-1],
                                                interpolate_parameters_around[parameter_to_move])
                             }
-                        #logging.info("Moving lower bound of parameter <{}> from {} to {} and trying again. "
+                        # logging.info("Moving lower bound of parameter <{}> from {} to {} and trying again. "
                         #             "This setting previously had {} failures.".
                         #             format(parameter_to_move, parameter_descriptor[0],
                         #                    options[parameter_descriptor[2]], failure_count))
@@ -505,7 +506,7 @@ class TurboSpectrum:
                                         format(parameter_to_move, options[0], options[-1],
                                                interpolate_parameters_around[parameter_to_move])
                             }
-                        #logging.info("Moving upper bound of parameter <{}> from {} to {} and trying again. "
+                        # logging.info("Moving upper bound of parameter <{}> from {} to {} and trying again. "
                         #             "This setting previously had {} failures.".
                         #             format(parameter_to_move, parameter_descriptor[1],
                         #                    options[parameter_descriptor[3]], failure_count))
@@ -522,7 +523,8 @@ class TurboSpectrum:
 
                     interpolate_parameters = ("temperature", "log_g", "metallicity")
 
-                    def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> tuple[int, int]:
+                    def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> \
+                    tuple[int, int]:
                         uniq_array = np.unique(array)
                         new_uniq_array = uniq_array[np.isin(uniq_array, values_to_dlt, invert=True)]
                         if value_to_search in new_uniq_array:
@@ -544,12 +546,14 @@ class TurboSpectrum:
                         # print(args_to_use_first, args_to_use_second)
                         return args_to_use_first, args_to_use_second
 
-                    def find_interp_indices(value: float, options: np.ndarray[float], values_to_ignore: np.ndarray[float]) -> tuple[int, int, list[float, float]]:
+                    def find_interp_indices(value: float, options: np.ndarray[float],
+                                            values_to_ignore: np.ndarray[float]) -> tuple[int, int, list[float, float]]:
                         # value = interpolate_parameters_around[key]
                         # options = marcs_values[key]
                         # options = options[args_to_use]
                         if (value < np.min(options[np.isin(options, values_to_ignore, invert=True)])) or (
-                                value > np.max(options[np.isin(options, values_to_ignore, invert=True)])):  # checks that the value is within the marcs possible values
+                                value > np.max(options[np.isin(options, values_to_ignore,
+                                                               invert=True)])):  # checks that the value is within the marcs possible values
                             return None, None, {
                                 "errors": f"Value of parameter  needs to be in range {np.min(options)} to {np.max(options)}. You requested {value}. OR the other parameters are not within the range"
                             }
@@ -577,7 +581,8 @@ class TurboSpectrum:
                                                                                                            loggs_to_ignore)
 
                         if args_to_use_first_1 is None:
-                            return np.append(temperatures_to_ignore, out_values_temp[0]), loggs_to_ignore, metallicities_to_ignore, False
+                            return np.append(temperatures_to_ignore,
+                                             out_values_temp[0]), loggs_to_ignore, metallicities_to_ignore, False
 
                         options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
                         args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
@@ -585,7 +590,8 @@ class TurboSpectrum:
                                                                                                            loggs_to_ignore)
 
                         if args_to_use_first_2 is None:
-                            return np.append(temperatures_to_ignore, out_values_temp[1]), loggs_to_ignore, metallicities_to_ignore, False
+                            return np.append(temperatures_to_ignore,
+                                             out_values_temp[1]), loggs_to_ignore, metallicities_to_ignore, False
 
                         """if args_to_use_first_1 is None:
                             #options_temp = marcs_values_new[interpolate_parameters[0]]
@@ -626,7 +632,8 @@ class TurboSpectrum:
                                                                                                              metallicities_to_ignore)
 
                         if args_to_use_first_10 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[0]), metallicities_to_ignore, False
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[
+                                0]), metallicities_to_ignore, False
 
                         options_met_12 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
                             args_to_use_second_1]
@@ -635,7 +642,8 @@ class TurboSpectrum:
                                                                                                              metallicities_to_ignore)
 
                         if args_to_use_first_20 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[1]), metallicities_to_ignore, False
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[
+                                1]), metallicities_to_ignore, False
 
                         options_met_21 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
                             args_to_use_first_2]
@@ -644,7 +652,8 @@ class TurboSpectrum:
                                                                                                              metallicities_to_ignore)
 
                         if args_to_use_first_30 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[0]), metallicities_to_ignore, False
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[
+                                0]), metallicities_to_ignore, False
 
                         options_met_22 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
                             args_to_use_second_2]
@@ -653,18 +662,24 @@ class TurboSpectrum:
                                                                                                              metallicities_to_ignore)
 
                         if args_to_use_first_40 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore,out_values_logg_2[1]), metallicities_to_ignore, False
+                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[
+                                1]), metallicities_to_ignore, False
 
-                        return [out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10, out_values_met_20, out_values_met_30, out_values_met_40], None, None, True
+                        return [out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10,
+                                out_values_met_20, out_values_met_30, out_values_met_40], None, None, True
 
                     while True:
-                        temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore, completed = find_new_marcs_models(temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore)
+                        temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore, completed = find_new_marcs_models(
+                            temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore)
                         if completed:
                             out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10, \
-                                out_values_met_20, out_values_met_30, out_values_met_40 = temperatures_to_ignore[0], temperatures_to_ignore[1], temperatures_to_ignore[2], temperatures_to_ignore[3], temperatures_to_ignore[4], temperatures_to_ignore[5], temperatures_to_ignore[6]
+                                out_values_met_20, out_values_met_30, out_values_met_40 = temperatures_to_ignore[0], \
+                            temperatures_to_ignore[1], temperatures_to_ignore[2], temperatures_to_ignore[3], \
+                            temperatures_to_ignore[4], temperatures_to_ignore[5], temperatures_to_ignore[6]
                             break
                         else:
-                            if collections.Counter(temperatures_to_ignore) == collections.Counter(marcs_values_new[interpolate_parameters[0]]) \
+                            if collections.Counter(temperatures_to_ignore) == collections.Counter(
+                                    marcs_values_new[interpolate_parameters[0]]) \
                                     or np.min(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore \
                                     or np.max(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore:
                                 return {"errors": "Could not find the models for interpolation"}
@@ -696,10 +711,10 @@ class TurboSpectrum:
 
                     marcs_models = []
 
-
                     try:
-                        model = {"temperature": out_values_temp[0], "log_g": out_values_logg_1[0], "metallicity": out_values_met_10[0],
-                                  "model_type": 'st', "spherical": 'p', 'turbulence': 2.0, 'mass': 0.0}
+                        model = {"temperature": out_values_temp[0], "log_g": out_values_logg_1[0],
+                                 "metallicity": out_values_met_10[0],
+                                 "model_type": 'st', "spherical": 'p', 'turbulence': 2.0, 'mass': 0.0}
 
                         marcs_models.append(get_marcs_model_atmosphere(model))
                         model["metallicity"] = out_values_met_10[1]
@@ -730,25 +745,23 @@ class TurboSpectrum:
                     marcs_model_list = marcs_models
                     failures = False
 
+            # print(marcs_model_list)
 
-
-            #print(marcs_model_list)
-
-        #print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
+        # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
         if self.nlte_flag == True:
             for element, abundance in self.free_abundances.items():
-                #print(element,self.model_atom_file[element])
-                #print("*******************")
-                #print(abundance, self.free_abundances[element])
-                #print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
-                #print("{:.2f}".format(round(float(abundance),2) + float(solar_abundances[element])))
-                #print("{}".format(float(self.metallicity)))
-                #print("{:.2f}".format(round(float(self.metallicity),2)))
-                #print("{}".format(abundance))
-                #print("{:.2f}".format(round(float(abundance),2)))
-                #print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
-                #print("*******************")
-                #print(element,self.model_atom_file[element])
+                # print(element,self.model_atom_file[element])
+                # print("*******************")
+                # print(abundance, self.free_abundances[element])
+                # print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
+                # print("{:.2f}".format(round(float(abundance),2) + float(solar_abundances[element])))
+                # print("{}".format(float(self.metallicity)))
+                # print("{:.2f}".format(round(float(self.metallicity),2)))
+                # print("{}".format(abundance))
+                # print("{:.2f}".format(round(float(abundance),2)))
+                # print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
+                # print("*******************")
+                # print(element,self.model_atom_file[element])
                 if element not in self.model_atom_file:
                     self.model_atom_file[element] = ""
                 if self.model_atom_file[element] != "":
@@ -758,38 +771,41 @@ class TurboSpectrum:
                     else:
                         stdout = open('/dev/null', 'w')
                         stderr = subprocess.STDOUT
-                    #print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
+                    # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
                     # Write configuration input for interpolator
                     output = os_path.join(self.tmp_dir, self.marcs_model_name)
-                    #output = os_path.join('Testout/', self.marcs_model_name)
-                    #print(output)
+                    # output = os_path.join('Testout/', self.marcs_model_name)
+                    # print(output)
                     model_test = "{}.test".format(output)
                     interpol_config = ""
-                    marcs_model_list_global = marcs_model_list
-                    #print(marcs_model_list)
-                    #print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
+                    self.marcs_model_list_global = marcs_model_list
+                    # print(marcs_model_list)
+                    # print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
                     for line in marcs_model_list:
-                        interpol_config += "'{}{}'\n".format(self.marcs_grid_path,line)
+                        interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
                     interpol_config += "'{}.interpol'\n".format(output)
                     interpol_config += "'{}.alt'\n".format(output)
-                    interpol_config += "'{}_{}_coef.dat'\n".format(output, element) #needed for nlte interpolator
-                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path,self.depart_bin_file[element])) #needed for nlte interpolator
-                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path,self.depart_aux_file[element])) #needed for nlte interpolator
-                    #interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
-                    #interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
-                    #interpol_config += "'1D_NLTE_grid_Fe_MARCSfullGrid.bin'\n" #needed for nlte interpolator
-                    #interpol_config += "'auxData_Fe_MARCSfullGrid.txt'\n" #needed for nlte interpolator
-                    interpol_config += "{}\n".format(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
+                    interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
+                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
+                        element]))  # needed for nlte interpolator
+                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
+                        element]))  # needed for nlte interpolator
+                    # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
+                    # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
+                    # interpol_config += "'1D_NLTE_grid_Fe_MARCSfullGrid.bin'\n" #needed for nlte interpolator
+                    # interpol_config += "'auxData_Fe_MARCSfullGrid.txt'\n" #needed for nlte interpolator
+                    interpol_config += "{}\n".format(self.aux_file_length_dict[element])
                     interpol_config += "{}\n".format(self.t_eff)
                     interpol_config += "{}\n".format(self.log_g)
-                    interpol_config += "{:.2f}\n".format(round(float(self.metallicity),2))
-                    interpol_config += "{:.2f}\n".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element]))
+                    interpol_config += "{:.2f}\n".format(round(float(self.metallicity), 2))
+                    interpol_config += "{:.2f}\n".format(
+                        round(float(self.free_abundances[element]), 2) + float(solar_abundances[element]))
                     interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
                     interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
                     interpol_config += "'{}'\n".format(model_test)
 
                     # Now we run the FORTRAN model interpolator
-                    #print(self.free_abundances["Ba"])
+                    # print(self.free_abundances["Ba"])
                     try:
                         if self.atmosphere_dimension == "1D":
                             p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
@@ -802,12 +818,12 @@ class TurboSpectrum:
                             p.stdin.write(bytes(interpol_config, 'utf-8'))
                             stdout, stderr = p.communicate()
                     except subprocess.CalledProcessError:
-                        #print("spud")
+                        # print("spud")
                         return {
                             "interpol_config": interpol_config,
                             "errors": "MARCS model atmosphere interpolation failed."
                         }
-                    #print("spud")
+                    # print("spud")
                     if spherical:
                         self.turbulent_velocity = microturbulence
         elif self.nlte_flag == False:
@@ -817,18 +833,18 @@ class TurboSpectrum:
             else:
                 stdout = open('/dev/null', 'w')
                 stderr = subprocess.STDOUT
-            #print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
+            # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
             # Write configuration input for interpolator
             output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            #output = os_path.join('Testout/', self.marcs_model_name)
-            #print(output)
+            # output = os_path.join('Testout/', self.marcs_model_name)
+            # print(output)
             model_test = "{}.test".format(output)
             interpol_config = ""
-            marcs_model_list_global = marcs_model_list
-            #print(marcs_model_list)
-            #print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
+            self.marcs_model_list_global = marcs_model_list
+            # print(marcs_model_list)
+            # print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
             for line in marcs_model_list:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path,line)
+                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
             interpol_config += "'{}.interpol'\n".format(output)
             interpol_config += "'{}.alt'\n".format(output)
             interpol_config += "{}\n".format(self.t_eff)
@@ -839,7 +855,7 @@ class TurboSpectrum:
             interpol_config += "'{}'\n".format(model_test)
 
             # Now we run the FORTRAN model interpolator
-            #print(self.free_abundances["Ba"])
+            # print(self.free_abundances["Ba"])
             try:
                 if self.atmosphere_dimension == "1D":
                     p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles')],
@@ -852,16 +868,16 @@ class TurboSpectrum:
                     p.stdin.write(bytes(interpol_config, 'utf-8'))
                     stdout, stderr = p.communicate()
             except subprocess.CalledProcessError:
-                #print("spud")
+                # print("spud")
                 return {
                     "interpol_config": interpol_config,
                     "errors": "MARCS model atmosphere interpolation failed."
                 }
-            #print("spud")
+            # print("spud")
             if spherical:
                 self.turbulent_velocity = microturbulence
         # TODO: equality with logg 4.0 here again?
-        if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D": #reset temp to what it was before
+        if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":  # reset temp to what it was before
             self.t_eff = temp_teff
 
         return {
@@ -876,20 +892,23 @@ class TurboSpectrum:
             output = os_path.join(self.tmp_dir, self.marcs_model_name)
             model_test = "{}.test".format(output)
             interpol_config = ""
-            for line in marcs_model_list_global:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path,line)
+            for line in self.marcs_model_list_global:
+                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
             interpol_config += "'{}.interpol'\n".format(output)
             interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "'{}_{}_coef.dat'\n".format(output, element) #needed for nlte interpolator
-            interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path,self.depart_bin_file[element])) #needed for nlte interpolator
-            interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path,self.depart_aux_file[element])) #needed for nlte interpolator
-            #interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
-            #interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
-            interpol_config += "{}\n".format(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
+            interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
+            interpol_config += "'{}'\n".format(
+                os_path.join(self.departure_file_path, self.depart_bin_file[element]))  # needed for nlte interpolator
+            interpol_config += "'{}'\n".format(
+                os_path.join(self.departure_file_path, self.depart_aux_file[element]))  # needed for nlte interpolator
+            # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
+            # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
+            interpol_config += "{}\n".format(self.aux_file_length_dict[element])
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{:.2f}\n".format(round(float(self.metallicity),2))
-            interpol_config += "{:.2f}\n".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element]))
+            interpol_config += "{:.2f}\n".format(round(float(self.metallicity), 2))
+            interpol_config += "{:.2f}\n".format(
+                round(float(self.free_abundances[element]), 2) + float(solar_abundances[element]))
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
             interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
             interpol_config += "'{}'\n".format(model_test)
@@ -897,8 +916,8 @@ class TurboSpectrum:
             output = os_path.join(self.tmp_dir, self.marcs_model_name)
             model_test = "{}.test".format(output)
             interpol_config = ""
-            for line in marcs_model_list_global:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path,line)
+            for line in self.marcs_model_list_global:
+                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
             interpol_config += "'{}.interpol'\n".format(output)
             interpol_config += "'{}.alt'\n".format(output)
             interpol_config += "{}\n".format(self.t_eff)
@@ -925,7 +944,8 @@ class TurboSpectrum:
         if self.log_g < 3:
             flag_dont_interp_microturb = 1
 
-        if flag_dont_interp_microturb == 0 and self.turbulent_velocity < 2.0 and (self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
+        if flag_dont_interp_microturb == 0 and self.turbulent_velocity < 2.0 and (
+                self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
             # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
             turbulence_low = 0.0
             turbulence_high = 5.0
@@ -934,62 +954,72 @@ class TurboSpectrum:
                 if self.turbulent_velocity > possible_turbulence[i]:
                     turbulence_low = possible_turbulence[i]
                     place = i
-            turbulence_high = possible_turbulence[place+1]
-            #print(turbulence_low,turbulence_high)
+            turbulence_high = possible_turbulence[place + 1]
+            # print(turbulence_low,turbulence_high)
 
-            #generate models for low and high parts
-            #temp_dir = self.tmp_dir
-            #self.tmp_dir = os_path.join("/Users/gerber/iwg7_pipeline/4most-4gp-scripts/files_from_synthesis/current_run", "files_for_micro_interp")
+            # generate models for low and high parts
+            # temp_dir = self.tmp_dir
+            # self.tmp_dir = os_path.join("/Users/gerber/iwg7_pipeline/4most-4gp-scripts/files_from_synthesis/current_run", "files_for_micro_interp")
             if self.nlte_flag == True:
-                #for element, abundance in self.free_abundances.items():
+                # for element, abundance in self.free_abundances.items():
                 self.turbulent_velocity = turbulence_low
                 atmosphere_properties_low = self._generate_model_atmosphere()
-                #print(marcs_model_list_global)
+                # print(marcs_model_list_global)
                 low_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 low_model_name += '.interpol'
-                #low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                #low_coef_dat_name += '_{}_coef.dat'.format(element)
+                # low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                # low_coef_dat_name += '_{}_coef.dat'.format(element)
                 if atmosphere_properties_low['errors']:
                     return atmosphere_properties_low
                 self.turbulent_velocity = turbulence_high
                 atmosphere_properties_high = self._generate_model_atmosphere()
                 high_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 high_model_name += '.interpol'
-                #high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                #high_coef_dat_name += '_{}_coef.dat'.format(element)
+                # high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                # high_coef_dat_name += '_{}_coef.dat'.format(element)
                 if atmosphere_properties_high['errors']:
                     return atmosphere_properties_high
-    
+
                 self.turbulent_velocity = microturbulence
-                #self.tmp_dir = temp_dir
-    
-                #interpolate and find a model atmosphere for the microturbulence
-                self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g, self.metallicity, self.turbulent_velocity)
+                # self.tmp_dir = temp_dir
+
+                # interpolate and find a model atmosphere for the microturbulence
+                self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                           self.metallicity,
+                                                                                           self.turbulent_velocity)
                 f_low = open(low_model_name, 'r')
                 lines_low = f_low.read().splitlines()
-                t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
+                t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(
+                    open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
 
                 f_high = open(high_model_name, 'r')
                 lines_high = f_high.read().splitlines()
-                t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
+                t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(
+                    open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
 
                 fxhigh = microturbulence - turbulence_low
                 fxlow = 1.0 - fxhigh
 
-                t_interp = t_low*fxlow + t_high*fxhigh
-                temp_interp = temp_low*fxlow + temp_high*fxhigh
-                pe_interp = pe_low*fxlow + pe_high*fxhigh
-                pt_interp = pt_low*fxlow + pt_high*fxhigh
-                lum_interp = lum_low*fxlow + lum_high*fxhigh
-                spud_interp = spud_low*fxlow + spud_high*fxhigh
+                t_interp = t_low * fxlow + t_high * fxhigh
+                temp_interp = temp_low * fxlow + temp_high * fxhigh
+                pe_interp = pe_low * fxlow + pe_high * fxhigh
+                pt_interp = pt_low * fxlow + pt_high * fxhigh
+                lum_interp = lum_low * fxlow + lum_high * fxhigh
+                spud_interp = spud_low * fxlow + spud_high * fxhigh
 
                 interp_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 interp_model_name += '.interpol'
-                #print(interp_model_name)
+                # print(interp_model_name)
                 g = open(interp_model_name, 'w')
                 print(lines_low[0], file=g)
                 for i in range(len(t_interp)):
-                    print(" {:.4f}  {:.2f}  {:.4f}   {:.4f}   {:.4f}    {:.6e}  {:.4f}".format(t_interp[i], temp_interp[i], pe_interp[i], pt_interp[i], microturbulence, lum_interp[i], spud_interp[i]), file=g)
+                    print(" {:.4f}  {:.2f}  {:.4f}   {:.4f}   {:.4f}    {:.6e}  {:.4f}".format(t_interp[i],
+                                                                                               temp_interp[i],
+                                                                                               pe_interp[i],
+                                                                                               pt_interp[i],
+                                                                                               microturbulence,
+                                                                                               lum_interp[i],
+                                                                                               spud_interp[i]), file=g)
                 print(lines_low[-8], file=g)
                 print(lines_low[-7], file=g)
                 print(lines_low[-6], file=g)
@@ -1000,29 +1030,29 @@ class TurboSpectrum:
                 print(lines_low[-1], file=g)
                 g.close()
 
-                #atmosphere_properties = atmosphere_properties_low
-                #atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], element)
+                # atmosphere_properties = atmosphere_properties_low
+                # atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], element)
 
-                    #print(atmosphere_properties)
+                # print(atmosphere_properties)
 
-                    #os.system("mv /Users/gerber/iwg7_pipeline/4most-4gp-scripts/files_from_synthesis/current_run/files_for_micro_interp/* ../")
-
+                # os.system("mv /Users/gerber/iwg7_pipeline/4most-4gp-scripts/files_from_synthesis/current_run/files_for_micro_interp/* ../")
 
                 for element, abundance in self.free_abundances.items():
                     if element not in self.model_atom_file:
                         self.model_atom_file[element] = ""
                     if self.model_atom_file[element] != "":
-                        atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], element)
-                        #low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        #low_coef_dat_name += '_{}_coef.dat'.format(element)
-                        low_coef_dat_name = low_model_name.replace('.interpol','_{}_coef.dat'.format(element))
+                        atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
+                                                                                element)
+                        # low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                        # low_coef_dat_name += '_{}_coef.dat'.format(element)
+                        low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
                         f_coef_low = open(low_coef_dat_name, 'r')
                         lines_coef_low = f_coef_low.read().splitlines()
                         f_coef_low.close()
 
                         high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                         high_coef_dat_name += '_{}_coef.dat'.format(element)
-                        high_coef_dat_name = high_model_name.replace('.interpol','_{}_coef.dat'.format(element))
+                        high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
                         f_coef_high = open(high_coef_dat_name, 'r')
                         lines_coef_high = f_coef_high.read().splitlines()
                         f_coef_high.close()
@@ -1030,28 +1060,28 @@ class TurboSpectrum:
                         interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                         interp_coef_dat_name += '_{}_coef.dat'.format(element)
 
-                        num_lines = np.loadtxt(low_coef_dat_name, unpack = True, skiprows=9, max_rows = 1)
+                        num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
 
                         g = open(interp_coef_dat_name, 'w')
                         for i in range(11):
                             print(lines_coef_low[i], file=g)
                         for i in range(len(t_interp)):
                             print(" {:7.4f}".format(t_interp[i]), file=g)
-                        for i in range(10+len(t_interp)+1,10+2*len(t_interp)+1):
+                        for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
                             fields_low = lines_coef_low[i].strip().split()
                             fields_high = lines_coef_high[i].strip().split()
-                            fields_interp=[]
+                            fields_interp = []
                             for j in range(len(fields_low)):
-                                fields_interp.append(float(fields_low[j])*fxlow + float(fields_high[j])*fxhigh)
+                                fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
                             fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
                             print(*fields_interp_print, file=g)
-                        for i in range(10+2*len(t_interp)+1,len(lines_coef_low)):
+                        for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
                             print(lines_coef_low[i], file=g)
                         g.close()
             elif self.nlte_flag == False:
                 self.turbulent_velocity = turbulence_low
                 atmosphere_properties_low = self._generate_model_atmosphere()
-                #print(marcs_model_list_global)
+                # print(marcs_model_list_global)
                 low_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 low_model_name += '.interpol'
                 if atmosphere_properties_low['errors']:
@@ -1064,35 +1094,45 @@ class TurboSpectrum:
                     return atmosphere_properties_high
 
                 self.turbulent_velocity = microturbulence
-                #self.tmp_dir = temp_dir
+                # self.tmp_dir = temp_dir
 
-                #interpolate and find a model atmosphere for the microturbulence
-                self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g, self.metallicity, self.turbulent_velocity)
+                # interpolate and find a model atmosphere for the microturbulence
+                self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                           self.metallicity,
+                                                                                           self.turbulent_velocity)
                 f_low = open(low_model_name, 'r')
                 lines_low = f_low.read().splitlines()
-                t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
+                t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(
+                    open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
 
                 f_high = open(high_model_name, 'r')
                 lines_high = f_high.read().splitlines()
-                t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
+                t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(
+                    open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
 
                 fxhigh = microturbulence - turbulence_low
                 fxlow = 1.0 - fxhigh
 
-                t_interp = t_low*fxlow + t_high*fxhigh
-                temp_interp = temp_low*fxlow + temp_high*fxhigh
-                pe_interp = pe_low*fxlow + pe_high*fxhigh
-                pt_interp = pt_low*fxlow + pt_high*fxhigh
-                lum_interp = lum_low*fxlow + lum_high*fxhigh
-                spud_interp = spud_low*fxlow + spud_high*fxhigh
+                t_interp = t_low * fxlow + t_high * fxhigh
+                temp_interp = temp_low * fxlow + temp_high * fxhigh
+                pe_interp = pe_low * fxlow + pe_high * fxhigh
+                pt_interp = pt_low * fxlow + pt_high * fxhigh
+                lum_interp = lum_low * fxlow + lum_high * fxhigh
+                spud_interp = spud_low * fxlow + spud_high * fxhigh
 
                 interp_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                 interp_model_name += '.interpol'
-                #print(interp_model_name)
+                # print(interp_model_name)
                 g = open(interp_model_name, 'w')
                 print(lines_low[0], file=g)
                 for i in range(len(t_interp)):
-                    print(" {:.4f}  {:.2f}  {:.4f}   {:.4f}   {:.4f}    {:.6e}  {:.4f}".format(t_interp[i], temp_interp[i], pe_interp[i], pt_interp[i], microturbulence, lum_interp[i], spud_interp[i]), file=g)
+                    print(" {:.4f}  {:.2f}  {:.4f}   {:.4f}   {:.4f}    {:.6e}  {:.4f}".format(t_interp[i],
+                                                                                               temp_interp[i],
+                                                                                               pe_interp[i],
+                                                                                               pt_interp[i],
+                                                                                               microturbulence,
+                                                                                               lum_interp[i],
+                                                                                               spud_interp[i]), file=g)
                 print(lines_low[-8], file=g)
                 print(lines_low[-7], file=g)
                 print(lines_low[-6], file=g)
@@ -1103,19 +1143,19 @@ class TurboSpectrum:
                 print(lines_low[-1], file=g)
                 g.close()
 
-                #atmosphere_properties = atmosphere_properties_low
+                # atmosphere_properties = atmosphere_properties_low
                 atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], 'Fe')
 
 
-        elif flag_dont_interp_microturb == 0 and self.turbulent_velocity > 2.0: #not enough models to interp if higher than 2
-            microturbulence = self.turbulent_velocity                           #just use 2.0 for the model if between 2 and 3
+        elif flag_dont_interp_microturb == 0 and self.turbulent_velocity > 2.0:  # not enough models to interp if higher than 2
+            microturbulence = self.turbulent_velocity  # just use 2.0 for the model if between 2 and 3
             self.turbulent_velocity = 2.0
             atmosphere_properties = self._generate_model_atmosphere()
             if atmosphere_properties['errors']:
                 return atmosphere_properties
             self.turbulent_velocity = microturbulence
 
-        elif flag_dont_interp_microturb == 0 and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.: #not enough models to interp if lower than 1 and t_eff > 3900
+        elif flag_dont_interp_microturb == 0 and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.:  # not enough models to interp if lower than 1 and t_eff > 3900
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 1.0
             atmosphere_properties = self._generate_model_atmosphere()
@@ -1132,30 +1172,30 @@ class TurboSpectrum:
             if self.log_g < 3:
                 self.turbulent_velocity = microturbulence
             if atmosphere_properties['errors']:
-                #print('spud')
+                # print('spud')
                 print(atmosphere_properties['errors'])
                 return atmosphere_properties
 
         self.atmosphere_properties = atmosphere_properties
-        #print(self.atmosphere_properties)
+        # print(self.atmosphere_properties)
 
     def make_species_lte_nlte_file(self):
         """
         Generate the SPECIES_LTE_NLTE.dat file for TS to determine what elements are NLTE
         """
-        #data_path = self.turbospec_path.replace("exec/","DATA/")
+        # data_path = self.turbospec_path.replace("exec/","DATA/")
         data_path = self.tmp_dir
 
         nlte = "nlte" if self.nlte_flag == True else "lte"
 
-        #if len(self.free_abundances.items()) == 1:
+        # if len(self.free_abundances.items()) == 1:
         #    nlte_fe = nlte
-        #else:
+        # else:
         #    nlte_fe =
 
-        file = open("{}/SPECIES_LTE_NLTE_{:08d}.dat".format(data_path,self.counter_spectra), 'w')
-        #print("# This file controls which species are treated in LTE/NLTE", file=file)
-        #print("# It also gives the path to the model atom and the departure files", file=file)
+        file = open("{}/SPECIES_LTE_NLTE_{:08d}.dat".format(data_path, self.counter_spectra), 'w')
+        # print("# This file controls which species are treated in LTE/NLTE", file=file)
+        # print("# It also gives the path to the model atom and the departure files", file=file)
         file.write("# This file controls which species are treated in LTE/NLTE\n")
         file.write("# It also gives the path to the model atom and the departure files\n")
         file.write("# First created 2021-02-22\n")
@@ -1171,20 +1211,25 @@ class TurboSpectrum:
         file.write("{}\n".format(self.tmp_dir))
         file.write("#\n")
         file.write("# atomic (N)LTE setup\n")
-        #file.write("1    'H' 'lte'   'atom.h20'  ' ' 'binary'\n")
+        # file.write("1    'H' 'lte'   'atom.h20'  ' ' 'binary'\n")
         if self.nlte_flag == True:
             for element, abundance in self.free_abundances.items():
                 atomic_number = periodic_table.index(element)
                 if element not in self.model_atom_file:
                     self.model_atom_file[element] = ""
                 if self.model_atom_file[element] == "":
-                    file.write("{}  '{}'  'lte'  ''   '' 'ascii'\n".format(atomic_number,element,nlte,self.model_atom_file[element],self.marcs_model_name, element))
+                    file.write("{}  '{}'  'lte'  ''   '' 'ascii'\n".format(atomic_number, element, nlte,
+                                                                           self.model_atom_file[element],
+                                                                           self.marcs_model_name, element))
                 else:
-                    file.write("{}  '{}'  '{}'  '{}'   '{}_{}_coef.dat' 'ascii'\n".format(atomic_number,element,nlte,self.model_atom_file[element],self.marcs_model_name, element))
+                    file.write("{}  '{}'  '{}'  '{}'   '{}_{}_coef.dat' 'ascii'\n".format(atomic_number, element, nlte,
+                                                                                          self.model_atom_file[element],
+                                                                                          self.marcs_model_name,
+                                                                                          element))
         elif self.nlte_flag == False:
             for element, abundance in self.free_abundances.items():
                 atomic_number = periodic_table.index(element)
-                file.write("{}  '{}'  '{}'  ''   '' 'ascii'\n".format(atomic_number,element,nlte))
+                file.write("{}  '{}'  '{}'  ''   '' 'ascii'\n".format(atomic_number, element, nlte))
         file.close()
 
     def make_babsma_bsyn_file(self, spherical):
@@ -1203,7 +1248,7 @@ class TurboSpectrum:
                 alpha = 0
 
         # Allow for user input abundances as a dictionary of the form {element: abundance}
-        #deprecated 8-2022
+        # deprecated 8-2022
         """
         if self.free_abundances is None:
             individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '0'\n"
@@ -1223,21 +1268,24 @@ class TurboSpectrum:
 
         # Updated abundances to below to allow user to set solar abundances through solar_abundances.py and not have to adjust make_abund.f
 
-        individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table)-1)
+        individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
         if self.free_abundances is None:
-            for i in range(1,len(periodic_table)):
-                individual_abundances += "{:d}  {:.2f}\n".format(i, float(solar_abundances[periodic_table[i]])+self.metallicity)
+            for i in range(1, len(periodic_table)):
+                individual_abundances += "{:d}  {:.2f}\n".format(i, float(
+                    solar_abundances[periodic_table[i]]) + self.metallicity)
         else:
             item_abund = {}
             item_abund['H'] = 12.00
-            item_abund[periodic_table[2]] = float(solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
-            for i in range(3,len(periodic_table)):
-                item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity),2)
+            item_abund[periodic_table[2]] = float(
+                solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+            for i in range(3, len(periodic_table)):
+                item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(
+                    float(self.metallicity), 2)
             for element, abundance in self.free_abundances.items():
-                item_abund[element] = float(solar_abundances[element]) + round(float(abundance),2)
-            for i in range(1,len(periodic_table)):
+                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 2)
+            for i in range(1, len(periodic_table)):
                 individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
-        #print(individual_abundances)
+        # print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
 
@@ -1251,10 +1299,9 @@ class TurboSpectrum:
             for isotope, ratio in solar_isotopes.items():
                 individual_isotopes += "{}  {:6f}\n".format(isotope, ratio)
 
-
-        #if self.free_isotopes is None:
+        # if self.free_isotopes is None:
         #    free_isotopes = "'ISOTOPES : ' '{:d}'\n".format(len(self.))
-        #else:
+        # else:
         #    individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(self.free_abundances))
 
         #    for element, abundance in self.free_abundances.items():
@@ -1263,8 +1310,8 @@ class TurboSpectrum:
 
         #        atomic_number = periodic_table.index(element)
         #        individual_abundances += "{:d}  {:.2f}\n".format(int(atomic_number),
-         #                                                        float(solar_abundances[element]) + float(abundance))
-        #print(individual_abundances.strip())
+        #                                                        float(solar_abundances[element]) + float(abundance))
+        # print(individual_abundances.strip())
         # Make a list of line-list files
         # We start by getting a list of all files in the line list directories we've been pointed towards,
         # excluding any text files we find.
@@ -1282,8 +1329,8 @@ class TurboSpectrum:
         for item in line_list_files:
             line_lists += "{}\n".format(item)
 
-        #print(self.line_list_paths)
-        #print(line_list_files)
+        # print(self.line_list_paths)
+        # print(line_list_files)
 
         # Build bsyn configuration file
         spherical_boolean_code = "T" if spherical else "F"
@@ -1424,36 +1471,36 @@ class TurboSpectrum:
            xifix=xifix_boolean_code
            )
 
-        #print(babsma_config)
-        #print(bsyn_config)
+        # print(babsma_config)
+        # print(bsyn_config)
         return babsma_config, bsyn_config
 
-    def stitch(self, specname1, specname2, lmin, lmax, new_range, count): #toss a coin to your stitcher
+    def stitch(self, specname1, specname2, lmin, lmax, new_range, count):  # toss a coin to your stitcher
         wave1, flux_norm1, flux1 = np.loadtxt(specname1, unpack=True)
         wave2, flux_norm2, flux2 = np.loadtxt(specname2, unpack=True)
 
-        #print(lmin, lmin+(count*new_range))
+        # print(lmin, lmin+(count*new_range))
 
-        wave1_clipped = wave1[np.where((wave1 < lmin+(count*new_range))& (wave1 >= lmin))]
-        flux_norm1_clipped = flux_norm1[np.where((wave1 < lmin+(count*new_range)) & (wave1 >= lmin))]
-        flux1_clipped = flux1[np.where((wave1 < lmin+(count*new_range)) & (wave1 >= lmin))]
-        wave2_clipped = wave2[np.where((wave2 >= lmin+(count*new_range)) & (wave2 <= lmax))]
-        flux_norm2_clipped = flux_norm2[np.where((wave2 >= lmin+(count*new_range)) & (wave2 <= lmax))]
-        flux2_clipped = flux2[np.where((wave2 >= lmin+(count*new_range)) & (wave2 <= lmax))]
+        wave1_clipped = wave1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
+        flux_norm1_clipped = flux_norm1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
+        flux1_clipped = flux1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
+        wave2_clipped = wave2[np.where((wave2 >= lmin + (count * new_range)) & (wave2 <= lmax))]
+        flux_norm2_clipped = flux_norm2[np.where((wave2 >= lmin + (count * new_range)) & (wave2 <= lmax))]
+        flux2_clipped = flux2[np.where((wave2 >= lmin + (count * new_range)) & (wave2 <= lmax))]
 
-        wave = np.concatenate((wave1_clipped,wave2_clipped))
-        flux_norm = np.concatenate((flux_norm1_clipped,flux_norm2_clipped))
-        flux = np.concatenate((flux1_clipped,flux2_clipped))
+        wave = np.concatenate((wave1_clipped, wave2_clipped))
+        flux_norm = np.concatenate((flux_norm1_clipped, flux_norm2_clipped))
+        flux = np.concatenate((flux1_clipped, flux2_clipped))
 
         return wave, flux_norm, flux
 
     def synthesize(self):
-            # Generate configuation files to pass to babsma and bsyn
+        # Generate configuation files to pass to babsma and bsyn
         self.make_species_lte_nlte_file()  # TODO: not create this file every time (same one for each run anyway)
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
 
-        #print(babsma_in)
-        #print(bsyn_in)
+        # print(babsma_in)
+        # print(bsyn_in)
 
         # Start making dictionary of output data
         output = self.atmosphere_properties
@@ -1475,8 +1522,8 @@ class TurboSpectrum:
         turbospec_root = os_path.join(self.turbospec_path, "..")
 
         # Run babsma. This creates an opacity file .opac from the MARCS atmospheric model
-        try:    # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
-            os.chdir(turbospec_root)    # Time wasted trying to make asyncio work here: 6 hours. Halts program halfway
+        try:  # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
+            os.chdir(turbospec_root)  # Time wasted trying to make asyncio work here: 6 hours. Halts program halfway
             pr1, stderr_bytes = self.run_babsma(babsma_in, stderr, stdout)
         except subprocess.CalledProcessError:
             output["errors"] = "babsma failed with CalledProcessError"
@@ -1487,7 +1534,7 @@ class TurboSpectrum:
             stderr_bytes = b''
         if pr1.returncode != 0:
             output["errors"] = "babsma failed"
-            #logging.info("Babsma failed. Return code {}. Error text <{}>".
+            # logging.info("Babsma failed. Return code {}. Error text <{}>".
             #             format(pr1.returncode, stderr_bytes.decode('utf-8')))
             return output
 
@@ -1503,7 +1550,7 @@ class TurboSpectrum:
             stderr_bytes = b''
         if pr.returncode != 0:
             output["errors"] = "bsyn failed"
-            #logging.info("Bsyn failed. Return code {}. Error text <{}>".
+            # logging.info("Bsyn failed. Return code {}. Error text <{}>".
             #             format(pr.returncode, stderr_bytes.decode('utf-8')))
             return output
 
@@ -1534,22 +1581,23 @@ class TurboSpectrum:
         lmax = self.lambda_max
 
         lpoint_max = 1000000 * 0.99  # first number comes from turbospectrum spectrum.inc : lpoint. 0.99 is to give some extra room so that bsyn does not fail for sure
-        points_in_new_spectra_to_generate = int((lmax-lmin) / self.lambda_delta)
+        points_in_new_spectra_to_generate = int((lmax - lmin) / self.lambda_delta)
 
         if points_in_new_spectra_to_generate > lpoint_max:
             print("WARNING. The range or delta wavelength asked is too big. Trying to break down into smaller "
                   "segments and stitch them together at the end.")
             number = math.ceil(points_in_new_spectra_to_generate / lpoint_max)
-            new_range = round((lmax-lmin)/number)
-            extra_wavelength_for_stitch = 30    # generats with extra wavlength so that stitch can be nice i guess (i did not write this originally)
+            new_range = round((lmax - lmin) / number)
+            extra_wavelength_for_stitch = 30  # generats with extra wavlength so that stitch can be nice i guess (i did not write this originally)
             for i in range(number):
-                self.configure(lambda_min=lmin-extra_wavelength_for_stitch, lambda_max=lmin+new_range+extra_wavelength_for_stitch, counter_spectra=i)
+                self.configure(lambda_min=lmin - extra_wavelength_for_stitch,
+                               lambda_max=lmin + new_range + extra_wavelength_for_stitch, counter_spectra=i)
                 self.synthesize()
                 lmin = lmin + new_range
-            for i in range(number-1):
+            for i in range(number - 1):
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
-                spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
-                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
+                spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i + 1))
+                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i + 1)
                 f = open(spectrum1, 'w')
                 for j in range(len(wave)):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
@@ -1568,14 +1616,18 @@ class TurboSpectrum:
             print(f"Interpolation failed? {error}")
 
 
-def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, marcs_values: dict):
+def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list):
     """
     Get a list of all of the MARCS models we have.
 
     :return:
         None
     """
-    #TODO: calling it every time. But we only need to run once.
+
+    marcs_values = {
+        "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
+        "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []}
+
     model_temperatures = []
     model_logs = []
     model_mets = []
@@ -1583,12 +1635,11 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, mar
     pattern = r"([sp])(\d\d\d\d)_g(....)_m(...)_t(..)_(..)_z(.....)_" \
               r"a(.....)_c(.....)_n(.....)_o(.....)_r(.....)_s(.....).mod"
 
-
     marcs_value_keys = [i for i in list(marcs_values.keys()) if i not in marcs_parameters_to_ignore]
     marcs_value_keys.sort()
     marcs_models = {}
 
-    #marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))  # 18.11.22 NS: Takes several seconds here per star, is not used anywhere though? Uncommented for now at least
+    # marcs_models = glob.glob(os_path.join(self.marcs_grid_path, "*"))  # 18.11.22 NS: Takes several seconds here per star, is not used anywhere though? Uncommented for now at least
     marcs_nlte_models = np.loadtxt(marcs_grid_list, dtype='str', usecols=(0,), unpack=True)
     spud_models = []
     for i in range(len(marcs_nlte_models)):
@@ -1597,9 +1648,9 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, mar
         re_test_aux = re.match(aux_pattern, marcs_nlte_models[i])
         mass = float(re_test_aux.group(3))
         if mass == 0.0:
-            spud = "p"+marcs_nlte_models[i]+".mod"
+            spud = "p" + marcs_nlte_models[i] + ".mod"
         else:
-            spud = "s"+marcs_nlte_models[i]+".mod"
+            spud = "s" + marcs_nlte_models[i] + ".mod"
         spud_models.append(spud)
 
     marcs_nlte_models = spud_models
@@ -1608,7 +1659,7 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, mar
 
         # Extract model parameters from .mod filename
         filename = os_path.split(item)[1]
-        #filename = item
+        # filename = item
         re_test = re.match(pattern, filename)
         assert re_test is not None, "Could not parse MARCS model filename <{}>".format(filename)
 
@@ -1632,7 +1683,7 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, mar
             model_logs.append(model["log_g"])
             model_mets.append(model["metallicity"])
         except ValueError:
-            #logging.info("Could not parse MARCS model filename <{}>".format(filename))
+            # logging.info("Could not parse MARCS model filename <{}>".format(filename))
             raise
 
         # Keep a list of all of the parameter values we've seen
@@ -1642,14 +1693,14 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, mar
 
         # Keep a list of all the models we've got in the grid
         dict_iter = marcs_models
-        #print(dict_iter)
+        # print(dict_iter)
         for parameter in marcs_value_keys:
             value = model[parameter]
             if value not in dict_iter:
                 dict_iter[value] = {}
             dict_iter = dict_iter[value]
-        #if "filename" in dict_iter:
-            #logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
+        # if "filename" in dict_iter:
+        # logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
         dict_iter["filename"] = item
 
     model_temperatures = np.asarray(model_temperatures)
@@ -1661,3 +1712,4 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list, mar
         marcs_values[parameter].sort()
 
     return model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
+
