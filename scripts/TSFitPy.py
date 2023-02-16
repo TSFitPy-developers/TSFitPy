@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+from scipy import integrate
 from scipy.optimize import minimize
 # from multiprocessing import Pool
 # import h5py
@@ -1031,12 +1032,37 @@ class Spectra:
                 # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(result[line_number]["fit_wavelength"])):
                     print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
+
+            wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(result[line_number]['fit_wavelength'], result[line_number]['fit_flux'], self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
+
+            line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                                 self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+            line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
+
+            equivalent_width = self.calculate_equivalent_width(line_number, wavelength_fit_conv, flux_fit_conv)
+
+            np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
+
             with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
                 # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
                 for k in range(len(result[line_number]["fit_wavelength_conv"])):
-                    print(f"{result[line_number]['fit_wavelength_conv']} {result[line_number]['fit_flux_norm_conv']}", file=h)
+                    print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
 
         return result_list
+
+    def calculate_equivalent_width(self, line_number: int, fit_wavelength: np.ndarray, fit_flux: np.ndarray) -> float:
+        line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+        line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
+
+
+        line_func = interpolate.interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
+                                         fill_value=1, bounds_error=False)
+        total_area = (line_right - line_left) * 1.0
+        area_under_line = integrate.quad(line_func, line_left, line_right, points=fit_wavelength[
+            np.logical_and.reduce((fit_wavelength > line_left, fit_wavelength < line_right))])
+
+        return area_under_line
 
     def fit_teff_function(self) -> list:
         """
@@ -1271,7 +1297,7 @@ class Spectra:
                 # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
             #    for k in range(len(wave_result)):
             #        print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-            wave_result_conv, flux_norm_result_conv = np.loadtxt(f"{temp_directory}spectrum_00000000_convolved.spec", unpack=True)
+            #wave_result_conv, flux_norm_result_conv = np.loadtxt(f"{temp_directory}spectrum_00000000_convolved.spec", unpack=True)
             #with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
                 # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
             #    for k in range(len(wave_result)):
@@ -1280,7 +1306,8 @@ class Spectra:
         except (OSError, ValueError) as error:
             print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         shutil.rmtree(temp_directory)
-        return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result, "fit_flux": flux_result, "fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv}
+        return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
+                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
 
 def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
