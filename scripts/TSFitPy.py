@@ -59,9 +59,6 @@ def calculate_vturb(teff: float, logg: float, met: float) -> float:
         v_mturb = 1.25 + 4.01e-4 * (teff - t0) + 3.1e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
                 logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
 
-    if teff == 5771 and logg == 4.44:
-        v_mturb = 0.9
-
     if v_mturb <= 0.0:
         print("error in calculating micro turb, setting it to 1.0")
         return 1.0
@@ -242,6 +239,16 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
             print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
         out.close()
     return chi_square
+
+
+def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray, left_bound: float, right_bound: float) -> float:
+    line_func = interpolate.interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
+                                     fill_value=1, bounds_error=False)
+    total_area = (right_bound - left_bound) * 1.0   # continuum
+    area_under_line = integrate.quad(line_func, left_bound, right_bound, points=fit_wavelength[
+        np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))])
+
+    return total_area - area_under_line[0]
 
 
 class Spectra:
@@ -1027,7 +1034,7 @@ class Spectra:
         result_list = []
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(Spectra.line_begins_sorted)):
-            result_list.append(result[line_number]["result"])
+
             with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
                 # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(result[line_number]["fit_wavelength"])):
@@ -1039,30 +1046,18 @@ class Spectra:
                                                  self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
             line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
 
-            equivalent_width = self.calculate_equivalent_width(line_number, wavelength_fit_conv, flux_fit_conv)
+            equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
 
-            np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
+            result_list.append(f"{result[line_number]['result']} {equivalent_width}")
+
+            indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
 
             with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
                 # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-                for k in range(len(result[line_number]["fit_wavelength_conv"])):
-                    print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
+                for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
+                    print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
 
         return result_list
-
-    def calculate_equivalent_width(self, line_number: int, fit_wavelength: np.ndarray, fit_flux: np.ndarray) -> float:
-        line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
-                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
-        line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
-
-
-        line_func = interpolate.interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
-                                         fill_value=1, bounds_error=False)
-        total_area = (line_right - line_left) * 1.0
-        area_under_line = integrate.quad(line_func, line_left, line_right, points=fit_wavelength[
-            np.logical_and.reduce((fit_wavelength > line_left, fit_wavelength < line_right))])
-
-        return area_under_line
 
     def fit_teff_function(self) -> list:
         """
@@ -1434,7 +1429,7 @@ def lbl_broad_abund_chi_sqr(param: list, ts: TurboSpectrum, spectra_to_fit: Spec
     else:
         macroturb = spectra_to_fit.macroturb
 
-    wave_ob = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
+    wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler) #spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False)
 
@@ -1530,7 +1525,8 @@ def lbl_broad_abund_chi_sqr_v2(param: list, ts: TurboSpectrum, spectra_to_fit: S
                        options={'maxiter': Spectra.ndimen * 50, 'disp': False})
 
         spectra_to_fit.doppler_shift = res.x[0]
-        wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
+        #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
+        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + spectra_to_fit.doppler_shift)
         if spectra_to_fit.fit_macroturb:
             spectra_to_fit.macroturb = res.x[1]
         macroturb = spectra_to_fit.macroturb
@@ -1600,7 +1596,8 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
                        options={'maxiter': Spectra.ndimen * 50, 'disp': False})
 
         spectra_to_fit.doppler_shift = res.x[0]
-        wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
+        #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
+        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + spectra_to_fit.doppler_shift)
         if spectra_to_fit.fit_macroturb:
             spectra_to_fit.macroturb = res.x[1]
         macroturb = spectra_to_fit.macroturb
@@ -1669,7 +1666,8 @@ def all_broad_abund_chi_sqr(param, ts, spectra_to_fit: Spectra) -> float:
     else:
         macroturb = spectra_to_fit.macroturb
 
-    wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
+    #wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
+    wave_obs = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
     if Spectra.fit_met:
         item_abund = {"Fe": abund}
@@ -1815,9 +1813,9 @@ def run_TSFitPy(output_folder_title):
                     line_list_path = fields[2]
                 # if fields[0] == "line_list_folder":
                 #    linelist_folder = fields[2]
-                if field_name == "model_atmosphere_grid_path_1D":
+                if field_name == "model_atmosphere_grid_path_1d":
                     model_atmosphere_grid_path_1D = fields[2]
-                if field_name == "model_atmosphere_grid_path_3D":
+                if field_name == "model_atmosphere_grid_path_3d":
                     model_atmosphere_grid_path_3D = fields[2]
                 # if fields[0] == "model_atmosphere_folder":
                 #    model_atmosphere_folder = fields[2]
@@ -2353,10 +2351,10 @@ def run_TSFitPy(output_folder_title):
             output_elem_column = f"{Spectra.elem_to_fit[0]}_Fe"
 
     if Spectra.fitting_mode == "all":
-        print(f"#specname        {output_elem_column}     Doppler_Shift_add_to_RV    chi_squared Macro_turb", file=f)
+        print(f"#specname\t{output_elem_column}\tDoppler_Shift_add_to_RV\tchi_squared\tMacroturb", file=f)
     elif Spectra.fitting_mode == "lbl":
         print(
-            f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared",
+            f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew",
             file=f)
     elif Spectra.fitting_mode == "lbl_quick":  # f" {res.x[0]} {vmicro} {macroturb} {res.fun}"
         output_columns = "#specname\twave_center\twave_start\twave_end"

@@ -82,7 +82,7 @@ class TurboSpectrum:
         self.lambda_max: float = None
         self.lambda_delta: float = None
         self.metallicity: float = None
-        self.stellar_mass: float = None
+        self.stellar_mass: float = 1
         self.log_g: float = None
         self.t_eff: float = None
         self.turbulent_velocity: float = None  # micro turbulence, km/s
@@ -353,8 +353,7 @@ class TurboSpectrum:
 
         # Create dictionary of the MARCS model parameters we're looking for in grid
         marcs_parameters = self.marcs_parameters.copy()
-        marcs_parameters[
-            'turbulence'] = self.turbulent_velocity  # JMG line to make microturbulence an adjustable variable
+        marcs_parameters['turbulence'] = self.turbulent_velocity  # JMG line to make microturbulence an adjustable variable
         # print(marcs_parameters)
         if spherical:
             marcs_parameters['spherical'] = "s"
