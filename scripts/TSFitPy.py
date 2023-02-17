@@ -1,6 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from scipy import integrate
+from scipy.interpolate import interpolate
 from scipy.optimize import minimize
 # from multiprocessing import Pool
 # import h5py
@@ -23,7 +24,7 @@ from typing import Union
 from sys import argv
 import collections
 import scipy
-from convolve import *
+from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
 
 
@@ -425,7 +426,6 @@ class Spectra:
         max_abundance = self.guess_max_abund  # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
         min_rv = self.guess_min_doppler  # km/s i think as well
         max_rv = self.guess_max_doppler
-        # TODO: check that not the same value every time? chance of not fitting at all if all values are same
         #microturb_guesses = np.linspace(min_microturb, max_microturb, self.ndimen + 1)
         macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2, max_macroturb + np.random.random(1)[0] / 2, self.ndimen + 1)
         abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10, max_abundance + np.random.random(1)[0] / 10, self.ndimen + 1)
