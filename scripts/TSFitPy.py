@@ -1355,7 +1355,7 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     else:
         rotation = spectra_to_fit.rotation
 
-    wave_ob = apply_doppler_correction(spectra_to_fit, doppler)
+    wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
 
     try:
@@ -1371,8 +1371,8 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
     return chi_square
 
 
-def apply_doppler_correction(spectra_to_fit, doppler):
-    return spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
+def apply_doppler_correction(wave_ob: np.ndarray, doppler: float):
+    return wave_ob / (1 + (doppler / 299792.))
 
 
 def lbl_broad_abund_chi_sqr(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
