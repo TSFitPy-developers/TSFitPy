@@ -13,7 +13,10 @@ import os
 from os import path as os_path
 # import glob
 import datetime
-from dask.distributed import Client, get_client, secede, rejoin
+try:
+    from dask.distributed import Client, get_client, secede, rejoin
+except ModuleNotFoundError:
+    raise ModuleNotFoundError("Dask not installed. It is required for multiprocessing. Install using pip install dask[complete]")
 import shutil
 import socket
 from typing import Union
@@ -1034,28 +1037,31 @@ class Spectra:
         result_list = []
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(Spectra.line_begins_sorted)):
+            if len(result[line_number]["fit_wavelength"]) > 0:
+                with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+                    # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+                    for k in range(len(result[line_number]["fit_wavelength"])):
+                        print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
 
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
-                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-                for k in range(len(result[line_number]["fit_wavelength"])):
-                    print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
+                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(result[line_number]['fit_wavelength'], result[line_number]['fit_flux'], self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
 
-            wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(result[line_number]['fit_wavelength'], result[line_number]['fit_flux'], self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
+                line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                                     self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+                line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
 
-            line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
-                                                 self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
-            line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
+                equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
 
-            equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
 
+
+                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
+
+                with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+                    # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
+                    for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
+                        print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
+            else:
+                equivalent_width = 9999
             result_list.append(f"{result[line_number]['result']} {equivalent_width}")
-
-            indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
-
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
-                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-                for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
-                    print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
 
         return result_list
 
@@ -1300,6 +1306,9 @@ class Spectra:
             # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
         except (OSError, ValueError) as error:
             print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+            wave_result = np.array([])
+            flux_norm_result = np.array([])
+            flux_result = np.array([])
         shutil.rmtree(temp_directory)
         return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
