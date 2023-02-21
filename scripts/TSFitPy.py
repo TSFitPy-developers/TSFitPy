@@ -1043,15 +1043,13 @@ class Spectra:
                     for k in range(len(result[line_number]["fit_wavelength"])):
                         print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
 
-                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(result[line_number]['fit_wavelength'], result[line_number]['fit_flux'], self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
+                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(result[line_number]['fit_wavelength'], result[line_number]['fit_flux_norm'], self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
 
                 line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                                      self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
                 line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
 
                 equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
-
-
 
                 indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
 
