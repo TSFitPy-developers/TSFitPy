@@ -1,7 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from scipy import integrate
-from scipy.interpolate import interpolate
+from scipy.interpolate import interp1d
 from scipy.optimize import minimize
 # from multiprocessing import Pool
 # import h5py
@@ -246,11 +246,11 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
 
 
 def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray, left_bound: float, right_bound: float) -> float:
-    line_func = interpolate.interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
+    line_func = interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
                                      fill_value=1, bounds_error=False)
     total_area = (right_bound - left_bound) * 1.0   # continuum
-    area_under_line = integrate.quad(line_func, left_bound, right_bound, points=fit_wavelength[
-        np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))])
+    integration_points = fit_wavelength[np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))]
+    area_under_line = integrate.quad(line_func, left_bound, right_bound, points=integration_points, limit=len(integration_points) * 5)
 
     return total_area - area_under_line[0]
 
@@ -1862,16 +1862,16 @@ def run_TSFitPy(output_folder_title):
                 if field_name == "fit_microturb":  # Yes No Input
                     Spectra.fit_microturb = fields[2]
                 if field_name == "fit_macroturb":  # Yes No Input
-                    if fields[2].lower == "yes":
+                    if fields[2].lower() == "yes":
                         Spectra.fit_macroturb = True
                     else:
                         Spectra.fit_macroturb = False
-                    if fields[2] == "Input":
+                    if fields[2].lower() == "input":
                         input_macro = True
                     else:
                         input_macro = False
                 if field_name == "fit_rotation":
-                    if fields[2].lower == "yes":
+                    if fields[2].lower() == "yes":
                         Spectra.fit_rotation = True
                     else:
                         Spectra.fit_rotation = False
@@ -2236,14 +2236,14 @@ def run_TSFitPy(output_folder_title):
         print(f"Expected fitting mode 'all', 'lbl', 'lbl_quick', 'teff', but got {Spectra.fitting_mode} instead")
     if Spectra.nlte_flag:
         for file in Spectra.depart_bin_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.departure_file_path, file)):
-                print(f"{file} does not exist! Check the spelling or if the file exists")
+            if not os.path.isfile(os.path.join(Spectra.departure_file_path, Spectra.depart_bin_file_dict[file])):
+                print(f"{Spectra.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
         for file in Spectra.depart_aux_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.departure_file_path, file)):
-                print(f"{file} does not exist! Check the spelling or if the file exists")
+            if not os.path.isfile(os.path.join(Spectra.departure_file_path, Spectra.depart_aux_file_dict[file])):
+                print(f"{Spectra.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
         for file in Spectra.model_atom_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.model_atom_path, file)):
-                print(f"{file} does not exist! Check the spelling or if the file exists")
+            if not os.path.isfile(os.path.join(Spectra.model_atom_path, Spectra.depart_aux_file_dict[file])):
+                print(f"{Spectra.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
 
     for line_start, line_end in zip(Spectra.line_begins_sorted, Spectra.line_ends_sorted):
         index_location = np.where(np.logical_and(Spectra.seg_begins <= line_start, line_end <= Spectra.seg_ends))[0]
