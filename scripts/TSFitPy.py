@@ -2240,8 +2240,8 @@ def run_TSFitPy(output_folder_title):
             if not os.path.isfile(os.path.join(Spectra.departure_file_path, Spectra.depart_aux_file_dict[file])):
                 print(f"{Spectra.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
         for file in Spectra.model_atom_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.model_atom_path, Spectra.depart_aux_file_dict[file])):
-                print(f"{Spectra.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
+            if not os.path.isfile(os.path.join(Spectra.model_atom_path, Spectra.model_atom_file_dict[file])):
+                print(f"{Spectra.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
 
     for line_start, line_end in zip(Spectra.line_begins_sorted, Spectra.line_ends_sorted):
         index_location = np.where(np.logical_and(Spectra.seg_begins <= line_start, line_end <= Spectra.seg_ends))[0]
