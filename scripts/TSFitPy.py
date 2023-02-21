@@ -249,8 +249,12 @@ def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray,
     line_func = interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
                                      fill_value=1, bounds_error=False)
     total_area = (right_bound - left_bound) * 1.0   # continuum
-    integration_points = fit_wavelength[np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))]
-    area_under_line = integrate.quad(line_func, left_bound, right_bound, points=integration_points, limit=len(integration_points) * 5)
+    try:
+        integration_points = fit_wavelength[np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))]
+        area_under_line = integrate.quad(line_func, left_bound, right_bound, points=integration_points, limit=len(integration_points) * 5)
+    except ValueError:
+        total_area = 0
+        area_under_line = -9999
 
     return total_area - area_under_line[0]
 
@@ -1037,7 +1041,7 @@ class Spectra:
         result_list = []
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(Spectra.line_begins_sorted)):
-            if len(result[line_number]["fit_wavelength"]) > 0:
+            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
                 with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
                     # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                     for k in range(len(result[line_number]["fit_wavelength"])):
@@ -1059,7 +1063,7 @@ class Spectra:
                         print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
             else:
                 equivalent_width = 9999
-            result_list.append(f"{result[line_number]['result']} {equivalent_width}")
+            result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
 
         return result_list
 
@@ -1309,7 +1313,7 @@ class Spectra:
             flux_result = np.array([])
         shutil.rmtree(temp_directory)
         return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
-                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": res.fun} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
 
 def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
