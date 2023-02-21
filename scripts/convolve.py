@@ -24,8 +24,8 @@ def conv_macroturbulence(wave, flux, vmac):
         print(F"Macroturbulence <0: {vmac}. Can only be positive (km/s).")
     elif not np.isnan(vmac):
         spec_deltaV = (wave[1]-wave[0])/np.mean(wave) * speed_of_light_kms
-        if (spec_deltaV) > vmac:
-            #print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vmac={vmac}. No convolution will be done, Vmac = 0.")
+        if False and (spec_deltaV) > vmac:
+            print(F"WARNING: resolution of model spectra {spec_deltaV} is less than Vmac={vmac}. No convolution will be done, Vmac = 0.")
             pass
         elif np.max(wave) - np.min(wave) > 5.:
             #if wavelength is too large, divide and conquer into 5 A windows
@@ -76,6 +76,7 @@ def conv_macroturbulence(wave, flux, vmac):
                 x_size += 1
             macro_kernel = convolution.Model1DKernel( rad_tang(fwhm), x_size=x_size)
             flux_conv = convolution.convolve(flux, macro_kernel, fill_value=1)
+            wave_conv = wave
     else:
         print(F"Unexpected Vmac={vmac} [km/s]. Stopped.")
         exit(1)

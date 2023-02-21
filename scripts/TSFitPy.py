@@ -784,7 +784,7 @@ class Spectra:
             if success:
                 spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
                 wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                          usecols=(0, 1), unpack=True)  # TODO asyncio here?
+                                                          usecols=(0, 1), unpack=True)
                 grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
 
         for j in range(len(Spectra.line_begins_sorted)):
@@ -924,7 +924,7 @@ class Spectra:
         for abund in abund_to_gen:
             spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
             wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                      usecols=(0, 1), unpack=True)  # TODO asyncio here?
+                                                      usecols=(0, 1), unpack=True)
             grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
         chi_squares = []
         macroturbs = []
@@ -1336,7 +1336,7 @@ def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
     return a, b, c
 
 def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
-                                  wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray) -> float: #TODO go through all functions that use this and add rotation
+                                  wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray) -> float:
     """
     Line by line quick. Takes precalculated synthetic spectra (i.e. 1 grid) and finds chi-sqr for observed spectra.
     Also fits doppler shift and can fit macroturbulence if needed.
@@ -1759,7 +1759,6 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
     :param load_fe: loads Fe in the dict as well with it being the last element even if not fitted
     :return: 3 dictionaries: NLTE location of elements that exist with keys as element names
     """
-    #TODO check if files exist
     depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
     if load_fe:
         if Spectra.fit_met:
