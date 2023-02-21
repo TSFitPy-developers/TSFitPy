@@ -253,8 +253,7 @@ def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray,
         integration_points = fit_wavelength[np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))]
         area_under_line = integrate.quad(line_func, left_bound, right_bound, points=integration_points, limit=len(integration_points) * 5)
     except ValueError:
-        total_area = 0
-        area_under_line = -9999
+        return -9999
 
     return total_area - area_under_line[0]
 
