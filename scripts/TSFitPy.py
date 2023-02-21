@@ -2000,9 +2000,9 @@ def run_TSFitPy(output_folder_title):
                     Spectra.debug_mode = float(fields[2])
                 if field_name == "experimental":
                     if fields[2] == "true" or fields[2] == "yes":
-                        Spectra.experimental_features = True
+                        Spectra.experimental = True
                     else:
-                        Spectra.experimental_features = False
+                        Spectra.experimental = False
             line = fp.readline()
         fp.close()
 
