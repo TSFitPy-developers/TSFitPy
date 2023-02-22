@@ -196,8 +196,8 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
 
 
 def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_obs: np.ndarray,
-                              wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, resolution: float, lmax: float,
-                              lmin: float, macro: float, rot: float, save_convolved=True) -> float:
+                              wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, resolution: float, lmin: float,
+                              lmax: float, macro: float, rot: float, save_convolved=True) -> float:
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
     calculates chi squared. Used for line by line method, by only looking at a specific line.
@@ -1046,11 +1046,14 @@ class Spectra:
                     for k in range(len(result[line_number]["fit_wavelength"])):
                         print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
 
-                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(result[line_number]['fit_wavelength'], result[line_number]['fit_flux_norm'], self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
+                line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
 
-                line_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
-                                                     self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
-                line_left, line_right = self.line_begins_sorted[line_index], self.line_ends_sorted[line_index]
+                wavelength_fit_array = result[line_number]['fit_wavelength']
+                norm_flux_fit_array = result[line_number]['fit_flux_norm']
+
+                indices_to_use_cut = np.where((wavelength_fit_array <= line_right + 5) & (wavelength_fit_array >= line_left - 5))
+                wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], norm_flux_fit_array[indices_to_use_cut]
+                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut, norm_flux_fit_array_cut, self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
 
                 equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
 
@@ -1369,10 +1372,9 @@ def lbl_broad_abund_chi_sqr_quick(param: list, spectra_to_fit: Spectra, lmin: fl
 
 
     try:
-        chi_square = calculate_lbl_chi_squared(None, wave_ob,
-                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax,
-                                               lmin, macroturb,
-                                               rotation, save_convolved=False)
+        chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig,
+                                               Spectra.resolution, lmin, lmax, macroturb, rotation,
+                                               save_convolved=False)
     except IndexError as e:
         chi_square = 9999.99
         print(f"{e} Is your segment seen in the observed spectra?")
@@ -1447,9 +1449,8 @@ def lbl_broad_abund_chi_sqr(param: list, ts: TurboSpectrum, spectra_to_fit: Spec
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
                                                   usecols=(0, 1), unpack=True)
-        chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
-                                               lmax, lmin, macroturb,
+        chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
+                                               flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb,
                                                Spectra.rotation)
     elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
@@ -1544,9 +1545,8 @@ def lbl_broad_abund_chi_sqr_v2(param: list, ts: TurboSpectrum, spectra_to_fit: S
             spectra_to_fit.rotation = res.x[-1]
         rotation = spectra_to_fit.rotation
         try:
-            chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob,
-                                                   wave_mod_orig, flux_mod_orig, Spectra.resolution, lmax, lmin,
-                                                   macroturb, rotation)
+            chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
+                                                   flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb, rotation)
         except IndexError as e:
             chi_square = 9999.99
             print(f"{e} Is your segment seen in the observed spectra?")
@@ -1615,10 +1615,8 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
             spectra_to_fit.rotation = res.x[-1]
         rotation = spectra_to_fit.rotation
 
-        chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob,
-                                               spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, Spectra.resolution,
-                                               lmax, lmin, macroturb,
-                                               rotation)
+        chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
+                                               flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb, rotation)
     elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
         chi_square = 999.99
