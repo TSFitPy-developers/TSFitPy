@@ -1802,13 +1802,10 @@ def run_TSFitPy(output_folder_title):
     with open(config_location) as fp:
         line = fp.readline()
         while line:
-            if len(line) != 0:
+            if len(line) > 1:
                 fields = line.strip().split()
                 # if fields[0][0] == "#":
                 # line = fp.readline()
-                if len(fields) == 0:
-                    line = fp.readline()
-                    fields = line.strip().split()
                 # if fields[0] == "turbospec_path":
                 #    turbospec_path = fields[2]
                 field_name = fields[0].lower()
@@ -2163,8 +2160,12 @@ def run_TSFitPy(output_folder_title):
             input_abund_data_spectra_names, input_abund_data_values = input_abund_data[:, 0], input_abund_data[:, 1].astype(float)
 
             for spectra in specname_fitlist:
-                spectra_loc_index = np.where(input_abund_data_spectra_names == spectra)[0][0]
-                input_elem_abundance_dict[spectra][input_elem] = input_abund_data_values[spectra_loc_index]
+                spectra_loc_index = np.where(input_abund_data_spectra_names == spectra)[0]
+                if np.size(spectra_loc_index) == 1:
+                    input_elem_abundance_dict[spectra][input_elem] = input_abund_data_values[spectra_loc_index]
+                else:
+                    print(f"{spectra} does not have element {input_elem} in the input spectra. Using [{input_elem}/Fe]=0")
+                    input_elem_abundance_dict[spectra][input_elem] = 0
 
         Spectra.input_elem_abundance = dict(input_elem_abundance_dict)
 
