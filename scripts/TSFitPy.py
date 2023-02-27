@@ -1997,12 +1997,11 @@ def run_TSFitPy(output_folder_title):
                 if field_name == "debug":
                     Spectra.debug_mode = float(fields[2])
                 if field_name == "experimental":
-                    if fields[2] == "true" or fields[2] == "yes":
+                    if fields[2].lower() == "true" or fields[2].lower() == "yes":
                         Spectra.experimental = True
                     else:
                         Spectra.experimental = False
             line = fp.readline()
-        fp.close()
 
     print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
 
