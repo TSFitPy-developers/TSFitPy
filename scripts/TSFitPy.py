@@ -1057,7 +1057,7 @@ class Spectra:
 
                 equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
 
-                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left, wavelength_fit_conv < line_right))
+                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left - 1, wavelength_fit_conv < line_right + 1))
 
                 with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
                     # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
