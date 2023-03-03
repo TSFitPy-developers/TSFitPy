@@ -6,6 +6,9 @@ import turbospectrum_class_nlte
 
 class MyTestCase(unittest.TestCase):
     # TODO: more unittests?
+
+    def test_calculate_vturb(self):
+        self.assertAlmostEqual(TSFitPy.calculate_vturb(5777, 4.44, 0.0), 1.0, delta=0.1)
     def test_chi_square_lbl(self):
         wave_obs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         flux_obs = np.array([1, 0.9, .8, .9, 1, 1, 1, 1, 1, 1])
@@ -166,6 +169,8 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(turbospectrum_class_nlte.closest_available_value(100, [0, 2.5, 5, 10]), 10)
         self.assertEqual(turbospectrum_class_nlte.closest_available_value(7, [0, 2.5, 5, 10]), 5)
         self.assertEqual(turbospectrum_class_nlte.closest_available_value(8, [0, 2.5, 5, 10]), 10)
+
+
 
 
 if __name__ == '__main__':

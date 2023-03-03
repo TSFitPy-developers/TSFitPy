@@ -16,8 +16,9 @@ from os import path as os_path
 import datetime
 try:
     from dask.distributed import Client, get_client, secede, rejoin
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
     raise ModuleNotFoundError("Dask not installed. It is required for multiprocessing. Install using pip install dask[complete]")
+    #pass
 import shutil
 import socket
 from typing import Union
