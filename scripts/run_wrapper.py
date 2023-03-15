@@ -1,4 +1,4 @@
-from turbospectrum_class_nlte import TurboSpectrum
+from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import math
 import time
 import numpy as np
@@ -130,6 +130,11 @@ linemask_file = "../input_files/linemask_files/"+linemask_file
 segment_file = "../input_files/linemask_files/"+segment_file
 #continuum_file = "../input_files/linemask_files/"+continuum_file
 
+model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+aux_file_length_dict = {}
+for element in model_atom_file:
+    aux_file_length_dict[element] = len(np.loadtxt(os.path.join(departure_file_path, depart_aux_file[element]), dtype='str'))
+
 ts = TurboSpectrum(
             turbospec_path=turbospec_path,
             interpol_path=interpol_path,
@@ -137,7 +142,14 @@ ts = TurboSpectrum(
             marcs_grid_path=model_atmosphere_grid_path,
             marcs_grid_list=model_atmosphere_list,
             model_atom_path=model_atom_path,
-            departure_file_path=departure_file_path)
+            departure_file_path=departure_file_path,
+            aux_file_length_dict=aux_file_length_dict,
+            model_temperatures=model_temperatures,
+            model_logs=model_logs,
+            model_mets=model_mets,
+            marcs_value_keys=marcs_value_keys,
+            marcs_models=marcs_models,
+            marcs_values=marcs_values)
 
 time_start = time.time()
 
