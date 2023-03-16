@@ -27,6 +27,7 @@ import collections
 import scipy
 from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
+import cma
 
 
 def create_dir(directory: str):
@@ -259,8 +260,24 @@ def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray,
     return total_area - area_under_line[0]
 
 
-def minimize_abundance_function(function, param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
-    return minimize(function, param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
+def minimize_abundance_function(function, input_param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
+    if False:
+        # using Scipy. Nelder-Mead or L-BFGS- algorithm
+        res = minimize(function, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
+
+    if input_param_guess.ndim > 1:
+        parameter_guess = np.median(input_param_guess, axis=0)
+        sigma = (np.max(input_param_guess, axis=0) - np.min(input_param_guess, axis=0)) / 3
+    else:
+        parameter_guess = input_param_guess
+        sigma = (np.max(bounds, axis=0) - np.min(bounds, axis=0)) / 5
+    result = cma.fmin(function, parameter_guess, sigma, args=function_arguments, options={'bounds': bounds})
+    res.x = result.xbest
+    res.fun = result.funbest
+
+    #res.x = [param1 best guess, param2 best guess etc]
+    #res.fun = function value (chi squared) after the fit
+    return res
 
 
 class Spectra:
