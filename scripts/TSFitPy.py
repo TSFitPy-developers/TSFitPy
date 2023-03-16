@@ -259,6 +259,10 @@ def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray,
     return total_area - area_under_line[0]
 
 
+def minimize_abundance_function(function, param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
+    return minimize(function, param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
+
+
 class Spectra:
     turbospec_path: str = None  # path to the /exec/ file
     interpol_path: str = None  # path to the model_interpolators folder with fortran code
@@ -692,9 +696,10 @@ class Spectra:
 
         ts = self.create_ts_object()
 
-        res = minimize(all_broad_abund_chi_sqr, self.init_param_guess, args=(ts, self), method='Nelder-Mead', bounds=self.minim_bounds,
-                       options={'maxiter': self.ndimen * 50, 'disp': self.python_verbose,
-                                'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05})
+        function_arguments = (ts, self)
+        minimize_options = {'maxiter': self.ndimen * 50, 'disp': self.python_verbose,
+                            'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05}
+        res = minimize_abundance_function(all_broad_abund_chi_sqr, self.init_param_guess, function_arguments, self.minim_bounds, 'Nelder-Mead', minimize_options)
         # print final result from minimazation
         print(res.x)
 
@@ -801,14 +806,12 @@ class Spectra:
             for abund, success in zip(self.abund_to_gen, success_grid_gen):
                 if success:  # for each successful grid find chi squared with best fit parameters
                     wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
-                    res = minimize(lbl_broad_abund_chi_sqr_quick, self.init_param_guess, args=(self,
-                                                                                               Spectra.line_begins_sorted[j] - 5.,
-                                                                                               Spectra.line_ends_sorted[j] + 5.,
-                                                                                               wave_abund,
-                                                                                               flux_abund),
-                                   bounds=self.minim_bounds,
-                                   method='L-BFGS-B',
-                                   options={'maxiter': Spectra.ndimen * 50, 'disp': False})
+                    function_argsuments=(self, Spectra.line_begins_sorted[j] - 5., Spectra.line_ends_sorted[j] + 5.,
+                                         wave_abund, flux_abund)
+                    minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+                    res = minimize_abundance_function(lbl_broad_abund_chi_sqr_quick, self.init_param_guess,
+                                                      function_argsuments, self.minim_bounds, 'L-BFGS-B',
+                                                      minimize_options)
                     #print(res.x)
                     if Spectra.fit_macroturb:  # if fitted macroturbulence
                         macroturb = res.x[1]
@@ -965,13 +968,10 @@ class Spectra:
             get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
                                       start)]
 
-        res = minimize(lbl_teff_chi_sqr, param_guess[0], args=(ts, self, Spectra.line_begins_sorted[line_number] - 5.,
-                                                                     Spectra.line_ends_sorted[line_number] + 5.),
-                       bounds=min_bounds,
-                       method='Nelder-Mead',
-                       options={'maxfev': 50, 'disp': self.python_verbose,
-                                'initial_simplex': param_guess,
-                                'xatol': 0.01, 'fatol': 0.01})
+        function_argsuments = (ts, self, Spectra.line_begins_sorted[line_number] - 5., Spectra.line_ends_sorted[line_number] + 5.)
+        minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
+        res = minimize_abundance_function(lbl_teff_chi_sqr, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
+
         print(res.x)
 
         teff = res.x[0]
@@ -1024,14 +1024,9 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
 
-        res = minimize(lbl_broad_abund_chi_sqr, param_guess[0], args=(ts, self,
-                                                                      Spectra.line_begins_sorted[line_number] - 5.,
-                                                                      Spectra.line_ends_sorted[line_number] + 5., temp_directory),
-                       bounds=min_bounds,
-                       method='Nelder-Mead',
-                       options={'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose,
-                                'initial_simplex': param_guess,
-                                'xatol': 0.01, 'fatol': 0.01, 'adaptive': True})
+        function_arguments = (ts, self, Spectra.line_begins_sorted[line_number] - 5., Spectra.line_ends_sorted[line_number] + 5., temp_directory)
+        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01, 'adaptive': True}
+        res = minimize_abundance_function(lbl_broad_abund_chi_sqr, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if Spectra.fit_met:
             met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
@@ -1220,11 +1215,10 @@ def lbl_broad_abund_chi_sqr(param: list, ts: TurboSpectrum, spectra_to_fit: Spec
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
-        res = minimize(lbl_broad_abund_chi_sqr_quick, np.median(param_guess, axis=0), args=(spectra_to_fit, lmin, lmax,
-                                                                            wave_mod_orig, flux_mod_orig),
-                       bounds=min_bounds,
-                       method='L-BFGS-B',
-                       options={'maxiter': Spectra.ndimen * 50, 'disp': False})
+        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
+        minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+        res = minimize_abundance_function(lbl_broad_abund_chi_sqr_quick, np.median(param_guess, axis=0),
+                                                         function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.doppler_shift = res.x[0]
         #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
@@ -1290,11 +1284,10 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
-        res = minimize(lbl_broad_abund_chi_sqr_quick, param_guess[0], args=(spectra_to_fit, lmin, lmax,
-                                                                            wave_mod_orig, flux_mod_orig),
-                       bounds=min_bounds,
-                       method='L-BFGS-B',
-                       options={'maxiter': Spectra.ndimen * 50, 'disp': False})
+        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
+        minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+        res = minimize_abundance_function(lbl_broad_abund_chi_sqr_quick, param_guess[0],
+                                                         function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.doppler_shift = res.x[0]
         #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
