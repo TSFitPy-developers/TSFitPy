@@ -18,7 +18,7 @@ debug = 0
 #type of atmosphere (1D or 3D). current models tested are 1D MARCS model textfiles and average 3D Stagger grid textfiles in MULTI format.
 atmosphere_type = 1D
 #
-#mode for fitting. Types are all or lbl, where lbl stands for line by line.
+#mode for fitting. Types are all or lbl or teff, where lbl stands for line by line. Teff - fit temperature.
 mode = lbl
 #
 #whether or not molecules are included in the trimmed linelist ('True' or 'False')
