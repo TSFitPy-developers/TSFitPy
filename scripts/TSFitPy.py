@@ -2021,7 +2021,7 @@ def run_TSFitPy(output_folder_title):
     shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
     shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
 
-    output = Spectra.output_folder + output
+    output = os.path.join(Spectra.output_folder, output)
 
     f = open(output, 'a')
 
@@ -2104,6 +2104,7 @@ if __name__ == '__main__':
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     try:
         run_TSFitPy(output_folder_title_date)
+        print("Fitting completed")
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
