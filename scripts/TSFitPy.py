@@ -1,5 +1,6 @@
 from __future__ import annotations
 import numpy as np
+import optuna as optuna
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
@@ -259,21 +260,51 @@ def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray,
 
     return total_area - area_under_line[0]
 
+class Result:
+    def __init__(self):
+        self.fun = None
+        self.x = None
 
-def minimize_abundance_function(function, input_param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
-    if False:
+def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
+
+    #if False:
         # using Scipy. Nelder-Mead or L-BFGS- algorithm
-        res = minimize(function, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
+    #    res = minimize(function_to_minimize, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
 
+    """
+    cma: might work for high dimensions, doesn't work for 1D easily.
     if input_param_guess.ndim > 1:
         parameter_guess = np.median(input_param_guess, axis=0)
         sigma = (np.max(input_param_guess, axis=0) - np.min(input_param_guess, axis=0)) / 3
     else:
         parameter_guess = input_param_guess
         sigma = (np.max(bounds, axis=0) - np.min(bounds, axis=0)) / 5
-    result = cma.fmin(function, parameter_guess, sigma, args=function_arguments, options={'bounds': bounds})
+    result = cma.fmin(function_to_minimize, parameter_guess, sigma, args=function_arguments, options={'bounds': bounds})
     res.x = result.xbest
-    res.fun = result.funbest
+    res.fun = result.funbest"""
+
+    if input_param_guess.ndim > 1:
+        parameter_guess = np.median(input_param_guess, axis=0)
+    else:
+        parameter_guess = input_param_guess
+
+    def suggest_float(trial, name, bounds, initial):
+        if len(initial) == 1:
+            lower, upper = bounds[0]
+            return trial.suggest_float(name + '_0', lower, upper)
+        else:
+            return [trial.suggest_float(f"{name}_{i}", bounds[i][0], bounds[i][1]) for i in range(len(initial))]
+
+    def objective(trial):
+        x = suggest_float(trial, "x", bounds, parameter_guess)
+        return function_to_minimize(x)
+
+    study = optuna.create_study()
+    study.optimize(objective, n_trials=50)
+
+    res = Result()
+    res.x = study.best_params
+    res.fun = study.best_value
 
     #res.x = [param1 best guess, param2 best guess etc]
     #res.fun = function value (chi squared) after the fit
