@@ -12,6 +12,9 @@ linemask_file_folder_location = ../input_files/linemask_files/
 segment_file_folder_location = ../input_files/linemask_files/
 spec_input_path = ../input_files/observed_spectra/
 fitlist_input_folder = ../input_files/
+temporary_directory = temp_directory/ #where temporary files created during fitting (opacity files, interpolated model atmospheres, etc.) are stored
+#0 - least info printed (fastest fitting). 1 - more Python info printed. 2 - Fortran output printed (very slow fitting; only use for heavy debugging).
+debug = 0
 #type of atmosphere (1D or 3D). current models tested are 1D MARCS model textfiles and average 3D Stagger grid textfiles in MULTI format.
 atmosphere_type = 1D
 #
@@ -22,60 +25,61 @@ mode = lbl
 include_molecules = True
 #
 #whether to use nlte or not. ('True' or 'False')
-nlte = True
+nlte = False
 #
 #whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode # or "Input" if one adds a column to the fitlist
-fit_microturb = Input
+fit_microturb = No
 #whether or not macroturbulence is fit as a parameter or taken from the value below ('Yes' / "No" / "Input")
 fit_macroturb = Yes
 #whether to fit rotation or use the one below as a constant for all of them (Yes / No)
-fit_rotation = Yes
+fit_rotation = No
 #
 #element fit: which elements to fit. Example: Mg Fe C . One element is faster
-element = Ba
+element = Fe
 #
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
 #TS will only generate spectra in the given segments to reduce calculation time.
-linemask_file =  Ba/ba-lmask.txt   #Mg/mg-lmask.txt
-segment_file = Ba/ba-seg.txt #Mg/mg-seg.txt
+linemask_file = Fe/fe-lmask.txt  
+segment_file = Fe/fe-seg.txt
 #
 #other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte. IRON ALWAYS NEEDED
-departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
-departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
-model_atom_file = atom.mg86b atom.fe607
+#will only be used if NLTE = True
+departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
+departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
+model_atom_file = atom.fe607
 #
-#spectrum parameters (wavelength in angstrom)
+#spectrum parameters (wavelength in angstrom); only used if mode = all
 wavelength_minimum = 5300
 wavelength_maximum = 5700
-wavelength_delta = 0.01
+#generated wavelength delta
+wavelength_delta = 0.005
 resolution = 0 #R (lambda_center/FWHM), 0 means no convolution based on resolution
-macroturbulence = 0.0 #in km/s
-rotation = 0.0 #in km/s
-temporary_directory = temp_directory/ #where temporary files created during fitting (opacity files, interpolated model atmospheres, etc.) are stored
+macroturbulence = 0.0 #in km/s; constant for all stars if not fitted
+rotation = 0.0 #in km/s; constant for all stars if not fitted
 #
 #other inputs for fitting
 input_file = fitlist #list of observation spectra (textfiles) and atmospheric parameters needed (teff, logg, met)
 output_file = output
 #Multiprocessing: workers is the requested amount of CPUs
-workers = 2
+workers = 1
 #if want to give initial guess to the element, list those elements here
 init_guess_elem =
 #location to files that give the initial guess to the abundance of elements (same order sa the element)
 init_guess_elem_location =
 #If you know abundance of some element and want to fit with it (i.e. assume that it is correct/constant), can write which element it is
-input_elem_abundance = Ti
+#input_elem_abundance = Ti
 #Location for the elemental abundance. First column spectra name, second column is abundance for the element above. Same order as element above
-input_elem_abundance_location = titititi
+#input_elem_abundance_location = location/ti.txt
 #NLTE data for inputs
-input_elem_departure_coefficient_binary = Ti/NLTEgrid4TS_TI_MARCS_Feb-21-2022.bin
-input_elem_departure_coefficient_aux = Ti/auxData_TI_MARCS_Feb-21-2022.dat
-input_elem_model_atom_file = atom.ti503
+#input_elem_departure_coefficient_binary = Ti/NLTEgrid4TS_TI_MARCS_Feb-21-2022.bin
+#input_elem_departure_coefficient_aux = Ti/auxData_TI_MARCS_Feb-21-2022.dat
+#input_elem_model_atom_file = atom.ti503
 #bounds for the minimisation -> HARD BOUND, will NEVER fit outside these bounds
 bounds_macro = 0 30        # km/s, can never be less than 0, mAAAAcro
 bounds_rotation = 0 30        # km/s, can never be less than 0
 bounds_micro = 0.01 5        # km/s, can never be less than 0, mIIIIcro
 bounds_abund = -40 100      # [X/Fe]
-bounds_met = -4 0.5        # [Fe/H], hard bounds set by turbospectrum
+bounds_met = -5 1.0        # [Fe/H], hard bounds set by turbospectrum
 bounds_doppler = -1 1     # km/s, too high might result in fits of wrong lines
 #guess ranges for minimisation -> GUESS ONLY. CAN fit outside, but depending on variable (especially abund/micro), may never fit outside guesses
 guess_range_macroturb = 0.2 8.0 # km/s; cannot be less than 0, mAAAAcro
@@ -86,3 +90,5 @@ guess_range_rv = -1 1 # km/s i
 #if fitting teff:
 bounds_teff = 2500 8000 # K, hard bound, will never go beyond it
 guess_range_teff = -1000 1000 # K, will fit depending on input of Teff +/- guess-ranges. E.g. having star with 5000K and setting guess -1000 1000 will result in guesses 4000 and 6000 K
+#Experimental: for lbl Dask will distribute all lines between all processes. Might break something with some Dask updates. True - makes faster fitting though.
+experimental = False
