@@ -13,7 +13,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 from TSFitPy import Spectra, load_nlte_files_in_dict, create_dir, calculate_equivalent_width
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
 def cut_linelist(seg_begins: list[float], seg_ends: list[float], line_list_file: str, new_path_name: str, elements_to_use: list[str]):
