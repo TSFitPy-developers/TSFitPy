@@ -192,7 +192,7 @@ def generate_lte_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_lis
 
     return wave_mod_orig, flux_norm_mod_orig
 
-def get_nlte_ew(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, lte_ew):
+def get_nlte_ew(abundance, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
     wavelength_nlte, norm_flux_nlte = generate_lte_atmosphere(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, True)
     nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin, lmax)
     return np.square(nlte_ew - lte_ew)
@@ -201,7 +201,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     wavelength_lte, norm_flux_lte = generate_lte_atmosphere(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, False)
     ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin, lmax)
     result = minimize(get_nlte_ew, abundance,
-                      args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, True, ew_lte),
+                      args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                       bounds=[(abundance - 3, abundance + 3)], method="L-BFGS-B", options={'disp': False})
 
     nlte_correction = result.x
