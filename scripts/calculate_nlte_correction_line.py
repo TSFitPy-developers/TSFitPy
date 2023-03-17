@@ -183,8 +183,8 @@ def generate_lte_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_lis
                                 line_mask_file=AbusingClasses.linemask_file, depart_bin_file=AbusingClasses.depart_bin_file_dict,
                                 depart_aux_file=AbusingClasses.depart_aux_file_dict, model_atom_file=AbusingClasses.model_atom_file_dict)
 
-    ts.calculate_atmosphere()
-    ts.run_turbospectrum()
+    ts.run_turbospectrum_and_atmosphere()
+    #ts.run_turbospectrum()
 
     wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory), usecols=(0,1,2), unpack=True)
 
