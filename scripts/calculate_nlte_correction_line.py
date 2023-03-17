@@ -12,7 +12,7 @@ from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize
 
-from TSFitPy import Spectra, load_nlte_files_in_dict, create_dir, calculate_equivalent_width
+from TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width
 from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
@@ -140,6 +140,11 @@ def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, e
                 new_file_to_write.write(line_to_write)
 
 
+class AbusingClasses:
+
+    def __init__(self):
+        pass
+
 def generate_lte_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
     #parameters to adjust
 
@@ -156,27 +161,27 @@ def generate_lte_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_lis
         os.makedirs(temp_directory)
 
     ts = TurboSpectrum(
-                turbospec_path=Spectra.turbospec_path,
-                interpol_path=Spectra.interpol_path,
+                turbospec_path=AbusingClasses.turbospec_path,
+                interpol_path=AbusingClasses.interpol_path,
                 line_list_paths=line_list_path,
-                marcs_grid_path=Spectra.model_atmosphere_grid_path,
-                marcs_grid_list=Spectra.model_atmosphere_list,
-                model_atom_path=Spectra.model_atom_path,
-                departure_file_path=Spectra.departure_file_path,
-                aux_file_length_dict=Spectra.aux_file_length_dict,
-                model_temperatures=Spectra.model_temperatures,
-                model_logs=Spectra.model_logs,
-                model_mets=Spectra.model_mets,
-                marcs_value_keys=Spectra.marcs_value_keys,
-                marcs_models=Spectra.marcs_models,
-                marcs_values=Spectra.marcs_values)
+                marcs_grid_path=AbusingClasses.model_atmosphere_grid_path,
+                marcs_grid_list=AbusingClasses.model_atmosphere_list,
+                model_atom_path=AbusingClasses.model_atom_path,
+                departure_file_path=AbusingClasses.departure_file_path,
+                aux_file_length_dict=AbusingClasses.aux_file_length_dict,
+                model_temperatures=AbusingClasses.model_temperatures,
+                model_logs=AbusingClasses.model_logs,
+                model_mets=AbusingClasses.model_mets,
+                marcs_value_keys=AbusingClasses.marcs_value_keys,
+                marcs_models=AbusingClasses.marcs_models,
+                marcs_values=AbusingClasses.marcs_values)
 
     ts.configure(t_eff = teff, log_g = logg, metallicity = met,
                                 turbulent_velocity = vturb, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax,
                                 free_abundances=item_abund, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=False,
-                                atmosphere_dimension=Spectra.atmosphere_type, windows_flag=False, segment_file=Spectra.segment_file,
-                                line_mask_file=Spectra.linemask_file, depart_bin_file=Spectra.depart_bin_file_dict,
-                                depart_aux_file=Spectra.depart_aux_file_dict, model_atom_file=Spectra.model_atom_file_dict)
+                                atmosphere_dimension=AbusingClasses.atmosphere_type, windows_flag=False, segment_file=AbusingClasses.segment_file,
+                                line_mask_file=AbusingClasses.linemask_file, depart_bin_file=AbusingClasses.depart_bin_file_dict,
+                                depart_aux_file=AbusingClasses.depart_aux_file_dict, model_atom_file=AbusingClasses.model_atom_file_dict)
 
     ts.calculate_atmosphere()
     ts.run_turbospectrum()
@@ -259,97 +264,97 @@ def run_nlte_corrections(config_file_name, output_folder_title):
                 if field_name == "turbospectrum_compiler":
                     ts_compiler = fields[2]
                 if field_name == "atmosphere_type":
-                    Spectra.atmosphere_type = fields[2]
+                    AbusingClasses.atmosphere_type = fields[2]
                 if field_name == "mode":
-                    Spectra.fitting_mode = fields[2].lower()
+                    AbusingClasses.fitting_mode = fields[2].lower()
                 if field_name == "include_molecules":
-                    Spectra.include_molecules = fields[2]
+                    AbusingClasses.include_molecules = fields[2]
                 if field_name == "nlte":
                     nlte_flag = fields[2].lower()
                     if nlte_flag == "true":
-                        Spectra.nlte_flag = True
+                        AbusingClasses.nlte_flag = True
                     else:
-                        Spectra.nlte_flag = False
+                        AbusingClasses.nlte_flag = False
                 if field_name == "fit_microturb":  # Yes No Input
-                    Spectra.fit_microturb = fields[2]
+                    AbusingClasses.fit_microturb = fields[2]
                 if field_name == "fit_macroturb":  # Yes No Input
                     if fields[2].lower() == "yes":
-                        Spectra.fit_macroturb = True
+                        AbusingClasses.fit_macroturb = True
                     else:
-                        Spectra.fit_macroturb = False
+                        AbusingClasses.fit_macroturb = False
                     if fields[2].lower() == "input":
                         input_macro = True
                     else:
                         input_macro = False
                 if field_name == "fit_rotation":
                     if fields[2].lower() == "yes":
-                        Spectra.fit_rotation = True
+                        AbusingClasses.fit_rotation = True
                     else:
-                        Spectra.fit_rotation = False
+                        AbusingClasses.fit_rotation = False
                 """if fields[0] == "fit_teff":
                     if fields[2].lower() == "true":
-                        Spectra.fit_teff = True
+                        AbusingClasses.fit_teff = True
                     else:
-                        Spectra.fit_teff = False
+                        AbusingClasses.fit_teff = False
                 if fields[0] == "fit_logg":
-                    Spectra.fit_logg = fields[2]"""
+                    AbusingClasses.fit_logg = fields[2]"""
                 if field_name == "element":
                     elements_to_fit = []
                     for i in range(len(fields) - 2):
                         elements_to_fit.append(fields[2 + i])
-                    Spectra.elem_to_fit = np.asarray(elements_to_fit)
+                    AbusingClasses.elem_to_fit = np.asarray(elements_to_fit)
                     if "Fe" in elements_to_fit:
-                        Spectra.fit_met = True
+                        AbusingClasses.fit_met = True
                     else:
-                        Spectra.fit_met = False
-                    Spectra.nelement = len(Spectra.elem_to_fit)
+                        AbusingClasses.fit_met = False
+                    AbusingClasses.nelement = len(AbusingClasses.elem_to_fit)
                 if field_name == "linemask_file":
                     linemask_file = fields[2]
                 if field_name == "segment_file":
                     segment_file = fields[2]
                 # if fields[0] == "continuum_file":
                 #    continuum_file = fields[2]
-                if field_name == "departure_coefficient_binary" and Spectra.nlte_flag:
+                if field_name == "departure_coefficient_binary" and AbusingClasses.nlte_flag:
                     for i in range(2, len(fields)):
                         depart_bin_file.append(fields[i])
-                if field_name == "departure_coefficient_aux" and Spectra.nlte_flag:
+                if field_name == "departure_coefficient_aux" and AbusingClasses.nlte_flag:
                     for i in range(2, len(fields)):
                         depart_aux_file.append(fields[i])
-                if field_name == "model_atom_file" and Spectra.nlte_flag:
+                if field_name == "model_atom_file" and AbusingClasses.nlte_flag:
                     for i in range(2, len(fields)):
                         model_atom_file.append(fields[i])
-                if field_name == "input_elem_departure_coefficient_binary" and Spectra.nlte_flag:
+                if field_name == "input_elem_departure_coefficient_binary" and AbusingClasses.nlte_flag:
                     for i in range(2, len(fields)):
                         depart_bin_file_input_elem.append(fields[i])
-                if field_name == "input_elem_departure_coefficient_aux" and Spectra.nlte_flag:
+                if field_name == "input_elem_departure_coefficient_aux" and AbusingClasses.nlte_flag:
                     for i in range(2, len(fields)):
                         depart_aux_file_input_elem.append(fields[i])
-                if field_name == "input_elem_model_atom_file" and Spectra.nlte_flag:
+                if field_name == "input_elem_model_atom_file" and AbusingClasses.nlte_flag:
                     for i in range(2, len(fields)):
                         model_atom_file_input_elem.append(fields[i])
                 if field_name == "wavelength_minimum":
-                    Spectra.lmin = float(fields[2])
+                    AbusingClasses.lmin = float(fields[2])
                 if field_name == "wavelength_maximum":
-                    Spectra.lmax = float(fields[2])
+                    AbusingClasses.lmax = float(fields[2])
                 if field_name == "wavelength_delta":
-                    Spectra.ldelta = float(fields[2])
+                    AbusingClasses.ldelta = float(fields[2])
                 if field_name == "resolution":
-                    Spectra.resolution = float(fields[2])
+                    AbusingClasses.resolution = float(fields[2])
                 if field_name == "macroturbulence":
                     macroturb_input = float(fields[2])
                 if field_name == "rotation":
-                    Spectra.rotation = float(fields[2])
+                    AbusingClasses.rotation = float(fields[2])
                 if field_name == "temporary_directory":
                     temp_directory = fields[2]
                     temp_directory = os.path.join(temp_directory, output_folder_title, '')
-                    Spectra.global_temp_dir = f"../{temp_directory}"
+                    AbusingClasses.global_temp_dir = f"../{temp_directory}"
                 if field_name == "input_file":
                     fitlist = fields[2]
                 if field_name == "output_file":
                     output = fields[2]
                 if field_name == "workers":
                     workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
-                    Spectra.dask_workers = workers
+                    AbusingClasses.dask_workers = workers
                 if field_name == "init_guess_elem":
                     init_guess_elements = []
                     for i in range(len(fields) - 2):
@@ -371,76 +376,76 @@ def run_nlte_corrections(config_file_name, output_folder_title):
                         input_elem_abundance_location.append(fields[2 + i])
                     input_elem_abundance_location = np.asarray(input_elem_abundance_location)
                 if field_name == "bounds_macro":
-                    Spectra.bound_min_macro = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_macro = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_macro = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_macro = max(float(fields[2]), float(fields[3]))
                 if field_name == "bounds_rotation":
-                    Spectra.bound_min_rotation = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_rotation = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_rotation = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_rotation = max(float(fields[2]), float(fields[3]))
                 if field_name == "bounds_micro":
-                    Spectra.bound_min_micro = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_micro = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_micro = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_micro = max(float(fields[2]), float(fields[3]))
                 if field_name == "bounds_abund":
-                    Spectra.bound_min_abund = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_abund = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_abund = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_abund = max(float(fields[2]), float(fields[3]))
                 if field_name == "bounds_met":
-                    Spectra.bound_min_met = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_met = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_met = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_met = max(float(fields[2]), float(fields[3]))
                 if field_name == "bounds_teff":
-                    Spectra.bound_min_teff = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_teff = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_teff = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_teff = max(float(fields[2]), float(fields[3]))
                 if field_name == "bounds_doppler":
-                    Spectra.bound_min_doppler = min(float(fields[2]), float(fields[3]))
-                    Spectra.bound_max_doppler = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_min_doppler = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.bound_max_doppler = max(float(fields[2]), float(fields[3]))
                 if field_name == "guess_range_microturb":
-                    Spectra.guess_min_micro = min(float(fields[2]), float(fields[3]))
-                    Spectra.guess_max_micro = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_min_micro = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_max_micro = max(float(fields[2]), float(fields[3]))
                 if field_name == "guess_range_macroturb":
-                    Spectra.guess_min_macro = min(float(fields[2]), float(fields[3]))
-                    Spectra.guess_max_macro = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_min_macro = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_max_macro = max(float(fields[2]), float(fields[3]))
                 if field_name == "guess_range_rotation":
-                    Spectra.guess_min_rotation = min(float(fields[2]), float(fields[3]))
-                    Spectra.guess_max_rotation = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_min_rotation = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_max_rotation = max(float(fields[2]), float(fields[3]))
                 if field_name == "guess_range_abundance":
-                    Spectra.guess_min_abund = min(float(fields[2]), float(fields[3]))
-                    Spectra.guess_max_abund = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_min_abund = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_max_abund = max(float(fields[2]), float(fields[3]))
                 if field_name == "guess_range_rv":
-                    Spectra.guess_min_doppler = min(float(fields[2]), float(fields[3]))
-                    Spectra.guess_max_doppler = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_min_doppler = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_max_doppler = max(float(fields[2]), float(fields[3]))
                 if field_name == "guess_range_teff":
-                    Spectra.guess_plus_minus_neg_teff = min(float(fields[2]), float(fields[3]))
-                    Spectra.guess_plus_minus_pos_teff = max(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_plus_minus_neg_teff = min(float(fields[2]), float(fields[3]))
+                    AbusingClasses.guess_plus_minus_pos_teff = max(float(fields[2]), float(fields[3]))
                 if field_name == "debug":
-                    Spectra.debug_mode = float(fields[2])
+                    AbusingClasses.debug_mode = float(fields[2])
                 if field_name == "experimental":
                     if fields[2].lower() == "true" or fields[2].lower() == "yes":
-                        Spectra.experimental = True
+                        AbusingClasses.experimental = True
                     else:
-                        Spectra.experimental = False
+                        AbusingClasses.experimental = False
             line = fp.readline()
 
-    print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
+    print(f"Fitting data at {spec_input_path} with resolution {AbusingClasses.resolution} and rotation {AbusingClasses.rotation}")
 
 
     # set directories
     if ts_compiler == "intel":
-        Spectra.turbospec_path = "../turbospectrum/exec/"
+        AbusingClasses.turbospec_path = "../turbospectrum/exec/"
     elif ts_compiler == "gnu":
-        Spectra.turbospec_path = "../turbospectrum/exec-gf/"
-    Spectra.interpol_path = interpol_path
-    line_list_path_trimmed = os.path.join(Spectra.global_temp_dir, f'linelist_for_fitting_trimmed_{output_folder_title_date}', "")
-    if Spectra.atmosphere_type == "1D":
-        Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_1D
-        Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    elif Spectra.atmosphere_type == "3D":
-        Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_3D
-        Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    Spectra.model_atom_path = model_atom_path
-    Spectra.departure_file_path = departure_file_path
-    Spectra.output_folder = f"{output_folder_og}{output_folder_title}/"
-    Spectra.spec_input_path = spec_input_path
+        AbusingClasses.turbospec_path = "../turbospectrum/exec-gf/"
+    AbusingClasses.interpol_path = interpol_path
+    line_list_path_trimmed = os.path.join(AbusingClasses.global_temp_dir, f'linelist_for_fitting_trimmed_{output_folder_title_date}', "")
+    if AbusingClasses.atmosphere_type == "1D":
+        AbusingClasses.model_atmosphere_grid_path = model_atmosphere_grid_path_1D
+        AbusingClasses.model_atmosphere_list = AbusingClasses.model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    elif AbusingClasses.atmosphere_type == "3D":
+        AbusingClasses.model_atmosphere_grid_path = model_atmosphere_grid_path_3D
+        AbusingClasses.model_atmosphere_list = AbusingClasses.model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    AbusingClasses.model_atom_path = model_atom_path
+    AbusingClasses.departure_file_path = departure_file_path
+    AbusingClasses.output_folder = f"{output_folder_og}{output_folder_title}/"
+    AbusingClasses.spec_input_path = spec_input_path
 
     # load NLTE data dicts
-    if Spectra.nlte_flag:
+    if AbusingClasses.nlte_flag:
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(elements_to_fit,
                                                                                                    depart_bin_file,
                                                                                                    depart_aux_file,
@@ -463,25 +468,25 @@ def run_nlte_corrections(config_file_name, output_folder_title):
               "the NLTE file locations. If Fe is not fitted, then it should be added last to the NLTE file location. "
               "Elements without NLTE binary files do not need them.")
 
-        Spectra.depart_bin_file_dict = depart_bin_file_dict
-        Spectra.depart_aux_file_dict = depart_aux_file_dict
-        Spectra.model_atom_file_dict = model_atom_file_dict
-        Spectra.aux_file_length_dict = {}
+        AbusingClasses.depart_bin_file_dict = depart_bin_file_dict
+        AbusingClasses.depart_aux_file_dict = depart_aux_file_dict
+        AbusingClasses.model_atom_file_dict = model_atom_file_dict
+        AbusingClasses.aux_file_length_dict = {}
 
         for element in model_atom_file_dict:
-            Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+            AbusingClasses.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
     #prevent overwriting
-    if os.path.exists(Spectra.output_folder):
+    if os.path.exists(AbusingClasses.output_folder):
         print("Error: output folder already exists. Run was stopped to prevent overwriting")
         return
 
-    Spectra.linemask_file = f"{linemask_file_og}{linemask_file}"
-    Spectra.segment_file = f"{segment_file_og}{segment_file}"
+    AbusingClasses.linemask_file = f"{linemask_file_og}{linemask_file}"
+    AbusingClasses.segment_file = f"{segment_file_og}{segment_file}"
 
-    print(f"Temporary directory name: {Spectra.global_temp_dir}")
-    create_dir(Spectra.global_temp_dir)
-    create_dir(Spectra.output_folder)
+    print(f"Temporary directory name: {AbusingClasses.global_temp_dir}")
+    create_dir(AbusingClasses.global_temp_dir)
+    create_dir(AbusingClasses.output_folder)
 
     fitlist = f"{fitlist_input_folder}{fitlist}"
 
@@ -493,47 +498,47 @@ def run_nlte_corrections(config_file_name, output_folder_title):
     specname_fitlist, teff_fitlist, logg_fitlist, met_fitlist, microturb_fitlist = fitlist_data[:, 0], fitlist_data[:, 1].astype(float), \
         fitlist_data[:, 2].astype(float), fitlist_data[:, 3].astype(float), fitlist_data[:, 4].astype(float)
 
-    line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2),
+    line_centers, line_begins, line_ends = np.loadtxt(AbusingClasses.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
 
     if line_centers.size > 1:
-        Spectra.line_begins_sorted = np.array(sorted(line_begins))
-        Spectra.line_ends_sorted = np.array(sorted(line_ends))
-        Spectra.line_centers_sorted = np.array(sorted(line_centers))
+        AbusingClasses.line_begins_sorted = np.array(sorted(line_begins))
+        AbusingClasses.line_ends_sorted = np.array(sorted(line_ends))
+        AbusingClasses.line_centers_sorted = np.array(sorted(line_centers))
     elif line_centers.size == 1:
-        Spectra.line_begins_sorted = np.array([line_begins])
-        Spectra.line_ends_sorted = np.array([line_ends])
-        Spectra.line_centers_sorted = np.array([line_centers])
+        AbusingClasses.line_begins_sorted = np.array([line_begins])
+        AbusingClasses.line_ends_sorted = np.array([line_ends])
+        AbusingClasses.line_centers_sorted = np.array([line_centers])
 
-    Spectra.seg_begins, Spectra.seg_ends = np.loadtxt(Spectra.segment_file, comments=";", usecols=(0, 1), unpack=True)
-    if Spectra.seg_begins.size == 1:
-        Spectra.seg_begins = np.array([Spectra.seg_begins])
-        Spectra.seg_ends = np.array([Spectra.seg_ends])
+    AbusingClasses.seg_begins, AbusingClasses.seg_ends = np.loadtxt(AbusingClasses.segment_file, comments=";", usecols=(0, 1), unpack=True)
+    if AbusingClasses.seg_begins.size == 1:
+        AbusingClasses.seg_begins = np.array([AbusingClasses.seg_begins])
+        AbusingClasses.seg_ends = np.array([AbusingClasses.seg_ends])
 
     # check inputs
 
     print("\n\nChecking inputs\n")
 
-    if np.size(Spectra.seg_begins) != np.size(Spectra.seg_ends):
+    if np.size(AbusingClasses.seg_begins) != np.size(AbusingClasses.seg_ends):
         print("Segment beginning and end are not the same length")
-    if np.size(Spectra.line_centers_sorted) != np.size(Spectra.line_begins_sorted) or np.size(
-            Spectra.line_centers_sorted) != np.size(Spectra.line_ends_sorted):
+    if np.size(AbusingClasses.line_centers_sorted) != np.size(AbusingClasses.line_begins_sorted) or np.size(
+            AbusingClasses.line_centers_sorted) != np.size(AbusingClasses.line_ends_sorted):
         print("Line center, beginning and end are not the same length")
     if ts_compiler not in ["intel", "gnu"]:
         print(f"Expected compiler intel or gnu, but got {ts_compiler} instead.")
-    if Spectra.nlte_flag:
-        for file in Spectra.depart_bin_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.departure_file_path, Spectra.depart_bin_file_dict[file])):
-                print(f"{Spectra.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
-        for file in Spectra.depart_aux_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.departure_file_path, Spectra.depart_aux_file_dict[file])):
-                print(f"{Spectra.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
-        for file in Spectra.model_atom_file_dict:
-            if not os.path.isfile(os.path.join(Spectra.model_atom_path, Spectra.model_atom_file_dict[file])):
-                print(f"{Spectra.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
+    if AbusingClasses.nlte_flag:
+        for file in AbusingClasses.depart_bin_file_dict:
+            if not os.path.isfile(os.path.join(AbusingClasses.departure_file_path, AbusingClasses.depart_bin_file_dict[file])):
+                print(f"{AbusingClasses.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
+        for file in AbusingClasses.depart_aux_file_dict:
+            if not os.path.isfile(os.path.join(AbusingClasses.departure_file_path, AbusingClasses.depart_aux_file_dict[file])):
+                print(f"{AbusingClasses.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
+        for file in AbusingClasses.model_atom_file_dict:
+            if not os.path.isfile(os.path.join(AbusingClasses.model_atom_path, AbusingClasses.model_atom_file_dict[file])):
+                print(f"{AbusingClasses.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
 
-    for line_start, line_end in zip(Spectra.line_begins_sorted, Spectra.line_ends_sorted):
-        index_location = np.where(np.logical_and(Spectra.seg_begins <= line_start, line_end <= Spectra.seg_ends))[0]
+    for line_start, line_end in zip(AbusingClasses.line_begins_sorted, AbusingClasses.line_ends_sorted):
+        index_location = np.where(np.logical_and(AbusingClasses.seg_begins <= line_start, line_end <= AbusingClasses.seg_ends))[0]
         if np.size(index_location) > 1:
             print(f"{line_start} {line_end} linemask has more than 1 segment!")
         if np.size(index_location) == 0:
@@ -543,20 +548,20 @@ def run_nlte_corrections(config_file_name, output_folder_title):
           "crashes.\n\n")
 
     print("Trimming")
-    cut_linelist(Spectra.seg_begins, Spectra.seg_ends, line_list_path, line_list_path_trimmed, elements_to_use)
+    cut_linelist(AbusingClasses.seg_begins, AbusingClasses.seg_ends, line_list_path, line_list_path_trimmed, elements_to_use)
     print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
-        Spectra.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
-    Spectra.model_temperatures = model_temperatures
-    Spectra.model_logs = model_logs
-    Spectra.model_mets = model_mets
-    Spectra.marcs_value_keys = marcs_value_keys
-    Spectra.marcs_models = marcs_models
-    Spectra.marcs_values = marcs_values
+        AbusingClasses.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+    AbusingClasses.model_temperatures = model_temperatures
+    AbusingClasses.model_logs = model_logs
+    AbusingClasses.model_mets = model_mets
+    AbusingClasses.marcs_value_keys = marcs_value_keys
+    AbusingClasses.marcs_models = marcs_models
+    AbusingClasses.marcs_values = marcs_values
 
     print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
-    client = Client(threads_per_worker=1, n_workers=Spectra.dask_workers)
+    client = Client(threads_per_worker=1, n_workers=AbusingClasses.dask_workers)
     print(client)
 
     host = client.run_on_scheduler(socket.gethostname)
@@ -571,9 +576,9 @@ def run_nlte_corrections(config_file_name, output_folder_title):
     futures = []
     for i in range(specname_fitlist.size):
         specname1, teff1, logg1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], met_fitlist[i], microturb_fitlist[i]
-        for j in range(len(Spectra.seg_begins)):
+        for j in range(len(AbusingClasses.seg_begins)):
             future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
-                                   Spectra.seg_begins, Spectra.seg_ends, Spectra.ldelta,
+                                   AbusingClasses.seg_begins, AbusingClasses.seg_ends, AbusingClasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), element_to_fit, abundance)
             futures.append(future)  # prepares to get values
 
