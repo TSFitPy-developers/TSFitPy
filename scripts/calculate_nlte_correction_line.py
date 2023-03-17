@@ -548,7 +548,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
           "crashes.\n\n")
 
     print("Trimming")
-    cut_linelist(AbusingClasses.seg_begins, AbusingClasses.seg_ends, line_list_path, line_list_path_trimmed, elements_to_use)
+    cut_linelist(AbusingClasses.line_begins_sorted, AbusingClasses.line_ends_sorted, line_list_path, line_list_path_trimmed, elements_to_use)
     print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
@@ -578,7 +578,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
         specname1, teff1, logg1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], met_fitlist[i], microturb_fitlist[i]
         for j in range(len(AbusingClasses.seg_begins)):
             future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
-                                   AbusingClasses.seg_begins, AbusingClasses.seg_ends, AbusingClasses.ldelta,
+                                   AbusingClasses.seg_begins[j], AbusingClasses.seg_ends[j], AbusingClasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), element_to_fit, abundance)
             futures.append(future)  # prepares to get values
 
