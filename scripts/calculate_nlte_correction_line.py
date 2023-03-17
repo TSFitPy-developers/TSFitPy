@@ -206,7 +206,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     return [specname, ew_lte, ew_nlte, nlte_correction]
 
 
-def run_nlte_corrections(config_file_name):
+def run_nlte_corrections(config_file_name, output_folder_title):
     depart_bin_file = []
     depart_aux_file = []
     model_atom_file = []
@@ -604,4 +604,4 @@ if __name__ == '__main__':
 
     login_node_address = "gemini-login.mpia.de"
 
-    run_nlte_corrections(config_location)
+    run_nlte_corrections(config_location, output_folder_title_date)
