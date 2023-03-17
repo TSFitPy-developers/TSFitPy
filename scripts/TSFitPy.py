@@ -303,7 +303,8 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
     study.optimize(objective, n_trials=50)
 
     res = Result()
-    res.x = study.best_params
+    #res.x = study.best_params
+    res.x = [study.best_params[key] for key in study.best_params.keys()]
     res.fun = study.best_value
 
     #res.x = [param1 best guess, param2 best guess etc]
