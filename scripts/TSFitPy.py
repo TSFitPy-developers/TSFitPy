@@ -291,7 +291,7 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
     def suggest_float(trial, name, bounds, initial):
         if len(initial) == 1:
             lower, upper = bounds[0]
-            return trial.suggest_float(name + '_0', lower, upper)
+            return [trial.suggest_float(name + '_0', lower, upper)]
         else:
             return [trial.suggest_float(f"{name}_{i}", bounds[i][0], bounds[i][1]) for i in range(len(initial))]
 
