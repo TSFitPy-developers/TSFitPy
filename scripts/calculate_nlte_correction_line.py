@@ -145,7 +145,7 @@ class AbusingClasses:
     def __init__(self):
         pass
 
-def generate_lte_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
+def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
     #parameters to adjust
 
     teff = teff
@@ -193,21 +193,21 @@ def generate_lte_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_lis
     return wave_mod_orig, flux_norm_mod_orig
 
 def get_nlte_ew(abundance, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
-    wavelength_nlte, norm_flux_nlte = generate_lte_atmosphere(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, True)
+    wavelength_nlte, norm_flux_nlte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta, line_list_path, element, abundance, True)
     nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin, lmax)
     return np.square(nlte_ew - lte_ew)
 
-def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance):
-    wavelength_lte, norm_flux_lte = generate_lte_atmosphere(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, False)
-    ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin, lmax)
+def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, line_center):
+    wavelength_lte, norm_flux_lte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta, line_list_path, element, abundance, False)
+    ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3)
     result = minimize(get_nlte_ew, abundance,
                       args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                       bounds=[(abundance - 3, abundance + 3)], method="L-BFGS-B", options={'disp': False})
 
     nlte_correction = result.x
-    ew_nlte = result.fun
+    ew_nlte = np.sqrt(result.fun) + ew_lte
 
-    return [specname, ew_lte, ew_nlte, nlte_correction]
+    return [specname, line_center, ew_lte, ew_nlte, nlte_correction]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title):
@@ -576,10 +576,10 @@ def run_nlte_corrections(config_file_name, output_folder_title):
     futures = []
     for i in range(specname_fitlist.size):
         specname1, teff1, logg1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], met_fitlist[i], microturb_fitlist[i]
-        for j in range(len(AbusingClasses.seg_begins)):
+        for j in range(len(AbusingClasses.line_begins_sorted)):
             future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
-                                   AbusingClasses.seg_begins[j], AbusingClasses.seg_ends[j], AbusingClasses.ldelta,
-                                   os.path.join(line_list_path_trimmed, str(j), ''), element_to_fit, abundance)
+                                   AbusingClasses.line_begins_sorted[j], AbusingClasses.line_ends_sorted[j], AbusingClasses.ldelta,
+                                   os.path.join(line_list_path_trimmed, str(j), ''), element_to_fit, abundance, AbusingClasses.line_centers_sorted[j])
             futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
