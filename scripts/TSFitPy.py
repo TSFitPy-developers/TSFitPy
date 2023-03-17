@@ -1,6 +1,5 @@
 from __future__ import annotations
 import numpy as np
-import optuna as optuna
 from optuna.pruners import MedianPruner
 from scipy import integrate
 from scipy.interpolate import interp1d
@@ -29,10 +28,7 @@ import collections
 import scipy
 from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
-import logging
 
-# Set the logging level to ERROR to suppress INFO messages
-logging.getLogger("optuna").setLevel(logging.ERROR)
 
 
 def create_dir(directory: str):
@@ -265,18 +261,22 @@ def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray,
     return total_area - area_under_line[0]
 
 class Result:
+    # because other fitting algorithms call result differently
     def __init__(self):
-        self.fun = None
-        self.x = None
+        # res.x: list = [param1 best guess, param2 best guess etc]
+        # res.fun: float = function value (chi squared) after the fit
+        self.fun: float = None
+        self.x: list = None
 
 def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
+    #res.x: list = [param1 best guess, param2 best guess etc]
+    #res.fun: float = function value (chi squared) after the fit
 
-    #if False:
-        # using Scipy. Nelder-Mead or L-BFGS- algorithm
-    #    res = minimize(function_to_minimize, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
+    # using Scipy. Nelder-Mead or L-BFGS- algorithm
+    res = minimize(function_to_minimize, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
 
     """
-    cma: might work for high dimensions, doesn't work for 1D easily.
+    cma: might work for high dimensions, doesn't work for 1D easily. so the implementation below doesn't work at all
     if input_param_guess.ndim > 1:
         parameter_guess = np.median(input_param_guess, axis=0)
         sigma = (np.max(input_param_guess, axis=0) - np.min(input_param_guess, axis=0)) / 3
@@ -286,6 +286,15 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
     result = cma.fmin(function_to_minimize, parameter_guess, sigma, args=function_arguments, options={'bounds': bounds})
     res.x = result.xbest
     res.fun = result.funbest"""
+
+    """
+    NS: Wasted 3 hours testing. Optuna works OK, but results vary up to 0.1 dex. Maybe more trials are needed. 
+    OR just dont use it lol.
+    Everything below works
+    import logging
+
+    # Set the logging level to ERROR to suppress INFO messages
+    logging.getLogger("optuna").setLevel(logging.ERROR)
 
     if input_param_guess.ndim > 1:
         parameter_guess = np.median(input_param_guess, axis=0)
@@ -312,12 +321,9 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
     study.optimize(objective, n_trials=50, callbacks=[silent_callback])
 
     res = Result()
-    #res.x = study.best_params
     res.x = [study.best_params[key] for key in study.best_params.keys()]
-    res.fun = study.best_value
+    res.fun = study.best_value"""
 
-    #res.x = [param1 best guess, param2 best guess etc]
-    #res.fun = function value (chi squared) after the fit
     return res
 
 

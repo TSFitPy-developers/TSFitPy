@@ -7,6 +7,18 @@ import turbospectrum_class_nlte
 class MyTestCase(unittest.TestCase):
     # TODO: more unittests?
 
+    def test_get_simplex_guess(self):
+        for i in range(1000):
+            initial_guess, bounds = TSFitPy.Spectra.get_simplex_guess(1, -10, 10, -5, 5)
+            self.assertTupleEqual((-5, 5), bounds)
+            self.assertLess(initial_guess[1], bounds[1])
+            self.assertGreater(initial_guess[0], bounds[0])
+        for i in range(1000):
+            initial_guess, bounds = TSFitPy.Spectra.get_simplex_guess(1, -3, 3, -5, 5)
+            self.assertTupleEqual((-5, 5), bounds)
+            self.assertLess(initial_guess[1], 3)
+            self.assertGreater(initial_guess[0], -3)
+
     def test_calculate_vturb(self):
         self.assertAlmostEqual(TSFitPy.calculate_vturb(5777, 4.44, 0.0), 1.0, delta=0.1)
     def test_chi_square_lbl(self):
