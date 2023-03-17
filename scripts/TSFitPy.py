@@ -1,6 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import optuna as optuna
+from optuna.pruners import MedianPruner
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
@@ -28,6 +29,10 @@ import collections
 import scipy
 from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
+import logging
+
+# Set the logging level to ERROR to suppress INFO messages
+logging.getLogger("optuna").setLevel(logging.ERROR)
 
 
 def create_dir(directory: str):
@@ -301,7 +306,9 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
     def silent_callback(study, trial):
         pass
 
-    study = optuna.create_study()
+    pruner = MedianPruner(n_startup_trials=10, n_warmup_steps=20, interval_steps=1)
+
+    study = optuna.create_study(direction="minimize", pruner=pruner)
     study.optimize(objective, n_trials=50, callbacks=[silent_callback])
 
     res = Result()
