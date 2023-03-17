@@ -490,8 +490,8 @@ def run_nlte_corrections(config_file_name, output_folder_title):
     if fitlist_data.ndim == 1:
         fitlist_data = np.array([fitlist_data])
 
-    specname_fitlist, teff_fitlist, logg_fitlist, met_fitlist, microturb_fitlist = fitlist_data[:, 0], fitlist_data[:, 1], \
-        fitlist_data[:, 2], fitlist_data[:, 3], fitlist_data[:, 4]
+    specname_fitlist, teff_fitlist, logg_fitlist, met_fitlist, microturb_fitlist = fitlist_data[:, 0], fitlist_data[:, 1].astype(float), \
+        fitlist_data[:, 2].astype(float), fitlist_data[:, 3].astype(float), fitlist_data[:, 4].astype(float)
 
     line_centers, line_begins, line_ends = np.loadtxt(Spectra.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
