@@ -28,7 +28,14 @@ import collections
 import scipy
 from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
-import cma
+import logging
+import sys
+
+logging.basicConfig(
+    stream=sys.stdout,
+    level=logging.WARNING,  # Set the logging level to WARNING or ERROR to avoid printing trial information
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
 
 
 def create_dir(directory: str):
