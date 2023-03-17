@@ -574,7 +574,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
         for j in range(len(Spectra.seg_begins)):
             future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
                                    Spectra.seg_begins, Spectra.seg_ends, Spectra.ldelta,
-                                   os.path.join(line_list_path_trimmed, j, ''), element_to_fit, abundance)
+                                   os.path.join(line_list_path_trimmed, str(j), ''), element_to_fit, abundance)
             futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
