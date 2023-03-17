@@ -28,14 +28,6 @@ import collections
 import scipy
 from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
-import logging
-import sys
-
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.WARNING,  # Set the logging level to WARNING or ERROR to avoid printing trial information
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
 
 
 def create_dir(directory: str):
@@ -306,8 +298,11 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
         x = suggest_float(trial, "x", bounds, parameter_guess)
         return function_to_minimize(x, *function_arguments)
 
+    def silent_callback(study, trial):
+        pass
+
     study = optuna.create_study()
-    study.optimize(objective, n_trials=50)
+    study.optimize(objective, n_trials=50, callbacks=[silent_callback])
 
     res = Result()
     #res.x = study.best_params
