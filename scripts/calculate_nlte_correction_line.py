@@ -51,31 +51,30 @@ def cut_linelist(seg_begins: list[float], seg_ends: list[float], line_list_file:
                             line_list_number)
                 all_lines_to_write: dict = {}
             element_name = f"{fields[0]}{fields[1]}"
+            if len(fields[0]) > 1:		# save the first two lines of an element for the future
+                elem_line_1_to_save: str = f"{fields[0]} {fields[1]}  {fields[2]}"  # first line of the element
+                number_of_lines_element: int = int(fields[3])
+            else:
+                elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
+                number_of_lines_element: int = int(fields[4])
+            line_number_read_file += 1
+            line: str = lines_file[line_number_read_file]
+            elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
+
+            # now we are reading the element's wavelength and stuff
+            line_number_read_file += 1
+            # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
+
+            # to not redo strip/split every time, save wavelength for the future here
+            element_wavelength_dictionary = {}
+
+            # wavelength minimum and maximum for the element (assume sorted)
+            wavelength_minimum_element: float = float(lines_file[line_number_read_file].strip().split()[0])
+            wavelength_maximum_element: float = float(lines_file[number_of_lines_element+line_number_read_file - 1].strip().split()[0])
+
+            element_wavelength_dictionary[0] = wavelength_minimum_element
+            element_wavelength_dictionary[number_of_lines_element - 1] = wavelength_maximum_element
             if element_name.replace("'", "") in elements_to_use:
-                if len(fields[0]) > 1:		# save the first two lines of an element for the future
-                    elem_line_1_to_save: str = f"{fields[0]} {fields[1]}  {fields[2]}"  # first line of the element
-                    number_of_lines_element: int = int(fields[3])
-                else:
-                    elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
-                    number_of_lines_element: int = int(fields[4])
-                line_number_read_file += 1
-                line: str = lines_file[line_number_read_file]
-                elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
-
-                # now we are reading the element's wavelength and stuff
-                line_number_read_file += 1
-                # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
-
-                # to not redo strip/split every time, save wavelength for the future here
-                element_wavelength_dictionary = {}
-
-                # wavelength minimum and maximum for the element (assume sorted)
-                wavelength_minimum_element: float = float(lines_file[line_number_read_file].strip().split()[0])
-                wavelength_maximum_element: float = float(lines_file[number_of_lines_element+line_number_read_file - 1].strip().split()[0])
-
-                element_wavelength_dictionary[0] = wavelength_minimum_element
-                element_wavelength_dictionary[number_of_lines_element - 1] = wavelength_maximum_element
-
                 # check that ANY wavelengths are within the range at all
                 if not (wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
                     for seg_index, (seg_begin, seg_end) in enumerate(zip(segment_to_use_begins, segment_to_use_ends)):  # wavelength lines write here
@@ -588,8 +587,8 @@ def run_nlte_corrections(config_file_name, output_folder_title):
 
 
 if __name__ == '__main__':
-    elements_to_use: list[str] = [""]
-    element_to_fit: str = ""
+    elements_to_use: list[str] = ["39.000"]
+    element_to_fit: str = "Y"
     abundance: float = 0.0  # abundance of element in LTE; scaled with metallicity
 
     if len(argv) > 1:   # when calling the program, can now add extra argument with location of config file, easier to call
