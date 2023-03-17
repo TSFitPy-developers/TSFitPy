@@ -1174,7 +1174,8 @@ class TurboSpectrum:
                 # print('spud')
                 print(atmosphere_properties['errors'])
                 return atmosphere_properties
-
+        else:
+            print("Unexpected error?")
         self.atmosphere_properties = atmosphere_properties
         # print(self.atmosphere_properties)
 
