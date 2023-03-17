@@ -297,7 +297,7 @@ def minimize_abundance_function(function_to_minimize, input_param_guess: np.ndar
 
     def objective(trial):
         x = suggest_float(trial, "x", bounds, parameter_guess)
-        return function_to_minimize(x)
+        return function_to_minimize(x, *function_arguments)
 
     study = optuna.create_study()
     study.optimize(objective, n_trials=50)
