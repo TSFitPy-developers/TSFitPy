@@ -205,7 +205,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
     result = minimize(get_nlte_ew, [abundance - 0.5],
                       args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
-                      bounds=[(abundance - 3, abundance + 3)], method="L-BFGS-B", options={'maxiter': 100, 'disp': False, 'ftol': 1e-9, 'gtol': 1e-6, 'eps': 1e-8})
+                      bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead", options={'maxiter': 100, 'disp': False, 'fatol': 1e-9, 'xatol': 1e-6}) # 'eps': 1e-8
 
     nlte_correction = result.x[0]
     ew_nlte = np.sqrt(result.fun) + ew_lte
