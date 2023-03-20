@@ -67,61 +67,61 @@ def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: 
                 line: str = lines_file[line_number_read_file]
                 fields: list[str] = line.strip().split()
 
-            # it means this is an element
-            if all_lines_to_write:  # if there was an element before with segments, then write them first
-                write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
-                            line_list_number)
-                all_lines_to_write: dict = {}
-            element_name = f"{fields[0]}{fields[1]}"
-            if len(fields[0]) > 1:  # save the first two lines of an element for the future
-                elem_line_1_to_save: str = f"{fields[0]} {fields[1]}  {fields[2]}"  # first line of the element
-                number_of_lines_element: int = int(fields[3])
-            else:
-                elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
-                number_of_lines_element: int = int(fields[4])
-            line_number_read_file += 1
-            line: str = lines_file[line_number_read_file]
-            elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
+                # it means this is an element
+                if all_lines_to_write:  # if there was an element before with segments, then write them first
+                    write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
+                                line_list_number)
+                    all_lines_to_write: dict = {}
+                element_name = f"{fields[0]}{fields[1]}"
+                if len(fields[0]) > 1:  # save the first two lines of an element for the future
+                    elem_line_1_to_save: str = f"{fields[0]} {fields[1]}  {fields[2]}"  # first line of the element
+                    number_of_lines_element: int = int(fields[3])
+                else:
+                    elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
+                    number_of_lines_element: int = int(fields[4])
+                line_number_read_file += 1
+                line: str = lines_file[line_number_read_file]
+                elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
 
-            # now we are reading the element's wavelength and stuff
-            line_number_read_file += 1
-            # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
+                # now we are reading the element's wavelength and stuff
+                line_number_read_file += 1
+                # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
 
-            # to not redo strip/split every time, save wavelength for the future here
-            element_wavelength_dictionary = {}
+                # to not redo strip/split every time, save wavelength for the future here
+                element_wavelength_dictionary = {}
 
-            # wavelength minimum and maximum for the element (assume sorted)
-            wavelength_minimum_element: float = float(lines_file[line_number_read_file].strip().split()[0])
-            wavelength_maximum_element: float = float(
-                lines_file[number_of_lines_element + line_number_read_file - 1].strip().split()[0])
+                # wavelength minimum and maximum for the element (assume sorted)
+                wavelength_minimum_element: float = float(lines_file[line_number_read_file].strip().split()[0])
+                wavelength_maximum_element: float = float(
+                    lines_file[number_of_lines_element + line_number_read_file - 1].strip().split()[0])
 
-            element_wavelength_dictionary[0] = wavelength_minimum_element
-            element_wavelength_dictionary[number_of_lines_element - 1] = wavelength_maximum_element
-            if elem_line_2_to_save.strip().replace("'", "").replace("NLTE", "").replace("LTE", "").replace("I", "").replace(" ", "") in elements_to_use:
-                # check that ANY wavelengths are within the range at all
-                if not (wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
-                    for seg_index, (seg_begin, seg_end) in enumerate(
-                            zip(segment_to_use_begins, segment_to_use_ends)):  # wavelength lines write here
-                        index_seg_start, element_wavelength_dictionary = binary_search_lower_bound(
-                            lines_file[line_number_read_file:number_of_lines_element + line_number_read_file],
-                            element_wavelength_dictionary, 0, number_of_lines_element - 1, seg_begin)
-                        wavelength_current_line: float = element_wavelength_dictionary[index_seg_start]
-                        line_stripped: str = lines_file[line_number_read_file + index_seg_start].strip()
-                        line_number_read_for_element: int = index_seg_start + line_number_read_file
-                        while wavelength_current_line <= seg_end and line_number_read_for_element < number_of_lines_element + line_number_read_file:
-                            seg_current_index = seg_index
-                            if seg_current_index not in all_lines_to_write:
-                                all_lines_to_write[seg_current_index] = [f"{line_stripped} \n"]
-                            else:
-                                all_lines_to_write[seg_current_index].append(f"{line_stripped} \n")
-                            line_number_read_for_element += 1
-                            try:
-                                line_stripped: str = lines_file[line_number_read_for_element].strip()
-                                wavelength_current_line: float = float(line_stripped.split()[0])
-                            except (ValueError, IndexError):
-                                pass
+                element_wavelength_dictionary[0] = wavelength_minimum_element
+                element_wavelength_dictionary[number_of_lines_element - 1] = wavelength_maximum_element
+                if elem_line_2_to_save.strip().replace("'", "").replace("NLTE", "").replace("LTE", "").replace("I", "").replace(" ", "") in elements_to_use:
+                    # check that ANY wavelengths are within the range at all
+                    if not (wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
+                        for seg_index, (seg_begin, seg_end) in enumerate(
+                                zip(segment_to_use_begins, segment_to_use_ends)):  # wavelength lines write here
+                            index_seg_start, element_wavelength_dictionary = binary_search_lower_bound(
+                                lines_file[line_number_read_file:number_of_lines_element + line_number_read_file],
+                                element_wavelength_dictionary, 0, number_of_lines_element - 1, seg_begin)
+                            wavelength_current_line: float = element_wavelength_dictionary[index_seg_start]
+                            line_stripped: str = lines_file[line_number_read_file + index_seg_start].strip()
+                            line_number_read_for_element: int = index_seg_start + line_number_read_file
+                            while wavelength_current_line <= seg_end and line_number_read_for_element < number_of_lines_element + line_number_read_file:
+                                seg_current_index = seg_index
+                                if seg_current_index not in all_lines_to_write:
+                                    all_lines_to_write[seg_current_index] = [f"{line_stripped} \n"]
+                                else:
+                                    all_lines_to_write[seg_current_index].append(f"{line_stripped} \n")
+                                line_number_read_for_element += 1
+                                try:
+                                    line_stripped: str = lines_file[line_number_read_for_element].strip()
+                                    wavelength_current_line: float = float(line_stripped.split()[0])
+                                except (ValueError, IndexError):
+                                    pass
 
-            line_number_read_file: int = number_of_lines_element + line_number_read_file
+                line_number_read_file: int = number_of_lines_element + line_number_read_file
 
         if len(all_lines_to_write) > 0:
             write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
