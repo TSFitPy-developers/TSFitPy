@@ -1,6 +1,5 @@
 from __future__ import annotations
 import numpy as np
-from optuna.pruners import MedianPruner
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
