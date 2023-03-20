@@ -74,7 +74,7 @@ def cut_linelist(seg_begins: list[float], seg_ends: list[float], line_list_file:
 
             element_wavelength_dictionary[0] = wavelength_minimum_element
             element_wavelength_dictionary[number_of_lines_element - 1] = wavelength_maximum_element
-            if element_name.replace("'", "") in elements_to_use:
+            if elem_line_2_to_save.strip().replace("'", "").replace("NLTE", "").replace("LTE", "").replace("I", "").replace(" ", "") in elements_to_use:
                 # check that ANY wavelengths are within the range at all
                 if not (wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
                     for seg_index, (seg_begin, seg_end) in enumerate(zip(segment_to_use_begins, segment_to_use_ends)):  # wavelength lines write here
@@ -551,7 +551,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
           "crashes.\n\n")
 
     print("Trimming")
-    cut_linelist(AbusingClasses.line_begins_sorted, AbusingClasses.line_ends_sorted, line_list_path, line_list_path_trimmed, elements_to_use)
+    cut_linelist(AbusingClasses.line_begins_sorted, AbusingClasses.line_ends_sorted, line_list_path, line_list_path_trimmed, AbusingClasses.elem_to_fit[0])
     print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
@@ -582,7 +582,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
         for j in range(len(AbusingClasses.line_begins_sorted)):
             future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
                                    AbusingClasses.line_begins_sorted[j], AbusingClasses.line_ends_sorted[j], AbusingClasses.ldelta,
-                                   os.path.join(line_list_path_trimmed, str(j), ''), element_to_fit, abundance, AbusingClasses.line_centers_sorted[j])
+                                   os.path.join(line_list_path_trimmed, str(j), ''), AbusingClasses.elem_to_fit[0], abundance, AbusingClasses.line_centers_sorted[j])
             futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -595,8 +595,8 @@ def run_nlte_corrections(config_file_name, output_folder_title):
 
 
 if __name__ == '__main__':
-    elements_to_use: list[str] = ["39.000"]
-    element_to_fit: str = "Y"
+    #elements_to_use: list[str] = ["39.000"]
+    #element_to_fit: str = "Y"
     abundance: float = 0.0  # abundance of element in LTE; scaled with metallicity
 
     if len(argv) > 1:   # when calling the program, can now add extra argument with location of config file, easier to call
