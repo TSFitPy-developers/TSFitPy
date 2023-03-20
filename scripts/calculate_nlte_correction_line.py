@@ -11,7 +11,7 @@ from sys import argv
 from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize
-
+from create_window_linelist_function import binary_search_lower_bound, write_lines
 from TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width
 from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
@@ -126,49 +126,6 @@ def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: 
         if len(all_lines_to_write) > 0:
             write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
                         line_list_number)
-
-
-def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int,
-                              element_to_search: float) -> tuple[int, dict]:
-    """
-    Gives out the lower index where the value is located between the ranges. For example, given array [12, 20, 32, 40, 52]
-    Value search: 5, result: 0
-    Value search: 13, result: 1
-    Value search: 20, result: 1
-    Value search: 21, result: 2
-    Value search: 51 or 52 or 53, result: 4
-    :param array_to_search:
-    :param dict_array_values:
-    :param low:
-    :param high:
-    :param element_to_search:
-    :return:
-    """
-    while low < high:
-        middle: int = low + (high - low) // 2
-
-        if middle not in dict_array_values:
-            dict_array_values[middle] = float(array_to_search[middle].strip().split()[0])
-        array_element_value: float = dict_array_values[middle]
-
-        if array_element_value < element_to_search:
-            low: int = middle + 1
-        else:
-            high: int = middle
-    return low, dict_array_values
-
-
-def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, elem_line_2_to_save: str,
-                new_path_name: str, line_list_number: float):
-    for key in all_lines_to_write:
-        new_linelist_name: str = os.path.join(f"{new_path_name}", f"{key}", f"linelist-{line_list_number}.bsyn")
-        with open(new_linelist_name, "a") as new_file_to_write:
-            new_file_to_write.write(f"{elem_line_1_to_save}	{len(all_lines_to_write[key])}\n")
-            new_file_to_write.write(f"{elem_line_2_to_save}")
-            for line_to_write in all_lines_to_write[key]:
-                # pass
-                new_file_to_write.write(line_to_write)
-
 
 class AbusingClasses:
 
