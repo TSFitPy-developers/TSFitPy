@@ -108,7 +108,7 @@ def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: 
                             wavelength_current_line: float = element_wavelength_dictionary[index_seg_start]
                             line_stripped: str = lines_file[line_number_read_file + index_seg_start].strip()
                             line_number_read_for_element: int = index_seg_start + line_number_read_file
-                            while wavelength_current_line <= seg_end and line_number_read_for_element < number_of_lines_element + line_number_read_file:
+                            while wavelength_current_line <= seg_end and line_number_read_for_element < number_of_lines_element + line_number_read_file and wavelength_current_line >= seg_begin:
                                 seg_current_index = seg_index
                                 if seg_current_index not in all_lines_to_write:
                                     all_lines_to_write[seg_current_index] = [f"{line_stripped} \n"]
