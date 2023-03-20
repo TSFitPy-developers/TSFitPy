@@ -199,7 +199,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     wavelength_lte, norm_flux_lte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                         line_list_path, element, abundance, False)
     ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
-    result = minimize(get_nlte_ew, [abundance],
+    result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
                       args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                       bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
                       options={'maxiter': 100, 'disp': False, 'fatol': 1e-9, 'xatol': 1e-6})  # 'eps': 1e-8
