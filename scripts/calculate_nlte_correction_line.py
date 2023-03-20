@@ -210,7 +210,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     nlte_correction = result.x[0]
     ew_nlte = np.sqrt(result.fun) + ew_lte
 
-    return [specname, line_center, ew_lte, ew_nlte, nlte_correction]
+    return [specname, line_center, ew_lte, ew_nlte, np.abs(ew_nlte - ew_lte), nlte_correction]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title):
@@ -592,6 +592,28 @@ def run_nlte_corrections(config_file_name, output_folder_title):
 
     for result in results:
         print(result)
+
+    #shutil.rmtree(AbusingClasses.global_temp_dir)  # clean up temp directory
+    #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+
+    output = os.path.join(AbusingClasses.output_folder, output)
+
+    f = open(output, 'a')
+    # specname, line_center, ew_lte, ew_nlte, nlte_correction
+    output_columns = "#specname\twave_center\tew_lte\tew_nlte\tew_diff\tnlte_correction"
+    print(output_columns, file=f)
+
+    results = np.array(results)
+
+    if np.ndim(results) == 1:
+        for i in range(np.size(results)):
+            print(results[i], file=f)
+    else:
+        for i in range(int(np.size(results) / np.size(results[0]))):
+            for j in range(np.size(results[0])):
+                print(results[i][j], file=f)
+
+    f.close()
 
 
 if __name__ == '__main__':
