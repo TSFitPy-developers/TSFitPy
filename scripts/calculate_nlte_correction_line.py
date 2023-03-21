@@ -200,6 +200,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     wavelength_lte, norm_flux_lte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                         line_list_path, element, abundance, False)
     ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
+    print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center}")
     result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
                       args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                       bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
@@ -208,7 +209,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     nlte_correction = result.x[0]
     ew_nlte = np.sqrt(result.fun) + ew_lte
 
-    return [f"{specname}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction}"]
+    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction}"]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title):
@@ -615,7 +616,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
 
     f = open(output, 'a')
     # specname, line_center, ew_lte, ew_nlte, nlte_correction
-    output_columns = "#specname\twave_center\tew_lte\tew_nlte\tew_diff\tnlte_correction"
+    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tew_nlte\tew_diff\tnlte_correction"
     print(output_columns, file=f)
 
     results = np.array(results)
