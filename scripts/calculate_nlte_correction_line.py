@@ -177,8 +177,8 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
     ts.run_turbospectrum_and_atmosphere()
     # ts.run_turbospectrum()
 
-    wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
-                                                                  usecols=(0, 1, 2), unpack=True)
+    wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
+                                                                  usecols=(0, 1), unpack=True)
 
     shutil.rmtree(temp_directory)
 
