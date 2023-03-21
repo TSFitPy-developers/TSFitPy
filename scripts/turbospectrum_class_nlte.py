@@ -1284,7 +1284,7 @@ class TurboSpectrum:
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 6)
         for i in range(1, len(periodic_table)):
-            individual_abundances += "{:d}  {:.6f}\n".format(i, item_abund[periodic_table[i]])
+            individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
         # print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
