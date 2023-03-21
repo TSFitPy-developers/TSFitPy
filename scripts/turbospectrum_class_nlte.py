@@ -1279,10 +1279,10 @@ class TurboSpectrum:
         item_abund[periodic_table[2]] = float(
             solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
         for i in range(3, len(periodic_table)):
-            item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 6)
+            item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 2)
         if self.free_abundances is not None:
             for element, abundance in self.free_abundances.items():
-                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 6)
+                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 2)
         for i in range(1, len(periodic_table)):
             individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
         # print(individual_abundances)
