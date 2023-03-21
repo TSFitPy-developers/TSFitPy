@@ -191,7 +191,7 @@ def get_nlte_ew(param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list
                                                           line_list_path, element, abundance, True)
     nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin, lmax) * 1000
     diff = np.square((nlte_ew - lte_ew))
-    print(abundance, diff)
+    print(f"NLTE abund={abundance} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
     return diff
 
 
@@ -200,7 +200,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     wavelength_lte, norm_flux_lte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                         line_list_path, element, abundance, False)
     ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
-    print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center}")
+    print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
     result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
                       args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                       bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
