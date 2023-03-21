@@ -1269,22 +1269,22 @@ class TurboSpectrum:
         # Updated abundances to below to allow user to set solar abundances through solar_abundances.py and not have to adjust make_abund.f
 
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
-        if self.free_abundances is None:
+        """if self.free_abundances is None:
             for i in range(1, len(periodic_table)):
-                individual_abundances += "{:d}  {:.2f}\n".format(i, float(
+                individual_abundances += "{:d}  {:.10f}\n".format(i, float(
                     solar_abundances[periodic_table[i]]) + self.metallicity)
-        else:
-            item_abund = {}
-            item_abund['H'] = 12.00
-            item_abund[periodic_table[2]] = float(
-                solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
-            for i in range(3, len(periodic_table)):
-                item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(
-                    float(self.metallicity), 2)
+        else:"""
+        item_abund = {}
+        item_abund['H'] = 12.00
+        item_abund[periodic_table[2]] = float(
+            solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+        for i in range(3, len(periodic_table)):
+            item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 10)
+        if self.free_abundances is not None:
             for element, abundance in self.free_abundances.items():
-                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 2)
-            for i in range(1, len(periodic_table)):
-                individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
+                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 10)
+        for i in range(1, len(periodic_table)):
+            individual_abundances += "{:d}  {:.10f}\n".format(i, item_abund[periodic_table[i]])
         # print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
