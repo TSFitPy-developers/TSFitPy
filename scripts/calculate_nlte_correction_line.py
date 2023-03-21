@@ -208,7 +208,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
 
     nlte_correction = result.x[0]
     ew_nlte = np.sqrt(result.fun) + ew_lte
-
+    print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte} EW_nlte={ew_nlte} EW_diff={result.fun}")
     return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction}"]
 
 
