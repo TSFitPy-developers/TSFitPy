@@ -797,8 +797,8 @@ class TurboSpectrum:
                     interpol_config += "{}\n".format(self.t_eff)
                     interpol_config += "{}\n".format(self.log_g)
                     interpol_config += "{:.2f}\n".format(round(float(self.metallicity), 2))
-                    interpol_config += "{:.2f}\n".format(
-                        round(float(self.free_abundances[element]), 2) + float(solar_abundances[element]))
+                    interpol_config += "{:.6f}\n".format(
+                        round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
                     interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
                     interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
                     interpol_config += "'{}'\n".format(model_test)
@@ -906,8 +906,8 @@ class TurboSpectrum:
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
             interpol_config += "{:.2f}\n".format(round(float(self.metallicity), 2))
-            interpol_config += "{:.2f}\n".format(
-                round(float(self.free_abundances[element]), 2) + float(solar_abundances[element]))
+            interpol_config += "{:.6f}\n".format(
+                round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
             interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
             interpol_config += "'{}'\n".format(model_test)
@@ -1282,9 +1282,9 @@ class TurboSpectrum:
             item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 2)
         if self.free_abundances is not None:
             for element, abundance in self.free_abundances.items():
-                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 2)
+                item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 6)
         for i in range(1, len(periodic_table)):
-            individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
+            individual_abundances += "{:d}  {:.6f}\n".format(i, item_abund[periodic_table[i]])
         # print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
