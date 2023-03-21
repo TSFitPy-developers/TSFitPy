@@ -189,7 +189,7 @@ def get_nlte_ew(param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list
     abundance = param[0]
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                           line_list_path, element, abundance, True)
-    nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin, lmax) * 1000
+    nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
     diff = np.square((nlte_ew - lte_ew))
     print(f"NLTE abund={abundance} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
     return diff
@@ -595,7 +595,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
             i], microturb_fitlist[i]
         for j in range(len(AbusingClasses.line_begins_sorted)):
             future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
-                                   AbusingClasses.line_begins_sorted[j], AbusingClasses.line_ends_sorted[j],
+                                   AbusingClasses.line_begins_sorted[j] - 2, AbusingClasses.line_ends_sorted[j] + 2,
                                    AbusingClasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), AbusingClasses.elem_to_fit[0],
                                    abundance, AbusingClasses.line_centers_sorted[j])
@@ -635,7 +635,7 @@ def run_nlte_corrections(config_file_name, output_folder_title):
 if __name__ == '__main__':
     # elements_to_use: list[str] = ["39.000"]
     # element_to_fit: str = "Y"
-    abundance: float = 0.0  # abundance of element in LTE; scaled with metallicity
+    abundance: float = 0.0  # abundance of element in LTE [X/Fe]; scaled with metallicity
 
     if len(argv) > 1:  # when calling the program, can now add extra argument with location of config file, easier to call
         config_location = argv[1]
