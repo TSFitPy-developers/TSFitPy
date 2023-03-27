@@ -796,7 +796,7 @@ class TurboSpectrum:
                     interpol_config += "{}\n".format(self.aux_file_length_dict[element])
                     interpol_config += "{}\n".format(self.t_eff)
                     interpol_config += "{}\n".format(self.log_g)
-                    interpol_config += "{:.2f}\n".format(round(float(self.metallicity), 2))
+                    interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
                     interpol_config += "{:.6f}\n".format(
                         round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
                     interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
@@ -905,7 +905,7 @@ class TurboSpectrum:
             interpol_config += "{}\n".format(self.aux_file_length_dict[element])
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{:.2f}\n".format(round(float(self.metallicity), 2))
+            interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
             interpol_config += "{:.6f}\n".format(
                 round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
@@ -1279,7 +1279,7 @@ class TurboSpectrum:
         item_abund[periodic_table[2]] = float(
             solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
         for i in range(3, len(periodic_table)):
-            item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 2)
+            item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 6)
         if self.free_abundances is not None:
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 6)
