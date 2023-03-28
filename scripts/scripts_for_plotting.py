@@ -95,10 +95,10 @@ def load_output_data(config_file_location: str, output_folder_location: str) -> 
                 if field_name == "output_file":
                     output = fields[2]
             line = fp.readline()
-    output_data = np.loadtxt(os.path.join(output_folder_location, output), dtype=str)
+    #output_data = np.loadtxt(os.path.join(output_folder_location, output), dtype=str)
 
     if fitting_mode != "lbl":
-        ValueError("Non-lbl fitting methods are not supported yet")
+        raise ValueError("Non-lbl fitting methods are not supported yet")
 
     output_elem_column = f"Fe_H"
 
@@ -163,7 +163,7 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
         # Warning if part of several specnames, just in case
         print(f"Warning, several specnames were found with that name {name_of_spectra_to_plot}, using first one")
     if len(indices_to_plot) == 0:
-        ValueError(f"Could not find {name_of_spectra_to_plot} in the spectra to plot")
+        raise ValueError(f"Could not find {name_of_spectra_to_plot} in the spectra to plot")
 
     # Take first occurrence of the name, hopefully the only one
     index_to_plot = indices_to_plot[0]
@@ -245,6 +245,11 @@ def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis
     plt.close()
 
 def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
+    if np.size(x_axis_column) == 1:
+        print("Only one point is found, so doing normal scatter plot")
+        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim, **pltargs)
+        return
+
     # creates density map for the plot
     x_array = df_results[x_axis_column]
     y_array = df_results[y_axis_column]
@@ -278,12 +283,13 @@ if __name__ == '__main__':
     # CHANGE NEXT TWO LINES
     configuration_file_location: str = "../input_files/tsfitpy_input_configuration_ba_oliver_y_nlte_fenlte.txt"  # CHANGE
     output_folder_location: str = "../output_files/Mar-27-2023-14-11-24_0.23697863971919042_y_nlte_fe_nlte_oliverba/"  # CHANGE
+    output_folder_location: str = "../output_files/test/"  # CHANGE
     # loads all data from config file and output
     config_dict = load_output_data(configuration_file_location, output_folder_location)
     output_results_pd_df = config_dict["output_file_df"]  # Pandas dataframe for your own use
     print("Column names are:")
     print(output_results_pd_df.columns.values)  # Column names if you want to plot them
     # CHANGE NEXT LINE
-    star_name_to_plot: str = "00035412-4708421"  # CHANGE
+    star_name_to_plot: str = "000003022"  # CHANGE
     # plots all fitted lines for the requested star
     plot_one_star(config_dict, star_name_to_plot)
