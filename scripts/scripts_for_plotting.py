@@ -134,9 +134,9 @@ def load_output_data(config_file_location: str, output_folder_location: str) -> 
 
     specname_fitlist = np.loadtxt(os.path.join(fitlist_input_folder, fitlist), dtype=str, unpack=True, usecols=(0))
     rv_fitlist = np.loadtxt(os.path.join(fitlist_input_folder, fitlist), dtype=float, unpack=True, usecols=(1))
-    #if specname_fitlist.ndim == 1:
-    #    specname_fitlist = np.array([specname_fitlist])
-    #    rv_fitlist = np.array([rv_fitlist])
+    if specname_fitlist.ndim == 0:
+        specname_fitlist = np.array([specname_fitlist])
+        rv_fitlist = np.array([rv_fitlist])
 
     config_dict = {}
     config_dict["filenames_output_folder"]: list[dir] = filenames_output_folder_convolved
