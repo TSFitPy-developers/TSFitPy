@@ -982,7 +982,7 @@ class Spectra:
                     left_bound_to_save = max(line_left - extra_wavelength_to_save, (line_left - line_previous_right) / 2 + line_previous_right)
                 else:
                     left_bound_to_save = line_left - extra_wavelength_to_save
-                if line_number < len(self.line_begins_sorted):
+                if line_number < len(self.line_begins_sorted) - 1:
                     line_next_left = self.line_begins_sorted[line_number + 1]
                     right_bound_to_save = min(line_right + extra_wavelength_to_save, (line_next_left - line_right) / 2 + line_right)
                 else:
