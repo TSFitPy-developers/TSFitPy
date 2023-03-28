@@ -108,12 +108,7 @@ def load_output_data(config_file_location: str, output_folder_location: str) -> 
         if elem_name != "Fe":
             output_elem_column += f"\t{elem_name}_Fe"
 
-    names = f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew"
-    output_results = {}
-    output_results["specname"] = output_data[:, 0]
-    output_results["wave_center"] = output_data[:, 1].astype(float)
-    output_results["Doppler_Shift_add_to_RV"] = output_data[:, 4].astype(float)
-
+    #names = f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew"
     filenames_output_folder: list[str] = get_all_file_names_in_a_folder(output_folder_location)
 
     filenames_output_folder_convolved = []
@@ -145,7 +140,6 @@ def load_output_data(config_file_location: str, output_folder_location: str) -> 
     config_dict["filenames_output_folder"]: list[dir] = filenames_output_folder_convolved
     config_dict["linemask_location"]: str = os.path.join(linemask_file_og, linemask_file)
     config_dict["observed_spectra_location"]: str = spec_input_path
-    config_dict["output_results"]: dict = output_results
     config_dict["specname_fitlist"]: np.ndarray = specname_fitlist
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
     config_dict["output_folder_location"] = output_folder_location
@@ -158,9 +152,9 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
     filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
     observed_spectra_location: str = config_dict["observed_spectra_location"]
     linemask_location: str = config_dict["linemask_location"]
-    output_results: dict = config_dict["output_results"]
     specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
     rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
+    output_file_df: pd.DataFrame = config_dict["output_file_df"]
 
     # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
     # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
@@ -173,23 +167,26 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
 
     # Take first occurrence of the name, hopefully the only one
     index_to_plot = indices_to_plot[0]
-    # unpack output results so that we can get fitted rv
-    output_results_specname = output_results["specname"]
-    output_results_wave_center = output_results["wave_center"]
-    output_results_dopplershift = output_results["Doppler_Shift_add_to_RV"]
+
     # get the name of the fitted and observed spectra
     filename_fitted_spectra = filenames_output_folder[index_to_plot]
     filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(config_dict["output_folder_location"], "")
+
     # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
-    output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
+    #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
+    df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
+
     # find RV in the fitlist that was input into the star
     rv_index = np.where(specname_fitlist == filename_observed_spectra)[0][0]
     rv = rv_fitlist[rv_index]
+
     # loads fitted and observed wavelength and flux
     wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
     wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True) # normalised flux observed
+
     # loads the linemask
     linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
+
     # sorts linemask, just like in TSFitPy
     if linemask_center_wavelengths.size > 1:
         linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
@@ -199,12 +196,15 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
         linemask_center_wavelengths = np.array([linemask_center_wavelengths])
         linemask_left_wavelengths = np.array([linemask_left_wavelengths])
         linemask_right_wavelengths = np.array([linemask_right_wavelengths])
+
     # makes a separate plot for each line
     for linemask_center_wavelength, linemask_left_wavelength, linemask_right_wavelength in zip(linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths):
         # finds in the output results, which of the wavelengths are equal to the linemask. Comparison is done using argmin to minimise risk of comparing floats. As downside, there is no check if line is actually the same
-        output_result_index_to_plot = (np.abs(output_results_wave_center[output_results_correct_specname_indices] - linemask_center_wavelength)).argmin()
+        output_result_index_to_plot = (np.abs(output_file_df[df_correct_specname_indices]["wave_center"] - linemask_center_wavelength)).argmin()
+
         # this is the fitted rv in this case then
-        fitted_rv = output_results_dopplershift[output_results_correct_specname_indices][output_result_index_to_plot]
+        fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
+
         # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
         doppler = fitted_rv + rv
         wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
@@ -259,3 +259,18 @@ def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim
     plt.ylabel("Count")
     plt.show()
     plt.close()
+
+
+if __name__ == '__main__':
+    # CHANGE NEXT TWO LINES
+    configuration_file_location: str = "../input_files/tsfitpy_input_configuration_ba_oliver_y_nlte_fenlte.txt"  # CHANGE
+    output_folder_location: str = "../output_files/Mar-27-2023-14-11-24_0.23697863971919042_y_nlte_fe_nlte_oliverba/"  # CHANGE
+    # loads all data from config file and output
+    config_dict = load_output_data(configuration_file_location, output_folder_location)
+    output_results_pd_df = config_dict["output_file_df"]  # Pandas dataframe for your own use
+    print("Column names are:")
+    print(output_results_pd_df.columns.values)  # Column names if you want to plot them
+    # CHANGE NEXT LINE
+    star_name_to_plot: str = "00035412-4708421"  # CHANGE
+    # plots all fitted lines for the requested star
+    plot_one_star(config_dict, star_name_to_plot)
