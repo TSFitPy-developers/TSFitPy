@@ -205,10 +205,23 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
         # this is the fitted rv in this case then
         fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
 
+        # other fitted values
+        fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
+        column_names = output_file_df.columns.values
+        if "_Fe" in column_names[6]:
+            abund_column_name = column_names[6]
+        else:
+            abund_column_name = column_names[5]
+        fitted_abund = output_file_df[df_correct_specname_indices][abund_column_name].values[output_result_index_to_plot]
+        fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
+
         # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
         doppler = fitted_rv + rv
         wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
 
+        abund_column_name = f"[{abund_column_name.replace('_', '/')}]"
+
+        plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
         plt.plot(wavelength, flux, color='red')
         plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
         # xlimit is wavelength left/right +/- 0.3 AA
