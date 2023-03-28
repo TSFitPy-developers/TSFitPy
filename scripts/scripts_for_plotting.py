@@ -172,13 +172,15 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
 
     # get the name of the fitted and observed spectra
     filename_fitted_spectra = filenames_output_folder[index_to_plot]
-    filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(config_dict["output_folder_location"], "")
+    filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
 
     # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
     #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
     df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
 
     # find RV in the fitlist that was input into the star
+    if filename_observed_spectra not in specname_fitlist:
+        raise ValueError(f"{filename_observed_spectra} not found in the fitlist names, which are {specname_fitlist}")
     rv_index = np.where(specname_fitlist == filename_observed_spectra)[0][0]
     rv = rv_fitlist[rv_index]
 
@@ -279,3 +281,19 @@ def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim
     plt.ylabel("Count")
     plt.show()
     plt.close()
+
+
+if __name__ == '__main__':
+    # CHANGE NEXT TWO LINES
+    configuration_file_location: str = "../input_files/tsfitpy_input_configuration_ba_oliver_y_nlte_fenlte.txt"  # CHANGE
+    output_folder_location: str = "../output_files/Mar-27-2023-14-11-24_0.23697863971919042_y_nlte_fe_nlte_oliverba/"  # CHANGE
+    output_folder_location: str = "../output_files/test"  # CHANGE
+    # loads all data from config file and output
+    config_dict = load_output_data(configuration_file_location, output_folder_location)
+    output_results_pd_df = config_dict["output_file_df"]  # Pandas dataframe for your own use
+    print("Column names are:")
+    print(output_results_pd_df.columns.values)  # Column names if you want to plot them
+    # CHANGE NEXT LINE
+    star_name_to_plot: str = "00"  # CHANGE
+    # plots all fitted lines for the requested star
+    plot_one_star(config_dict, star_name_to_plot)
