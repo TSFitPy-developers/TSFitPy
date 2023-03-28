@@ -14,19 +14,29 @@ TSFitPy is a pipeline designed to determine stellar abundances and atmospheric p
 
 To use TSFitPy, you will need a working Turbospectrum (TS) installation of the latest version, which has the capability to compute NLTE line profiles as well as calculate specified spectral windows instead of a full spectrum for a given range. TSFitPy has not been tested on older versions of TS. The latest version of TS can be found here: https://github.com/bertrandplez/Turbospectrum_NLTE
 
-The code is written in Python 3 (3.7.1, but should work with any version of python 3). It also makes use of fortran programs, which will need to be compiled on the 
-user's machine. The Python packages needed are as follows:
+The code requires at least version Python 3.7. It also makes use of fortran programs, which will need to be compiled on the 
+user's machine. The Python packages needed are as follows (they should all be installable via "pip install"):
 - Numpy
-- Scipy
-- Time
-- OS
-- Subprocess
-- Glob
-- Re
-- Math
-- Operator
+- Scipy (at least 1.7.1)
+- Dask (installed using pip install dask[complete])
+- Pandas (only for plotting)
+- Matplotlib (only for plotting)
 
-They should all be installable via "pip install"
+## Installation
+
+- Clone or download code to your favourite directory
+- Download actual [TurboSpectrum fortran code](https://github.com/bertrandplez/Turbospectrum_NLTE) and put it into folder `TSFitPy/turbospectrum/`
+- Compile TS fortran code using the make file in `turbospectrum/exec/` (or in `turbospectrum/exec-gf/` if using the gnu compiler)
+- Copy fortran files (can copy everything in unsure) from `TSFitPy/turbospectrum/interpolator/` to `TSFitPy/scripts/model_interpolators/`
+- Run `TSFitPy/scripts/compile_fortran_codes.py` to compile model interpolators
+- Download all desired linelists and put them into `TSFitPy/input_files/linelists/linelist_for_fitting/`.
+  - Gaia-ESO linelists are provided [here](https://keeper.mpdl.mpg.de/d/3a5749b0bb5d4e0d8f4f/) in the file `nlte_ges_linelist`. 
+  - Additional linelists to include are vald ones (3700-3800, 3800-4200, 9200-9300, 9300-9800) that extend the wavelength regime of the Gaia-ESO linelist
+  - Molecular linelists may also be important. They are found in the same link as the Gaia-ESO linelist in the folder `molecules-420-920nm`
+- Download desired atmospheric models and put them into the `TSFitPy/input_files/model_atmospheres/` in either `1D` or `3D` folder
+  - 1D MARCS standard composition models are included [here](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) in the folder `atmospheres`
+  - 3D averaged STAGGER models can be included in the `3D` folder as well
+- If desired to use NLTE data, then one needs to provide departure coefficient files. They can be downloaded from [here](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) in the `dep-grids` folder.
 
 All of the fortran codes are compilable either with a gnu or ifort compiler. In the scripts folder, there is a Python script titled "compile_fortran_codes.py". Running this code should compile all of the necessary codes needed for the main TSFitPy pipeline. It makes use of the OS Python package.
 
