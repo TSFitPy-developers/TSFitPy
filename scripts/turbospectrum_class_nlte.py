@@ -95,6 +95,7 @@ class TurboSpectrum:
         self.r_process = 0
         self.verbose = False
         self.line_list_files = None
+        self.lpoint = 1000000 #number of points in TS
 
         #parameters needed for nlte and <3D> calculations
         self.nlte_flag = False
@@ -225,7 +226,7 @@ class TurboSpectrum:
                   line_list_paths=None, line_list_files=None,
                   verbose=None, counter_spectra=None, temp_directory=None, nlte_flag=None, atmosphere_dimension=None, windows_flag=None,
                   depart_bin_file=None, depart_aux_file=None, model_atom_file=None,
-                  segment_file=None, cont_mask_file=None, line_mask_file=None):
+                  segment_file=None, cont_mask_file=None, line_mask_file=None, lpoint=None):
         """
         Set the stellar parameters of the synthetic spectra to generate. This can be called as often as needed
         to generate many synthetic spectra with one class instance. All arguments are optional; any which are not
@@ -328,6 +329,8 @@ class TurboSpectrum:
         if self.atmosphere_dimension == "3D":
             self.turbulent_velocity = 2.0
             print("turbulent_velocity is not used since model atmosphere is 3D")
+        if lpoint is not None:
+            self.lpoint = lpoint
 
     def closest_available_value(self, target, options):
         """
@@ -765,7 +768,7 @@ class TurboSpectrum:
                 lines_high = f_high.read().splitlines()
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
     
-                fxhigh = microturbulence - turbulence_low
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
                 fxlow = 1.0 - fxhigh
     
                 t_interp = t_low*fxlow + t_high*fxhigh
@@ -866,7 +869,7 @@ class TurboSpectrum:
                 lines_high = f_high.read().splitlines()
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
     
-                fxhigh = microturbulence - turbulence_low
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
                 fxlow = 1.0 - fxhigh
     
                 t_interp = t_low*fxlow + t_high*fxhigh
@@ -1018,13 +1021,14 @@ class TurboSpectrum:
         else:
             item_abund = {}
             item_abund['H'] = 12.00
-            for i in range(2,len(periodic_table)):
+            item_abund['He'] = 10.93
+            for i in range(3,len(periodic_table)):
                 item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity),2)
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance),2)
             for i in range(1,len(periodic_table)):
                 individual_abundances += "{:d}  {:.2f}\n".format(i, item_abund[periodic_table[i]])
-        #print(individual_abundances)
+        print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
         
@@ -1408,6 +1412,8 @@ class TurboSpectrum:
         lmax_orig = self.lambda_max
         lmin = self.lambda_min
         lmax = self.lambda_max
+        '''
+        deprecated, replaced below with cleaner way to do this
         if lmax-lmin > 30000. and self.lambda_delta < 0.01:
             number = math.ceil((lmax-lmin)/300.)
             new_range = round((lmax-lmin)/number)
@@ -1430,6 +1436,7 @@ class TurboSpectrum:
             new_range = round((lmax-lmin)/number)
             for i in range(number):
                 self.configure(lambda_min=lmin-30, lambda_max=lmin+new_range+30, counter_spectra=i)
+                #self.configure(lambda_min=lmin, lambda_max=lmin+new_range, counter_spectra=i)
                 #print(self.counter_spectra)
                 self.synthesize()
                 lmin = lmin+new_range
@@ -1441,7 +1448,7 @@ class TurboSpectrum:
                 for j in range(len(wave)):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
                 f.close()
-        elif lmax-lmin > 500000. and self.lambda_delta < 0.1:
+        elif lmax-lmin > 50000. and self.lambda_delta < 0.1:
             number = math.ceil((lmax-lmin)/5000.)
             new_range = round((lmax-lmin)/number)
             for i in range(number):
@@ -1450,6 +1457,28 @@ class TurboSpectrum:
                 self.synthesize()
                 lmin = lmin+new_range
             for i in range(number-1):
+                spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
+                spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
+                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
+                f = open(spectrum1, 'w')
+                for j in range(len(wave)):
+                    print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
+                f.close()
+        '''
+        if (lmax-lmin)/self.lambda_delta > self.lpoint:
+            print("Whoops! You went over the default maximum number of spectrum points. TSFitPy will break up the wavelength range and stitch together the smaller pieces, but a better solution is to increase the number of points in Turbospectrum in the file spectrum.inc to match what you need. Then adjust the same lpoint parameter next time you call TSFitPy.")
+            lmax = (self.lpoint*self.lambda_delta) + lmin
+            k = 0
+            while lmax < lmax_orig:
+                self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+                self.synthesize()
+                lmin = lmax
+                lmax = (self.lpoint*self.lambda_delta) + lmin
+                k+=1
+            lmax = lmag_orig
+            self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+            self.synthesize()
+            for i in range(k-1):
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
                 wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
@@ -1519,7 +1548,7 @@ class TurboSpectrum:
                 lines_high = f_high.read().splitlines()
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
     
-                fxhigh = microturbulence - turbulence_low
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
                 fxlow = 1.0 - fxhigh
     
                 t_interp = t_low*fxlow + t_high*fxhigh
@@ -1620,7 +1649,7 @@ class TurboSpectrum:
                 lines_high = f_high.read().splitlines()
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
     
-                fxhigh = microturbulence - turbulence_low
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
                 fxlow = 1.0 - fxhigh
     
                 t_interp = t_low*fxlow + t_high*fxhigh
@@ -1685,6 +1714,8 @@ class TurboSpectrum:
         lmax_orig = self.lambda_max
         lmin = self.lambda_min
         lmax = self.lambda_max
+        '''
+        deprecated, replaced below with cleaner way to do this
         if lmax-lmin > 30000. and self.lambda_delta < 0.01:
             number = math.ceil((lmax-lmin)/300.)
             new_range = round((lmax-lmin)/number)
@@ -1728,6 +1759,28 @@ class TurboSpectrum:
                 self.synthesize()
                 lmin = lmin+new_range
             for i in range(number-1):
+                spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
+                spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
+                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
+                f = open(spectrum1, 'w')
+                for j in range(len(wave)):
+                    print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
+                f.close()
+        '''
+        if (lmax-lmin)/self.lambda_delta > self.lpoint:
+            print("Whoops! You went over the default maximum number of spectrum points. TSFitPy will break up the wavelength range and stitch together the smaller pieces, but a better solution is to increase the number of points in Turbospectrum in the file spectrum.inc to match what you need. Then adjust the same lpoint parameter next time you call TSFitPy.")
+            lmax = (self.lpoint*self.lambda_delta) + lmin
+            k = 0
+            while lmax < lmax_orig:
+                self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+                self.synthesize()
+                lmin = lmax
+                lmax = (self.lpoint*self.lambda_delta) + lmin
+                k+=1
+            lmax = lmag_orig
+            self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+            self.synthesize()
+            for i in range(k-1):
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
                 wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
@@ -1788,7 +1841,7 @@ class TurboSpectrum:
             lines_high = f_high.read().splitlines()
             t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(open(high_model_name, 'rt').readlines()[:-1], skiprows=1, unpack=True)
 
-            fxhigh = microturbulence - turbulence_low
+            fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
             fxlow = 1.0 - fxhigh
 
             t_interp = t_low*fxlow + t_high*fxhigh
