@@ -3,8 +3,10 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 import pandas as pd
-from TSFitPy import apply_doppler_correction
 from scipy.stats import gaussian_kde
+
+def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
+    return wave_ob / (1 + (doppler / 299792.))
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
     """
