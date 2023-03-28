@@ -973,7 +973,21 @@ class Spectra:
 
                 equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
 
-                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > line_left - 1, wavelength_fit_conv < line_right + 1))
+                extra_wavelength_to_save = 1  # AA extra wavelength to save left and right of the line
+
+                # this will save extra +/- extra_wavelength_to_save in convolved spectra. But just so that it doesn't
+                # overlap other lines, I save only up to half of the other linemask if they are close enough
+                if line_number > 0:
+                    line_previous_right = self.line_ends_sorted[line_number - 1]
+                    left_bound_to_save = max(line_left - extra_wavelength_to_save, (line_left - line_previous_right) / 2 + line_previous_right)
+                else:
+                    left_bound_to_save = line_left - extra_wavelength_to_save
+                if line_number < len(self.line_begins_sorted) - 1:
+                    line_next_left = self.line_begins_sorted[line_number + 1]
+                    right_bound_to_save = min(line_right + extra_wavelength_to_save, (line_next_left - line_right) / 2 + line_right)
+                else:
+                    right_bound_to_save = line_right + extra_wavelength_to_save
+                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > left_bound_to_save, wavelength_fit_conv < right_bound_to_save))
 
                 with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
                     # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
@@ -1088,7 +1102,7 @@ class Spectra:
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
 
         function_arguments = (ts, self, Spectra.line_begins_sorted[line_number] - 5., Spectra.line_ends_sorted[line_number] + 5., temp_directory)
-        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01, 'adaptive': True}
+        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.001, 'fatol': 0.001, 'adaptive': True}
         res = minimize_abundance_function(lbl_broad_abund_chi_sqr, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if Spectra.fit_met:
