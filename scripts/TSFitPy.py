@@ -1102,7 +1102,7 @@ class Spectra:
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
 
         function_arguments = (ts, self, Spectra.line_begins_sorted[line_number] - 5., Spectra.line_ends_sorted[line_number] + 5., temp_directory)
-        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01, 'adaptive': True}
+        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.001, 'fatol': 0.001, 'adaptive': True}
         res = minimize_abundance_function(lbl_broad_abund_chi_sqr, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if Spectra.fit_met:
