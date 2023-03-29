@@ -29,14 +29,58 @@ user's machine. The Python packages needed are as follows (they should all be in
 - Compile TS fortran code using the make file in `turbospectrum/exec/` (or in `turbospectrum/exec-gf/` if using the gnu compiler)
 - Copy fortran files (can copy everything in unsure) from `TSFitPy/turbospectrum/interpolator/` to `TSFitPy/scripts/model_interpolators/`
 - Run `TSFitPy/scripts/compile_fortran_codes.py` to compile model interpolators
-- Download all desired linelists and put them into `TSFitPy/input_files/linelists/linelist_for_fitting/`.
-  - Gaia-ESO linelists are provided [here](https://keeper.mpdl.mpg.de/d/3a5749b0bb5d4e0d8f4f/) in the file `nlte_ges_linelist`. 
+- Download all desired linelists and put them into `TSFitPy/input_files/linelists/linelist_for_fitting/`
+  - Example VALD lines are included in the `TSFitPy/input_files/linelists/linelist_vald/`, which you can move to the `TSFitPy/input_files/linelists/linelist_for_fitting/`
+  - **ALTERNATIVELY** Gaia-ESO linelists are provided [here](https://keeper.mpdl.mpg.de/d/3a5749b0bb5d4e0d8f4f/) in the file `nlte_ges_linelist` (wavelength ranges: 4200-9200 Å)
   - Additional linelists to include are vald ones (3700-3800, 3800-4200, 9200-9300, 9300-9800) that extend the wavelength regime of the Gaia-ESO linelist
   - Molecular linelists may also be important. They are found in the same link as the Gaia-ESO linelist in the folder `molecules-420-920nm`
+  - **IMPORTANT**: ALL files in the `TSFitPy/input_files/linelists/linelist_for_fitting/` are used, so do not use BOTH Gaia-ESO and VALD data from same wavelength ranges
 - Download desired atmospheric models and put them into the `TSFitPy/input_files/model_atmospheres/` in either `1D` or `3D` folder
   - 1D MARCS standard composition models are included [here](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) in the folder `atmospheres`
   - 3D averaged STAGGER models can be included in the `3D` folder as well
 - If desired to use NLTE data, then one needs to provide departure coefficient files. They can be downloaded from [here](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) in the `dep-grids` folder.
+  - The size of each file is big (anywhere from a few GB up to a few dozen GB), so only download relevant files
+  - In the relevant element file you will find several files, for 1D MARCS you will need:
+    - atom.ELEMENT_AND_NUMBER
+    - auxData_ELEMENT_MARCS_DATE.txt
+    - NLTEgrid_ELEMENT_MARCS_DATE.bin
+  - The same idea applies for 3D averaged STAGGER atmospheres:
+    - atom.ELEMENT_AND_NUMBER
+    - auxData_ELEMENT_STAGGERmean3D_DATE_marcs_names.txt
+    - NLTEgrid_Ba_STAGGERmean3D_DATE.bin
+  - The naming might vary, but use MARCS for 1D models, use STAGGERmean3D (with marcs_names!) for mean STAGGER models
+  - For each element, download, unzip and place auxData and NLTEgrid into their own folder (e.g. `TSFitPy/input_files/nlte_data/Ba/`)
+  - Put all relevant atom files into `TSFitPy/input_files/nlte_data/model_atoms/`
+  - Important note: even if you want to only fit one specific element in NLTE, you will always need Fe NLTE data, so download that one as well
+- Some default linemask files are already provided in the script; linemask are wavelength ranges where line will be fitted (i.e. left and right sides of the line)
+  - They are located in the `TSFitPy/input_files/linemask_files/` and separated into individual folders
+  - Each folder contains two files: `ELEMENT-lmask.txt` and `ELEMENT-seg.txt`
+  - You can also create your own linemasks.
+  - To create your own linemask:
+    - Create new textfile (naming doesn't matter)
+      - First column: wavelength center of the line (no need to be exact, it is only used in printing)
+      - Second column: left side of the line where it is fitted (i.e. include wings as well)
+      - Third column: right side of the line where it is fitted
+    - You can add comments using `;` 
+    - Each line needs to be included within a corresponding segment
+      - Segment are wavelengths where the spectra is computed for the line, such that the wings from other lines/blends are also included in the actual line
+    - Rule of thumb: line center +/- 3-5 Å is one segment
+    - Segment can contain several or no lines:
+      - First column: wavelength to the left of the line
+      - Second column: wavelength to the right of the line.
+      - Feel free to merge segments together
+
+## Usage
+
+- There are two main steps to take for every fit: get normalised spectra and change the configuration (config) file
+- As an example, we are going to use provided sample spectrum and change config file to fit the Sun
+- Take spectrum from `TSFitPy/input_files/sample_spectrum/` and put it into desired folder, such as ``TSFitPy/input_files/observed spectra/`
+- It is recommended to create a separate config file for each run/set of stars. This allows to quickly refit the same sample of stars without recreating config file each time
+- Copy and paste the existing `TSFitPy/input_files/tsfitpy_input_configuration.txt` and call it something like `TSFitPy/input_files/tsfitpy_input_configuration_sun_test.txt`
+- The config file should already be ready for a test run, but it is worth going through it as well
+  - `turbospectrum_compiler` specifies the compiler (intel or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
+  - Next few lines specify the paths. Default paths are relative to the `TSFitPy/scripts/TSFitPy.py`, but it is possible to change paths if you want to keep your data in a separate folder (e.g. it can be useful if sharing data on a cluster)
+  - debug
 
 All of the fortran codes are compilable either with a gnu or ifort compiler. In the scripts folder, there is a Python script titled "compile_fortran_codes.py". Running this code should compile all of the necessary codes needed for the main TSFitPy pipeline. It makes use of the OS Python package.
 
