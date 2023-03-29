@@ -94,6 +94,7 @@ class TurboSpectrum:
         self.r_process = 0  # not used?
         self.verbose: bool = False
         self.line_list_files = None
+        self.lpoint = 1000000  # number of points in TS
 
         # parameters needed for nlte and <3D> calculations
         self.nlte_flag: bool = False
@@ -223,7 +224,7 @@ class TurboSpectrum:
                   verbose=None, counter_spectra=None, temp_directory=None, nlte_flag=None, atmosphere_dimension=None,
                   windows_flag=None,
                   depart_bin_file=None, depart_aux_file=None, model_atom_file=None,
-                  segment_file=None, cont_mask_file=None, line_mask_file=None):
+                  segment_file=None, cont_mask_file=None, line_mask_file=None, lpoint=None):
         """
         Set the stellar parameters of the synthetic spectra to generate. This can be called as often as needed
         to generate many synthetic spectra with one class instance. All arguments are optional; any which are not
@@ -326,6 +327,8 @@ class TurboSpectrum:
         if self.atmosphere_dimension == "3D":
             self.turbulent_velocity = 2.0
             print("turbulent_velocity is not used since model atmosphere is 3D")
+        if lpoint is not None:
+            self.lpoint = lpoint
 
     def _generate_model_atmosphere(self):
         """
@@ -996,7 +999,7 @@ class TurboSpectrum:
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(
                     open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
 
-                fxhigh = microturbulence - turbulence_low
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
                 fxlow = 1.0 - fxhigh
 
                 t_interp = t_low * fxlow + t_high * fxhigh
@@ -1109,7 +1112,7 @@ class TurboSpectrum:
                 t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(
                     open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
 
-                fxhigh = microturbulence - turbulence_low
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
                 fxlow = 1.0 - fxhigh
 
                 t_interp = t_low * fxlow + t_high * fxhigh
@@ -1580,7 +1583,7 @@ class TurboSpectrum:
         lmin = self.lambda_min
         lmax = self.lambda_max
 
-        lpoint_max = 1000000 * 0.99  # first number comes from turbospectrum spectrum.inc : lpoint. 0.99 is to give some extra room so that bsyn does not fail for sure
+        lpoint_max = self.lpoint * 0.99  # first number comes from turbospectrum spectrum.inc : lpoint. 0.99 is to give some extra room so that bsyn does not fail for sure
         points_in_new_spectra_to_generate = int((lmax - lmin) / self.lambda_delta)
 
         if points_in_new_spectra_to_generate > lpoint_max:

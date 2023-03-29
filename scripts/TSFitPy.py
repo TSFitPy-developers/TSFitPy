@@ -2085,9 +2085,6 @@ def run_TSFitPy(output_folder_title):
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   initial_guess_string, line_list_path_trimmed, input_abundance, i))
 
-    shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
-    shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
-
     output = os.path.join(Spectra.output_folder, output)
 
     f = open(output, 'a')
@@ -2137,6 +2134,12 @@ def run_TSFitPy(output_folder_title):
                 print(results[i][j], file=f)
 
     f.close()
+
+    shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
+    try:
+        shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
+    except FileNotFoundError:
+        pass    # because now trimmed files are in the temp directory, might give error
 
 
 if __name__ == '__main__':
