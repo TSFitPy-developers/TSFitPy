@@ -1,0 +1,3 @@
+; synthesis segments example for Fe
+      5410.71      5418.0
+      5439.16      5450.54

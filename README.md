@@ -72,15 +72,41 @@ user's machine. The Python packages needed are as follows (they should all be in
 
 ## Usage
 
-- There are two main steps to take for every fit: get normalised spectra and change the configuration (config) file
+- There are three main steps to take for every fit: get normalised spectra, create corresponding fitlist and change the configuration (config) file
 - As an example, we are going to use provided sample spectrum and change config file to fit the Sun
 - Take spectrum from `TSFitPy/input_files/sample_spectrum/` and put it into desired folder, such as ``TSFitPy/input_files/observed spectra/`
 - It is recommended to create a separate config file for each run/set of stars. This allows to quickly refit the same sample of stars without recreating config file each time
 - Copy and paste the existing `TSFitPy/input_files/tsfitpy_input_configuration.txt` and call it something like `TSFitPy/input_files/tsfitpy_input_configuration_sun_test.txt`
-- The config file should already be ready for a test run, but it is worth going through it as well
+- The config file should already be ready for a test run, but here is the reference breakdown if needed
   - `turbospectrum_compiler` specifies the compiler (intel or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
   - Next few lines specify the paths. Default paths are relative to the `TSFitPy/scripts/TSFitPy.py`, but it is possible to change paths if you want to keep your data in a separate folder (e.g. it can be useful if sharing data on a cluster)
-  - debug
+  - `debug` can be used for debugging code. 0 is best for normal fits, 1 outputs some extra information during the Python fitting, 2 outputs full TS fortran information (a lot of info and much slower fit)
+  - `atmosphere_type` 1D or 3D: MARCS is 1D, STAGGER mean are 3D models
+  - `mode` specifies fitting mode
+    - `all` fits all lines within the linemask at the same time. Advantage: faster. Disadvantage: cannot know whether any specific line has good or bad fit. Not recommended
+    - `lbl` fits all lines within the linemask one line at a time. Advantage: get full info for each line with separate abundance, macroturbulence etc. Can also fit microturbulence (not very well though?) Disadvatage: slower.
+    - `teff` fits specified line by changing temperature, not abundance. Recommended use: use element H and include NLTE for H and Fe.
+  - `include_molecules` is whether you want molecules in your spectra. Fitting can be faster without them (useful when testing?). Recommended: yes, unless molecules are not expected in the spectra.
+  - `nlte` whether want to have NLTE or not. Elements to include with NLTE are written below
+  - `fit_microturb`, `fit_macroturb` Yes/No/Input depending on if you want to fit them or not. If "no", then microturbulence is calculated based on empirical relation (based on teff, logg, [Fe/H]) and works rather well for FGK-type stars. If Input, it is possible to input microturbulence in the fitlist later. If macroturbulence is "no", then constant one will be applied to all stars (chosen below). If Input, then each star can be given one in the fitlist later on
+  - `fir_rotation` Yes/No as well. Yes - fits rotation (not recommended to use togehter with macroturbulence). No - takes constant one for all below.
+  - `element` which element to fit. Normally one would fit one element at a time, but it is possible to fit several elements at once using the same linemask (e.g. blended line). If you want to fit abundance for different lines, then you need to fit one element at a time
+  - `linemask_file` and `segment_file` are the paths in the `TSFitPy/input_files/linemask_files/` from where the linemask and segment are taken
+  - `departure_coefficient_binary`, `departure_coefficient_aux` are paths in the `TSFitPy/input_files/nlte_data/` for the files that need NLTE data (only if NLTE is fitted). You can put several of them by separating them with a space. Order should be the same as the `element` above. If Fe is not fitted, it has to be included regardless (it is also put last).
+  - `model_atom_file` are names of model atoms in the `TSFitPy/input_files/nlte_data/model_atoms/` with the same order as two lines above
+  - `wavelength_minimum` and `wavelength_maximum` are **ONLY** used if using `mode = all`, which specifies the ranges of the fitted spectra. Otherwise ignored
+  - `wavelength_delta` is the synthetic generated `wavelength_delta`. Try not to have it less than observed spectra, but too small will result in slow fitting. Recommended as a start: `0.005`
+  - `resolution` is resolution of teh spectra. 0 is no convolution based on the resolution
+  - `macroturbulence` is default macroturbulence for all stars if `fit_macroturb = No`
+  - `rotation` is default macroturbulence for all stars if `fit_rotation = No`
+  - `input_file` is the name of the fitlist file that will be explained later
+  - `output_file` is the name of the output file, usually expected to be `output` for the plotting tool
+  - `workers` are the amount of workers to use for the Dask multiprocessing package. Do not set higher than the amount of CPU cores that you have. 1 works best for debugging.
+  - init/input
+  - bounds
+  - guess
+  - experimental
+- 
 
 All of the fortran codes are compilable either with a gnu or ifort compiler. In the scripts folder, there is a Python script titled "compile_fortran_codes.py". Running this code should compile all of the necessary codes needed for the main TSFitPy pipeline. It makes use of the OS Python package.
 
