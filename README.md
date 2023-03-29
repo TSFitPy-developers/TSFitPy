@@ -1,12 +1,3 @@
-# Development branch of TSFitPy
-
-Changes:
-- Full code refactoring. Faster fitting
-- Multiprocessing support using Dask. Change number of workers to number of requested CPUs (setting to 1 does not turn on multithreading) in the TSFitPy.py (at the bottom). Change login_node_access to your node login. Then check the status of the Dask by checking the output of the slurm script (should be something like ssh -N -L PORT_NUMBER:node03:PORT_NUMBER supercomputer.university.edu), run that command on your local terminal. Now you should be able to connect to Dask dashboard via "localhost:8787/status" (more about it here: https://github.com/dask/dask/discussions/7480).
-- Fit lbl with macro and rotation
-- More configuration so that the TSFitPy script does not need to be changed for anything basically
-- Ability to fit much quicker at a cost of exact fitting (at least x4-5 times faster). Outputs a long series of chi-squares depending on the input guess for metallicity/abundance. The curve can be plotted to find lowest point -> lowest chi-squared might correspond to the correct metallicity? Use "lbl_quick" for this method.
-
 # Turbospectrum Spectral Fitting with Python (TSFitPy)
 <!--# AKA PODRACES (Pipeline for the Objective Determination of Realistically Accurate Characteristics and Elements of Stars)-->
 
@@ -39,4 +30,12 @@ The linelist/s used by Turbospectrum should be put in the folder "linelists/line
 Finally, if you wish to fit using NLTE, you'll need the relevant NLTE data. This includes binary files of departure coefficients, auxiliary text files that tell the model interpolators how to read these files, and model atom files. These files are too large to keep on Github (especially the binary files), so those available to the public can be found at https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/. The information then needs to be stored in the relevant directories under "input_files/nlte_data". This directory also has model atmospheres (both average 3D from the STAGGER grid and the 1D MARCS standard composition models).
 
 Once these folders are set, you can begin fitting with TSFitPy. Set up the parameters of your fit using the "tsfitpy_input_configuration.txt" file, place normalized observed spectra for fitting in the folder "observed_spectra" in input_files, and update the "fitlist" file to list the spectra to be fit and their parameters. The folder "examples" provides some examples of various fitting methods as well as sample input files, output files, and terminal outputs. These examples were done using the Gaia-ESO linelists provided at the link above.
+
+
+Recently added changes:
+- Full code refactoring. Faster fitting
+- Multiprocessing support using Dask. Change number of workers to number of requested CPUs (setting to 1 does not turn on multithreading) in the TSFitPy.py (at the bottom). Change login_node_access to your node login. Then check the status of the Dask by checking the output of the slurm script (should be something like ssh -N -L PORT_NUMBER:node03:PORT_NUMBER supercomputer.university.edu), run that command on your local terminal. Now you should be able to connect to Dask dashboard via "localhost:8787/status" (more about it here: https://github.com/dask/dask/discussions/7480).
+- Fit lbl with macro and rotation
+- More configuration so that the TSFitPy script does not need to be changed for anything basically
+- Ability to fit much quicker at a cost of exact fitting (at least x4-5 times faster). Outputs a long series of chi-squares depending on the input guess for metallicity/abundance. The curve can be plotted to find lowest point -> lowest chi-squared might correspond to the correct metallicity? Use "lbl_quick" for this method.
 
