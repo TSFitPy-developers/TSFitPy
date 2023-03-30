@@ -1192,11 +1192,7 @@ class TurboSpectrum:
         # Updated abundances to below to allow user to set solar abundances through solar_abundances.py and not have to adjust make_abund.f
 
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
-        """if self.free_abundances is None:
-            for i in range(1, len(periodic_table)):
-                individual_abundances += "{:d}  {:.10f}\n".format(i, float(
-                    solar_abundances[periodic_table[i]]) + self.metallicity)
-        else:"""
+        
         item_abund = {}
         item_abund['H'] = 12.00
         item_abund[periodic_table[2]] = float(
@@ -1512,6 +1508,7 @@ class TurboSpectrum:
             number = math.ceil(points_in_new_spectra_to_generate / lpoint_max)
             new_range = round((lmax - lmin) / number)
             extra_wavelength_for_stitch = 30  # generats with extra wavlength so that stitch can be nice i guess (i did not write this originally)
+
             for i in range(number):
                 self.configure(lambda_min=lmin - extra_wavelength_for_stitch,
                                lambda_max=lmin + new_range + extra_wavelength_for_stitch, counter_spectra=i)
@@ -1521,6 +1518,28 @@ class TurboSpectrum:
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i + 1))
                 wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i + 1)
+                f = open(spectrum1, 'w')
+                for j in range(len(wave)):
+                    print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
+                f.close()
+        '''
+        if (lmax-lmin)/self.lambda_delta > self.lpoint:
+            print("Whoops! You went over the default maximum number of spectrum points. TSFitPy will break up the wavelength range and stitch together the smaller pieces, but a better solution is to increase the number of points in Turbospectrum in the file spectrum.inc to match what you need. Then adjust the same lpoint parameter next time you call TSFitPy.")
+            lmax = (self.lpoint*self.lambda_delta) + lmin
+            k = 0
+            while lmax < lmax_orig:
+                self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+                self.synthesize()
+                lmin = lmax
+                lmax = (self.lpoint*self.lambda_delta) + lmin
+                k+=1
+            lmax = lmag_orig
+            self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+            self.synthesize()
+            for i in range(k-1):
+                spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
+                spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
+                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
                 f = open(spectrum1, 'w')
                 for j in range(len(wave)):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
@@ -1546,7 +1565,7 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list):
     :return:
         None
     """
-
+    
     marcs_values = {
         "spherical": [], "temperature": [], "log_g": [], "mass": [], "turbulence": [], "model_type": [],
         "metallicity": [], "a": [], "c": [], "n": [], "o": [], "r": [], "s": []}
