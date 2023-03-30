@@ -106,7 +106,7 @@ user's machine. The Python packages needed are as follows (they should all be in
   - bounds
   - guess
   - experimental
-- 
+- An example of `fitlist` file is added
 
 All of the fortran codes are compilable either with a gnu or ifort compiler. In the scripts folder, there is a Python script titled "compile_fortran_codes.py". Running this code should compile all of the necessary codes needed for the main TSFitPy pipeline. It makes use of the OS Python package.
 
