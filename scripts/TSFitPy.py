@@ -1754,7 +1754,6 @@ def run_TSFitPy(output_folder_title):
             line = fp.readline()
 
     print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
-
     # set directories
     if ts_compiler == "intel":
         Spectra.turbospec_path = "../turbospectrum/exec/"
@@ -2084,7 +2083,7 @@ def run_TSFitPy(output_folder_title):
             macroturb1 = macroturb[i]
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   initial_guess_string, line_list_path_trimmed, input_abundance, i))
-
+                                                  
     output = os.path.join(Spectra.output_folder, output)
 
     f = open(output, 'a')
@@ -2140,7 +2139,6 @@ def run_TSFitPy(output_folder_title):
         shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
     except FileNotFoundError:
         pass    # because now trimmed files are in the temp directory, might give error
-
 
 if __name__ == '__main__':
     major_version_scipy, minor_version_scipy, patch_version_scipy = scipy.__version__.split(".")
