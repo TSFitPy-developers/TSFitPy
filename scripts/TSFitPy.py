@@ -336,7 +336,7 @@ class Spectra:
     linemask_file: str = None
     segment_file: str = None
     atmosphere_type: str = None  # "1D" or "3D", string
-    include_molecules: str = None  # "True" or "False", string
+    include_molecules: bool = None  # "True" or "False", bool
     nlte_flag: bool = None
     fit_microturb: str = "No"   # TODO: redo as bool. It expects, "Yes", "No" or "Input". Add extra variable if input?
     fit_macroturb: bool = False
@@ -1041,9 +1041,7 @@ class Spectra:
 
         ts = self.create_ts_object()
 
-        ts.line_list_paths = [
-            get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
-                                      start)]
+        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         function_argsuments = (ts, self, Spectra.line_begins_sorted[line_number] - 5., Spectra.line_ends_sorted[line_number] + 5.)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
@@ -1095,14 +1093,12 @@ class Spectra:
         start = np.where(np.logical_and(Spectra.seg_begins <= Spectra.line_centers_sorted[line_number],
                                         Spectra.line_centers_sorted[line_number] <= Spectra.seg_ends))[0][0]
         print(Spectra.line_centers_sorted[line_number], Spectra.seg_begins[start], Spectra.seg_ends[start])
-        ts.line_list_paths = [
-            get_trimmed_lbl_path_name(self.elem_to_fit, self.line_list_path_trimmed, Spectra.segment_file, line_number,
-                                      start)]
+        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_micro, self.guess_max_micro, self.guess_min_abund, self.guess_max_abund)
 
         function_arguments = (ts, self, Spectra.line_begins_sorted[line_number] - 5., Spectra.line_ends_sorted[line_number] + 5., temp_directory)
-        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.001, 'fatol': 0.001, 'adaptive': True}
+        minimization_options = {'maxfev': Spectra.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': True}
         res = minimize_abundance_function(lbl_broad_abund_chi_sqr, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if Spectra.fit_met:
@@ -1391,30 +1387,14 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
     return chi_square
 
 
-def get_trimmed_lbl_path_name(element: Union[str, np.ndarray], line_list_path_trimmed: str, segment_file: str, j: float,
-                              segment_index: float) -> os.path:
+def get_trimmed_lbl_path_name(line_list_path_trimmed: str, segment_index: float) -> os.path:
     """
-    Gets the anem for the lbl trimmed path. Consistent algorithm to always get the same folder name. Takes into account
-    element, line center, where molecules are used, segment etc.
-    :param element: Name of the element
+    Gets the name for the lbl trimmed path. Consistent algorithm to always get the same folder name.
     :param line_list_path_trimmed: Path to the trimmed line list
-    :param segment_file: Name of the segment file
-    :param j: center line's numbering
     :param segment_index: Segment's numbering
     :return: path to the folder where to save/already saved trimmed files can exist.
     """
     return os.path.join(line_list_path_trimmed, f"{segment_index}", '')
-
-    element_to_print = ""
-    if isinstance(element, np.ndarray):
-        for elem in element:
-            element_to_print += elem
-    else:
-        element_to_print = element
-    return os.path.join(line_list_path_trimmed,
-                        f"{segment_file.replace('/', '_').replace('.', '_')}_{element_to_print}_"
-                        f"{Spectra.include_molecules}_{str(Spectra.seg_begins[segment_index]).replace('.', '_')}_"
-                        f"{str(Spectra.seg_ends[segment_index]).replace('.', '_')}", '')
 
 
 def all_broad_abund_chi_sqr(param, ts, spectra_to_fit: Spectra) -> float:
@@ -1604,29 +1584,43 @@ def run_TSFitPy(output_folder_title):
                 if field_name == "mode":
                     Spectra.fitting_mode = fields[2].lower()
                 if field_name == "include_molecules":
-                    Spectra.include_molecules = fields[2]
+                    #Spectra.include_molecules = fields[2]
+                    if fields[2].lower() in ["yes", "true"]:
+                        Spectra.include_molecules = True
+                    elif fields[2].lower() in ["no", "false"]:
+                        Spectra.include_molecules = False
+                    else:
+                        raise ValueError(f"Expected True/False for including molecules, got {fields[2]}")
                 if field_name == "nlte":
                     nlte_flag = fields[2].lower()
-                    if nlte_flag == "true":
+                    if nlte_flag in ["yes", "true"]:
                         Spectra.nlte_flag = True
-                    else:
+                    elif nlte_flag in ["no", "false"]:
                         Spectra.nlte_flag = False
+                    else:
+                        raise ValueError(f"Expected True/False for nlte flag, got {fields[2]}")
                 if field_name == "fit_microturb":  # Yes No Input
                     Spectra.fit_microturb = fields[2]
+                    if Spectra.fit_microturb not in ["Yes", "No", "Input"]:
+                        raise ValueError(f"Expected Yes/No/Input for micro fit, got {fields[2]}")
                 if field_name == "fit_macroturb":  # Yes No Input
-                    if fields[2].lower() == "yes":
+                    if fields[2].lower() in ["yes", "true"]:
                         Spectra.fit_macroturb = True
-                    else:
+                        input_macro = False
+                    elif fields[2].lower() in ["no", "false"]:
                         Spectra.fit_macroturb = False
-                    if fields[2].lower() == "input":
+                        input_macro = False
+                    elif fields[2].lower() == "input":
                         input_macro = True
                     else:
-                        input_macro = False
+                        raise ValueError(f"Expected Yes/No/Input for macro fit, got {fields[2]}")
                 if field_name == "fit_rotation":
-                    if fields[2].lower() == "yes":
+                    if fields[2].lower() in ["yes", "true"]:
                         Spectra.fit_rotation = True
-                    else:
+                    elif fields[2].lower() in ["no", "false"]:
                         Spectra.fit_rotation = False
+                    else:
+                        raise ValueError(f"Expected Yes/No for rotation fit, got {fields[2]}")
                 """if fields[0] == "fit_teff":
                     if fields[2].lower() == "true":
                         Spectra.fit_teff = True
@@ -1683,7 +1677,7 @@ def run_TSFitPy(output_folder_title):
                 if field_name == "temporary_directory":
                     temp_directory = fields[2]
                     temp_directory = os.path.join(temp_directory, output_folder_title, '')
-                    Spectra.global_temp_dir = f"../{temp_directory}"
+                    Spectra.global_temp_dir = os.path.join("..", temp_directory, "")
                 if field_name == "input_file":
                     fitlist = fields[2]
                 if field_name == "output_file":
@@ -1751,7 +1745,7 @@ def run_TSFitPy(output_folder_title):
                     Spectra.guess_plus_minus_neg_teff = min(float(fields[2]), float(fields[3]))
                     Spectra.guess_plus_minus_pos_teff = max(float(fields[2]), float(fields[3]))
                 if field_name == "debug":
-                    Spectra.debug_mode = float(fields[2])
+                    Spectra.debug_mode = int(fields[2])
                 if field_name == "experimental":
                     if fields[2].lower() == "true" or fields[2].lower() == "yes":
                         Spectra.experimental = True
@@ -1761,21 +1755,24 @@ def run_TSFitPy(output_folder_title):
 
     print(f"Fitting data at {spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
 
-
     # set directories
     if ts_compiler == "intel":
         Spectra.turbospec_path = "../turbospectrum/exec/"
     elif ts_compiler == "gnu":
         Spectra.turbospec_path = "../turbospectrum/exec-gf/"
+    else:
+        raise ValueError(f"Expected compiler intel or gnu, got {ts_compiler}")
     Spectra.interpol_path = interpol_path
     line_list_path_orig = line_list_path
-    line_list_path_trimmed = f"{line_list_path}../linelist_for_fitting_trimmed/"
+    line_list_path_trimmed = os.path.join(Spectra.global_temp_dir, "linelist_for_fitting_trimmed", "") # f"{line_list_path}../linelist_for_fitting_trimmed/"
     if Spectra.atmosphere_type == "1D":
         Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_1D
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
     elif Spectra.atmosphere_type == "3D":
         Spectra.model_atmosphere_grid_path = model_atmosphere_grid_path_3D
         Spectra.model_atmosphere_list = Spectra.model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    else:
+        raise ValueError(f"Expected atmosphere type 1D or 3D, got {Spectra.atmosphere_type}")
     Spectra.model_atom_path = model_atom_path
     Spectra.departure_file_path = departure_file_path
     Spectra.output_folder = f"{output_folder_og}{output_folder_title}/"
@@ -2088,9 +2085,6 @@ def run_TSFitPy(output_folder_title):
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   initial_guess_string, line_list_path_trimmed, input_abundance, i))
 
-    shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
-    shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
-
     output = os.path.join(Spectra.output_folder, output)
 
     f = open(output, 'a')
@@ -2140,6 +2134,12 @@ def run_TSFitPy(output_folder_title):
                 print(results[i][j], file=f)
 
     f.close()
+
+    shutil.rmtree(Spectra.global_temp_dir)  # clean up temp directory
+    try:
+        shutil.rmtree(line_list_path_trimmed)   # clean up trimmed line list
+    except FileNotFoundError:
+        pass    # because now trimmed files are in the temp directory, might give error
 
 
 if __name__ == '__main__':
