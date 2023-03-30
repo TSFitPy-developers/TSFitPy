@@ -4,8 +4,7 @@ from os import path as os_path
 import glob
 import numpy as np
 
-def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
-						   molecules_flag: str, lbl=False):
+def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str, molecules_flag: bool, lbl=False):
 	line_list_path: str = old_path_name
 	line_list_files_draft: list = []
 	line_list_files_draft.extend([i for i in glob.glob(os_path.join(line_list_path, "*")) if not i.endswith(".txt")])
@@ -29,7 +28,7 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 			sep = '.'
 			element = fields[0] + fields[1]
 			elements = element.split(sep, 1)[0]
-			if len(elements) > 3 and molecules_flag == 'True':
+			if len(elements) > 3 and molecules_flag:
 				line_list_files.append(line_list_files_draft[i])
 			elif len(elements) <= 3:
 				line_list_files.append(line_list_files_draft[i])

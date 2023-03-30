@@ -6,7 +6,7 @@ line_list_path = ../input_files/linelists/linelist_for_fitting/
 model_atmosphere_grid_path_1D = ../input_files/model_atmospheres/1D/
 model_atmosphere_grid_path_3D = ../input_files/model_atmospheres/3D/
 model_atom_path = ../input_files/nlte_data/model_atoms/
-departure_file_path = /mnt/beegfs/gemini/groups/bergemann/users/storm/data/nlte_data/
+departure_file_path = ../input_files/nlte_data/
 output_folder = ../output_files/
 linemask_file_folder_location = ../input_files/linemask_files/
 segment_file_folder_location = ../input_files/linemask_files/
@@ -39,8 +39,8 @@ element = Fe
 #
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
 #TS will only generate spectra in the given segments to reduce calculation time.
-linemask_file = Fe/fe-lmask.txt  
-segment_file = Fe/fe-seg.txt
+linemask_file = Fe/fe-lmask_test.txt
+segment_file = Fe/fe-seg_test.txt
 #
 #other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte. IRON ALWAYS NEEDED
 #will only be used if NLTE = True
