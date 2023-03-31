@@ -149,7 +149,7 @@ def load_output_data(config_file_location: str, output_folder_location: str) -> 
 
     return config_dict
 
-def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True):
+def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None):
     # unpack the config dict into separate variables
     filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
     observed_spectra_location: str = config_dict["observed_spectra_location"]
@@ -238,6 +238,8 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.xlabel("Wavelength [Å]")
         plt.ylabel("Normalised flux")
         plt.show()
+        if save_figure is not None:
+            plt.savefig(save_figure)
         plt.close()
 
 def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
