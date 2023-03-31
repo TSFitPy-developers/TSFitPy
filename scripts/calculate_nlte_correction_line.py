@@ -177,10 +177,16 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
     ts.run_turbospectrum_and_atmosphere()
     # ts.run_turbospectrum()
 
-    wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
-                                                                  usecols=(0, 1), unpack=True)
+    try:
+        wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
+                                                                      usecols=(0, 1), unpack=True)
+    except (FileNotFoundError, OSError, ValueError) as error:
+        wave_mod_orig, flux_norm_mod_orig = None, None
 
     shutil.rmtree(temp_directory)
+
+    if np.size(wave_mod_orig) == 0:
+        wave_mod_orig, flux_norm_mod_orig = None, None
 
     return wave_mod_orig, flux_norm_mod_orig
 
@@ -189,10 +195,15 @@ def get_nlte_ew(param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list
     abundance = param[0]
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                           line_list_path, element, abundance, True)
-    nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
-    diff = np.square((nlte_ew - lte_ew))
+    if wavelength_nlte is not None:
+        nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
+        diff = np.square((nlte_ew - lte_ew))
+    else:
+        nlte_ew = 9999999
+        diff = 9999999
     print(f"NLTE abund={abundance} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
     return diff
+
 
 
 def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
@@ -204,7 +215,7 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
     result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
                       args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                       bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
-                      options={'maxiter': 100, 'disp': False, 'fatol': 1e-9, 'xatol': 1e-6})  # 'eps': 1e-8
+                      options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
     nlte_correction = result.x[0]
     ew_nlte = np.sqrt(result.fun) + ew_lte
