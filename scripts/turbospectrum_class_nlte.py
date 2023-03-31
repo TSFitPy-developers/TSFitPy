@@ -946,7 +946,8 @@ class TurboSpectrum:
         if self.log_g < 3:
             flag_dont_interp_microturb = True
 
-        if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
+        if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
+                self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
             # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
             turbulence_low = 0.0
             microturbulence = self.turbulent_velocity
@@ -956,6 +957,7 @@ class TurboSpectrum:
                     place = i
             turbulence_high = possible_turbulence[place + 1]
             # print(turbulence_low,turbulence_high)
+
             self.turbulent_velocity = turbulence_low
             atmosphere_properties_low = self._generate_model_atmosphere()
             # print(marcs_model_list_global)
@@ -1074,6 +1076,7 @@ class TurboSpectrum:
             if atmosphere_properties['errors']:
                 return atmosphere_properties
             self.turbulent_velocity = microturbulence
+
         elif not flag_dont_interp_microturb and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.:  # not enough models to interp if lower than 1 and t_eff > 3900
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 1.0
@@ -1542,7 +1545,7 @@ class TurboSpectrum:
                         print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
                     f.close()'''
         else:
-            self.synthesize()'''
+            self.synthesize()
 
     def run_turbospectrum_and_atmosphere(self):
         try:
