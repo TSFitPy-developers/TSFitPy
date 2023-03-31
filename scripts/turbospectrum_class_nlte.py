@@ -1519,28 +1519,28 @@ class TurboSpectrum:
                 for j in range(len(wave)):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
                 f.close()
-        '''
-        if (lmax-lmin)/self.lambda_delta > self.lpoint:
-            print("Whoops! You went over the default maximum number of spectrum points. TSFitPy will break up the wavelength range and stitch together the smaller pieces, but a better solution is to increase the number of points in Turbospectrum in the file spectrum.inc to match what you need. Then adjust the same lpoint parameter next time you call TSFitPy.")
-            lmax = (self.lpoint*self.lambda_delta) + lmin
-            k = 0
-            while lmax < lmax_orig:
+            '''
+            if (lmax-lmin)/self.lambda_delta > self.lpoint:
+                print("Whoops! You went over the default maximum number of spectrum points. TSFitPy will break up the wavelength range and stitch together the smaller pieces, but a better solution is to increase the number of points in Turbospectrum in the file spectrum.inc to match what you need. Then adjust the same lpoint parameter next time you call TSFitPy.")
+                lmax = (self.lpoint*self.lambda_delta) + lmin
+                k = 0
+                while lmax < lmax_orig:
+                    self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
+                    self.synthesize()
+                    lmin = lmax
+                    lmax = (self.lpoint*self.lambda_delta) + lmin
+                    k+=1
+                lmax = lmag_orig
                 self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
                 self.synthesize()
-                lmin = lmax
-                lmax = (self.lpoint*self.lambda_delta) + lmin
-                k+=1
-            lmax = lmag_orig
-            self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
-            self.synthesize()
-            for i in range(k-1):
-                spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
-                spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
-                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
-                f = open(spectrum1, 'w')
-                for j in range(len(wave)):
-                    print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
-                f.close()
+                for i in range(k-1):
+                    spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
+                    spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
+                    wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
+                    f = open(spectrum1, 'w')
+                    for j in range(len(wave)):
+                        print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
+                    f.close()'''
         else:
             self.synthesize()'''
 
