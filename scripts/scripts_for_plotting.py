@@ -237,9 +237,9 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
         plt.xlabel("Wavelength [Å]")
         plt.ylabel("Normalised flux")
-        plt.show()
         if save_figure is not None:
             plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}")
+        plt.show()
         plt.close()
 
 def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
