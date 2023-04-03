@@ -149,7 +149,7 @@ def load_output_data(config_file_location: str, output_folder_location: str) -> 
 
     return config_dict
 
-def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
+def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None):
     # unpack the config dict into separate variables
     filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
     observed_spectra_location: str = config_dict["observed_spectra_location"]
@@ -186,7 +186,7 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
 
     # loads fitted and observed wavelength and flux
     wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
-    wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True) # normalised flux observed
+    wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
 
     # loads the linemask
     linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
@@ -225,7 +225,8 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
 
         abund_column_name = f"[{abund_column_name.replace('_', '/')}]"
 
-        plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
+        if plot_title:
+            plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
         plt.plot(wavelength, flux, color='red')
         plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
         # xlimit is wavelength left/right +/- 0.3 AA
@@ -236,6 +237,8 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str):
         plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
         plt.xlabel("Wavelength [Å]")
         plt.ylabel("Normalised flux")
+        if save_figure is not None:
+            plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}")
         plt.show()
         plt.close()
 
