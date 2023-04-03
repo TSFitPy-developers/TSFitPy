@@ -178,7 +178,7 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
     # ts.run_turbospectrum()
 
     try:
-        if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat('{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
+        if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat('{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
             wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
                                                                       usecols=(0, 1), unpack=True)
             if np.size(wave_mod_orig) == 0:
