@@ -190,6 +190,9 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
 
     shutil.rmtree(temp_directory)
 
+    if np.size(wave_mod_orig) == 0:
+        wave_mod_orig, flux_norm_mod_orig = None, None
+
     return wave_mod_orig, flux_norm_mod_orig
 
 
