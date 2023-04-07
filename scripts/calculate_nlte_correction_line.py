@@ -178,8 +178,13 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
     # ts.run_turbospectrum()
 
     try:
-        wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
+        if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat('{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
+            wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
                                                                       usecols=(0, 1), unpack=True)
+            if np.size(wave_mod_orig) == 0:
+                wave_mod_orig, flux_norm_mod_orig = None, None
+        else:
+            wave_mod_orig, flux_norm_mod_orig = None, None
     except (FileNotFoundError, OSError, ValueError) as error:
         wave_mod_orig, flux_norm_mod_orig = None, None
 
@@ -210,17 +215,21 @@ def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax
                                 abundance, line_center):
     wavelength_lte, norm_flux_lte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                         line_list_path, element, abundance, False)
-    ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
-    print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
-    result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
-                      args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
-                      bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
-                      options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
+    if wavelength_lte is not None:
+        ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
+        print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
+        result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
+                          args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
+                          bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
+                          options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
-    nlte_correction = result.x[0]
-    ew_nlte = np.sqrt(result.fun) + ew_lte
-    print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte} EW_nlte={ew_nlte} EW_diff={result.fun}")
-    # abundance error cannot be lower than 0.0075 dex
+        nlte_correction = result.x[0]
+        ew_nlte = np.sqrt(result.fun) + ew_lte
+        print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte} EW_nlte={ew_nlte} EW_diff={result.fun}")
+    else:
+        ew_lte = -99999
+        ew_nlte = -99999
+        nlte_correction = -99999
     return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction}"]
 
 

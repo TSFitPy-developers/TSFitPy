@@ -132,8 +132,9 @@ segment_file = "../input_files/linemask_files/"+segment_file
 
 model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
 aux_file_length_dict = {}
-for element in model_atom_file:
-    aux_file_length_dict[element] = len(np.loadtxt(os.path.join(departure_file_path, depart_aux_file[element]), dtype='str'))
+if nlte_flag:
+    for element in model_atom_file:
+        aux_file_length_dict[element] = len(np.loadtxt(os.path.join(departure_file_path, depart_aux_file[element]), dtype='str'))
 
 ts = TurboSpectrum(
             turbospec_path=turbospec_path,
