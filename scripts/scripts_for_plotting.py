@@ -4,6 +4,7 @@ import os
 from matplotlib import pyplot as plt
 import pandas as pd
 from scipy.stats import gaussian_kde
+from warnings import warn
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
@@ -21,7 +22,24 @@ def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
         file_names.remove('.DS_Store')  # Sometimes these get in the way, so try to remove this file
     return file_names
 
-def load_output_data(config_file_location: str, output_folder_location: str) -> dict:
+def load_output_data(output_folder_location: str, old_variable=None) -> dict:
+    if old_variable is not None:
+        warn("Warning: now the config file is copied into the output folder. There is no need to "
+             "pass config file location for new outputs. Thus you only need to write output folder "
+             "from now on. In the future this will give an error", DeprecationWarning, stacklevel=2)
+        if os.path.isfile(os.path.join(old_variable, "configuration.txt")):
+            # trying new way of loading: first variable is output folder with config in it
+            print(f"Loading config from {os.path.join(old_variable, 'configuration.txt')}")
+            config_file_location = os.path.join(old_variable, "configuration.txt")
+            output_folder_location = old_variable
+        else:
+            # this was an old way of loading. first variable: config file, second variable: output folder
+            print(f"Loading config from {output_folder_location}")
+            config_file_location = output_folder_location
+            output_folder_location = old_variable
+    else:
+        # new way of loading: first variable is output folder with config in it
+        config_file_location = os.path.join(output_folder_location, "configuration.txt")
     with open(config_file_location) as fp:
         line = fp.readline()
         while line:
