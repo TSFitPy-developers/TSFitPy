@@ -1778,9 +1778,6 @@ def run_TSFitPy(output_folder_title):
     Spectra.output_folder = f"{output_folder_og}{output_folder_title}/"
     Spectra.spec_input_path = spec_input_path
 
-    # copy config file into output folder (for easier plotting)
-    shutil.copyfile(config_location, os.path.join(Spectra.output_folder, "configuration.txt"))
-
     # load NLTE data dicts
     if Spectra.nlte_flag:
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(elements_to_fit,
@@ -1824,6 +1821,9 @@ def run_TSFitPy(output_folder_title):
     print(f"Temporary directory name: {Spectra.global_temp_dir}")
     create_dir(Spectra.global_temp_dir)
     create_dir(Spectra.output_folder)
+
+    # copy config file into output folder (for easier plotting)
+    shutil.copyfile(config_location, os.path.join(Spectra.output_folder, "configuration.txt"))
 
     if Spectra.fitting_mode == "teff":
         Spectra.fit_teff = True
