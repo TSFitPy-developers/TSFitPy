@@ -304,6 +304,40 @@ def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim
     plt.close()
 
 
+def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limits=None, abund_limits=None,
+                         macroturb_limits=None, microturb_limits=None, rotation_limits=None, ew_limits=None):
+    """rv_results = df_results["Doppler_Shift_add_to_RV"]
+    microturb_results = df_results["Microturb"]
+    macroturb_results = df_results["Macroturb"]
+    rotation_results = df_results["rotation"]
+    chi_squared_results = df_results["chi_squared"]
+    ew_results = df_results["ew"]
+    microturb_results = df_results["Microturb"]"""
+
+    if rv_limits is not None:
+        df_results = df_results[(df_results["Doppler_Shift_add_to_RV"] >= min(rv_limits)) & (df_results["Doppler_Shift_add_to_RV"] <= max(rv_limits))]
+    if chi_sqr_limits is not None:
+        df_results = df_results[(df_results["chi_squared"] >= min(chi_sqr_limits)) & (df_results["chi_squared"] <= max(chi_sqr_limits))]
+    if macroturb_limits is not None:
+        df_results = df_results[(df_results["Macroturb"] >= min(macroturb_limits)) & (df_results["Macroturb"] <= max(macroturb_limits))]
+    if microturb_limits is not None:
+        df_results = df_results[(df_results["Microturb"] >= min(microturb_limits)) & (df_results["Microturb"] <= max(microturb_limits))]
+    if rotation_limits is not None:
+        df_results = df_results[(df_results["rotation"] >= min(rotation_limits)) & (df_results["rotation"] <= max(rotation_limits))]
+    if ew_limits is not None:
+        df_results = df_results[(df_results["ew"] >= min(ew_limits)) & (df_results["ew"] <= max(ew_limits))]
+
+    columns = df_results.columns.values
+    for column in columns:
+        if column != "specname":
+            print(f"The mean value of the '{column}' column is: {df_results[column].mean()}")
+            print(f"The median value of the '{column}' column is: {df_results[column].median()}")
+            print(f"The std value of the '{column}' column is: {df_results[column].std()}")
+
+
+
+
+
 if __name__ == '__main__':
     # CHANGE NEXT TWO LINES
     configuration_file_location: str = "../input_files/tsfitpy_input_configuration_ba_oliver_y_nlte_fenlte.txt"  # CHANGE
