@@ -304,7 +304,7 @@ def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim
     plt.close()
 
 
-def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limits=None, abund_limits=None,
+def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limits=None, abund_limits=None, abund_to_limit=None,
                          macroturb_limits=None, microturb_limits=None, rotation_limits=None, ew_limits=None,
                          print_columns=None):
     """rv_results = df_results["Doppler_Shift_add_to_RV"]
@@ -327,6 +327,9 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
         df_results = df_results[(df_results["rotation"] >= min(rotation_limits)) & (df_results["rotation"] <= max(rotation_limits))]
     if ew_limits is not None:
         df_results = df_results[(df_results["ew"] >= min(ew_limits)) & (df_results["ew"] <= max(ew_limits))]
+    if abund_limits is not None and abund_to_limit is not None:
+        for abund_limit, one_abund_to_limit in zip(abund_limits, abund_to_limit):
+            df_results = df_results[(df_results[one_abund_to_limit] >= min(abund_limit)) & (df_results[one_abund_to_limit] <= max(abund_limit))]
 
     columns = df_results.columns.values
     for column in columns:
