@@ -329,10 +329,10 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
 
     columns = df_results.columns.values
     for column in columns:
-        if column != "specname":
-            print(f"The mean value of the '{column}' column is: {df_results[column].mean()}")
-            print(f"The median value of the '{column}' column is: {df_results[column].median()}")
-            print(f"The std value of the '{column}' column is: {df_results[column].std()}")
+        if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
+            print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std()}")
+            #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
+            #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
 
 
