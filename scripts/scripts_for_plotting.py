@@ -333,9 +333,9 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
         if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
             if print_columns is not None:
                 if column in print_columns:
-                    print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std()}")
+                    print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
             else:
-                print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std()}")
+                print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
             #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
             #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
