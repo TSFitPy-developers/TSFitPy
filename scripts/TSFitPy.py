@@ -1368,7 +1368,7 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
         if spectra_to_fit.fit_macroturb:
             spectra_to_fit.macroturb = res.x[1]
         macroturb = spectra_to_fit.macroturb
-        if spectra_to_fit.fit_macroturb:
+        if spectra_to_fit.fit_rotation:
             spectra_to_fit.rotation = res.x[-1]
         rotation = spectra_to_fit.rotation
 
