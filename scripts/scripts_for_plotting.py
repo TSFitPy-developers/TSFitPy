@@ -305,7 +305,8 @@ def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim
 
 
 def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limits=None, abund_limits=None,
-                         macroturb_limits=None, microturb_limits=None, rotation_limits=None, ew_limits=None):
+                         macroturb_limits=None, microturb_limits=None, rotation_limits=None, ew_limits=None,
+                         print_columns=None):
     """rv_results = df_results["Doppler_Shift_add_to_RV"]
     microturb_results = df_results["Microturb"]
     macroturb_results = df_results["Macroturb"]
@@ -330,7 +331,11 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
     columns = df_results.columns.values
     for column in columns:
         if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
-            print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std()}")
+            if print_columns is not None:
+                if column in print_columns:
+                    print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std()}")
+            else:
+                print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std()}")
             #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
             #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
