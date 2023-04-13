@@ -4,6 +4,7 @@ import os
 from matplotlib import pyplot as plt
 import pandas as pd
 from scipy.stats import gaussian_kde
+from warnings import warn
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
@@ -21,7 +22,24 @@ def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
         file_names.remove('.DS_Store')  # Sometimes these get in the way, so try to remove this file
     return file_names
 
-def load_output_data(config_file_location: str, output_folder_location: str) -> dict:
+def load_output_data(output_folder_location: str, old_variable=None) -> dict:
+    if old_variable is not None:
+        warn("Warning: now the config file is copied into the output folder. There is no need to "
+             "pass config file location for new outputs. Thus you only need to write output folder "
+             "from now on. In the future this will give an error", DeprecationWarning, stacklevel=2)
+        if os.path.isfile(os.path.join(old_variable, "configuration.txt")):
+            # trying new way of loading: first variable is output folder with config in it
+            print(f"Loading config from {os.path.join(old_variable, 'configuration.txt')}")
+            config_file_location = os.path.join(old_variable, "configuration.txt")
+            output_folder_location = old_variable
+        else:
+            # this was an old way of loading. first variable: config file, second variable: output folder
+            print(f"Loading config from {output_folder_location}")
+            config_file_location = output_folder_location
+            output_folder_location = old_variable
+    else:
+        # new way of loading: first variable is output folder with config in it
+        config_file_location = os.path.join(output_folder_location, "configuration.txt")
     with open(config_file_location) as fp:
         line = fp.readline()
         while line:
@@ -284,6 +302,48 @@ def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim
     plt.ylabel("Count")
     plt.show()
     plt.close()
+
+
+def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limits=None, abund_limits=None, abund_to_limit=None,
+                         macroturb_limits=None, microturb_limits=None, rotation_limits=None, ew_limits=None,
+                         print_columns=None):
+    """rv_results = df_results["Doppler_Shift_add_to_RV"]
+    microturb_results = df_results["Microturb"]
+    macroturb_results = df_results["Macroturb"]
+    rotation_results = df_results["rotation"]
+    chi_squared_results = df_results["chi_squared"]
+    ew_results = df_results["ew"]
+    microturb_results = df_results["Microturb"]"""
+
+    if rv_limits is not None:
+        df_results = df_results[(df_results["Doppler_Shift_add_to_RV"] >= min(rv_limits)) & (df_results["Doppler_Shift_add_to_RV"] <= max(rv_limits))]
+    if chi_sqr_limits is not None:
+        df_results = df_results[(df_results["chi_squared"] >= min(chi_sqr_limits)) & (df_results["chi_squared"] <= max(chi_sqr_limits))]
+    if macroturb_limits is not None:
+        df_results = df_results[(df_results["Macroturb"] >= min(macroturb_limits)) & (df_results["Macroturb"] <= max(macroturb_limits))]
+    if microturb_limits is not None:
+        df_results = df_results[(df_results["Microturb"] >= min(microturb_limits)) & (df_results["Microturb"] <= max(microturb_limits))]
+    if rotation_limits is not None:
+        df_results = df_results[(df_results["rotation"] >= min(rotation_limits)) & (df_results["rotation"] <= max(rotation_limits))]
+    if ew_limits is not None:
+        df_results = df_results[(df_results["ew"] >= min(ew_limits)) & (df_results["ew"] <= max(ew_limits))]
+    if abund_limits is not None and abund_to_limit is not None:
+        for abund_limit, one_abund_to_limit in zip(abund_limits, abund_to_limit):
+            df_results = df_results[(df_results[one_abund_to_limit] >= min(abund_limit)) & (df_results[one_abund_to_limit] <= max(abund_limit))]
+
+    columns = df_results.columns.values
+    for column in columns:
+        if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
+            if print_columns is not None:
+                if column in print_columns:
+                    print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
+            else:
+                print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
+            #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
+            #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
+
+
+
 
 
 if __name__ == '__main__':

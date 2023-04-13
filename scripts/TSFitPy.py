@@ -1368,7 +1368,7 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
         if spectra_to_fit.fit_macroturb:
             spectra_to_fit.macroturb = res.x[1]
         macroturb = spectra_to_fit.macroturb
-        if spectra_to_fit.fit_macroturb:
+        if spectra_to_fit.fit_rotation:
             spectra_to_fit.rotation = res.x[-1]
         rotation = spectra_to_fit.rotation
 
@@ -1820,6 +1820,9 @@ def run_TSFitPy(output_folder_title):
     print(f"Temporary directory name: {Spectra.global_temp_dir}")
     create_dir(Spectra.global_temp_dir)
     create_dir(Spectra.output_folder)
+
+    # copy config file into output folder (for easier plotting)
+    shutil.copyfile(config_location, os.path.join(Spectra.output_folder, "configuration.txt"))
 
     if Spectra.fitting_mode == "teff":
         Spectra.fit_teff = True
