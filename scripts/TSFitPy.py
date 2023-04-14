@@ -1342,7 +1342,7 @@ def lbl_teff_chi_sqr(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     rotation = 9999
