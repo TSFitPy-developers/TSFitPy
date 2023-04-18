@@ -751,83 +751,66 @@ class TurboSpectrum:
 
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
         if self.nlte_flag == True:
-            for element, abundance in self.free_abundances.items():
-                # print(element,self.model_atom_file[element])
-                # print("*******************")
-                # print(abundance, self.free_abundances[element])
-                # print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
-                # print("{:.2f}".format(round(float(abundance),2) + float(solar_abundances[element])))
-                # print("{}".format(float(self.metallicity)))
-                # print("{:.2f}".format(round(float(self.metallicity),2)))
-                # print("{}".format(abundance))
-                # print("{:.2f}".format(round(float(abundance),2)))
-                # print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
-                # print("*******************")
-                # print(element,self.model_atom_file[element])
-                if element not in self.model_atom_file:
-                    self.model_atom_file[element] = ""
-                if self.model_atom_file[element] != "":
-                    if self.verbose:
-                        stdout = None
-                        stderr = subprocess.STDOUT
-                    else:
-                        stdout = open('/dev/null', 'w')
-                        stderr = subprocess.STDOUT
-                    # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
-                    # Write configuration input for interpolator
-                    output = os_path.join(self.tmp_dir, self.marcs_model_name)
-                    # output = os_path.join('Testout/', self.marcs_model_name)
-                    # print(output)
-                    model_test = "{}.test".format(output)
-                    interpol_config = ""
-                    self.marcs_model_list_global = marcs_model_list
-                    # print(marcs_model_list)
-                    # print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
-                    for line in marcs_model_list:
-                        interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-                    interpol_config += "'{}.interpol'\n".format(output)
-                    interpol_config += "'{}.alt'\n".format(output)
-                    interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
-                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
-                        element]))  # needed for nlte interpolator
-                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
-                        element]))  # needed for nlte interpolator
-                    # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
-                    # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
-                    # interpol_config += "'1D_NLTE_grid_Fe_MARCSfullGrid.bin'\n" #needed for nlte interpolator
-                    # interpol_config += "'auxData_Fe_MARCSfullGrid.txt'\n" #needed for nlte interpolator
-                    interpol_config += "{}\n".format(self.aux_file_length_dict[element])
-                    interpol_config += "{}\n".format(self.t_eff)
-                    interpol_config += "{}\n".format(self.log_g)
-                    interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-                    interpol_config += "{:.6f}\n".format(
-                        round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
-                    interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-                    interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-                    interpol_config += "'{}'\n".format(model_test)
+            for element in self.model_atom_file:
+                if element in self.free_abundances:
+                    # if element abundance was given, then pass it to the NLTE
+                    # self.free_abundances[element] = [X/Fe] + [Fe/H] = [X/H] (already scaled from before)
+                    # solar_abundances[element] = abundance as A(X)
+                    element_abundance = self.free_abundances[element] + float(solar_abundances[element])
+                else:
+                    # else, take solar abundance and scale with metallicity
+                    # solar_abundances[element] = abundance as A(X)
+                    # self.metallicity = [Fe/H]
+                    element_abundance = float(solar_abundances[element]) + self.metallicity
 
-                    # Now we run the FORTRAN model interpolator
-                    # print(self.free_abundances["Ba"])
-                    try:
-                        if self.atmosphere_dimension == "1D":
-                            p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
-                                                 stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                            p.stdin.write(bytes(interpol_config, 'utf-8'))
-                            stdout, stderr = p.communicate()
-                        elif self.atmosphere_dimension == "3D":
-                            p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
-                                                 stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                            p.stdin.write(bytes(interpol_config, 'utf-8'))
-                            stdout, stderr = p.communicate()
-                    except subprocess.CalledProcessError:
-                        # print("spud")
-                        return {
-                            "interpol_config": interpol_config,
-                            "errors": "MARCS model atmosphere interpolation failed."
-                        }
-                    # print("spud")
-                    if spherical:
-                        self.turbulent_velocity = microturbulence
+                if self.verbose:
+                    stdout = None
+                    stderr = subprocess.STDOUT
+                else:
+                    stdout = open('/dev/null', 'w')
+                    stderr = subprocess.STDOUT
+                # Write configuration input for interpolator
+                output = os_path.join(self.tmp_dir, self.marcs_model_name)
+                model_test = "{}.test".format(output)
+                interpol_config = ""
+                self.marcs_model_list_global = marcs_model_list
+                for line in marcs_model_list:
+                    interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
+                interpol_config += "'{}.interpol'\n".format(output)
+                interpol_config += "'{}.alt'\n".format(output)
+                interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
+                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
+                    element]))  # needed for nlte interpolator
+                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
+                    element]))  # needed for nlte interpolator
+                interpol_config += "{}\n".format(self.aux_file_length_dict[element])
+                interpol_config += "{}\n".format(self.t_eff)
+                interpol_config += "{}\n".format(self.log_g)
+                interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
+                interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
+                interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
+                interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
+                interpol_config += "'{}'\n".format(model_test)
+
+                # Now we run the FORTRAN model interpolator
+                try:
+                    if self.atmosphere_dimension == "1D":
+                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                        p.stdin.write(bytes(interpol_config, 'utf-8'))
+                        stdout, stderr = p.communicate()
+                    elif self.atmosphere_dimension == "3D":
+                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                        p.stdin.write(bytes(interpol_config, 'utf-8'))
+                        stdout, stderr = p.communicate()
+                except subprocess.CalledProcessError:
+                    return {
+                        "interpol_config": interpol_config,
+                        "errors": "MARCS model atmosphere interpolation failed."
+                    }
+                if spherical:
+                    self.turbulent_velocity = microturbulence
         elif self.nlte_flag == False:
             if self.verbose:
                 stdout = None
@@ -1024,14 +1007,9 @@ class TurboSpectrum:
 
             # generate models for low and high parts
             if self.nlte_flag:
-                for element, abundance in self.free_abundances.items():
-                    if element not in self.model_atom_file:
-                        self.model_atom_file[element] = ""
-                    if self.model_atom_file[element] != "":
+                for element in self.model_atom_file:
                         atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
                                                                                 element)
-                        # low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        # low_coef_dat_name += '_{}_coef.dat'.format(element)
                         low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
                         f_coef_low = open(low_coef_dat_name, 'r')
                         lines_coef_low = f_coef_low.read().splitlines()
@@ -1039,6 +1017,7 @@ class TurboSpectrum:
 
                         high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                         high_coef_dat_name += '_{}_coef.dat'.format(element)
+
                         high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
                         f_coef_high = open(high_coef_dat_name, 'r')
                         lines_coef_high = f_coef_high.read().splitlines()
@@ -1106,19 +1085,8 @@ class TurboSpectrum:
         """
         Generate the SPECIES_LTE_NLTE.dat file for TS to determine what elements are NLTE
         """
-        # data_path = self.turbospec_path.replace("exec/","DATA/")
         data_path = self.tmp_dir
-
-        nlte = "nlte" if self.nlte_flag == True else "lte"
-
-        # if len(self.free_abundances.items()) == 1:
-        #    nlte_fe = nlte
-        # else:
-        #    nlte_fe =
-
         file = open("{}/SPECIES_LTE_NLTE_{:08d}.dat".format(data_path, self.counter_spectra), 'w')
-        # print("# This file controls which species are treated in LTE/NLTE", file=file)
-        # print("# It also gives the path to the model atom and the departure files", file=file)
         file.write("# This file controls which species are treated in LTE/NLTE\n")
         file.write("# It also gives the path to the model atom and the departure files\n")
         file.write("# First created 2021-02-22\n")
@@ -1128,31 +1096,26 @@ class TurboSpectrum:
         file.write("# atomic number / name / (n)lte / model atom / departure file / binary or ascii departure file\n")
         file.write("#\n")
         file.write("# path for model atom files     ! don't change this line !\n")
-        file.write("{}\n".format(self.model_atom_path))
+        file.write(f"{self.model_atom_path}\n")
         file.write("#\n")
         file.write("# path for departure files      ! don't change this line !\n")
-        file.write("{}\n".format(self.tmp_dir))
+        file.write(f"{self.tmp_dir}\n")
         file.write("#\n")
         file.write("# atomic (N)LTE setup\n")
-        # file.write("1    'H' 'lte'   'atom.h20'  ' ' 'binary'\n")
-        if self.nlte_flag == True:
-            for element, abundance in self.free_abundances.items():
+        if self.nlte_flag:
+            for element in self.model_atom_file:
+                # write all nlte elements
+                atomic_number = periodic_table.index(element)
+                file.write(f"{atomic_number}  '{element}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
+            for element in self.free_abundances:
+                # now check for any lte elements which have a specific given abundance and write them too
                 atomic_number = periodic_table.index(element)
                 if element not in self.model_atom_file:
-                    self.model_atom_file[element] = ""
-                if self.model_atom_file[element] == "":
-                    file.write("{}  '{}'  'lte'  ''   '' 'ascii'\n".format(atomic_number, element, nlte,
-                                                                           self.model_atom_file[element],
-                                                                           self.marcs_model_name, element))
-                else:
-                    file.write("{}  '{}'  '{}'  '{}'   '{}_{}_coef.dat' 'ascii'\n".format(atomic_number, element, nlte,
-                                                                                          self.model_atom_file[element],
-                                                                                          self.marcs_model_name,
-                                                                                          element))
-        elif self.nlte_flag == False:
-            for element, abundance in self.free_abundances.items():
+                    file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
+        else:
+            for element in self.free_abundances:
                 atomic_number = periodic_table.index(element)
-                file.write("{}  '{}'  '{}'  ''   '' 'ascii'\n".format(atomic_number, element, nlte))
+                file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
         file.close()
 
     def make_babsma_bsyn_file(self, spherical):
@@ -1170,41 +1133,22 @@ class TurboSpectrum:
             else:
                 alpha = 0
 
-        # Allow for user input abundances as a dictionary of the form {element: abundance}
-        # deprecated 8-2022
-        """
-        if self.free_abundances is None:
-            individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '0'\n"
-        else:
-            individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(self.free_abundances))
-
-            for element, abundance in self.free_abundances.items():
-                assert element in solar_abundances, "Cannot proceed as solar abundance for element <{}> is unknown". \
-                    format(element)
-
-                atomic_number = periodic_table.index(element)
-                individual_abundances += "{:d}  {:.2f}\n".format(int(atomic_number),
-                                                                 float(solar_abundances[element]) + round(float(abundance),2))
-        #print(individual_abundances.strip())
-        #print(individual_abundances)
-        """
-
         # Updated abundances to below to allow user to set solar abundances through solar_abundances.py and not have to adjust make_abund.f
 
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
         
         item_abund = {}
         item_abund['H'] = 12.00
-        item_abund[periodic_table[2]] = float(
-            solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+        item_abund[periodic_table[2]] = float(solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
         for i in range(3, len(periodic_table)):
+            # first take solar scaled abundances as A(X)
             item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 6)
         if self.free_abundances is not None:
+            # and if any abundance is passed, take it and convert to A(X)
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 6)
         for i in range(1, len(periodic_table)):
             individual_abundances += "{:d}  {:.6f}\n".format(i, item_abund[periodic_table[i]])
-        # print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
 
@@ -1218,19 +1162,6 @@ class TurboSpectrum:
             for isotope, ratio in solar_isotopes.items():
                 individual_isotopes += "{}  {:6f}\n".format(isotope, ratio)
 
-        # if self.free_isotopes is None:
-        #    free_isotopes = "'ISOTOPES : ' '{:d}'\n".format(len(self.))
-        # else:
-        #    individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(self.free_abundances))
-
-        #    for element, abundance in self.free_abundances.items():
-        #        assert element in solar_abundances, "Cannot proceed as solar abundance for element <{}> is unknown". \
-        #            format(element)
-
-        #        atomic_number = periodic_table.index(element)
-        #        individual_abundances += "{:d}  {:.2f}\n".format(int(atomic_number),
-        #                                                        float(solar_abundances[element]) + float(abundance))
-        # print(individual_abundances.strip())
         # Make a list of line-list files
         # We start by getting a list of all files in the line list directories we've been pointed towards,
         # excluding any text files we find.
@@ -1247,9 +1178,6 @@ class TurboSpectrum:
         line_lists = "'NFILES   :' '{:d}'\n".format(len(line_list_files))
         for item in line_list_files:
             line_lists += "{}\n".format(item)
-
-        # print(self.line_list_paths)
-        # print(line_list_files)
 
         # Build bsyn configuration file
         spherical_boolean_code = "T" if spherical else "F"
