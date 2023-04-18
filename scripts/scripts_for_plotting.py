@@ -353,7 +353,7 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
             #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
 
-def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vturb, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
+def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
                         elements_in_nlte, element_abundances, resolution=0, macro=0, rotation=0):
     for element in element_abundances:
         element_abundances[element] += met
@@ -408,8 +408,8 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vturb, lmin, lmax,
         turbospec_path=turbospectrum_paths["turbospec_path"],
         interpol_path=turbospectrum_paths["interpol_path"],
         line_list_paths=line_list_path_trimmed,
-        marcs_grid_path=turbospectrum_paths["model_atmosphere_grid_path"],
-        marcs_grid_list=turbospectrum_paths["model_atmosphere_list"],
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
         model_atom_path=turbospectrum_paths["model_atom_path"],
         departure_file_path=turbospectrum_paths["departure_file_path"],
         aux_file_length_dict=aux_file_length_dict,
@@ -421,7 +421,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vturb, lmin, lmax,
         marcs_values=marcs_values)
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                 turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
+                 turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
                  free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
                  atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
