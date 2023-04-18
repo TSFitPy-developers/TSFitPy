@@ -398,7 +398,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
-    create_window_linelist([lmin - 3], [lmax + 3], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
+    create_window_linelist([lmin - 4], [lmax + 4], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
     print("Trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
@@ -420,7 +420,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         marcs_values=marcs_values)
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
-                 turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
+                 turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin - 3, lambda_max=lmax + 3,
                  free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
                  atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
