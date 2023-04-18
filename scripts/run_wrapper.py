@@ -222,8 +222,8 @@ else:
     flux_mod_macro = flux_mod_conv
 
 if rotation != 0.0:
-    wave_mod, flux_norm_mod = conv_macroturbulence(wave_mod_macro, flux_norm_mod_macro, rotation)
-    wave_mod, flux_mod = conv_macroturbulence(wave_mod_macro, flux_mod_macro, rotation)
+    wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+    wave_mod, flux_mod = conv_rotation(wave_mod_macro, flux_mod_macro, rotation)
 else:
     wave_mod = wave_mod_macro
     flux_norm_mod = flux_norm_mod_macro
