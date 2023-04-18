@@ -1892,11 +1892,11 @@ def run_TSFitPy(output_folder_title):
 
                 for elements_to_save in nlte_items_config:
                     nlte_config_to_write.add_section(elements_to_save)
-                    nlte_config_to_write[elements_to_save]["atom_file"] = nlte_items_config[elements_to_save][0]
                     nlte_config_to_write[elements_to_save]["1d_bin"] = nlte_items_config[elements_to_save][1]
                     nlte_config_to_write[elements_to_save]["1d_aux"] = nlte_items_config[elements_to_save][2]
                     nlte_config_to_write[elements_to_save]["3d_bin"] = nlte_items_config[elements_to_save][3]
                     nlte_config_to_write[elements_to_save]["3d_aux"] = nlte_items_config[elements_to_save][4]
+                    nlte_config_to_write[elements_to_save]["atom_file"] = nlte_items_config[elements_to_save][0]
 
                 with open(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
                     new_config_file.write("# You can add more or change models paths/names here if needed\n"
@@ -1906,7 +1906,7 @@ def run_TSFitPy(output_folder_title):
                                           "\n"
                                           "# 14 elements\n"
                                           "# 3D and 1D models: Ba, Ca, Fe, H, Mg, Mn, Ni, O\n"
-                                          "# 1D models only: Co, Na, Si, Sr, Ti, Y\n")
+                                          "# 1D models only: Co, Na, Si, Sr, Ti, Y\n\n")
                     nlte_config_to_write.write(new_config_file)
 
                 warn(f"Added {Spectra.departure_file_path, 'nlte_filenames.cfg'} with paths. Please check it or maybe "
