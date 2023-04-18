@@ -11,9 +11,9 @@ import pandas as pd
 from scipy.stats import gaussian_kde
 from warnings import warn
 
-from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
-from scripts.create_window_linelist_function import create_window_linelist
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from convolve import conv_macroturbulence, conv_rotation, conv_res
+from create_window_linelist_function import create_window_linelist
+from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
@@ -400,7 +400,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     print("Trimming")
     include_molecules = True
     create_window_linelist([lmin], [lmax], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
-    print("trimming done")
+    print("Trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
@@ -426,9 +426,9 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                  atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
-
+    print("Running TS")
     ts.run_turbospectrum_and_atmosphere()
-
+    print("TS completed")
     wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
                                                                   usecols=(0, 1), unpack=True)
     shutil.rmtree(temp_directory)
