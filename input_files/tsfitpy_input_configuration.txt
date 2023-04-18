@@ -24,9 +24,6 @@ mode = lbl
 #whether or not molecules are included in the trimmed linelist ('True' or 'False')
 include_molecules = True
 #
-#whether to use nlte or not. ('True' or 'False')
-nlte = False
-#
 #whether or not microturbulence is fit as a parameter or calculated based on Teff and logg ('Yes' or 'No') #should be set to 'No' if using 3D atmos #only works in lbl mode # or "Input" if one adds a column to the fitlist
 fit_microturb = No
 #whether or not macroturbulence is fit as a parameter or taken from the value below ('Yes' / "No" / "Input")
@@ -37,16 +34,17 @@ fit_rotation = No
 #element fit: which elements to fit. Example: Mg Fe C . One element is faster
 element = Fe
 #
+#whether to use nlte or not. ('True' or 'False')
+nlte = False
+#
+#elements to have in NLTE (just choose whichever elements you want, whether you fit them or not, as few or many as you want). E.g. :
+# nlte_elements = Mg Ca Fe
+nlte_elements =
+#
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
 #TS will only generate spectra in the given segments to reduce calculation time.
 linemask_file = Fe/fe-lmask_test.txt
 segment_file = Fe/fe-seg_test.txt
-#
-#other files needed for nlte calculations, need a list of files one binary, aux, and model atom for each element (iron last) comment out if not using nlte. IRON ALWAYS NEEDED
-#will only be used if NLTE = True
-departure_coefficient_binary = Fe/output_NLTEgrid4TS_MARCS_May-07-2021.bin
-departure_coefficient_aux = Fe/auxData_NLTEgrid4TS_MARCS_May-07-2021.dat
-model_atom_file = atom.fe607
 #
 #spectrum parameters (wavelength in angstrom); only used if mode = all
 wavelength_minimum = 5300
@@ -63,17 +61,13 @@ output_file = output
 #Multiprocessing: workers is the requested amount of CPUs
 workers = 1
 #if want to give initial guess to the element, list those elements here
-init_guess_elem =
+#init_guess_elem = Mg
 #location to files that give the initial guess to the abundance of elements (same order sa the element)
-init_guess_elem_location =
+#init_guess_elem_location = location/mg.txt
 #If you know abundance of some element and want to fit with it (i.e. assume that it is correct/constant), can write which element it is
 #input_elem_abundance = Ti
 #Location for the elemental abundance. First column spectra name, second column is abundance for the element above. Same order as element above
 #input_elem_abundance_location = location/ti.txt
-#NLTE data for inputs
-#input_elem_departure_coefficient_binary = Ti/NLTEgrid4TS_TI_MARCS_Feb-21-2022.bin
-#input_elem_departure_coefficient_aux = Ti/auxData_TI_MARCS_Feb-21-2022.dat
-#input_elem_model_atom_file = atom.ti503
 #bounds for the minimisation -> HARD BOUND, will NEVER fit outside these bounds
 bounds_macro = 0 30        # km/s, can never be less than 0, mAAAAcro
 bounds_rotation = 0 30        # km/s, can never be less than 0

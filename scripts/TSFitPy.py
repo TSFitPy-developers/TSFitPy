@@ -1,18 +1,15 @@
 from __future__ import annotations
+
+from configparser import ConfigParser
+from warnings import warn
 import numpy as np
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
-# from multiprocessing import Pool
-# import h5py
-# import matplotlib.pyplot as plt
 from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-# from turbospectrum_class_3d import TurboSpectrum_3D
 import time
-# import math
 import os
 from os import path as os_path
-# import glob
 import datetime
 try:
     from dask.distributed import Client, get_client, secede, rejoin
@@ -21,13 +18,11 @@ except (ModuleNotFoundError, ImportError):
     #pass
 import shutil
 import socket
-from typing import Union
 from sys import argv
 import collections
 import scipy
 from convolve import conv_rotation, conv_macroturbulence, conv_res
 from create_window_linelist_function import create_window_linelist
-
 
 
 def create_dir(directory: str):
@@ -1531,6 +1526,10 @@ def run_TSFitPy(output_folder_title):
     depart_bin_file_input_elem = []
     depart_aux_file_input_elem = []
     model_atom_file_input_elem = []
+    elements_to_do_in_nlte = []
+
+    nlte_config_outdated = False
+    need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
 
     initial_guess_string = None
 
@@ -1644,24 +1643,28 @@ def run_TSFitPy(output_folder_title):
                     segment_file = fields[2]
                 # if fields[0] == "continuum_file":
                 #    continuum_file = fields[2]
+
                 if field_name == "departure_coefficient_binary" and Spectra.nlte_flag:
-                    for i in range(2, len(fields)):
-                        depart_bin_file.append(fields[i])
+                    nlte_config_outdated = True
                 if field_name == "departure_coefficient_aux" and Spectra.nlte_flag:
-                    for i in range(2, len(fields)):
-                        depart_aux_file.append(fields[i])
+                    nlte_config_outdated = True
                 if field_name == "model_atom_file" and Spectra.nlte_flag:
+                    nlte_config_outdated = True
                     for i in range(2, len(fields)):
                         model_atom_file.append(fields[i])
                 if field_name == "input_elem_departure_coefficient_binary" and Spectra.nlte_flag:
-                    for i in range(2, len(fields)):
-                        depart_bin_file_input_elem.append(fields[i])
+                    nlte_config_outdated = True
                 if field_name == "input_elem_departure_coefficient_aux" and Spectra.nlte_flag:
-                    for i in range(2, len(fields)):
-                        depart_aux_file_input_elem.append(fields[i])
+                    nlte_config_outdated = True
                 if field_name == "input_elem_model_atom_file" and Spectra.nlte_flag:
+                    nlte_config_outdated = True
                     for i in range(2, len(fields)):
                         model_atom_file_input_elem.append(fields[i])
+
+                if field_name == "nlte_elements" and Spectra.nlte_flag:
+                    need_to_add_new_nlte_config = False
+                    for i in range(len(fields) - 2):
+                        elements_to_do_in_nlte.append(fields[2 + i])
                 if field_name == "wavelength_minimum":
                     Spectra.lmin = float(fields[2])
                 if field_name == "wavelength_maximum":
@@ -1779,35 +1782,204 @@ def run_TSFitPy(output_folder_title):
 
     # load NLTE data dicts
     if Spectra.nlte_flag:
-        depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(elements_to_fit,
-                                                                                                   depart_bin_file,
-                                                                                                   depart_aux_file,
-                                                                                                   model_atom_file)
+        nlte_elements_add_to_og_config = []
+        if nlte_config_outdated:
+            print("\n\nDEPRECATION WARNING PLEASE CHECK IT\n\n")
+            warn("There is no need to specify paths of NLTE elements. Now you can just specify which elements you want "
+                 "in NLTE and the code will load everything. This will cause error in the future.", DeprecationWarning, stacklevel=2)
+            if not os.path.exists(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg")):
+                nlte_config_to_write = ConfigParser()
 
-        input_elem_depart_bin_file_dict, input_elem_depart_aux_file_dict, input_elem_model_atom_file_dict = load_nlte_files_in_dict(input_elem_abundance,
-                                                                                                   depart_bin_file_input_elem,
-                                                                                                   depart_aux_file_input_elem,
-                                                                                                   model_atom_file_input_elem, load_fe=False)
+                nlte_items_config = {"Ba": [
+                                            'atom.ba111',
+                                            'Ba/NLTEgrid_Ba_MARCS_May-10-2021.bin',
+                                            'Ba/auxData_Ba_MARCS_May-10-2021.txt',
+                                            'Ba/NLTEgrid_Ba_STAGGERmean3D_May-10-2021.bin',
+                                            'Ba/auxData_output_Ba_mean3D_May-10-2021_marcs_names.txt'
+                                        ],
+                                     "Ca": [
+                                         'atom.ca105b',
+                                         'Ca/NLTEgrid4TS_Ca_MARCS_Jun-02-2021.bin',
+                                         'Ca/auxData_Ca_MARCS_Jun-02-2021.dat',
+                                         'Ca/NLTEgrid4TS_Ca_STAGGERmean3D_May-18-2021.bin',
+                                         'Ca/auxData_Ca_STAGGERmean3D_May-18-2021_marcs_names.txt'
+                                    ],
+                                     "Co": [
+                                         'atom.co247',
+                                         'Co/NLTEgrid4TS_CO_MARCS_Mar-15-2023.bin',
+                                         'Co/auxData_CO_MARCS_Mar-15-2023.dat',
+                                         '',
+                                         ''
+                                        ],
+                                     "Fe": [
+                                         'atom.fe607a',
+                                         'Fe/NLTEgrid4TS_Fe_MARCS_May-07-2021.bin',
+                                         'Fe/auxData_Fe_MARCS_May-07-2021.dat',
+                                         'Fe/NLTEgrid4TS_Fe_STAGGERmean3D_May-21-2021.bin',
+                                         'Fe/auxData_Fe_STAGGERmean3D_May-21-2021_marcs_names.txt'
+                                     ],
+                                     "H": [
+                                         'atom.h20',
+                                         'H/NLTEgrid_H_MARCS_May-10-2021.bin',
+                                         'H/auxData_H_MARCS_May-10-2021.txt',
+                                         'H/NLTEgrid4TS_H_STAGGERmean3D_Jun-17-2021.bin',
+                                         'H/auxData_H_STAGGERmean3D_Jun-17-2021_marcs_names.txt'
+                                     ],
+                                     "Mg": [
+                                         'atom.mg86b',
+                                         'Mg/NLTEgrid4TS_Mg_MARCS_Jun-02-2021.bin',
+                                         'Mg/auxData_Mg_MARCS_Jun-02-2021.dat',
+                                         'Mg/NLTEgrid_Mg_STAGGERmean3D_May-17-2021.bin',
+                                         'Mg/auxData_Mg_STAGGEmean3D_May-17-2021_marcs_names.txt'
+                                     ],
+                                     "Mn": [
+                                         'atom.mn281kbc',
+                                         'Mn/NLTEgrid4TS_MN_MARCS_Mar-15-2023.bin',
+                                         'Mn/auxData_MN_MARCS_Mar-15-2023.dat',
+                                         'Mn/NLTEgrid4TS_Mn_STAGGERmean3D_May-17-2021.bin',
+                                         'Mn/auxData_Mn_STAGGERmean3D_May-17-2021_marcs_names.txt'
+                                     ],
+                                    "Na": [
+                                        'atom.na102',
+                                        'Na/NLTEgrid4TS_NA_MARCS_Feb-20-2022.bin',
+                                        'Na/auxData_Na_MARCS_Feb-20-2022.dat',
+                                        '',
+                                        ''
+                                    ],
+                                    "Ni": [
+                                        'atom.ni538qm',
+                                        'Ni/NLTEgrid4TS_Ni_MARCS_Jan-31-2022.bin',
+                                        'Ni/auxData_Ni_MARCS_Jan-21-2022.txt',
+                                        'Ni/NLTEgrid4TS_NI_STAGGERmean3D_Jun-10-2021.bin',
+                                        'Ni/auxData_NI_STAGGERmean3DJun-10-2021_marcs_names.txt'
+                                    ],
+                                    "O": [
+                                        'atom.o41f',
+                                        'O/NLTEgrid4TS_O_MARCS_May-21-2021.bin',
+                                        'O/auxData_O_MARCS_May-21-2021.txt',
+                                        'O/NLTEgrid4TS_O_STAGGERmean3D_May-18-2021.bin',
+                                        'O/auxData_O_STAGGER_May-18-2021_marcs_names.txt'
+                                    ],
+                                    "Si": [
+                                        'atom.si340',
+                                        'Si/NLTEgrid4TS_Si_MARCS_Feb-13-2022.bin',
+                                        'Si/auxData_Si_MARCS_Feb-13-2022.dat',
+                                        '',
+                                        ''
+                                    ],
+                                    "Sr": [
+                                        'atom.sr191',
+                                        'Sr/NLTEgrid4TS_Sr_MARCS_Mar-15-2023.bin',
+                                        'Sr/auxData_Sr_MARCS_Mar-15-2023.dat',
+                                        '',
+                                        ''
+                                    ],
+                                    "Ti": [
+                                        'atom.ti503',
+                                        'Ti/NLTEgrid4TS_TI_MARCS_Feb-21-2022.bin',
+                                        'Ti/auxData_TI_MARCS_Feb-21-2022.dat',
+                                        '',
+                                        ''
+                                    ],
+                                    "Y": [
+                                        'atom.y423',
+                                        'Y/NLTEgrid4TS_Y_MARCS_Mar-27-2023.bin',
+                                        'Y/auxData_Y_MARCS_Mar-27-2023.dat',
+                                        '',
+                                        ''
+                                    ]
+                                     }
 
-        depart_bin_file_dict = {**depart_bin_file_dict, **input_elem_depart_bin_file_dict}
-        depart_aux_file_dict = {**depart_aux_file_dict, **input_elem_depart_aux_file_dict}
-        model_atom_file_dict = {**model_atom_file_dict, **input_elem_model_atom_file_dict}
+                for elements_to_save in nlte_items_config:
+                    nlte_config_to_write.add_section(elements_to_save)
+                    nlte_config_to_write[elements_to_save]["1d_bin"] = nlte_items_config[elements_to_save][1]
+                    nlte_config_to_write[elements_to_save]["1d_aux"] = nlte_items_config[elements_to_save][2]
+                    nlte_config_to_write[elements_to_save]["3d_bin"] = nlte_items_config[elements_to_save][3]
+                    nlte_config_to_write[elements_to_save]["3d_aux"] = nlte_items_config[elements_to_save][4]
+                    nlte_config_to_write[elements_to_save]["atom_file"] = nlte_items_config[elements_to_save][0]
+
+                with open(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
+                    new_config_file.write("# You can add more or change models paths/names here if needed\n"
+                                          "#\n"
+                                          "# Changelog:\n"
+                                          "# 2023 Apr 18: File creation date\n"
+                                          "\n"
+                                          "# 14 elements\n"
+                                          "# 3D and 1D models: Ba, Ca, Fe, H, Mg, Mn, Ni, O\n"
+                                          "# 1D models only: Co, Na, Si, Sr, Ti, Y\n\n")
+                    nlte_config_to_write.write(new_config_file)
+
+                warn(f"Added {Spectra.departure_file_path, 'nlte_filenames.cfg'} with paths. Please check it or maybe "
+                     f"download updated one from the GitHub", DeprecationWarning, stacklevel=2)
+            if need_to_add_new_nlte_config:
+                for element in model_atom_file + model_atom_file_input_elem:
+                    if ".ba" in element:
+                        nlte_elements_add_to_og_config.append("Ba")
+                    if ".ca" in element:
+                        nlte_elements_add_to_og_config.append("Ca")
+                    if ".co" in element:
+                        nlte_elements_add_to_og_config.append("Co")
+                    if ".fe" in element:
+                        nlte_elements_add_to_og_config.append("Fe")
+                    if ".h" in element:
+                        nlte_elements_add_to_og_config.append("H")
+                    if ".mg" in element:
+                        nlte_elements_add_to_og_config.append("Mg")
+                    if ".mn" in element:
+                        nlte_elements_add_to_og_config.append("Mn")
+                    if ".na" in element:
+                        nlte_elements_add_to_og_config.append("Na")
+                    if ".ni" in element:
+                        nlte_elements_add_to_og_config.append("Ni")
+                    if ".o" in element:
+                        nlte_elements_add_to_og_config.append("O")
+                    if ".si" in element:
+                        nlte_elements_add_to_og_config.append("Si")
+                    if ".sr" in element:
+                        nlte_elements_add_to_og_config.append("Sr")
+                    if ".ti" in element:
+                        nlte_elements_add_to_og_config.append("Ti")
+                    if ".y" in element:
+                        nlte_elements_add_to_og_config.append("Y")
+
+                nlte_elements_to_write = ""
+                for element in nlte_elements_add_to_og_config:
+                    nlte_elements_to_write = f"{nlte_elements_to_write} {element}"
+
+                with open(config_location, "a") as og_config_file:
+                    og_config_file.write(f"\n#elements to have in NLTE (just choose whichever elements you want, whether you fit them or not, as few or many as you want). E.g. :"
+                                         f"# nlte_elements = Mg Ca Fe\n"
+                                         f"nlte_elements = {nlte_elements_to_write}\n"
+                                         f"#\n")
+                    warn(f"Added how to add NLTE elements now in the {config_location}", DeprecationWarning, stacklevel=2)
+
+        if len(elements_to_do_in_nlte) == 0 and len(nlte_elements_add_to_og_config) > 0:
+            elements_to_do_in_nlte = nlte_elements_add_to_og_config
+
+        nlte_config = ConfigParser()
+        nlte_config.read(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg"))
+
+        depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
+
+        for element in elements_to_do_in_nlte:
+            if Spectra.atmosphere_type == "1D":
+                bin_config_name, aux_config_name = "1d_bin", "1d_aux"
+            else:
+                bin_config_name, aux_config_name = "3d_bin", "3d_aux"
+            depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
+            depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
+            model_atom_file_dict[element] = nlte_config[element]["atom_file"]
 
         print("NLTE loaded. Please check that elements correspond to their correct binary files:")
         for key in depart_bin_file_dict:
             print(f"{key}: {depart_bin_file_dict[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
 
-        print("If files do not correspond, please check config file. Fitted elements should go in the same order as "
-              "the NLTE file locations. If Fe is not fitted, then it should be added last to the NLTE file location. "
-              "Elements without NLTE binary files do not need them.")
+        print(f"If files do not correspond, please check config file {os.path.join(Spectra.departure_file_path, 'nlte_filenames.cfg')}. "
+              f"Elements without NLTE binary files do not need them.")
 
         Spectra.depart_bin_file_dict = depart_bin_file_dict
         Spectra.depart_aux_file_dict = depart_aux_file_dict
         Spectra.model_atom_file_dict = model_atom_file_dict
-        Spectra.aux_file_length_dict = {}
-
-        for element in model_atom_file_dict:
-            Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
     #prevent overwriting
     if os.path.exists(Spectra.output_folder):
@@ -2037,12 +2209,12 @@ def run_TSFitPy(output_folder_title):
     Spectra.marcs_value_keys = marcs_value_keys
     Spectra.marcs_models = marcs_models
     Spectra.marcs_values = marcs_values
-    """TurboSpectrum.model_temperatures = model_temperatures
-    TurboSpectrum.model_logs = model_logs
-    TurboSpectrum.model_mets = model_mets
-    TurboSpectrum.marcs_value_keys = marcs_value_keys
-    TurboSpectrum.marcs_models = marcs_models
-    TurboSpectrum.marcs_values = marcs_values"""
+    if Spectra.nlte_flag:
+        Spectra.aux_file_length_dict = {}
+
+        for element in model_atom_file_dict:
+            Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+
 
     if Spectra.dask_workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
