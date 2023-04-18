@@ -460,6 +460,8 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     plt.xlabel("Wavelength")
     plt.ylabel("Normalised flux")
 
+    return wave_mod, flux_norm_mod
+
 
 
 if __name__ == '__main__':
