@@ -1785,7 +1785,7 @@ def run_TSFitPy(output_folder_title):
     if Spectra.nlte_flag:
         nlte_elements_add_to_og_config = []
         if nlte_config_outdated:
-            print("DEPRECATION WARNING PLEASE CHECK IT")
+            print("\n\nDEPRECATION WARNING PLEASE CHECK IT\n\n")
             warn("There is no need to specify paths of NLTE elements. Now you can just specify which elements you want "
                  "in NLTE and the code will load everything. This will cause error in the future.", DeprecationWarning, stacklevel=2)
             if not os.path.exists(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg")):
