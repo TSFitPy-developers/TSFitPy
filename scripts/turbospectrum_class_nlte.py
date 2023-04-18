@@ -10,7 +10,7 @@ from operator import itemgetter
 import numpy as np
 import math
 
-from solar_abundances import solar_abundances, periodic_table
+from solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
 from solar_isotopes import solar_isotopes
 
 
@@ -369,15 +369,6 @@ class TurboSpectrum:
             marcs_parameters['spherical'] = "p"
             marcs_parameters['mass'] = 0  # All plane-parallel models have mass set to zero
 
-        # quick setting to reduce temperature in case temperature is higher than grid allows, will give warning that it has happened
-        # TODO: logg == 4.0? should be inequality sign maybe?
-        if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":
-            print(
-                "warning temp was {} and the highest value available is 6500. setting temp to 6500 to interpolate model atmosphere. will be {:.2f} for spectrum generation".format(
-                    self.t_eff, self.t_eff))
-            temp_teff = self.t_eff
-            self.t_eff = 6499
-
         # Pick MARCS settings which bracket requested stellar parameters
         interpolate_parameters = ("metallicity", "log_g", "temperature")
 
@@ -482,275 +473,41 @@ class TurboSpectrum:
                 options = self.marcs_values[parameter_to_move]
                 parameter_descriptor = marcs_parameters[parameter_to_move]
 
-                if self.atmosphere_dimension == "1D" or self.atmosphere_dimension == "3D":
-                    if option_no == 0:
-                        parameter_descriptor[2] -= 1
-                        if parameter_descriptor[2] < 0:
-                            return {
-                                "errors":
-                                    "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
-                                    "and due to missing models we could not interpolate.". \
-                                        format(parameter_to_move, options[0], options[-1],
-                                               interpolate_parameters_around[parameter_to_move])
-                            }
-                        # logging.info("Moving lower bound of parameter <{}> from {} to {} and trying again. "
-                        #             "This setting previously had {} failures.".
-                        #             format(parameter_to_move, parameter_descriptor[0],
-                        #                    options[parameter_descriptor[2]], failure_count))
-                        parameter_descriptor[0] = options[parameter_descriptor[2]]
-                    else:
-                        parameter_descriptor[3] += 1
-                        if parameter_descriptor[3] >= len(options):
-                            return {
-                                "errors":
-                                    "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
-                                    "and due to missing models we could not interpolate.". \
-                                        format(parameter_to_move, options[0], options[-1],
-                                               interpolate_parameters_around[parameter_to_move])
-                            }
-                        # logging.info("Moving upper bound of parameter <{}> from {} to {} and trying again. "
-                        #             "This setting previously had {} failures.".
-                        #             format(parameter_to_move, parameter_descriptor[1],
-                        #                    options[parameter_descriptor[3]], failure_count))
-                        parameter_descriptor[1] = options[parameter_descriptor[3]]
-                elif self.atmosphere_dimension == "3D":
-                    # TODO: remove? refactor?
-                    # This part was written to be able to interpolate 3D models when they are not at equal vertices.
-                    # Now it seems like it is not needed? Not removing, but this part of the code will currently
-                    # never run.
-                    marcs_values_new = {}
-                    marcs_values_new["temperature"] = self.model_temperatures
-                    marcs_values_new["log_g"] = self.model_logs
-                    marcs_values_new["metallicity"] = self.model_mets
-
-                    interpolate_parameters = ("temperature", "log_g", "metallicity")
-
-                    def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> \
-                    tuple[int, int]:
-                        uniq_array = np.unique(array)
-                        new_uniq_array = uniq_array[np.isin(uniq_array, values_to_dlt, invert=True)]
-                        if value_to_search in new_uniq_array:
-                            args_to_use_first = np.where(array == value_to_search)[0]
-                            args_to_use_second = args_to_use_first
-                        else:
-                            new_uniq_array = uniq_array[np.where(uniq_array < value_to_search)[0]]
-                            new_uniq_array = new_uniq_array[np.isin(new_uniq_array, values_to_dlt, invert=True)]
-                            first_closest_value = new_uniq_array[
-                                (np.abs(new_uniq_array - value_to_search)).argmin()]
-
-                            new_uniq_array = uniq_array[np.where(uniq_array > value_to_search)[0]]
-                            new_uniq_array = new_uniq_array[np.isin(new_uniq_array, values_to_dlt, invert=True)]
-                            second_closest_value = new_uniq_array[
-                                (np.abs(new_uniq_array - value_to_search)).argmin()]
-
-                            args_to_use_first = np.where(array == first_closest_value)[0]
-                            args_to_use_second = np.where(array == second_closest_value)[0]
-                        # print(args_to_use_first, args_to_use_second)
-                        return args_to_use_first, args_to_use_second
-
-                    def find_interp_indices(value: float, options: np.ndarray[float],
-                                            values_to_ignore: np.ndarray[float]) -> tuple[int, int, list[float, float]]:
-                        # value = interpolate_parameters_around[key]
-                        # options = marcs_values[key]
-                        # options = options[args_to_use]
-                        if (value < np.min(options[np.isin(options, values_to_ignore, invert=True)])) or (
-                                value > np.max(options[np.isin(options, values_to_ignore,
-                                                               invert=True)])):  # checks that the value is within the marcs possible values
-                            return None, None, {
-                                "errors": f"Value of parameter  needs to be in range {np.min(options)} to {np.max(options)}. You requested {value}. OR the other parameters are not within the range"
-                            }
-                        args_to_use_first, args_to_use_second = get_args(value, options, values_to_ignore)
-                        return args_to_use_first, args_to_use_second, [options[args_to_use_first][0],
-                                                                       options[args_to_use_second][0]]
-
-                    temperatures_to_ignore = np.array([])
-                    loggs_to_ignore = np.array([])
-                    metallicities_to_ignore = np.array([])
-
-                    def find_new_marcs_models(temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore):
-                        # temperature
-                        value_temp = interpolate_parameters_around[interpolate_parameters[0]]
-                        options_temp = marcs_values_new[interpolate_parameters[0]]
-                        args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                     options_temp,
-                                                                                                     temperatures_to_ignore)
-
-                        # logg
-                        value_logg = interpolate_parameters_around[interpolate_parameters[1]]
-                        options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                        args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                           options_logg_first,
-                                                                                                           loggs_to_ignore)
-
-                        if args_to_use_first_1 is None:
-                            return np.append(temperatures_to_ignore,
-                                             out_values_temp[0]), loggs_to_ignore, metallicities_to_ignore, False
-
-                        options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                        args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                           options_logg_second,
-                                                                                                           loggs_to_ignore)
-
-                        if args_to_use_first_2 is None:
-                            return np.append(temperatures_to_ignore,
-                                             out_values_temp[1]), loggs_to_ignore, metallicities_to_ignore, False
-
-                        """if args_to_use_first_1 is None:
-                            #options_temp = marcs_values_new[interpolate_parameters[0]]
-                            options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[0]), axis=0)
-                            args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                         options_temp)
-
-                            # logg
-                            options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                            args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                               options_logg_first)
-
-                            options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                            args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                               options_logg_second)
-
-                        if args_to_use_first_2 is None:
-                            #options_temp = marcs_values_new[interpolate_parameters[0]]
-                            options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[1]), axis=0)
-                            args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                         options_temp)
-
-                            # logg
-                            options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                            args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                               options_logg_first)
-
-                            options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                            args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                               options_logg_second)"""
-
-                        # metallicity
-                        value_met = interpolate_parameters_around[interpolate_parameters[2]]
-                        options_met_11 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
-                            args_to_use_first_1]
-                        args_to_use_first_10, args_to_use_second_10, out_values_met_10 = find_interp_indices(value_met,
-                                                                                                             options_met_11,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_10 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[
-                                0]), metallicities_to_ignore, False
-
-                        options_met_12 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
-                            args_to_use_second_1]
-                        args_to_use_first_20, args_to_use_second_20, out_values_met_20 = find_interp_indices(value_met,
-                                                                                                             options_met_12,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_20 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[
-                                1]), metallicities_to_ignore, False
-
-                        options_met_21 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
-                            args_to_use_first_2]
-                        args_to_use_first_30, args_to_use_second_30, out_values_met_30 = find_interp_indices(value_met,
-                                                                                                             options_met_21,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_30 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[
-                                0]), metallicities_to_ignore, False
-
-                        options_met_22 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
-                            args_to_use_second_2]
-                        args_to_use_first_40, args_to_use_second_40, out_values_met_40 = find_interp_indices(value_met,
-                                                                                                             options_met_22,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_40 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[
-                                1]), metallicities_to_ignore, False
-
-                        return [out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10,
-                                out_values_met_20, out_values_met_30, out_values_met_40], None, None, True
-
-                    while True:
-                        temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore, completed = find_new_marcs_models(
-                            temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore)
-                        if completed:
-                            out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10, \
-                                out_values_met_20, out_values_met_30, out_values_met_40 = temperatures_to_ignore[0], \
-                            temperatures_to_ignore[1], temperatures_to_ignore[2], temperatures_to_ignore[3], \
-                            temperatures_to_ignore[4], temperatures_to_ignore[5], temperatures_to_ignore[6]
-                            break
-                        else:
-                            if collections.Counter(temperatures_to_ignore) == collections.Counter(
-                                    marcs_values_new[interpolate_parameters[0]]) \
-                                    or np.min(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore \
-                                    or np.max(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore:
-                                return {"errors": "Could not find the models for interpolation"}
-
-                    def get_marcs_model_atmosphere(model):
-                        dict_iter = self.marcs_models
-
-                        for parameter in self.marcs_value_keys:
-                            if parameter == "spherical":
-                                try:
-                                    value = 'p'
-                                    dict_iter = dict_iter[value]
-                                except KeyError:
-                                    value = 's'
-                                    dict_iter = dict_iter[value]
-                            elif parameter == "mass":
-                                try:
-                                    value = 1.0
-                                    dict_iter = dict_iter[value]
-                                except KeyError:
-                                    value = 0.0
-                                    dict_iter = dict_iter[value]
-                            else:
-                                value = model[parameter]
-                                dict_iter = dict_iter[value]
-
-                        dict_iter = dict_iter['filename']
-                        return dict_iter
-
-                    marcs_models = []
-
-                    try:
-                        model = {"temperature": out_values_temp[0], "log_g": out_values_logg_1[0],
-                                 "metallicity": out_values_met_10[0],
-                                 "model_type": 'st', "spherical": 'p', 'turbulence': 2.0, 'mass': 0.0}
-
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_10[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["log_g"] = out_values_logg_1[1]
-                        model["metallicity"] = out_values_met_20[0]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_20[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["temperature"] = out_values_temp[1]
-                        model["log_g"] = out_values_logg_2[0]
-                        model["metallicity"] = out_values_met_30[0]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_30[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["log_g"] = out_values_logg_2[1]
-                        model["metallicity"] = out_values_met_40[0]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_40[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                    except KeyError:
-                        return {"errors": f"Value of parameter needs to be in range. No clue where though haha"}
-
-                    print("NEWW models:")
-                    for model in marcs_models:
-                        print(model)
-
-                    marcs_model_list = marcs_models
-                    failures = False
+                if option_no == 0:
+                    parameter_descriptor[2] -= 1
+                    if parameter_descriptor[2] < 0:
+                        return {
+                            "errors":
+                                "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
+                                "and due to missing models we could not interpolate.". \
+                                    format(parameter_to_move, options[0], options[-1],
+                                           interpolate_parameters_around[parameter_to_move])
+                        }
+                    # logging.info("Moving lower bound of parameter <{}> from {} to {} and trying again. "
+                    #             "This setting previously had {} failures.".
+                    #             format(parameter_to_move, parameter_descriptor[0],
+                    #                    options[parameter_descriptor[2]], failure_count))
+                    parameter_descriptor[0] = options[parameter_descriptor[2]]
+                else:
+                    parameter_descriptor[3] += 1
+                    if parameter_descriptor[3] >= len(options):
+                        return {
+                            "errors":
+                                "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
+                                "and due to missing models we could not interpolate.". \
+                                    format(parameter_to_move, options[0], options[-1],
+                                           interpolate_parameters_around[parameter_to_move])
+                        }
+                    # logging.info("Moving upper bound of parameter <{}> from {} to {} and trying again. "
+                    #             "This setting previously had {} failures.".
+                    #             format(parameter_to_move, parameter_descriptor[1],
+                    #                    options[parameter_descriptor[3]], failure_count))
+                    parameter_descriptor[1] = options[parameter_descriptor[3]]
 
             # print(marcs_model_list)
 
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
-        if self.nlte_flag == True:
+        if self.nlte_flag:
             for element in self.model_atom_file:
                 if element in self.free_abundances:
                     # if element abundance was given, then pass it to the NLTE
@@ -811,7 +568,7 @@ class TurboSpectrum:
                     }
                 if spherical:
                     self.turbulent_velocity = microturbulence
-        elif self.nlte_flag == False:
+        else:
             if self.verbose:
                 stdout = None
                 stderr = subprocess.STDOUT
@@ -861,9 +618,6 @@ class TurboSpectrum:
             # print("spud")
             if spherical:
                 self.turbulent_velocity = microturbulence
-        # TODO: equality with logg 4.0 here again?
-        if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":  # reset temp to what it was before
-            self.t_eff = temp_teff
 
         return {
             "interpol_config": interpol_config,
@@ -1105,7 +859,11 @@ class TurboSpectrum:
         if self.nlte_flag:
             for element in self.model_atom_file:
                 # write all nlte elements
-                atomic_number = periodic_table.index(element)
+                if element in molecules_atomic_number:
+                    # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                    atomic_number = molecules_atomic_number[element]
+                else:
+                    atomic_number = periodic_table.index(element)
                 file.write(f"{atomic_number}  '{element}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
             for element in self.free_abundances:
                 # now check for any lte elements which have a specific given abundance and write them too
