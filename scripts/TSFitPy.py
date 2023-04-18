@@ -1981,10 +1981,6 @@ def run_TSFitPy(output_folder_title):
         Spectra.depart_bin_file_dict = depart_bin_file_dict
         Spectra.depart_aux_file_dict = depart_aux_file_dict
         Spectra.model_atom_file_dict = model_atom_file_dict
-        Spectra.aux_file_length_dict = {}
-
-        for element in model_atom_file_dict:
-            Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
     #prevent overwriting
     if os.path.exists(Spectra.output_folder):
@@ -2214,12 +2210,12 @@ def run_TSFitPy(output_folder_title):
     Spectra.marcs_value_keys = marcs_value_keys
     Spectra.marcs_models = marcs_models
     Spectra.marcs_values = marcs_values
-    """TurboSpectrum.model_temperatures = model_temperatures
-    TurboSpectrum.model_logs = model_logs
-    TurboSpectrum.model_mets = model_mets
-    TurboSpectrum.marcs_value_keys = marcs_value_keys
-    TurboSpectrum.marcs_models = marcs_models
-    TurboSpectrum.marcs_values = marcs_values"""
+    if Spectra.nlte_flag:
+        Spectra.aux_file_length_dict = {}
+
+        for element in model_atom_file_dict:
+            Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+
 
     if Spectra.dask_workers > 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
