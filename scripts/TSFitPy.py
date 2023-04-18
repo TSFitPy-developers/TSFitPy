@@ -1792,98 +1792,98 @@ def run_TSFitPy(output_folder_title):
                 nlte_config_to_write = ConfigParser()
 
                 nlte_items_config = {"Ba": [
-                                            'model_atoms/atom.ba111',
+                                            'atom.ba111',
                                             'Ba/NLTEgrid_Ba_MARCS_May-10-2021.bin',
                                             'Ba/auxData_Ba_MARCS_May-10-2021.txt',
                                             'Ba/NLTEgrid_Ba_STAGGERmean3D_May-10-2021.bin',
                                             'Ba/auxData_output_Ba_mean3D_May-10-2021_marcs_names.txt'
                                         ],
                                      "Ca": [
-                                         'model_atoms/atom.ca105b',
+                                         'atom.ca105b',
                                          'Ca/NLTEgrid4TS_Ca_MARCS_Jun-02-2021.bin',
                                          'Ca/auxData_Ca_MARCS_Jun-02-2021.dat',
                                          'Ca/NLTEgrid4TS_Ca_STAGGERmean3D_May-18-2021.bin',
                                          'Ca/auxData_Ca_STAGGERmean3D_May-18-2021_marcs_names.txt'
                                     ],
                                      "Co": [
-                                         'model_atoms/atom.co247',
+                                         'atom.co247',
                                          'Co/NLTEgrid4TS_CO_MARCS_Mar-15-2023.bin',
                                          'Co/auxData_CO_MARCS_Mar-15-2023.dat',
                                          '',
                                          ''
                                         ],
                                      "Fe": [
-                                         'model_atoms/atom.fe607a',
+                                         'atom.fe607a',
                                          'Fe/NLTEgrid4TS_Fe_MARCS_May-07-2021.bin',
                                          'Fe/auxData_Fe_MARCS_May-07-2021.dat',
                                          'Fe/NLTEgrid4TS_Fe_STAGGERmean3D_May-21-2021.bin',
                                          'Fe/auxData_Fe_STAGGERmean3D_May-21-2021_marcs_names.txt'
                                      ],
                                      "H": [
-                                         'model_atoms/atom.h20',
+                                         'atom.h20',
                                          'H/NLTEgrid_H_MARCS_May-10-2021.bin',
                                          'H/auxData_H_MARCS_May-10-2021.txt',
                                          'H/NLTEgrid4TS_H_STAGGERmean3D_Jun-17-2021.bin',
                                          'H/auxData_H_STAGGERmean3D_Jun-17-2021_marcs_names.txt'
                                      ],
                                      "Mg": [
-                                         'model_atoms/atom.mg86b',
+                                         'atom.mg86b',
                                          'Mg/NLTEgrid4TS_Mg_MARCS_Jun-02-2021.bin',
                                          'Mg/auxData_Mg_MARCS_Jun-02-2021.dat',
                                          'Mg/NLTEgrid_Mg_STAGGERmean3D_May-17-2021.bin',
                                          'Mg/auxData_Mg_STAGGEmean3D_May-17-2021_marcs_names.txt'
                                      ],
                                      "Mn": [
-                                         'model_atoms/atom.mn281kbc',
+                                         'atom.mn281kbc',
                                          'Mn/NLTEgrid4TS_MN_MARCS_Mar-15-2023.bin',
                                          'Mn/auxData_MN_MARCS_Mar-15-2023.dat',
                                          'Mn/NLTEgrid4TS_Mn_STAGGERmean3D_May-17-2021.bin',
                                          'Mn/auxData_Mn_STAGGERmean3D_May-17-2021_marcs_names.txt'
                                      ],
                                     "Na": [
-                                        'model_atoms/atom.na102',
+                                        'atom.na102',
                                         'Na/NLTEgrid4TS_NA_MARCS_Feb-20-2022.bin',
                                         'Na/auxData_Na_MARCS_Feb-20-2022.dat',
                                         '',
                                         ''
                                     ],
                                     "Ni": [
-                                        'model_atoms/atom.ni538qm',
+                                        'atom.ni538qm',
                                         'Ni/NLTEgrid4TS_Ni_MARCS_Jan-31-2022.bin',
                                         'Ni/auxData_Ni_MARCS_Jan-21-2022.txt',
                                         'Ni/NLTEgrid4TS_NI_STAGGERmean3D_Jun-10-2021.bin',
                                         'Ni/auxData_NI_STAGGERmean3DJun-10-2021_marcs_names.txt'
                                     ],
                                     "O": [
-                                        'model_atoms/atom.o41f',
+                                        'atom.o41f',
                                         'O/NLTEgrid4TS_O_MARCS_May-21-2021.bin',
                                         'O/auxData_O_MARCS_May-21-2021.txt',
                                         'O/NLTEgrid4TS_O_STAGGERmean3D_May-18-2021.bin',
                                         'O/auxData_O_STAGGER_May-18-2021_marcs_names.txt'
                                     ],
                                     "Si": [
-                                        'model_atoms/atom.si340',
+                                        'atom.si340',
                                         'Si/NLTEgrid4TS_Si_MARCS_Feb-13-2022.bin',
                                         'Si/auxData_Si_MARCS_Feb-13-2022.dat',
                                         '',
                                         ''
                                     ],
                                     "Sr": [
-                                        'model_atoms/atom.sr191',
+                                        'atom.sr191',
                                         'Sr/NLTEgrid4TS_Sr_MARCS_Mar-15-2023.bin',
                                         'Sr/auxData_Sr_MARCS_Mar-15-2023.dat',
                                         '',
                                         ''
                                     ],
                                     "Ti": [
-                                        'model_atoms/atom.ti503',
+                                        'atom.ti503',
                                         'Ti/NLTEgrid4TS_TI_MARCS_Feb-21-2022.bin',
                                         'Ti/auxData_TI_MARCS_Feb-21-2022.dat',
                                         '',
                                         ''
                                     ],
                                     "Y": [
-                                        'model_atoms/atom.y423',
+                                        'atom.y423',
                                         'Y/NLTEgrid4TS_Y_MARCS_Mar-27-2023.bin',
                                         'Y/auxData_Y_MARCS_Mar-27-2023.dat',
                                         '',
