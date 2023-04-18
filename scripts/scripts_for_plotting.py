@@ -354,7 +354,7 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
 
 
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
-                        elements_in_nlte, element_abundances, resolution=0, macro=0, rotation=0):
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -398,8 +398,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
-    include_molecules = True
-    create_window_linelist([lmin], [lmax], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
+    create_window_linelist([lmin - 3], [lmax + 3], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
     print("Trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
@@ -432,7 +431,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
                                                                   usecols=(0, 1), unpack=True)
     shutil.rmtree(temp_directory)
-    shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+    #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
 
     wave_mod_filled = wave_mod_orig
     flux_norm_mod_filled = flux_norm_mod_orig
@@ -456,7 +455,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         flux_norm_mod = flux_norm_mod_macro
 
     plt.plot(wave_mod, flux_norm_mod)
-    plt.xlim(lmin - 0.45, lmax + 0.45)
+    plt.xlim(lmin - 0.2, lmax + 0.2)
     plt.ylim(0, 1.05)
     plt.xlabel("Wavelength")
     plt.ylabel("Normalised flux")
