@@ -1912,7 +1912,7 @@ def run_TSFitPy(output_folder_title):
                 warn(f"Added {Spectra.departure_file_path, 'nlte_filenames.cfg'} with paths. Please check it or maybe "
                      f"download updated one from the GitHub", DeprecationWarning, stacklevel=2)
             if need_to_add_new_nlte_config:
-                for element in model_atom_path:
+                for element in model_atom_file + model_atom_file_input_elem:
                     if ".ba" in element:
                         nlte_elements_add_to_og_config.append("Ba")
                     if ".ca" in element:
