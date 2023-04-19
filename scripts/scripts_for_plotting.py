@@ -478,6 +478,7 @@ def remove_bad_lines(output_data):
 
     mask = output_file_df["wave_center"].isin(linemask_center_wavelengths)
     output_file_df = output_file_df[mask]
+    output_file_df.to_csv(os.path.join(config_dict["output_folder_location"], "output_good_lines"), sep=' ', index=False, header=True)
     return output_file_df
 
 
