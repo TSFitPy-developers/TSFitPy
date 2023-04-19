@@ -463,6 +463,23 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     return wave_mod, flux_norm_mod
 
 
+def remove_bad_lines(config_dict):
+    linemask_location = config_dict["linemask_location"]
+    output_file_df: pd.DataFrame = config_dict["output_file_df"]
+
+    # loads the linemask
+    linemask_center_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0), unpack=True)
+
+    # sorts linemask, just like in TSFitPy
+    if linemask_center_wavelengths.size > 1:
+        linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
+    elif linemask_center_wavelengths.size == 1:
+        linemask_center_wavelengths = np.array([linemask_center_wavelengths])
+
+    mask = output_file_df["wave_center"].isin(linemask_center_wavelengths)
+    output_file_df = output_file_df[mask]
+    return output_file_df
+
 
 if __name__ == '__main__':
     # CHANGE NEXT TWO LINES
