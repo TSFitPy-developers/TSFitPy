@@ -1,10 +1,20 @@
 from __future__ import annotations
+
+import datetime
+import shutil
+from configparser import ConfigParser
+
 import numpy as np
 import os
 from matplotlib import pyplot as plt
 import pandas as pd
 from scipy.stats import gaussian_kde
 from warnings import warn
+
+from convolve import conv_macroturbulence, conv_rotation, conv_res
+from create_window_linelist_function import create_window_linelist
+from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
@@ -343,7 +353,133 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
             #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
 
+def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0):
+    for element in element_abundances:
+        element_abundances[element] += met
+    temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
 
+    if not os.path.exists(temp_directory):
+        os.makedirs(temp_directory)
+
+    if atmosphere_type == "1D":
+        model_atmosphere_grid_path = os.path.join(turbospectrum_paths["model_atmosphere_grid_path"], "1D", "")
+        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    elif atmosphere_type == "3D":
+        model_atmosphere_grid_path = os.path.join(turbospectrum_paths["model_atmosphere_grid_path"], "3D", "")
+        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
+
+    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
+        model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+
+    nlte_config = ConfigParser()
+    nlte_config.read(os.path.join(turbospectrum_paths["departure_file_path"], "nlte_filenames.cfg"))
+
+    depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
+
+    for element in elements_in_nlte:
+        if atmosphere_type == "1D":
+            bin_config_name, aux_config_name = "1d_bin", "1d_aux"
+        else:
+            bin_config_name, aux_config_name = "3d_bin", "3d_aux"
+        depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
+        depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
+        model_atom_file_dict[element] = nlte_config[element]["atom_file"]
+
+    aux_file_length_dict = {}
+    if nlte_flag:
+        for element in model_atom_file_dict:
+            aux_file_length_dict[element] = len(
+                np.loadtxt(os.path.join(turbospectrum_paths["departure_file_path"], depart_aux_file_dict[element]), dtype='str'))
+
+    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    today = f"{today}_{np.random.random(1)[0]}"
+    line_list_path_trimmed = os.path.join(f"{temp_directory}", "linelist_for_fitting_trimmed", "")
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
+
+    print("Trimming")
+    create_window_linelist([lmin - 4], [lmax + 4], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
+    print("Trimming done")
+
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
+
+    ts = TurboSpectrum(
+        turbospec_path=turbospectrum_paths["turbospec_path"],
+        interpol_path=turbospectrum_paths["interpol_path"],
+        line_list_paths=line_list_path_trimmed,
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=turbospectrum_paths["model_atom_path"],
+        departure_file_path=turbospectrum_paths["departure_file_path"],
+        aux_file_length_dict=aux_file_length_dict,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values)
+
+    ts.configure(t_eff=teff, log_g=logg, metallicity=met,
+                 turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin - 3, lambda_max=lmax + 3,
+                 free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
+                 atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
+                 line_mask_file=None, depart_bin_file=depart_bin_file_dict,
+                 depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
+    print("Running TS")
+    ts.run_turbospectrum_and_atmosphere()
+    print("TS completed")
+    wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
+                                                                  usecols=(0, 1), unpack=True)
+    shutil.rmtree(temp_directory)
+    #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+
+    wave_mod_filled = wave_mod_orig
+    flux_norm_mod_filled = flux_norm_mod_orig
+
+    if resolution != 0.0:
+        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+    else:
+        wave_mod_conv = wave_mod_filled
+        flux_norm_mod_conv = flux_norm_mod_filled
+
+    if macro != 0.0:
+        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+    else:
+        wave_mod_macro = wave_mod_conv
+        flux_norm_mod_macro = flux_norm_mod_conv
+
+    if rotation != 0.0:
+        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+    else:
+        wave_mod = wave_mod_macro
+        flux_norm_mod = flux_norm_mod_macro
+
+    plt.plot(wave_mod, flux_norm_mod)
+    plt.xlim(lmin - 0.2, lmax + 0.2)
+    plt.ylim(0, 1.05)
+    plt.xlabel("Wavelength")
+    plt.ylabel("Normalised flux")
+
+    return wave_mod, flux_norm_mod
+
+
+def remove_bad_lines(output_data):
+    linemask_location = output_data["linemask_location"]
+    output_file_df: pd.DataFrame = output_data["output_file_df"]
+
+    # loads the linemask
+    linemask_center_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=0, unpack=True)
+
+    # sorts linemask, just like in TSFitPy
+    if linemask_center_wavelengths.size > 1:
+        linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
+    elif linemask_center_wavelengths.size == 1:
+        linemask_center_wavelengths = np.array([linemask_center_wavelengths])
+
+    mask = output_file_df["wave_center"].isin(linemask_center_wavelengths)
+    output_file_df = output_file_df[mask]
+    output_file_df.to_csv(os.path.join(output_data["output_folder_location"], "output_good_lines"), sep=' ', index=False, header=True)
+    return output_file_df
 
 
 if __name__ == '__main__':
