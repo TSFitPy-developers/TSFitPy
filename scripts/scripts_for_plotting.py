@@ -154,6 +154,9 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     output_file_header[0] = output_file_header[0].replace("#", "")
     output_file_data_lines = [line.strip().split() for line in output_file_lines[1:]]
 
+    if len(output_file_data_lines) == 1:
+        output_file_data_lines = [output_file_data_lines]
+
     # Create a DataFrame from the processed data
     output_file_df = pd.DataFrame(output_file_data_lines, columns=output_file_header)
 
