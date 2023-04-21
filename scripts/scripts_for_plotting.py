@@ -180,7 +180,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
 
     return config_dict
 
-def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None):
+def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None, xlim=None, ylim=None):
     # unpack the config dict into separate variables
     filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
     observed_spectra_location: str = config_dict["observed_spectra_location"]
@@ -261,8 +261,14 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.plot(wavelength, flux, color='red')
         plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
         # xlimit is wavelength left/right +/- 0.3 AA
-        plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
-        plt.ylim(0, 1.05)
+        if xlim is not None:
+            plt.xlim(xlim)
+        else:
+            plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
+        if ylim is not None:
+            plt.ylim(ylim)
+        else:
+            plt.ylim(0, 1.05)
         plt.plot([linemask_left_wavelength, linemask_left_wavelength], [0, 2], color='green', alpha=0.2)
         plt.plot([linemask_right_wavelength, linemask_right_wavelength], [0, 2], color='green', alpha=0.2)
         plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
