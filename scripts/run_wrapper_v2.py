@@ -1,11 +1,7 @@
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-import math
-import time
-import numpy as np
-import os
-from convolve import *
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.convolve import *
 import datetime
-from create_window_linelist_function import create_window_linelist
+from scripts.create_window_linelist_function import create_window_linelist
 import shutil
 from dask.distributed import Client
 import socket

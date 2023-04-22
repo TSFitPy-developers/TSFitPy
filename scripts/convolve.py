@@ -1,6 +1,4 @@
 import numpy as np
-import os
-import subprocess
 from astropy import convolution
 from astropy import constants as const
 from astropy.modeling import Fittable1DModel, Parameter

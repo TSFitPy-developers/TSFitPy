@@ -6,7 +6,7 @@ import numpy as np
 from scipy import integrate
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import time
 import os
 from os import path as os_path
@@ -15,14 +15,13 @@ try:
     from dask.distributed import Client, get_client, secede, rejoin
 except (ModuleNotFoundError, ImportError):
     raise ModuleNotFoundError("Dask not installed. It is required for multiprocessing. Install using pip install dask[complete]")
-    #pass
 import shutil
 import socket
 from sys import argv
 import collections
 import scipy
-from convolve import conv_rotation, conv_macroturbulence, conv_res
-from create_window_linelist_function import create_window_linelist
+from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
+from scripts.create_window_linelist_function import create_window_linelist
 
 
 def create_dir(directory: str):
@@ -1516,6 +1515,245 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
             model_atom_file_dict["Fe"] = model_atom_file[-1]
     return depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
 
+class Configuration:
+    def __init__(self, config_name):
+        self.config_parser = ConfigParser()
+        self.config_location = config_name
+
+    def load_config(self):
+        # if last 3 characters are .cfg then new config
+        if self.config_location[:-3] == ".cfg":
+            self.load_new_config()
+        else:
+            self.load_old_config()
+
+    def load_old_config(self):
+        with open(self.config_location) as fp:
+            line = fp.readline()
+            while line:
+                if len(line) > 1:
+                    fields = line.strip().split()
+                    # if fields[0][0] == "#":
+                    # line = fp.readline()
+                    # if fields[0] == "turbospec_path":
+                    #    turbospec_path = fields[2]
+                    field_name = fields[0].lower()
+                    if field_name == "title":
+                        output_folder_title = fields[2]
+                    if field_name == "interpol_path":
+                        interpol_path = fields[2]
+                    if field_name == "line_list_path":
+                        line_list_path = fields[2]
+                    # if fields[0] == "line_list_folder":
+                    #    linelist_folder = fields[2]
+                    if field_name == "model_atmosphere_grid_path_1d":
+                        model_atmosphere_grid_path_1D = fields[2]
+                    if field_name == "model_atmosphere_grid_path_3d":
+                        model_atmosphere_grid_path_3D = fields[2]
+                    # if fields[0] == "model_atmosphere_folder":
+                    #    model_atmosphere_folder = fields[2]
+                    # if fields[0] == "model_atmosphere_list":
+                    #    model_atmosphere_list = fields[2]
+                    if field_name == "model_atom_path":
+                        model_atom_path = fields[2]
+                    if field_name == "departure_file_path":
+                        departure_file_path = fields[2]
+                    if field_name == "output_folder":
+                        output_folder_og = fields[2]
+                    if field_name == "linemask_file_folder_location":
+                        linemask_file_og = fields[2]
+                    if field_name == "segment_file_folder_location":
+                        segment_file_og = fields[2]
+                    if field_name == "spec_input_path":
+                        spec_input_path = fields[2]
+                        if obs_location is not None:
+                            spec_input_path = obs_location
+                    if field_name == "fitlist_input_folder":
+                        fitlist_input_folder = fields[2]
+                    if field_name == "turbospectrum_compiler":
+                        ts_compiler = fields[2]
+                    if field_name == "atmosphere_type":
+                        Spectra.atmosphere_type = fields[2]
+                    if field_name == "mode":
+                        Spectra.fitting_mode = fields[2].lower()
+                    if field_name == "include_molecules":
+                        # Spectra.include_molecules = fields[2]
+                        if fields[2].lower() in ["yes", "true"]:
+                            Spectra.include_molecules = True
+                        elif fields[2].lower() in ["no", "false"]:
+                            Spectra.include_molecules = False
+                        else:
+                            raise ValueError(f"Expected True/False for including molecules, got {fields[2]}")
+                    if field_name == "nlte":
+                        nlte_flag = fields[2].lower()
+                        if nlte_flag in ["yes", "true"]:
+                            Spectra.nlte_flag = True
+                        elif nlte_flag in ["no", "false"]:
+                            Spectra.nlte_flag = False
+                        else:
+                            raise ValueError(f"Expected True/False for nlte flag, got {fields[2]}")
+                    if field_name == "fit_microturb":  # Yes No Input
+                        Spectra.fit_microturb = fields[2]
+                        if Spectra.fit_microturb not in ["Yes", "No", "Input"]:
+                            raise ValueError(f"Expected Yes/No/Input for micro fit, got {fields[2]}")
+                    if field_name == "fit_macroturb":  # Yes No Input
+                        if fields[2].lower() in ["yes", "true"]:
+                            Spectra.fit_macroturb = True
+                            input_macro = False
+                        elif fields[2].lower() in ["no", "false"]:
+                            Spectra.fit_macroturb = False
+                            input_macro = False
+                        elif fields[2].lower() == "input":
+                            input_macro = True
+                        else:
+                            raise ValueError(f"Expected Yes/No/Input for macro fit, got {fields[2]}")
+                    if field_name == "fit_rotation":
+                        if fields[2].lower() in ["yes", "true"]:
+                            Spectra.fit_rotation = True
+                        elif fields[2].lower() in ["no", "false"]:
+                            Spectra.fit_rotation = False
+                        else:
+                            raise ValueError(f"Expected Yes/No for rotation fit, got {fields[2]}")
+                    """if fields[0] == "fit_teff":
+                        if fields[2].lower() == "true":
+                            Spectra.fit_teff = True
+                        else:
+                            Spectra.fit_teff = False
+                    if fields[0] == "fit_logg":
+                        Spectra.fit_logg = fields[2]"""
+                    if field_name == "element":
+                        elements_to_fit = []
+                        for i in range(len(fields) - 2):
+                            elements_to_fit.append(fields[2 + i])
+                        Spectra.elem_to_fit = np.asarray(elements_to_fit)
+                        if "Fe" in elements_to_fit:
+                            Spectra.fit_met = True
+                        else:
+                            Spectra.fit_met = False
+                        Spectra.nelement = len(Spectra.elem_to_fit)
+                    if field_name == "linemask_file":
+                        linemask_file = fields[2]
+                    if field_name == "segment_file":
+                        segment_file = fields[2]
+                    # if fields[0] == "continuum_file":
+                    #    continuum_file = fields[2]
+
+                    if field_name == "departure_coefficient_binary" and Spectra.nlte_flag:
+                        nlte_config_outdated = True
+                    if field_name == "departure_coefficient_aux" and Spectra.nlte_flag:
+                        nlte_config_outdated = True
+                    if field_name == "model_atom_file" and Spectra.nlte_flag:
+                        nlte_config_outdated = True
+                        for i in range(2, len(fields)):
+                            model_atom_file.append(fields[i])
+                    if field_name == "input_elem_departure_coefficient_binary" and Spectra.nlte_flag:
+                        nlte_config_outdated = True
+                    if field_name == "input_elem_departure_coefficient_aux" and Spectra.nlte_flag:
+                        nlte_config_outdated = True
+                    if field_name == "input_elem_model_atom_file" and Spectra.nlte_flag:
+                        nlte_config_outdated = True
+                        for i in range(2, len(fields)):
+                            model_atom_file_input_elem.append(fields[i])
+
+                    if field_name == "nlte_elements" and Spectra.nlte_flag:
+                        need_to_add_new_nlte_config = False
+                        for i in range(len(fields) - 2):
+                            elements_to_do_in_nlte.append(fields[2 + i])
+                    if field_name == "wavelength_minimum":
+                        Spectra.lmin = float(fields[2])
+                    if field_name == "wavelength_maximum":
+                        Spectra.lmax = float(fields[2])
+                    if field_name == "wavelength_delta":
+                        Spectra.ldelta = float(fields[2])
+                    if field_name == "resolution":
+                        Spectra.resolution = float(fields[2])
+                    if field_name == "macroturbulence":
+                        macroturb_input = float(fields[2])
+                    if field_name == "rotation":
+                        Spectra.rotation = float(fields[2])
+                    if field_name == "temporary_directory":
+                        temp_directory = fields[2]
+                        temp_directory = os.path.join(temp_directory, output_folder_title, '')
+                        Spectra.global_temp_dir = os.path.join("..", temp_directory, "")
+                    if field_name == "input_file":
+                        fitlist = fields[2]
+                    if field_name == "output_file":
+                        output = fields[2]
+                    if field_name == "workers":
+                        workers = int(fields[
+                                          2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
+                        Spectra.dask_workers = workers
+                    if field_name == "init_guess_elem":
+                        init_guess_elements = []
+                        for i in range(len(fields) - 2):
+                            init_guess_elements.append(fields[2 + i])
+                        init_guess_elements = np.asarray(init_guess_elements)
+                    if field_name == "init_guess_elem_location":
+                        init_guess_elements_location = []
+                        for i in range(len(init_guess_elements)):
+                            init_guess_elements_location.append(fields[2 + i])
+                        init_guess_elements_location = np.asarray(init_guess_elements_location)
+                    if field_name == "input_elem_abundance":
+                        input_elem_abundance = []
+                        for i in range(len(fields) - 2):
+                            input_elem_abundance.append(fields[2 + i])
+                        input_elem_abundance = np.asarray(input_elem_abundance)
+                    if field_name == "input_elem_abundance_location":
+                        input_elem_abundance_location = []
+                        for i in range(len(input_elem_abundance)):
+                            input_elem_abundance_location.append(fields[2 + i])
+                        input_elem_abundance_location = np.asarray(input_elem_abundance_location)
+                    if field_name == "bounds_macro":
+                        Spectra.bound_min_macro = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_macro = max(float(fields[2]), float(fields[3]))
+                    if field_name == "bounds_rotation":
+                        Spectra.bound_min_rotation = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_rotation = max(float(fields[2]), float(fields[3]))
+                    if field_name == "bounds_micro":
+                        Spectra.bound_min_micro = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_micro = max(float(fields[2]), float(fields[3]))
+                    if field_name == "bounds_abund":
+                        Spectra.bound_min_abund = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_abund = max(float(fields[2]), float(fields[3]))
+                    if field_name == "bounds_met":
+                        Spectra.bound_min_met = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_met = max(float(fields[2]), float(fields[3]))
+                    if field_name == "bounds_teff":
+                        Spectra.bound_min_teff = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_teff = max(float(fields[2]), float(fields[3]))
+                    if field_name == "bounds_doppler":
+                        Spectra.bound_min_doppler = min(float(fields[2]), float(fields[3]))
+                        Spectra.bound_max_doppler = max(float(fields[2]), float(fields[3]))
+                    if field_name == "guess_range_microturb":
+                        Spectra.guess_min_micro = min(float(fields[2]), float(fields[3]))
+                        Spectra.guess_max_micro = max(float(fields[2]), float(fields[3]))
+                    if field_name == "guess_range_macroturb":
+                        Spectra.guess_min_macro = min(float(fields[2]), float(fields[3]))
+                        Spectra.guess_max_macro = max(float(fields[2]), float(fields[3]))
+                    if field_name == "guess_range_rotation":
+                        Spectra.guess_min_rotation = min(float(fields[2]), float(fields[3]))
+                        Spectra.guess_max_rotation = max(float(fields[2]), float(fields[3]))
+                    if field_name == "guess_range_abundance":
+                        Spectra.guess_min_abund = min(float(fields[2]), float(fields[3]))
+                        Spectra.guess_max_abund = max(float(fields[2]), float(fields[3]))
+                    if field_name == "guess_range_rv":
+                        Spectra.guess_min_doppler = min(float(fields[2]), float(fields[3]))
+                        Spectra.guess_max_doppler = max(float(fields[2]), float(fields[3]))
+                    if field_name == "guess_range_teff":
+                        Spectra.guess_plus_minus_neg_teff = min(float(fields[2]), float(fields[3]))
+                        Spectra.guess_plus_minus_pos_teff = max(float(fields[2]), float(fields[3]))
+                    if field_name == "debug":
+                        Spectra.debug_mode = int(fields[2])
+                    if field_name == "experimental":
+                        if fields[2].lower() == "true" or fields[2].lower() == "yes":
+                            Spectra.experimental = True
+                        else:
+                            Spectra.experimental = False
+                line = fp.readline()
+
+    def load_new_config(self):
+        self.config_parser.read()
+
 
 def run_TSFitPy(output_folder_title):
     depart_bin_file = []
@@ -1583,7 +1821,7 @@ def run_TSFitPy(output_folder_title):
                 if field_name == "mode":
                     Spectra.fitting_mode = fields[2].lower()
                 if field_name == "include_molecules":
-                    #Spectra.include_molecules = fields[2]
+                    # Spectra.include_molecules = fields[2]
                     if fields[2].lower() in ["yes", "true"]:
                         Spectra.include_molecules = True
                     elif fields[2].lower() in ["no", "false"]:
@@ -1686,7 +1924,8 @@ def run_TSFitPy(output_folder_title):
                 if field_name == "output_file":
                     output = fields[2]
                 if field_name == "workers":
-                    workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
+                    workers = int(fields[
+                                      2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
                     Spectra.dask_workers = workers
                 if field_name == "init_guess_elem":
                     init_guess_elements = []

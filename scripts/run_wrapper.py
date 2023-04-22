@@ -1,9 +1,6 @@
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-import math
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import time
-import numpy as np
-import os
-from convolve import *
+from scripts.convolve import *
 
 def calculate_vturb(teff, logg, met):
     t0 = 5500.

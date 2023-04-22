@@ -11,9 +11,9 @@ import pandas as pd
 from scipy.stats import gaussian_kde
 from warnings import warn
 
-from convolve import conv_macroturbulence, conv_rotation, conv_res
-from create_window_linelist_function import create_window_linelist
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
+from scripts.create_window_linelist_function import create_window_linelist
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:

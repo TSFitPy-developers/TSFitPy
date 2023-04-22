@@ -10,8 +10,8 @@ from operator import itemgetter
 import numpy as np
 import math
 
-from solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
-from solar_isotopes import solar_isotopes
+from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
+from scripts.solar_isotopes import solar_isotopes
 
 
 def closest_available_value(target: float, options: list[float]) -> float:

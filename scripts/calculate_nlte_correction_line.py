@@ -1,19 +1,17 @@
 from __future__ import annotations
-import collections
 import datetime
 import os
 import shutil
 import socket
-import time
 from os import path as os_path
 import glob
 from sys import argv
 from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize
-from create_window_linelist_function import binary_search_lower_bound, write_lines
-from TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
+from scripts.TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
 def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
