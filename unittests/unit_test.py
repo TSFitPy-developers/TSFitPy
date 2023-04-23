@@ -135,7 +135,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Eu": "Eu2", "Fe": "Fe2"}
         expec_dict3 = {"Eu": "Eu3", "Fe": "Fe3"}
 
-        TSFitPy.Spectra.fit_met = True
+        TSFitPy.Spectra.fit_feh = True
 
         dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
         self.assertDictEqual(expec_dict1, dict1)
@@ -151,7 +151,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe": "Fe2", "Eu": "Eu2"}
         expec_dict3 = {"Fe": "Fe3", "Eu": "Eu3"}
 
-        TSFitPy.Spectra.fit_met = True
+        TSFitPy.Spectra.fit_feh = True
 
         dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
         self.assertDictEqual(expec_dict1, dict1)
@@ -167,7 +167,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Eu": "Eu2", "Fe5": "Fe2", "Fe": "Fe02"}
         expec_dict3 = {"Eu": "Eu3", "Fe5": "Fe3", "Fe": "Fe03"}
 
-        TSFitPy.Spectra.fit_met = False
+        TSFitPy.Spectra.fit_feh = False
 
         dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
         self.assertDictEqual(expec_dict1, dict1)
@@ -183,7 +183,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe5": "Fe2", "Eu": "Eu2", "Fe": "Fe02"}
         expec_dict3 = {"Fe5": "Fe3", "Eu": "Eu3", "Fe": "Fe03"}
 
-        TSFitPy.Spectra.fit_met = False
+        TSFitPy.Spectra.fit_feh = False
 
         dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
         self.assertDictEqual(expec_dict1, dict1)
@@ -199,7 +199,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe5": "Fe2", "Eu": "", "Fe": "Fe02"}
         expec_dict3 = {"Fe5": "Fe3", "Eu": "", "Fe": "Fe03"}
 
-        TSFitPy.Spectra.fit_met = False
+        TSFitPy.Spectra.fit_feh = False
 
         dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
         self.assertDictEqual(expec_dict1, dict1)
