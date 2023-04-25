@@ -518,7 +518,14 @@ class TurboSpectrum:
                     # else, take solar abundance and scale with metallicity
                     # solar_abundances[element] = abundance as A(X)
                     # self.metallicity = [Fe/H]
-                    element_abundance = float(solar_abundances[element]) + self.metallicity
+                    if element in molecules_atomic_number:
+                        # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                        if element == "CN":
+                            element_abundance = float(solar_abundances["N"]) + self.metallicity
+                        elif element == "CH":
+                            element_abundance = float(solar_abundances["C"]) + self.metallicity
+                    else:
+                        element_abundance = float(solar_abundances[element]) + self.metallicity
 
                 if self.verbose:
                     stdout = None
