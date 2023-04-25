@@ -1716,17 +1716,17 @@ class TSFitPyConfig:
                     #if field_name == "segment_file":
                         #self.segment_file = fields[2]
 
-                    if field_name == "model_atom_file" and Spectra.nlte_flag:
+                    if field_name == "model_atom_file":
                         self.oldconfig_nlte_config_outdated = True
                         for i in range(2, len(fields)):
                             model_atom_file.append(fields[i])
                         self.oldconfig_model_atom_file = model_atom_file
-                    if field_name == "input_elem_model_atom_file" and Spectra.nlte_flag:
+                    if field_name == "input_elem_model_atom_file":
                         self.oldconfig_nlte_config_outdated = True
                         for i in range(2, len(fields)):
                             model_atom_file_input_elem.append(fields[i])
                         self.oldconfig_model_atom_file_input_elem = model_atom_file_input_elem
-                    if field_name == "nlte_elements" and Spectra.nlte_flag:
+                    if field_name == "nlte_elements":
                         self.oldconfig_need_to_add_new_nlte_config = False
                         for i in range(len(fields) - 2):
                             elements_to_do_in_nlte.append(fields[2 + i])
@@ -2212,14 +2212,14 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
                     warn(f"Added how to add NLTE elements now in the {config_location}", DeprecationWarning, stacklevel=2)
 
         if len(tsfitpy_configuration.nlte_elements) == 0 and len(nlte_elements_add_to_og_config) > 0:
-            elements_to_do_in_nlte = nlte_elements_add_to_og_config
+            tsfitpy_configuration.nlte_elements = nlte_elements_add_to_og_config
 
         nlte_config = ConfigParser()
         nlte_config.read(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg"))
 
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
-        for element in elements_to_do_in_nlte:
+        for element in tsfitpy_configuration.nlte_elements:
             if Spectra.atmosphere_type == "1D":
                 bin_config_name, aux_config_name = "1d_bin", "1d_aux"
             else:
