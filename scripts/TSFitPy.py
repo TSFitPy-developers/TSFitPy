@@ -1814,12 +1814,6 @@ class TSFitPyConfig:
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
         self.compiler = self.check_valid_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
-        if self.compiler == "Intel":
-            self.turbospectrum_path = os.path.join(self.config_parser["MainPaths"]["turbospectrum_path"], "exec", "")
-        elif self.compiler == "Gnu":
-            self.turbospectrum_path = os.path.join(self.config_parser["MainPaths"]["turbospectrum_path"], "exec-gf", "")
-        else:
-            raise ValueError("Compiler not recognized")
 
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
@@ -1948,20 +1942,30 @@ class TSFitPyConfig:
 
         Spectra.nelement = len(Spectra.elem_to_fit)
 
-        Spectra.interpol_path = self.interpolators_path
+        if self.compiler.lower() == "intel":
+            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.config_parser["MainPaths"]["turbospectrum_path"]), "exec", "")
+        elif self.compiler.lower() == "gnu":
+            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.config_parser["MainPaths"]["turbospectrum_path"]), "exec-gf", "")
+        else:
+            raise ValueError("Compiler not recognized")
+
+        if os.path.exists(self.interpolators_path):
+            Spectra.interpol_path = self.interpolators_path
+        else:
+            Spectra.interpol_path = os.path.join("scripts", self.interpolators_path)
 
         if self.atmosphere_type == "1d":
-            Spectra.model_atmosphere_grid_path = self.model_atmosphere_grid_path_1d
+            Spectra.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d)
             Spectra.model_atmosphere_list = os.path.join(Spectra.model_atmosphere_grid_path, "model_atmosphere_list.txt")
         elif self.atmosphere_type == "3d":
-            Spectra.model_atmosphere_grid_path = self.model_atmosphere_grid_path_3d
+            Spectra.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_3d)
             Spectra.model_atmosphere_list = os.path.join(Spectra.model_atmosphere_grid_path, "model_atmosphere_list.txt")
         else:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {Spectra.atmosphere_type.upper()}")
-        Spectra.model_atom_path = self.model_atoms_path
-        Spectra.departure_file_path = self.departure_file_path
-        Spectra.output_folder = os.path.join(self.output_folder_path, self.output_folder_title)
-        Spectra.spec_input_path = self.spectra_input_path
+        Spectra.model_atom_path = self.check_if_path_exists(self.model_atoms_path)
+        Spectra.departure_file_path = self.check_if_path_exists(self.departure_file_path)
+        Spectra.output_folder = os.path.join(self.check_if_path_exists(self.output_folder_path), self.output_folder_title)
+        Spectra.spec_input_path = self.check_if_path_exists(self.spectra_input_path)
 
         if Spectra.fitting_mode == "teff":
             Spectra.fit_teff = True
@@ -2001,6 +2005,19 @@ class TSFitPyConfig:
             return input_to_check.lower().capitalize()
         else:
             raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
+
+    @staticmethod
+    def check_if_path_exists(path_to_check: str) -> str:
+        if os.path.exists(os.path.join(path_to_check, "")):
+            return path_to_check
+        else:
+            # if it starts with ../ convert to ./ and check again
+            if path_to_check.startswith("../"):
+                path_to_check = "./" + path_to_check[3:]
+                if os.path.exists(os.path.join(path_to_check, "")):
+                    return path_to_check
+                else:
+                    raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> np.ndarray:
