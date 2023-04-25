@@ -1814,7 +1814,7 @@ class TSFitPyConfig:
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
         self.compiler = self.check_valid_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
-
+        self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
         self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
@@ -1942,10 +1942,12 @@ class TSFitPyConfig:
 
         Spectra.nelement = len(Spectra.elem_to_fit)
 
+        if self.turbospectrum_path is None:
+            self.turbospectrum_path = "../turbospectrum/"
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.config_parser["MainPaths"]["turbospectrum_path"]), "exec", "")
+            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.turbospectrum_path), "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.config_parser["MainPaths"]["turbospectrum_path"]), "exec-gf", "")
+            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.turbospectrum_path), "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
 
