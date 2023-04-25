@@ -1606,6 +1606,19 @@ class TSFitPyConfig:
         input_elem_abundance = []
         model_atom_file_input_elem = []
         elements_to_do_in_nlte = []
+        self.bounds_rotation = [0, 15] # default value
+        self.bounds_vmic = [0, 5] # default value
+        self.bounds_vmac = [0, 15] # default value
+        self.bounds_abundance = [-40, 40] # default value
+        self.bounds_feh = [-5, 1] # default value
+        self.bounds_doppler = [-2, 2] # default value
+        self.guess_range_rotation = [0, 15] # default value
+        self.guess_range_vmic = [0.8, 2.0] # default value
+        self.guess_range_vmac = [0, 15] # default value
+        self.guess_range_abundance = [-2, 2] # default value
+        self.guess_range_doppler = [2, -2] # default value
+        self.bounds_teff = [2000, 8000] # default value
+        self.guess_range_teff = [-250, 250] # default value
 
         #nlte_config_outdated = False
         #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
