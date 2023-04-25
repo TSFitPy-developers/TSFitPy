@@ -1545,7 +1545,7 @@ class TSFitPyConfig:
         self.vmac_input: bool = None
         self.element_to_fit: list[str] = None
         self.fit_feh: bool = None
-        self.nlte_elements: list[str] = None
+        self.nlte_elements: list[str] = []
         self.linemask_file: str = None
         self.wavelength_delta: float = None
         self.segment_size: float = 5  # default value
@@ -1717,17 +1717,17 @@ class TSFitPyConfig:
                         #self.segment_file = fields[2]
 
                     if field_name == "model_atom_file" and Spectra.nlte_flag:
-                        self.nlte_config_outdated = True
+                        self.oldconfig_nlte_config_outdated = True
                         for i in range(2, len(fields)):
                             model_atom_file.append(fields[i])
-                        self.model_atom_file = model_atom_file
+                        self.oldconfig_model_atom_file = model_atom_file
                     if field_name == "input_elem_model_atom_file" and Spectra.nlte_flag:
-                        self.nlte_config_outdated = True
+                        self.oldconfig_nlte_config_outdated = True
                         for i in range(2, len(fields)):
                             model_atom_file_input_elem.append(fields[i])
-                        self.model_atom_file_input_elem = model_atom_file_input_elem
+                        self.oldconfig_model_atom_file_input_elem = model_atom_file_input_elem
                     if field_name == "nlte_elements" and Spectra.nlte_flag:
-                        self.need_to_add_new_nlte_config = False
+                        self.oldconfig_need_to_add_new_nlte_config = False
                         for i in range(len(fields) - 2):
                             elements_to_do_in_nlte.append(fields[2 + i])
                         self.nlte_elements = elements_to_do_in_nlte
