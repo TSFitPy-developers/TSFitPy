@@ -417,6 +417,7 @@ class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  line_list_path_trimmed: str, index_temp_dir: float, elem_abund=None):
         self.spec_name: str = str(specname)
+        print(self.spec_input_path, str(specname))
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
         self.teff: float = float(teff)
         self.logg: float = float(logg)
@@ -1648,14 +1649,14 @@ class TSFitPyConfig:
                     if field_name == "output_folder":
                         self.output_folder_path = fields[2]
                     if field_name == "linemask_file_folder_location":
-                        self.linemasks_path = fields[2]
+                        self.linemasks_path = self.check_if_path_exists(fields[2])
                     #if field_name == "segment_file_folder_location":
                         #self.segment_file_og = fields[2]
                     if field_name == "spec_input_path":
                         if self.spectra_input_path is None:
                             self.spectra_input_path = fields[2]
                     if field_name == "fitlist_input_folder":
-                        self.fitlist_input_path = fields[2]
+                        self.fitlist_input_path = self.check_if_path_exists(fields[2])
                     if field_name == "turbospectrum_compiler":
                         self.compiler = fields[2]
                     if field_name == "atmosphere_type":
@@ -1823,10 +1824,10 @@ class TSFitPyConfig:
         self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
         self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
         self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.linemasks_path = self.config_parser["MainPaths"]["linemasks_path"]
+        self.linemasks_path = self.check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
         if self.spectra_input_path is None:
             self.spectra_input_path = self.config_parser["MainPaths"]["spectra_input_path"]
-        self.fitlist_input_path = self.config_parser["MainPaths"]["fitlist_input_path"]
+        self.fitlist_input_path = self.check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
         self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
         self.atmosphere_type = self.check_valid_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
@@ -1954,7 +1955,9 @@ class TSFitPyConfig:
         if os.path.exists(self.interpolators_path):
             Spectra.interpol_path = self.interpolators_path
         else:
-            Spectra.interpol_path = os.path.join("scripts", self.interpolators_path)
+            if self.interpolators_path.startswith("./"):
+                self.interpolators_path = self.interpolators_path[2:]
+                Spectra.interpol_path = os.path.join("scripts", self.interpolators_path)
 
         if self.atmosphere_type == "1d":
             Spectra.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d)
@@ -2020,6 +2023,8 @@ class TSFitPyConfig:
                     return path_to_check
                 else:
                     raise ValueError(f"Configuration: {path_to_check} does not exist")
+            else:
+                raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> np.ndarray:
@@ -2489,8 +2494,7 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
         for element in model_atom_file_dict:
             Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
-
-    if Spectra.dask_workers != 0:
+    if Spectra.dask_workers != 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         if dask_mpi_installed:
             print("Ignoring requested number of CPUs in the config file and launching based on CPUs requested in the slurm script")
