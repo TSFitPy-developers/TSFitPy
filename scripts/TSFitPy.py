@@ -1639,9 +1639,8 @@ class TSFitPyConfig:
                     #if field_name == "segment_file_folder_location":
                         #self.segment_file_og = fields[2]
                     if field_name == "spec_input_path":
-                        self.spectra_input_path = fields[2]
-                        if obs_location is not None:
-                            self.spectra_input_path = obs_location
+                        if self.spectra_input_path is None:
+                            self.spectra_input_path = fields[2]
                     if field_name == "fitlist_input_folder":
                         self.fitlist_input_path = fields[2]
                     if field_name == "turbospectrum_compiler":
@@ -2009,7 +2008,7 @@ def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -
     return np.asarray(segments)
 
 
-def run_TSFitPy(output_folder_title, config_location, spectra_location):
+def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi_installed):
     #nlte_config_outdated = False
     #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
 
@@ -2459,7 +2458,7 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location):
             Spectra.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
 
-    if Spectra.dask_workers > 1:
+    if Spectra.dask_workers != 0:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         if dask_mpi_installed:
             print("Ignoring requested number of CPUs in the config file and launching based on CPUs requested in the slurm script")
@@ -2563,7 +2562,8 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location):
 
 
 if __name__ == '__main__':
-    major_version_scipy, minor_version_scipy, patch_version_scipy = scipy.__version__.split(".")
+    raise RuntimeError("This file is not meant to be run as main. Please run TSFitPy/main.py instead.")  # this is a module
+    """major_version_scipy, minor_version_scipy, patch_version_scipy = scipy.__version__.split(".")
     if int(major_version_scipy) < 1 or (int(major_version_scipy) == 1 and int(minor_version_scipy) < 7) or (
             int(major_version_scipy) == 1 and int(minor_version_scipy) == 7 and int(patch_version_scipy) == 0):
         raise ImportError(f"Scipy has to be at least version 1.7.1, otherwise bounds are not considered in mimisation. "
@@ -2598,4 +2598,4 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
-        print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")
+        print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
