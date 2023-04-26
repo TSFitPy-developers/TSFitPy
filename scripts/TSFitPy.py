@@ -1955,6 +1955,7 @@ class TSFitPyConfig:
             self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.turbospectrum_path), "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
+        Spectra.turbospec_path = self.turbospectrum_path
 
         if os.path.exists(self.interpolators_path):
             Spectra.interpol_path = self.interpolators_path
@@ -2396,9 +2397,9 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
         Spectra.line_centers_sorted = np.array([line_centers])
 
     Spectra.seg_begins, Spectra.seg_ends = create_segment_file(tsfitpy_configuration.segment_size, Spectra.line_begins_sorted, Spectra.line_ends_sorted)
-    if Spectra.seg_begins.size == 1:
-        Spectra.seg_begins = np.array([Spectra.seg_begins])
-        Spectra.seg_ends = np.array([Spectra.seg_ends])
+    #if Spectra.seg_begins.size == 1:
+    #    Spectra.seg_begins = np.array([Spectra.seg_begins])
+    #    Spectra.seg_ends = np.array([Spectra.seg_ends])
 
     # check inputs
 

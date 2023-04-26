@@ -8,6 +8,28 @@ from scripts.create_window_linelist_function import create_window_linelist
 
 class MyTestCase(unittest.TestCase):
     # TODO: more unittests?
+
+    def test_segment_creation(self):
+        # tests if the segments are created correctly in TSFitPy.create_segments
+        segment_size = 5
+        wavelength_start = [4200.0, 4201.0, 4202.0, 4220.0, 4240.0]
+        wavelength_end = [4201.0, 4202.0, 4203.0, 4221.0, 4241.0]
+        segment_left, segment_right = TSFitPy.create_segment_file(segment_size, wavelength_start, wavelength_end)
+        segment_left = list(segment_left)
+        segment_right = list(segment_right)
+
+        self.assertListEqual(segment_left, [4195.0, 4215.0, 4235.0])
+        self.assertListEqual(segment_right, [4208.0, 4226.0, 4246.0])
+
+        wavelength_start = [4200.0]
+        wavelength_end = [4201.0]
+        segment_left, segment_right = TSFitPy.create_segment_file(segment_size, wavelength_start, wavelength_end)
+        segment_left = list(segment_left)
+        segment_right = list(segment_right)
+
+        self.assertListEqual(segment_left, [4195.0])
+        self.assertListEqual(segment_right, [4206.0])
+
     def test_create_window_linst_linelist_function(self):
         def compare_files_ignore_consecutive_spaces(file1, file2):
             with open(file1, 'r') as f1, open(file2, 'r') as f2:
