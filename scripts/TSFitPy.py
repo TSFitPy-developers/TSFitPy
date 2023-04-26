@@ -1442,7 +1442,8 @@ def all_broad_abund_chi_sqr(param, ts, spectra_to_fit: Spectra) -> float:
 
 
 def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
-                           macroturb: float, line_list_path_trimmed: str, input_abundance: float, index: float) -> list:
+                           macroturb: float, line_list_path_trimmed: str, input_abundance: float, index: float,
+                           tsfitpy_configuration) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param specname: Name of the textfile
@@ -1456,7 +1457,7 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
     :return: result of the fit with the best fit parameters and chi squared
     """
-    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, line_list_path_trimmed, index,
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, line_list_path_trimmed, index, tsfitpy_configuration,
                       elem_abund=input_abundance)
 
     print(f"Fitting {spectra.spec_name}")
@@ -2056,7 +2057,7 @@ class TSFitPyConfig:
             return os.path.join(os.getcwd(), temp_directory[3:])
         else:
             # otherwise just return the temp_directory
-            return os.path.join(os.getcwd(), temp_directory) 
+            return os.path.join(os.getcwd(), temp_directory)
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
@@ -2559,7 +2560,7 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
             macroturb1 = vmac_input[i]
             input_abundance = input_abundances[i]
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   line_list_path_trimmed, input_abundance, i)
+                                   line_list_path_trimmed, input_abundance, i, tsfitpy_configuration)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -2574,7 +2575,7 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
             input_abundance = input_abundances[i]
             macroturb1 = vmac_input[i]
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                                  line_list_path_trimmed, input_abundance, i))
+                                                  line_list_path_trimmed, input_abundance, i, tsfitpy_configuration))
 
     output = os.path.join(Spectra.output_folder, tsfitpy_configuration.output_filename)
 
