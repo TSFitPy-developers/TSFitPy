@@ -1950,19 +1950,19 @@ class TSFitPyConfig:
         if self.turbospectrum_path is None:
             self.turbospectrum_path = "../turbospectrum/"
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.turbospectrum_path), "exec", "")
+            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path), "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(self.check_if_path_exists(self.turbospectrum_path), "exec-gf", "")
+            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path), "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
         Spectra.turbospec_path = self.turbospectrum_path
 
         if os.path.exists(self.interpolators_path):
-            Spectra.interpol_path = self.interpolators_path
+            Spectra.interpol_path = os.path.join(os.getcwd(), self.interpolators_path)
         else:
             if self.interpolators_path.startswith("./"):
                 self.interpolators_path = self.interpolators_path[2:]
-                Spectra.interpol_path = os.path.join("scripts", self.interpolators_path)
+                Spectra.interpol_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
 
         if self.atmosphere_type == "1d":
             Spectra.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d)
