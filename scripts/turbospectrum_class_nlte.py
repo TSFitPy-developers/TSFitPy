@@ -305,7 +305,7 @@ class TurboSpectrum:
         if counter_spectra is not None:
             self.counter_spectra = counter_spectra
         if temp_directory is not None:
-            self.tmp_dir = temp_directory
+            self.tmp_dir = os.path.join(os.getcwd(), temp_directory)
         if nlte_flag is not None:
             self.nlte_flag = nlte_flag
         if atmosphere_dimension is not None:

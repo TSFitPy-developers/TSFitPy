@@ -2038,13 +2038,13 @@ class TSFitPyConfig:
         # if it is, change temp_directory path to that one
         # first check if path above path directory contains /scripts/
         if os.path.exists(os.path.join(temp_directory, "..", "scripts", "")):
-            return temp_directory
+            return os.path.join("./", temp_directory)
         elif temp_directory.startswith("../"):
             # if it doesnt, and temp_directory contains ../ remove the ../ and return that
-            return temp_directory[3:]
+            return os.path.join("./", temp_directory[3:])
         else:
             # otherwise just return the temp_directory
-            return temp_directory
+            return os.path.join("./", temp_directory)
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
