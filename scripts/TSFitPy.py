@@ -1914,7 +1914,7 @@ class TSFitPyConfig:
         Spectra.ldelta = self.wavelength_delta
         Spectra.resolution = self.resolution
         Spectra.rotation = self.rotation
-        Spectra.global_temp_dir = self.temporary_directory_path
+        Spectra.global_temp_dir = self.check_if_path_exists(self.temporary_directory_path)
         Spectra.dask_workers = self.number_of_cpus
         Spectra.bound_min_vmac = self.bounds_rotation[0]
         Spectra.bound_max_vmac = self.bounds_rotation[1]
@@ -2064,7 +2064,7 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.load_spectra_config()
 
-    print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
+    print(f"Fitting data at {Spectra.spec_input_path} with resolution {Spectra.resolution} and rotation {Spectra.rotation}")
 
     # set directories
     line_list_path_orig = tsfitpy_configuration.line_list_path
