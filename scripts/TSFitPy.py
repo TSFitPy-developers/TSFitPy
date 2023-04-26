@@ -2031,22 +2031,25 @@ class TSFitPyConfig:
                 raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 
-def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> np.ndarray:
-    segments = []
+def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
+    segments_left = []
+    segments_right = []
     start = line_begins_list[0] - segment_size
     end = line_ends_list[0] + segment_size
 
     for (line_left, line_right) in zip(line_begins_list, line_ends_list):
         if line_left > end + segment_size:
-            segments.append((start, end))
+            segments_left.append(start)
+            segments_right.append(end)
             start = line_left - segment_size
             end = line_right + segment_size
         else:
             end = line_right + segment_size
 
-    segments.append((start, end))
+    segments_left.append(start)
+    segments_right.append(end)
 
-    return np.asarray(segments)
+    return np.asarray(segments_left), np.asarray(segments_right)
 
 
 def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi_installed):
