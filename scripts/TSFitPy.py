@@ -2019,14 +2019,22 @@ class TSFitPyConfig:
 
     @staticmethod
     def check_if_path_exists(path_to_check: str) -> str:
+        # check if path is absolute
+        if os.path.isabs(path_to_check):
+            if os.path.exists(os.path.join(path_to_check, "")):
+                return path_to_check
+            else:
+                raise ValueError(f"Configuration: {path_to_check} does not exist")
+        # if path is relative, check if it exists in the current directory
         if os.path.exists(os.path.join(path_to_check, "")):
-            return path_to_check
+            # returns absolute path
+            return os.path.join(os.getcwd(), path_to_check, "")
         else:
             # if it starts with ../ convert to ./ and check again
             if path_to_check.startswith("../"):
-                path_to_check = "./" + path_to_check[3:]
+                path_to_check = path_to_check[3:]
                 if os.path.exists(os.path.join(path_to_check, "")):
-                    return path_to_check
+                    return os.path.join(os.getcwd(), path_to_check, "")
                 else:
                     raise ValueError(f"Configuration: {path_to_check} does not exist")
             else:
@@ -2036,15 +2044,19 @@ class TSFitPyConfig:
     def find_path_temporary_directory(temp_directory):
         # find the path to the temporary directory by finding if /scripts/ is located adjacent to the input directory
         # if it is, change temp_directory path to that one
+        # check if path is absolute then return it
+        if os.path.isabs(temp_directory):
+            return temp_directory
+
         # first check if path above path directory contains /scripts/
         if os.path.exists(os.path.join(temp_directory, "..", "scripts", "")):
-            return os.path.join("./", temp_directory)
+            return os.path.join(os.getcwd(), temp_directory)
         elif temp_directory.startswith("../"):
             # if it doesnt, and temp_directory contains ../ remove the ../ and return that
-            return os.path.join("./", temp_directory[3:])
+            return os.path.join(os.getcwd(), temp_directory[3:])
         else:
             # otherwise just return the temp_directory
-            return os.path.join("./", temp_directory)
+            return os.path.join(os.getcwd(), temp_directory)
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
