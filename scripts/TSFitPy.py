@@ -1707,6 +1707,10 @@ class TSFitPyConfig:
                         for i in range(len(fields) - 2):
                             elements_to_fit.append(fields[2 + i])
                         self.element_to_fit = np.asarray(elements_to_fit)
+                        if 'Fe' in self.element_to_fit:
+                            self.fit_feh = True
+                        else:
+                            self.fit_feh = False
                         """if "Fe" in elements_to_fit:
                             Spectra.fit_feh = True
                         else:
@@ -2065,7 +2069,7 @@ def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi
     # load NLTE data dicts
     if Spectra.nlte_flag:
         nlte_elements_add_to_og_config = []
-        if tsfitpy_configuration.oldconfig_nlte_config_outdated is not None:
+        if tsfitpy_configuration.oldconfig_nlte_config_outdated is not False:
             print("\n\nDEPRECATION WARNING PLEASE CHECK IT\n\n")
             warn("There is no need to specify paths of NLTE elements. Now you can just specify which elements you want "
                  "in NLTE and the code will load everything. This will cause error in the future.", DeprecationWarning, stacklevel=2)
