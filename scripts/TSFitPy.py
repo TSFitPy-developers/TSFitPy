@@ -2056,7 +2056,7 @@ class TSFitPyConfig:
             return os.path.join(os.getcwd(), temp_directory[3:])
         else:
             # otherwise just return the temp_directory
-            return os.path.join(os.getcwd(), temp_directory)
+            return os.path.join(os.getcwd(), temp_directory) 
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
