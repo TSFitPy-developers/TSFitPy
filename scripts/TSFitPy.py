@@ -1914,7 +1914,8 @@ class TSFitPyConfig:
         Spectra.ldelta = self.wavelength_delta
         Spectra.resolution = self.resolution
         Spectra.rotation = self.rotation
-        Spectra.global_temp_dir = self.check_if_path_exists(self.temporary_directory_path)
+        self.temporary_directory_path = self.find_path_temporary_directory(self.temporary_directory_path)
+        Spectra.global_temp_dir = self.temporary_directory_path
         Spectra.dask_workers = self.number_of_cpus
         Spectra.bound_min_vmac = self.bounds_rotation[0]
         Spectra.bound_max_vmac = self.bounds_rotation[1]
@@ -2031,6 +2032,19 @@ class TSFitPyConfig:
             else:
                 raise ValueError(f"Configuration: {path_to_check} does not exist")
 
+    @staticmethod
+    def find_path_temporary_directory(temp_directory):
+        # find the path to the temporary directory by finding if /scripts/ is located adjacent to the input directory
+        # if it is, change temp_directory path to that one
+        # first check if path above path directory contains /scripts/
+        if os.path.exists(os.path.join(temp_directory, "..", "scripts", "")):
+            return temp_directory
+        elif temp_directory.startswith("../"):
+            # if it doesnt, and temp_directory contains ../ remove the ../ and return that
+            return temp_directory[3:]
+        else:
+            # otherwise just return the temp_directory
+            return temp_directory
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
@@ -2051,6 +2065,8 @@ def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -
     segments_right.append(end)
 
     return np.asarray(segments_left), np.asarray(segments_right)
+
+
 
 
 def run_TSFitPy(output_folder_title, config_location, spectra_location, dask_mpi_installed):
