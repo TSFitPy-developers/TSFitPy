@@ -421,8 +421,8 @@ class Spectra:
         tsfitpy_config.load_spectra_config(self)
 
         self.spec_name: str = str(specname)
-        print(self.spec_input_path, str(specname))
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
+        print(self.spec_path)
         self.teff: float = float(teff)
         self.logg: float = float(logg)
         self.met: float = float(met)
@@ -2828,11 +2828,11 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     """if workers < np.size(specname_fitlist.size):
         print(f"You requested {workers}, but you only need to fit {specname_fitlist.size} stars. Requesting more CPUs "
               f"(=workers) than the spectra will just result in idle workers.")"""
-    if tsfitpy_configuration.bounds_teff[0] > 0:
-        print(f"You requested your {tsfitpy_configuration.bounds_teff[0]} to be positive. That will result in the lower "
+    if tsfitpy_configuration.guess_range_teff[0] > 0:
+        print(f"You requested your {tsfitpy_configuration.guess_range_teff[0]} to be positive. That will result in the lower "
               f"guess value to be bigger than the expected star temperature. Consider changing the number to negative.")
-    if tsfitpy_configuration.bounds_teff[1] < 0:
-        print(f"You requested your {tsfitpy_configuration.bounds_teff[1]} to be negative. That will result in the upper "
+    if tsfitpy_configuration.guess_range_teff[1] < 0:
+        print(f"You requested your {tsfitpy_configuration.guess_range_teff[1]} to be negative. That will result in the upper "
               f"guess value to be smaller than the expected star temperature. Consider changing the number to positive.")
     if min(tsfitpy_configuration.guess_range_vmac) < min(tsfitpy_configuration.bounds_vmac) or max(tsfitpy_configuration.guess_range_vmac) > max(tsfitpy_configuration.bounds_vmac):
         print(f"You requested your macro bounds as {tsfitpy_configuration.bounds_vmac}, but guesses"
@@ -2965,6 +2965,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                                                   line_list_path_trimmed, input_abundance, i, tsfitpy_configuration))
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
+    print(tsfitpy_configuration.output_folder_path)
+    print(output)
 
     f = open(output, 'a')
 
