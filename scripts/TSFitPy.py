@@ -1710,7 +1710,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     # macrorurb = param [2] (if needed)
     abund = param[0]
     doppler = spectra_to_fit.rv + param[1]
-    if Spectra.fit_vmac:
+    if spectra_to_fit.fit_vmac:
         macroturb = param[2]
     else:
         macroturb = spectra_to_fit.vmac
@@ -1718,7 +1718,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     #wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
     wave_obs = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
-    if Spectra.fit_feh:
+    if spectra_to_fit.fit_feh:
         item_abund = {"Fe": abund}
         met = abund
         if spectra_to_fit.vmic is not None:
@@ -1726,7 +1726,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
         else:
             vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
     else:   # Fe: [Fe/H]. X: [X/Fe]. But TS takes [X/H]. Thus convert [X/H] = [X/Fe] + [Fe/H]
-        item_abund = {"Fe": spectra_to_fit.met, Spectra.elem_to_fit[0]: abund + spectra_to_fit.met}
+        item_abund = {"Fe": spectra_to_fit.met, spectra_to_fit.elem_to_fit[0]: abund + spectra_to_fit.met}
         met = spectra_to_fit.met
         if spectra_to_fit.vmic is not None:
             vmicro = spectra_to_fit.vmic
@@ -1738,9 +1738,9 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
                                            spectra_to_fit.output_folder,
                                            wave_obs, spectra_to_fit.flux_ob,
-                                           macroturb, Spectra.resolution, Spectra.rotation,
-                                           Spectra.line_begins_sorted, Spectra.line_ends_sorted,
-                                           Spectra.seg_begins, Spectra.seg_ends)
+                                           macroturb, spectra_to_fit.resolution, spectra_to_fit.rotation,
+                                           spectra_to_fit.line_begins_sorted, spectra_to_fit.line_ends_sorted,
+                                           spectra_to_fit.seg_begins, spectra_to_fit.seg_ends)
 
     #print(abund, doppler, chi_square, macroturb)
 
@@ -1769,18 +1769,18 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
 
-    if Spectra.fitting_mode == "all":
+    if spectra_to_fit.fitting_mode == "all":
         result = spectra.fit_all()
-    elif Spectra.fitting_mode == "lbl":     # calls specific lbl version. remove next 5 lines to revert to original
+    elif spectra_to_fit.fitting_mode == "lbl":     # calls specific lbl version. remove next 5 lines to revert to original
         result = spectra.fit_lbl()
-    elif Spectra.fitting_mode == "lbl_quick":
+    elif spectra_to_fit.fitting_mode == "lbl_quick":
         result = spectra.fit_lbl_quick()
-    elif Spectra.fitting_mode == "teff":
+    elif spectra_to_fit.fitting_mode == "teff":
         result = spectra.fit_teff_function()
-    elif Spectra.fitting_mode == "vmic":
+    elif spectra_to_fit.fitting_mode == "vmic":
         result = spectra.fit_vmic_slow()
     else:
-        raise ValueError(f"unknown fitting mode {Spectra.fitting_mode}, need all or lbl or teff")
+        raise ValueError(f"unknown fitting mode {spectra_to_fit.fitting_mode}, need all or lbl or teff")
     del spectra
     return result
 
@@ -1797,7 +1797,7 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
     """
     depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
     if load_fe:
-        if Spectra.fit_feh:
+        if spectra_to_fit.fit_feh:
             iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
         else:
             iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
@@ -2000,7 +2000,7 @@ class TSFitPyConfig:
                     if field_name == "mode":
                         self.fitting_mode = fields[2].lower()
                     if field_name == "include_molecules":
-                        # Spectra.include_molecules = fields[2]
+                        # spectra_to_fit.include_molecules = fields[2]
                         if fields[2].lower() in ["yes", "true"]:
                             self.include_molecules = True
                         elif fields[2].lower() in ["no", "false"]:
@@ -2048,7 +2048,7 @@ class TSFitPyConfig:
                         else:
                             self.fit_feh = False
                         """if "Fe" in elements_to_fit:
-                            Spectra.fit_feh = True
+                            spectra_to_fit.fit_feh = True
                         else:
                             Spectra.fit_feh = False
                         Spectra.nelement = len(Spectra.elem_to_fit)"""
