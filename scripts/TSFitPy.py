@@ -481,7 +481,6 @@ class Spectra:
     def set_param_guess(self):
         """
         Converts init param guess list to the 2D list for the simplex calculation
-        :param init_param_guess: Initial list equal to n x ndimen+1, where ndimen = number of fitted parameters
         """
         # make an array for initial guess equal to n x ndimen+1
         initial_guess = np.empty((self.ndimen + 1, self.ndimen))
@@ -1352,12 +1351,12 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
 
     doppler = spectra_to_fit.rv + param[0]
 
-    if Spectra.fit_vmac:
+    if spectra_to_fit.fit_vmac:
         macroturb = param[1]
     else:
         macroturb = spectra_to_fit.vmac
 
-    if Spectra.fit_rotation:
+    if spectra_to_fit.fit_rotation:
         rotation = param[-1]
     else:
         rotation = spectra_to_fit.rotation
@@ -1367,7 +1366,7 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
 
     try:
         chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig,
-                                               Spectra.resolution, lmin, lmax, macroturb, rotation,
+                                               spectra_to_fit.resolution, lmin, lmax, macroturb, rotation,
                                                save_convolved=False)
     except IndexError as e:
         chi_square = 9999.99
@@ -1396,8 +1395,8 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     # param[-1] = vmicro
     # param[0:nelements - 1] = met or abund
 
-    if Spectra.fit_feh:
-        met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
+    if spectra_to_fit.fit_feh:
+        met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
         met = param[met_index]  # no offset, first is always element
     else:
         met = spectra_to_fit.met
@@ -1405,10 +1404,10 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
     #abundances = [met]
 
-    for i in range(Spectra.nelement):
-        # Spectra.elem_to_fit[i] = element name
+    for i in range(spectra_to_fit.nelement):
+        # spectra_to_fit.elem_to_fit[i] = element name
         # param[0:nelement - 1] = abundance of the element
-        elem_name = Spectra.elem_to_fit[i]
+        elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param[i] + met
             #abundances.append(param[i])
@@ -1419,11 +1418,11 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     if spectra_to_fit.vmic is not None:  # Input given
         microturb = spectra_to_fit.vmic
     else:
-        if Spectra.fit_vmic == "No" and Spectra.atmosphere_type == "1D":
+        if spectra_to_fit.fit_vmic == "No" and spectra_to_fit.atmosphere_type == "1D":
             microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, met)
-        elif Spectra.fit_vmic == "Yes" and Spectra.atmosphere_type == "1D":
+        elif spectra_to_fit.fit_vmic == "Yes" and spectra_to_fit.atmosphere_type == "1D":
             microturb = param[-1]
-        elif Spectra.fit_vmic == "Input":  # just for safety's sake, normally should take in the input above anyway
+        elif spectra_to_fit.fit_vmic == "Input":  # just for safety's sake, normally should take in the input above anyway
             raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
                              "a problem in the code?")
         else:
@@ -1443,7 +1442,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
-        minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+        minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1458,7 +1457,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         rotation = spectra_to_fit.rotation
         try:
             chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb, rotation)
+                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
         except IndexError as e:
             chi_square = 9999.99
             print(f"{e} Is your segment seen in the observed spectra?")
@@ -1491,8 +1490,8 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
     # new: now includes several elements
     # param[0:nelements - 1] = met or abund
 
-    if Spectra.fit_feh:
-        met_index = np.where(Spectra.elem_to_fit == "Fe")[0][0]
+    if spectra_to_fit.fit_feh:
+        met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
         met = param[met_index]  # no offset, first is always element
     else:
         met = spectra_to_fit.met
@@ -1500,10 +1499,10 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
 
     #abundances = [met]
 
-    for i in range(Spectra.nelement):
-        # Spectra.elem_to_fit[i] = element name
+    for i in range(spectra_to_fit.nelement):
+        # spectra_to_fit.elem_to_fit[i] = element name
         # param[0:nelement - 1] = abundance of the element
-        elem_name = Spectra.elem_to_fit[i]
+        elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param[i] + met
             #abundances.append(param[i])
@@ -1524,7 +1523,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
-        minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+        minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_vmic, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1539,7 +1538,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
         rotation = spectra_to_fit.rotation
         try:
             chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb, rotation)
+                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
         except IndexError as e:
             chi_square = 9999.99
             print(f"{e} Is your segment seen in the observed spectra?")
@@ -1590,7 +1589,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
-        minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+        minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1605,7 +1604,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         rotation = spectra_to_fit.rotation
         try:
             chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb, rotation)
+                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
         except IndexError as e:
             chi_square = 9999.99
             print(f"{e} Is your segment seen in the observed spectra?")
@@ -1659,7 +1658,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float)
         # Thus macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
-        minimize_options = {'maxiter': Spectra.ndimen * 50, 'disp': False}
+        minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_rv_vmac_rot, param_guess[0],
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1674,7 +1673,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float)
         rotation = spectra_to_fit.rotation
 
         chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                               flux_mod_orig, Spectra.resolution, lmin, lmax, macroturb, rotation)
+                                               flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
     elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
         chi_square = 999.99
@@ -2257,7 +2256,7 @@ class TSFitPyConfig:
         self.debug_mode = self.debug_mode
         self.experimental_parallelisation = self.experimental_parallelisation
 
-        self.nelement = len(self.elem_to_fit)
+        self.nelement = len(self.elements_to_fit)
 
         if self.turbospectrum_path is None:
             self.turbospectrum_path = "../turbospectrum/"
@@ -2613,7 +2612,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                     nlte_config_to_write[elements_to_save]["3d_aux"] = nlte_items_config[elements_to_save][4]
                     nlte_config_to_write[elements_to_save]["atom_file"] = nlte_items_config[elements_to_save][0]
 
-                with open(os.path.join(Spectra.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
+                with open(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
                     new_config_file.write("# You can add more or change models paths/names here if needed\n"
                                           "#\n"
                                           "# Changelog:\n"
@@ -2624,7 +2623,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                                           "# 1D models only: Co, Na, Si, Sr, Ti, Y\n\n")
                     nlte_config_to_write.write(new_config_file)
 
-                warn(f"Added {Spectra.departure_file_path, 'nlte_filenames.cfg'} with paths. Please check it or maybe "
+                warn(f"Added {tsfitpy_configuration.departure_file_path, 'nlte_filenames.cfg'} with paths. Please check it or maybe "
                      f"download updated one from the GitHub", DeprecationWarning, stacklevel=2)
             if tsfitpy_configuration.oldconfig_need_to_add_new_nlte_config:
                 for element in tsfitpy_configuration.oldconfig_model_atom_file + tsfitpy_configuration.oldconfig_model_atom_file_input_elem:
