@@ -2277,11 +2277,11 @@ class TSFitPyConfig:
                 self.interpolators_path = self.interpolators_path[2:]
                 self.interpolators_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
 
-        if self.atmosphere_type == "1d":
+        if self.atmosphere_type.upper() == "1D":
             self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
-        elif self.atmosphere_type == "3d":
+        elif self.atmosphere_type.upper() == "3D":
             self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_3d)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
