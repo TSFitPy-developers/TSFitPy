@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.TSFitPy import run_TSFitPy
+from scripts.TSFitPy import run_tsfitpy
 import scipy
 from sys import argv
 import datetime
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     print(f"Start of the fitting: {output_folder_title_date}")
     login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     try:
-        run_TSFitPy(output_folder_title_date, config_location, obs_location, dask_mpi_installed)
+        run_tsfitpy(output_folder_title_date, config_location, obs_location, dask_mpi_installed)
         print("Fitting completed")
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
