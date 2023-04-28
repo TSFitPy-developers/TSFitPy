@@ -2491,7 +2491,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
 
     # set directories
-    line_list_path_orig = tsfitpy_configuration.line_list_path
+    line_list_path_orig = tsfitpy_configuration.line_list_path      # TODO: check if files exist in this path or something or it exists, looks like problem is here
     line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path, "linelist_for_fitting_trimmed", "") # f"{line_list_path}../linelist_for_fitting_trimmed/"
 
     # load NLTE data dicts
