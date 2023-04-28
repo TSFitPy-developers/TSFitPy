@@ -1769,23 +1769,23 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
 
-    if spectra_to_fit.fitting_mode == "all":
+    if spectra.fitting_mode == "all":
         result = spectra.fit_all()
-    elif spectra_to_fit.fitting_mode == "lbl":     # calls specific lbl version. remove next 5 lines to revert to original
+    elif spectra.fitting_mode == "lbl":     # calls specific lbl version. remove next 5 lines to revert to original
         result = spectra.fit_lbl()
-    elif spectra_to_fit.fitting_mode == "lbl_quick":
+    elif spectra.fitting_mode == "lbl_quick":
         result = spectra.fit_lbl_quick()
-    elif spectra_to_fit.fitting_mode == "teff":
+    elif spectra.fitting_mode == "teff":
         result = spectra.fit_teff_function()
-    elif spectra_to_fit.fitting_mode == "vmic":
+    elif spectra.fitting_mode == "vmic":
         result = spectra.fit_vmic_slow()
     else:
-        raise ValueError(f"unknown fitting mode {spectra_to_fit.fitting_mode}, need all or lbl or teff")
+        raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     del spectra
     return result
 
 
-def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart_aux_file: list, model_atom_file: list, load_fe=True) -> tuple[dict, dict, dict]:
+def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart_aux_file: list, model_atom_file: list, fit_feh, load_fe=True) -> tuple[dict, dict, dict]:
     """
     Loads and sorts NLTE elements to fit into respective dictionaries
     :param elements_to_fit: Array of elements to fit
@@ -1797,7 +1797,7 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
     """
     depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
     if load_fe:
-        if spectra_to_fit.fit_feh:
+        if fit_feh:
             iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
         else:
             iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
