@@ -986,7 +986,7 @@ class Spectra:
                     right_bound_to_save = line_right + extra_wavelength_to_save
                 indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > left_bound_to_save, wavelength_fit_conv < right_bound_to_save))
 
-                with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
                     # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
                     for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
                         print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
@@ -1068,7 +1068,7 @@ class Spectra:
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
             wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
                 # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
@@ -1300,7 +1300,7 @@ class Spectra:
                     right_bound_to_save = line_right + extra_wavelength_to_save
                 indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > left_bound_to_save, wavelength_fit_conv < right_bound_to_save))
 
-                with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
+                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
                     # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
                     for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
                         print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
