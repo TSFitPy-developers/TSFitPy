@@ -1131,8 +1131,14 @@ class Spectra:
                     "a problem in the code?")
             else:
                 microturb = 2.0
-        macroturb = self.vmac_dict[line_number]
-        rotation = self.rotation_dict[line_number]
+        if self.fit_vmac:
+            macroturb = self.vmac_dict[line_number]
+        else:
+            macroturb = self.vmac
+        if self.fit_rotation:
+            rotation = self.rotation_dict[line_number]
+        else:
+            rotation = self.rotation
         result_output = f"{self.spec_name} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
                         f"{self.line_ends_sorted[line_number]} {doppler_fit}"
         for key in elem_abund_dict:
