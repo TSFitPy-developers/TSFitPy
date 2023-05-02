@@ -2292,6 +2292,7 @@ class TSFitPyConfig:
         self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path),
                                                     self.output_folder_title)
         self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path)
+        self.line_list_path = self.check_if_path_exists(self.line_list_path)
 
         if self.fitting_mode == "teff":
             self.fit_teff = True
