@@ -1132,7 +1132,7 @@ class Spectra:
                     "a problem in the code?")
             else:
                 microturb = 2.0
-        if self.fit_vmac:
+        if self.fit_vmac == "Yes":
             macroturb = self.vmac_dict[line_number]
         else:
             macroturb = self.vmac
@@ -1187,7 +1187,7 @@ class Spectra:
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory)
         minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': True}
-        res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+        res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if self.fit_feh:
             met_index = np.where(self.elem_to_fit == "Fe")[0][0]
@@ -1215,6 +1215,7 @@ class Spectra:
                     "a problem in the code?")
             else:
                 microturb = 2.0
+        if self.fit_vmac
         macroturb = self.vmac
         rotation = self.rotation
         result_output = f"{self.spec_name} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
