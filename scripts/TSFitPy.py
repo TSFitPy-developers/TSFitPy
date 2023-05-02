@@ -2966,8 +2966,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                                                   line_list_path_trimmed, input_abundance, i, tsfitpy_configuration))
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
-    print(tsfitpy_configuration.output_folder_path)
-    print(output)
 
     f = open(output, 'a')
 
