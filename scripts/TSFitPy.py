@@ -485,6 +485,7 @@ class Spectra:
         self.vmic_dict = {}
         self.rotation_dict = {}
         self.doppler_shift_dict = {}
+        self.elem_abund_dict_fitting = {}
 
     def set_param_guess(self):
         """
@@ -1185,7 +1186,7 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
         minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': True}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
@@ -1201,23 +1202,16 @@ class Spectra:
             elem_name = self.elem_to_fit[i]
             if elem_name != "Fe":
                 elem_abund_dict[elem_name] = res.x[i]  # + met
-        doppler_fit = self.doppler_shift
-        if self.vmic is not None:  # Input given
-            microturb = self.vmic
+        doppler_fit = self.doppler_shift_dict[line_number]
+        microturb = self.vmic_dict[line_number]
+        if self.fit_vmac:
+            macroturb = self.vmac_dict[line_number]
         else:
-            if self.fit_vmic == "No" and self.atmosphere_type == "1D":
-                microturb = calculate_vturb(self.teff, self.logg, met)
-            elif self.fit_vmic == "Yes" and self.atmosphere_type == "1D":
-                microturb = res.x[-1]  # if no macroturb fit, then last param is microturb
-            elif self.fit_vmic == "Input":  # just for safety's sake, normally should take in the input above anyway
-                raise ValueError(
-                    "Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
-                    "a problem in the code?")
-            else:
-                microturb = 2.0
-        if self.fit_vmac
-        macroturb = self.vmac
-        rotation = self.rotation
+            macroturb = self.vmac
+        if self.fit_rotation:
+            rotation = self.rotation_dict[line_number]
+        else:
+            rotation = self.rotation
         result_output = f"{self.spec_name} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
                         f"{self.line_ends_sorted[line_number]} {doppler_fit}"
         for key in elem_abund_dict:
@@ -1496,7 +1490,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
     return chi_square
 
-def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str) -> float:
+def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1531,6 +1525,9 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met
 
     microturb = 9999    # for printing only here, in case not fitted
+    macroturb = 9999    # for printing only here, in case not fitted
+    rotation = 9999     # for printing only here, in case not fitted
+    doppler_shift = 9999    # for printing only here, in case not fitted
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
@@ -1544,18 +1541,21 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
+        spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
         res = minimize_function(lbl_vmic, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
-        spectra_to_fit.doppler_shift = res.x[0]
-        #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
-        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + spectra_to_fit.doppler_shift)
+        spectra_to_fit.vmic_dict[line_number] = res.x[0]
+        doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
+        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + doppler_shift)
         if spectra_to_fit.fit_vmac:
-            spectra_to_fit.vmac = res.x[1]
-        macroturb = spectra_to_fit.vmac
+            macroturb = spectra_to_fit.vmac_dict[line_number]
+        else:
+            macroturb = spectra_to_fit.vmac
         if spectra_to_fit.fit_rotation:
-            spectra_to_fit.rotation = res.x[-1]
-        rotation = spectra_to_fit.rotation
+            rotation = spectra_to_fit.rotation_dict[line_number]
+        else:
+            rotation = spectra_to_fit.rotation
         try:
             chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
                                                    flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
@@ -1573,11 +1573,11 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={spectra_to_fit.doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
+    print(f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
 
     return chi_square
 
-def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str) -> float:
+def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1594,9 +1594,10 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
 
     macroturb = 9999    # for printing only here, in case not fitted
     rotation = 9999
+    doppler_shift = 9999    # for printing only here, in case not fitted
 
     met = spectra_to_fit.met
-    elem_abund_dict = spectra_to_fit.elem_abund_dict_fitting
+    elem_abund_dict = spectra_to_fit.elem_abund_dict_fitting[line_number]
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
@@ -1613,18 +1614,23 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
-        spectra_to_fit.doppler_shift = res.x[0]
-        #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
-        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + spectra_to_fit.doppler_shift)
+        spectra_to_fit.doppler_shift_dict[line_number] = res.x[0]
+        doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
+        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + doppler_shift)
         if spectra_to_fit.fit_vmac:
-            spectra_to_fit.vmac = res.x[1]
-        macroturb = spectra_to_fit.vmac
+            spectra_to_fit.vmac_dict[line_number] = res.x[1]
+            macroturb = spectra_to_fit.vmac_dict[line_number]
+        else:
+            macroturb = spectra_to_fit.vmac
         if spectra_to_fit.fit_rotation:
-            spectra_to_fit.rotation = res.x[-1]
-        rotation = spectra_to_fit.rotation
+            spectra_to_fit.rotation_dict[line_number] = res.x[-1]
+            rotation = spectra_to_fit.rotation_dict[line_number]
+        else:
+            rotation = spectra_to_fit.rotation
         try:
             chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
+                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb,
+                                                   rotation)
         except IndexError as e:
             chi_square = 9999.99
             print(f"{e} Is your segment seen in the observed spectra?")
@@ -1639,7 +1645,8 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={spectra_to_fit.doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
+    print(
+        f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
 
     return chi_square
 
