@@ -954,7 +954,7 @@ class Spectra:
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(self.line_begins_sorted)):
             if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
-                with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                     # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                     for k in range(len(result[line_number]["fit_wavelength"])):
                         print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
@@ -1063,7 +1063,7 @@ class Spectra:
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
                                                                     unpack=True)
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                 # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
@@ -1268,7 +1268,7 @@ class Spectra:
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(self.line_begins_sorted)):
             if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
-                with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
+                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                     # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                     for k in range(len(result[line_number]["fit_wavelength"])):
                         print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
