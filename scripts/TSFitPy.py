@@ -1783,7 +1783,7 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
 
     if spectra.fitting_mode == "all":
         result = spectra.fit_all()
-    elif spectra.fitting_mode == "lbl":     # calls specific lbl version. remove next 5 lines to revert to original
+    elif spectra.fitting_mode == "lbl":
         result = spectra.fit_lbl()
     elif spectra.fitting_mode == "lbl_quick":
         result = spectra.fit_lbl_quick()
@@ -2504,7 +2504,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
 
     # set directories
-    line_list_path_orig = tsfitpy_configuration.line_list_path      # TODO: check if files exist in this path or something or it exists, looks like problem is here
+    line_list_path_orig = tsfitpy_configuration.line_list_path
     line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path, "linelist_for_fitting_trimmed", "") # f"{line_list_path}../linelist_for_fitting_trimmed/"
 
     # load NLTE data dicts
@@ -3072,3 +3072,12 @@ if __name__ == '__main__':
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
+
+# TODO:
+# - add slow vmic fitting
+# - fix pathing in calculate_nlte_correction_line
+# - fix pathing in run_wrapper
+# - fix pathing in run_wrapper_v2
+# - fix pathing in scripts_for_plotting and corresponding jupyter notebook
+# - add conversion of old config into new one
+# - test other fitting modes: all, teff
