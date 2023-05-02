@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pickle
 from configparser import ConfigParser
 from warnings import warn
 import numpy as np
@@ -1767,7 +1768,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, line_list_path_trimmed: str, input_abundance: float, index: float,
-                           tsfitpy_configuration) -> list:
+                           tsfitpy_pickled_configuration_path: str) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param specname: Name of the textfile
@@ -1781,6 +1782,10 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
     :return: result of the fit with the best fit parameters and chi squared
     """
+    # Load TS configuration
+    with open(tsfitpy_pickled_configuration_path, 'rb') as f:
+        tsfitpy_configuration = pickle.load(f)
+
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, line_list_path_trimmed, index, tsfitpy_configuration,
                       elem_abund=input_abundance)
 
@@ -2937,6 +2942,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         for element in model_atom_file_dict:
             tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
+    # pickle the configuration file into the temp folder
+    with open(os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
+        pickle.dump(tsfitpy_configuration, f)
+
     if tsfitpy_configuration.number_of_cpus != 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         if dask_mpi_installed:
@@ -2966,7 +2975,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             macroturb1 = vmac_input[i]
             input_abundance = input_abundances[i]
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   line_list_path_trimmed, input_abundance, i, tsfitpy_configuration)
+                                   line_list_path_trimmed, input_abundance, i, tsfitpy_pickled_configuration_path)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -2981,7 +2990,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             input_abundance = input_abundances[i]
             macroturb1 = vmac_input[i]
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                                  line_list_path_trimmed, input_abundance, i, tsfitpy_configuration))
+                                                  line_list_path_trimmed, input_abundance, i, tsfitpy_pickled_configuration_path))
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
 
