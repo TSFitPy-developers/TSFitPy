@@ -368,11 +368,36 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
             #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
 
+def check_if_path_exists(path_to_check: str) -> str:
+    # check if path is absolute
+    if os.path.isabs(path_to_check):
+        if os.path.exists(os.path.join(path_to_check, "")):
+            return path_to_check
+        else:
+            raise ValueError(f"Configuration: {path_to_check} does not exist")
+    # if path is relative, check if it exists in the current directory
+    if os.path.exists(os.path.join(path_to_check, "")):
+        # returns absolute path
+        return os.path.join(os.getcwd(), path_to_check, "")
+    else:
+        # if it starts with ../ convert to ./ and check again
+        if path_to_check.startswith("../"):
+            path_to_check = path_to_check[3:]
+            if os.path.exists(os.path.join(path_to_check, "")):
+                return os.path.join(os.getcwd(), path_to_check, "")
+            else:
+                raise ValueError(f"Configuration: {path_to_check} does not exist")
+        else:
+            raise ValueError(f"Configuration: {path_to_check} does not exist")
+
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
-                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0):
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+
+    for path in turbospectrum_paths:
+        turbospectrum_paths[path] = check_if_path_exists(turbospectrum_paths[path])
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
@@ -436,44 +461,47 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin - 3, lambda_max=lmax + 3,
-                 free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
+                 free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
     ts.run_turbospectrum_and_atmosphere()
     print("TS completed")
-    wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
+    try:
+        wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
                                                                   usecols=(0, 1), unpack=True)
+        wave_mod_filled = wave_mod_orig
+        flux_norm_mod_filled = flux_norm_mod_orig
+
+        if resolution != 0.0:
+            wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+        else:
+            wave_mod_conv = wave_mod_filled
+            flux_norm_mod_conv = flux_norm_mod_filled
+
+        if macro != 0.0:
+            wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+        else:
+            wave_mod_macro = wave_mod_conv
+            flux_norm_mod_macro = flux_norm_mod_conv
+
+        if rotation != 0.0:
+            wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+        else:
+            wave_mod = wave_mod_macro
+            flux_norm_mod = flux_norm_mod_macro
+
+        plt.plot(wave_mod, flux_norm_mod)
+        plt.xlim(lmin - 0.2, lmax + 0.2)
+        plt.ylim(0, 1.05)
+        plt.xlabel("Wavelength")
+        plt.ylabel("Normalised flux")
+    except FileNotFoundError:
+        print("TS failed")
+        wave_mod, flux_norm_mod = np.array([]), np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
-
-    wave_mod_filled = wave_mod_orig
-    flux_norm_mod_filled = flux_norm_mod_orig
-
-    if resolution != 0.0:
-        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-    else:
-        wave_mod_conv = wave_mod_filled
-        flux_norm_mod_conv = flux_norm_mod_filled
-
-    if macro != 0.0:
-        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-    else:
-        wave_mod_macro = wave_mod_conv
-        flux_norm_mod_macro = flux_norm_mod_conv
-
-    if rotation != 0.0:
-        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-    else:
-        wave_mod = wave_mod_macro
-        flux_norm_mod = flux_norm_mod_macro
-
-    plt.plot(wave_mod, flux_norm_mod)
-    plt.xlim(lmin - 0.2, lmax + 0.2)
-    plt.ylim(0, 1.05)
-    plt.xlabel("Wavelength")
-    plt.ylabel("Normalised flux")
 
     return wave_mod, flux_norm_mod
 
