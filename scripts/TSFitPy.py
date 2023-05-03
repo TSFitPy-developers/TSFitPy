@@ -1577,48 +1577,25 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met
 
-    microturb = 9999    # for printing only here, in case not fitted
-    macroturb = 9999    # for printing only here, in case not fitted
-    rotation = 9999     # for printing only here, in case not fitted
-    doppler_shift = 9999    # for printing only here, in case not fitted
-
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
-
     spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
 
-    if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-            '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
-                                                  usecols=(0, 1), unpack=True)
-        param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
-        function_arguments = (ts, spectra_to_fit, spectra_to_fit.line_begins_sorted[line_number] - 5., spectra_to_fit.line_ends_sorted[line_number] + 5., temp_directory, line_number)
-        minimization_options = {'maxfev': 50, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.05, 'fatol': 0.00001, 'adaptive': False}
-        res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+    param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
+    function_arguments = (ts, spectra_to_fit, spectra_to_fit.line_begins_sorted[line_number] - 5., spectra_to_fit.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+    minimization_options = {'maxfev': 50, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.05, 'fatol': 0.00001, 'adaptive': False}
+    res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
 
-        spectra_to_fit.vmic_dict[line_number] = res.x[0]
-        doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
-        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + doppler_shift)
-        if spectra_to_fit.fit_vmac:
-            macroturb = spectra_to_fit.vmac_dict[line_number]
-        else:
-            macroturb = spectra_to_fit.vmac
-        if spectra_to_fit.fit_rotation:
-            rotation = spectra_to_fit.rotation_dict[line_number]
-        else:
-            rotation = spectra_to_fit.rotation
-        try:
-            chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
-        except IndexError as e:
-            chi_square = 9999.99
-            print(f"{e} Is your segment seen in the observed spectra?")
-    elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-            '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
-        chi_square = 999.99
-        print("empty spectrum file.")
+    spectra_to_fit.vmic_dict[line_number] = res.x[0]
+    microturb = spectra_to_fit.vmic_dict[line_number]
+    doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
+    if spectra_to_fit.fit_vmac:
+        macroturb = spectra_to_fit.vmac_dict[line_number]
     else:
-        chi_square = 9999.9999
-        print("didn't generate spectra or atmosphere")
+        macroturb = spectra_to_fit.vmac
+    if spectra_to_fit.fit_rotation:
+        rotation = spectra_to_fit.rotation_dict[line_number]
+    else:
+        rotation = spectra_to_fit.rotation
+    chi_square = res.fun
 
     output_print = f""
     for key in elem_abund_dict:
@@ -1663,7 +1640,6 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
 
         spectra_to_fit.doppler_shift_dict[line_number] = res.x[0]
         doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
-        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + doppler_shift)
         if spectra_to_fit.fit_vmac:
             spectra_to_fit.vmac_dict[line_number] = res.x[1]
             macroturb = spectra_to_fit.vmac_dict[line_number]
@@ -1674,13 +1650,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
             rotation = spectra_to_fit.rotation_dict[line_number]
         else:
             rotation = spectra_to_fit.rotation
-        try:
-            chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb,
-                                                   rotation)
-        except IndexError as e:
-            chi_square = 9999.99
-            print(f"{e} Is your segment seen in the observed spectra?")
+        chi_square = res.fun
     elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
             '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
         chi_square = 999.99
