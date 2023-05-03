@@ -1584,6 +1584,8 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
+    spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
+
     if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
             '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
