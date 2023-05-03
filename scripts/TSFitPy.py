@@ -2766,7 +2766,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         if tsfitpy_configuration.fit_vmic == "Yes" and (
                 tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "lbl_quick") and not tsfitpy_configuration.atmosphere_type == "3D":
             tsfitpy_configuration.ndimen += 1  # if fitting micro for lbl, not 3D
-        if tsfitpy_configuration.fitting_mode == "lbl":  # TODO: if several elements fitted for other modes, change here
+        if tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "vmic":  # TODO: if several elements fitted for other modes, change here
             tsfitpy_configuration.ndimen += tsfitpy_configuration.nelement
             print(f"Fitting {tsfitpy_configuration.nelement} element(s): {tsfitpy_configuration.elements_to_fit}")
         elif tsfitpy_configuration.fitting_mode == "lbl_quick":
@@ -2910,8 +2910,9 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     if tsfitpy_configuration.vmac < 0:
         print(f"Requested macroturbulence input of {tsfitpy_configuration.vmac}, which is less than 0. Consider changing it if "
               f"you fit it.")
-    if tsfitpy_configuration.fitting_mode not in ["all", "lbl", "lbl_quick", "teff"]:
-        print(f"Expected fitting mode 'all', 'lbl', 'lbl_quick', 'teff', but got {tsfitpy_configuration.fitting_mode} instead")
+    # check done in tsfitpyconfiguration
+    #if tsfitpy_configuration.fitting_mode not in ["all", "lbl", "lbl_quick", "teff"]:
+    #    print(f"Expected fitting mode 'all', 'lbl', 'lbl_quick', 'teff', but got {tsfitpy_configuration.fitting_mode} instead")
     if tsfitpy_configuration.nlte_flag:
         for file in tsfitpy_configuration.depart_bin_file_dict:
             if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_bin_file_dict[file])):
