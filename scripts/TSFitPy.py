@@ -637,9 +637,9 @@ class Spectra:
 
         guesses = np.array([])
 
-        if self.fit_vmic == "Yes" and self.atmosphere_type != "3D":  # last is micro
+        if self.atmosphere_type != "3D":  # last is micro
             micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_microturb, max_microturb, self.bound_min_vmic, self.bound_max_vmic)
-            guesses = np.append(guesses, [micro_guess], axis=0)
+            guesses = np.array([micro_guess])
             bounds.append(micro_bounds)
 
         guesses = np.transpose(guesses)
