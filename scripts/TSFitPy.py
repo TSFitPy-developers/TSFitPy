@@ -1493,6 +1493,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     macroturb = 9999    # for printing only here, in case not fitted
     rotation = 9999
     doppler_shift = 9999
+    spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
@@ -1623,7 +1624,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     rotation = 9999
     doppler_shift = 9999    # for printing only here, in case not fitted
 
-    met = spectra_to_fit.met
+    met = spectra_to_fit.elem_abund_dict_fitting[line_number]["Fe"]
     elem_abund_dict = spectra_to_fit.elem_abund_dict_fitting[line_number]
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
@@ -3118,10 +3119,11 @@ if __name__ == '__main__':
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
 
 # TODO:
-# - add slow vmic fitting
+# - add slow vmic fitting <- NLTE doesnt work? fix
 # - fix pathing in calculate_nlte_correction_line
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
 # - fix pathing in scripts_for_plotting and corresponding jupyter notebook
 # - add conversion of old config into new one
 # - test other fitting modes: all, teff
+# - default values in the dict if fails
