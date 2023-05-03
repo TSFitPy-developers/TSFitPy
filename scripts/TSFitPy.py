@@ -592,6 +592,59 @@ class Spectra:
         guesses = np.transpose(guesses)
 
         return guesses, bounds
+    def get_elem_guess(self, min_abundance: float, max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
+        # param[0:nelements-1] = met or abund
+        # param[-1] = micro turb
+
+        guess_length = self.nelement
+
+        bounds = []
+
+        guesses = np.array([])
+
+        for i in range(0, self.nelement):
+            if self.elem_to_fit[i] == "Fe":
+                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
+                                                                self.bound_min_feh, self.bound_max_feh)
+            else:
+                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
+                                                                self.bound_min_abund, self.bound_max_abund)
+            if self.init_guess_dict is not None and self.elem_to_fit[i] in self.init_guess_dict[self.spec_name]:
+                abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i]]
+                abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, guess_length + 1)
+                if np.size(guesses) == 0:
+                    guesses = np.array([abundance_guesses])
+                else:
+                    guesses = np.append(guesses, [abundance_guesses], axis=0)
+                # if initial abundance is given, then linearly give guess +/- 0.1 dex
+            else:
+                if np.size(guesses) == 0:
+                    guesses = np.array([guess_elem])
+                else:
+                    guesses = np.append(guesses, [guess_elem], axis=0)
+            bounds.append(bound_elem)
+
+        guesses = np.transpose(guesses)
+
+        return guesses, bounds
+    def get_micro_guess(self, min_microturb: float, max_microturb: float) -> tuple[np.ndarray, list[tuple]]:
+        # param[0:nelements-1] = met or abund
+        # param[-1] = micro turb
+
+        guess_length = 1
+
+        bounds = []
+
+        guesses = np.array([])
+
+        if self.fit_vmic == "Yes" and self.atmosphere_type != "3D":  # last is micro
+            micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_microturb, max_microturb, self.bound_min_vmic, self.bound_max_vmic)
+            guesses = np.append(guesses, [micro_guess], axis=0)
+            bounds.append(micro_bounds)
+
+        guesses = np.transpose(guesses)
+
+        return guesses, bounds
 
     def get_rv_elem_micro_macro_guess(self, min_rv: float, max_rv: float, min_macroturb: float,
                            max_macroturb: float, min_microturb: float, max_microturb: float, min_abundance: float,
@@ -1133,7 +1186,7 @@ class Spectra:
                     "a problem in the code?")
             else:
                 microturb = 2.0
-        if self.fit_vmac == "Yes":
+        if self.fit_vmac:
             macroturb = self.vmac_dict[line_number]
         else:
             macroturb = self.vmac
@@ -1184,10 +1237,10 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.seg_begins[start], self.seg_ends[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
+        param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
-        minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': True}
+        minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if self.fit_feh:
@@ -1535,15 +1588,10 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
             '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
                                                   usecols=(0, 1), unpack=True)
-        param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
-        # now for the generated abundance it tries to fit best fit macro + doppler shift.
-        # Thus, macro should not be dependent on the abundance directly, hopefully
-        # Seems to work way better
-        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
-        minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
-        res = minimize_function(lbl_vmic, np.median(param_guess, axis=0),
-                                function_args, min_bounds, 'L-BFGS-B', minimize_options)
+        param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
+        function_arguments = (ts, spectra_to_fit, spectra_to_fit.line_begins_sorted[line_number] - 5., spectra_to_fit.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        minimization_options = {'maxfev': 50, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.05, 'fatol': 0.00001, 'adaptive': False}
+        res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
 
         spectra_to_fit.vmic_dict[line_number] = res.x[0]
         doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
@@ -1606,9 +1654,6 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
                                                   usecols=(0, 1), unpack=True)
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
-        # now for the generated abundance it tries to fit best fit macro + doppler shift.
-        # Thus, macro should not be dependent on the abundance directly, hopefully
-        # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
