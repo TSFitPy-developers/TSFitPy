@@ -2219,7 +2219,7 @@ class TSFitPyConfig:
         self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
         self.atmosphere_type = self.validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
-        self.fitting_mode = self.validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick"])
+        self.fitting_mode = self.validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
         self.include_molecules = self.convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
         self.nlte_flag = self.convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
         self.fit_vmic = self.validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
@@ -2940,7 +2940,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                tsfitpy_configuration.include_molecules, lbl=False)
         line_list_path_trimmed =  os.path.join(line_list_path_trimmed, "0", "")
-    elif tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "teff":
+    elif tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "teff" or tsfitpy_configuration.fitting_mode == "vmic":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", output_folder_title, '')
         """for j in range(len(tsfitpy_configuration.line_begins_sorted)):
             start = np.where(np.logical_and(tsfitpy_configuration.seg_begins <= tsfitpy_configuration.line_centers_sorted[j],
@@ -2952,6 +2952,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig,
                                line_list_path_trimmed,
                                tsfitpy_configuration.include_molecules, lbl=True)
+    else:
+        raise ValueError("Unknown fitting method")
     print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(tsfitpy_configuration.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
