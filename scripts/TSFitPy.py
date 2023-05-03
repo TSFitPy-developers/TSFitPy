@@ -2998,6 +2998,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     # pickle the configuration file into the temp folder
     with open(os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(tsfitpy_configuration, f)
+    tsfitpy_pickled_configuration_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl")
 
     if tsfitpy_configuration.number_of_cpus != 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
