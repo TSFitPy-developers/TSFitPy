@@ -1494,6 +1494,8 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     rotation = 9999
     doppler_shift = 9999
     spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
+    spectra_to_fit.vmac_dict[line_number] = macroturb
+    spectra_to_fit.rotation_dict[line_number] = rotation
 
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
@@ -1512,7 +1514,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
         spectra_to_fit.doppler_shift_dict[line_number] = res.x[0]
         doppler_shift = spectra_to_fit.doppler_shift_dict[line_number]
-        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + doppler_shift)
         if spectra_to_fit.fit_vmac:
             spectra_to_fit.vmac_dict[line_number] = res.x[1]
             macroturb = spectra_to_fit.vmac_dict[line_number]
@@ -1523,12 +1524,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
             rotation = spectra_to_fit.rotation_dict[line_number]
         else:
             rotation = spectra_to_fit.rotation
-        try:
-            chi_square = calculate_lbl_chi_squared(temp_directory, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                                   flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
-        except IndexError as e:
-            chi_square = 9999.99
-            print(f"{e} Is your segment seen in the observed spectra?")
+        chi_square = res.fun
     elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
             '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
         chi_square = 999.99
@@ -1623,6 +1619,9 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     macroturb = 9999    # for printing only here, in case not fitted
     rotation = 9999
     doppler_shift = 9999    # for printing only here, in case not fitted
+    spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
+    spectra_to_fit.vmac_dict[line_number] = macroturb
+    spectra_to_fit.rotation_dict[line_number] = rotation
 
     met = spectra_to_fit.elem_abund_dict_fitting[line_number]["Fe"]
     elem_abund_dict = spectra_to_fit.elem_abund_dict_fitting[line_number]
@@ -1708,8 +1707,6 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float)
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.doppler_shift = res.x[0]
-        #wave_ob = spectra_to_fit.wave_ob / (1 + ((spectra_to_fit.rv + spectra_to_fit.doppler_shift) / 299792.))
-        wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, spectra_to_fit.rv + spectra_to_fit.doppler_shift)
         if spectra_to_fit.fit_vmac:
             spectra_to_fit.vmac = res.x[1]
         macroturb = spectra_to_fit.vmac
@@ -1717,8 +1714,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float)
             spectra_to_fit.rotation = res.x[-1]
         rotation = spectra_to_fit.rotation
 
-        chi_square = calculate_lbl_chi_squared(spectra_to_fit.temp_dir, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig,
-                                               flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
+        chi_square = res.fun
     elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
             '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
         chi_square = 999.99
@@ -1978,6 +1974,7 @@ class TSFitPyConfig:
         self.marcs_models = None
         self.marcs_values = None
 
+        self.global_temporary_directory = None  # used only to convert old config to new config
 
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -2135,6 +2132,7 @@ class TSFitPyConfig:
                         self.rotation = float(fields[2])
                     if field_name == "temporary_directory":
                         temp_directory = fields[2]
+                        self.global_temporary_directory = os.path.join("..", temp_directory, "")
                         temp_directory = os.path.join(temp_directory, self.output_folder_title, '')
                         self.temporary_directory_path = os.path.join("..", temp_directory, "")
                     if field_name == "input_file":
@@ -2283,6 +2281,57 @@ class TSFitPyConfig:
         self.guess_range_rotation = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_rotation"])
         self.guess_range_abundance = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_abundance"])
         self.guess_range_doppler = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_doppler"])
+
+    def convert_old_config(self):
+        self.config_parser.add_section("turbospectrum_compiler")
+        self.config_parser["turbospectrum_compiler"]["compiler"] = self.compiler
+
+        self.config_parser.add_section("MainPaths")
+        self.config_parser["MainPaths"]["turbospectrum_path"] = self.turbospectrum_path
+        self.config_parser["MainPaths"]["interpolators_path"] = self.interpolators_path
+        self.config_parser["MainPaths"]["line_list_path"] = self.line_list_path
+        self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"] = self.model_atmosphere_grid_path_1d
+        self.config_parser["MainPaths"]["model_atmosphere_grid_path_3d"] = self.model_atmosphere_grid_path_3d
+        self.config_parser["MainPaths"]["model_atoms_path"] = self.model_atoms_path
+        self.config_parser["MainPaths"]["departure_file_path"] = self.departure_file_path
+        self.config_parser["MainPaths"]["departure_file_config_path"] = self.departure_file_config_path
+        self.config_parser["MainPaths"]["output_path"] = self.output_folder_path
+        self.config_parser["MainPaths"]["linemasks_path"] = self.linemasks_path
+        self.config_parser["MainPaths"]["spectra_input_path"] = self.spectra_input_path
+        self.config_parser["MainPaths"]["fitlist_input_path"] = self.fitlist_input_path
+        self.config_parser["MainPaths"]["temporary_directory_path"] = self.global_temporary_directory
+
+        self.config_parser.add_section("FittingParameters")
+        self.config_parser["FittingParameters"]["atmosphere_type"] = self.atmosphere_type
+        self.config_parser["FittingParameters"]["fitting_mode"] = self.fitting_mode
+        self.config_parser["FittingParameters"]["include_molecules"] = str(self.include_molecules)
+        self.config_parser["FittingParameters"]["nlte"] = str(self.nlte_flag)
+        self.config_parser["FittingParameters"]["fit_vmic"] = self.fit_vmic
+        if self.vmac_input:
+            vmac_fitting_mode = "Input"
+        elif self.fit_vmac:
+            vmac_fitting_mode = "Yes"
+        else:
+            vmac_fitting_mode = "No"
+        self.config_parser["FittingParameters"]["fit_vmac"] = vmac_fitting_mode
+        self.config_parser["FittingParameters"]["fit_rotation"] = str(self.fit_rotation)
+        self.config_parser["FittingParameters"]["element_to_fit"] = self.convert_list_to_str(self.elements_to_fit)
+
+        self.nlte_elements = self.split_string_to_string(self.config_parser["FittingParameters"]["nlte_elements"])
+        self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
+        self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
+        self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
+
+        with open(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
+            new_config_file.write("# You can add more or change models paths/names here if needed\n"
+                                  "#\n"
+                                  "# Changelog:\n"
+                                  "# 2023 Apr 18: File creation date\n"
+                                  "\n"
+                                  "# 14 elements\n"
+                                  "# 3D and 1D models: Ba, Ca, Fe, H, Mg, Mn, Ni, O\n"
+                                  "# 1D models only: Co, Na, Si, Sr, Ti, Y\n\n")
+            nlte_config_to_write.write(new_config_file)
 
     def check_valid_input(self):
         self.atmosphere_type = self.atmosphere_type.upper()
@@ -2506,6 +2555,14 @@ class TSFitPyConfig:
         else:
             # otherwise just return the temp_directory
             return os.path.join(os.getcwd(), temp_directory)
+
+    @staticmethod
+    def convert_list_to_str(list_to_convert: list) -> str:
+        string_to_return = ""
+        for element in list_to_convert:
+            string_to_return = f"{string_to_return} {element}"
+        return string_to_return
+
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
@@ -3046,7 +3103,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     if tsfitpy_configuration.fitting_mode == "all":
         print(f"#specname\t{output_elem_column}\tDoppler_Shift_add_to_RV\tchi_squared\tMacroturb", file=f)
-    elif tsfitpy_configuration.fitting_mode == "lbl":
+    elif tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "vmic":
         print(
             f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew",
             file=f)
@@ -3119,11 +3176,9 @@ if __name__ == '__main__':
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
 
 # TODO:
-# - add slow vmic fitting <- NLTE doesnt work? fix
 # - fix pathing in calculate_nlte_correction_line
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
 # - fix pathing in scripts_for_plotting and corresponding jupyter notebook
 # - add conversion of old config into new one
 # - test other fitting modes: all, teff
-# - default values in the dict if fails
