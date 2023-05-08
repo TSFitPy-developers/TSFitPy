@@ -1905,6 +1905,8 @@ class TSFitPyConfig:
         self.wavelength_delta: float = None
         self.segment_size: float = 5  # default value
 
+        self.segment_file: str = None  # path to the temp place where segment is saved
+
         self.debug_mode: int = None
         self.number_of_cpus: int = None
         self.experimental_parallelisation: bool = None
@@ -2235,13 +2237,13 @@ class TSFitPyConfig:
         else:
             raise ValueError(f"Vmac fitting mode {vmac_fitting_mode} not recognized")
         self.fit_rotation = self.convert_string_to_bool(self.config_parser["FittingParameters"]["fit_rotation"])
-        self.elements_to_fit = self.split_string_to_string(self.config_parser["FittingParameters"]["element_to_fit"])
+        self.elements_to_fit = self.split_string_to_string_list(self.config_parser["FittingParameters"]["element_to_fit"])
         if 'Fe' in self.elements_to_fit:
             self.fit_feh = True
         else:
             self.fit_feh = False
 
-        self.nlte_elements = self.split_string_to_string(self.config_parser["FittingParameters"]["nlte_elements"])
+        self.nlte_elements = self.split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
         self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
         self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
         self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
@@ -2257,30 +2259,30 @@ class TSFitPyConfig:
         self.resolution = float(self.config_parser["SpectraParameters"]["resolution"])
         self.vmac = float(self.config_parser["SpectraParameters"]["vmac"])
         self.rotation = float(self.config_parser["SpectraParameters"]["rotation"])
-        self.init_guess_elements = self.split_string_to_float(self.config_parser["SpectraParameters"]["init_guess_elements"])
-        self.init_guess_elements_path = self.split_string_to_float(self.config_parser["SpectraParameters"]["init_guess_elements_path"])
-        self.input_elements_abundance = self.split_string_to_float(self.config_parser["SpectraParameters"]["input_elements_abundance"])
-        self.input_elements_abundance_path = self.split_string_to_float(self.config_parser["SpectraParameters"]["input_elements_abundance_path"])
+        self.init_guess_elements = self.split_string_to_float_list(self.config_parser["SpectraParameters"]["init_guess_elements"])
+        self.init_guess_elements_path = self.split_string_to_float_list(self.config_parser["SpectraParameters"]["init_guess_elements_path"])
+        self.input_elements_abundance = self.split_string_to_float_list(self.config_parser["SpectraParameters"]["input_elements_abundance"])
+        self.input_elements_abundance_path = self.split_string_to_float_list(self.config_parser["SpectraParameters"]["input_elements_abundance_path"])
 
         self.wavelength_min = float(self.config_parser["ParametersForModeAll"]["wavelength_min"])
         self.wavelength_max = float(self.config_parser["ParametersForModeAll"]["wavelength_max"])
 
-        self.bounds_vmic = self.split_string_to_float(self.config_parser["ParametersForModeLbl"]["bounds_vmic"])
-        self.guess_range_vmic = self.split_string_to_float(self.config_parser["ParametersForModeLbl"]["guess_range_vmic"])
+        self.bounds_vmic = self.split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_vmic"])
+        self.guess_range_vmic = self.split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["guess_range_vmic"])
 
-        self.bounds_teff = self.split_string_to_float(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
-        self.guess_range_teff = self.split_string_to_float(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
+        self.bounds_teff = self.split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
+        self.guess_range_teff = self.split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
 
-        self.bounds_vmac = self.split_string_to_float(self.config_parser["Bounds"]["bounds_vmac"])
-        self.bounds_rotation = self.split_string_to_float(self.config_parser["Bounds"]["bounds_rotation"])
-        self.bounds_abundance = self.split_string_to_float(self.config_parser["Bounds"]["bounds_abundance"])
-        self.bounds_feh = self.split_string_to_float(self.config_parser["Bounds"]["bounds_feh"])
-        self.bounds_doppler = self.split_string_to_float(self.config_parser["Bounds"]["bounds_doppler"])
+        self.bounds_vmac = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
+        self.bounds_rotation = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])
+        self.bounds_abundance = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_abundance"])
+        self.bounds_feh = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_feh"])
+        self.bounds_doppler = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_doppler"])
 
-        self.guess_range_vmac = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_vmac"])
-        self.guess_range_rotation = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_rotation"])
-        self.guess_range_abundance = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_abundance"])
-        self.guess_range_doppler = self.split_string_to_float(self.config_parser["GuessRanges"]["guess_range_doppler"])
+        self.guess_range_vmac = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_vmac"])
+        self.guess_range_rotation = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
+        self.guess_range_abundance = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
+        self.guess_range_doppler = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
 
     def convert_old_config(self):
         self.config_parser.add_section("turbospectrum_compiler")
@@ -2317,21 +2319,71 @@ class TSFitPyConfig:
         self.config_parser["FittingParameters"]["fit_rotation"] = str(self.fit_rotation)
         self.config_parser["FittingParameters"]["element_to_fit"] = self.convert_list_to_str(self.elements_to_fit)
 
-        self.nlte_elements = self.split_string_to_string(self.config_parser["FittingParameters"]["nlte_elements"])
+        self.nlte_elements = self.split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
         self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
         self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
         self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
 
-        with open(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
-            new_config_file.write("# You can add more or change models paths/names here if needed\n"
-                                  "#\n"
-                                  "# Changelog:\n"
-                                  "# 2023 Apr 18: File creation date\n"
-                                  "\n"
-                                  "# 14 elements\n"
-                                  "# 3D and 1D models: Ba, Ca, Fe, H, Mg, Mn, Ni, O\n"
-                                  "# 1D models only: Co, Na, Si, Sr, Ti, Y\n\n")
-            nlte_config_to_write.write(new_config_file)
+        self.config_parser.add_section("ExtraParameters")
+        self.config_parser["ExtraParameters"]["debug_mode"] = str(self.debug_mode)
+        self.config_parser["ExtraParameters"]["number_of_cpus"] = str(self.number_of_cpus)
+        self.config_parser["ExtraParameters"]["experimental_parallelisation"] = str(self.experimental_parallelisation)
+        self.config_parser["ExtraParameters"]["cluster_name"] = self.cluster_name
+
+        self.config_parser.add_section("InputAndOutputFiles")
+        self.config_parser["InputAndOutputFiles"]["input_filename"] = self.input_fitlist_filename
+        self.config_parser["InputAndOutputFiles"]["output_filename"] = self.output_filename
+
+        self.config_parser.add_section("SpectraParameters")
+        self.config_parser["SpectraParameters"]["resolution"] = str(self.resolution)
+        self.config_parser["SpectraParameters"]["vmac"] = str(self.vmac)
+        self.config_parser["SpectraParameters"]["rotation"] = str(self.rotation)
+        self.config_parser["SpectraParameters"]["init_guess_elements"] = self.convert_list_to_str(self.init_guess_elements)
+        self.config_parser["SpectraParameters"]["init_guess_elements_path"] = self.convert_list_to_str(self.init_guess_elements_path)
+        self.config_parser["SpectraParameters"]["input_elements_abundance"] = self.convert_list_to_str(self.input_elements_abundance)
+        self.config_parser["SpectraParameters"]["input_elements_abundance_path"] = self.convert_list_to_str(self.input_elements_abundance_path)
+
+        self.config_parser.add_section("ParametersForModeAll")
+        self.config_parser["ParametersForModeAll"]["wavelength_min"] = str(self.wavelength_min)
+        self.config_parser["ParametersForModeAll"]["wavelength_max"] = str(self.wavelength_max)
+
+        self.config_parser.add_section("ParametersForModeLbl")
+        self.config_parser["ParametersForModeLbl"]["bounds_vmic"] = self.convert_list_to_str(self.bounds_vmic)
+        self.config_parser["ParametersForModeLbl"]["guess_range_vmic"] = self.convert_list_to_str(self.guess_range_vmic)
+
+        self.config_parser.add_section("ParametersForModeTeff")
+        self.config_parser["ParametersForModeTeff"]["bounds_teff"] = self.convert_list_to_str(self.bounds_teff)
+        self.config_parser["ParametersForModeTeff"]["guess_range_teff"] = self.convert_list_to_str(self.guess_range_teff)
+
+        self.config_parser.add_section("Bounds")
+        self.config_parser["Bounds"]["bounds_vmac"] = self.convert_list_to_str(self.bounds_vmac)
+        self.config_parser["Bounds"]["bounds_rotation"] = self.convert_list_to_str(self.bounds_rotation)
+        self.config_parser["Bounds"]["bounds_abundance"] = self.convert_list_to_str(self.bounds_abundance)
+        self.config_parser["Bounds"]["bounds_feh"] = self.convert_list_to_str(self.bounds_feh)
+        self.config_parser["Bounds"]["bounds_doppler"] = self.convert_list_to_str(self.bounds_doppler)
+
+        self.config_parser.add_section("GuessRanges")
+        self.config_parser["GuessRanges"]["guess_range_vmac"] = self.convert_list_to_str(self.guess_range_vmac)
+        self.config_parser["GuessRanges"]["guess_range_rotation"] = self.convert_list_to_str(self.guess_range_rotation)
+        self.config_parser["GuessRanges"]["guess_range_abundance"] = self.convert_list_to_str(self.guess_range_abundance)
+        self.config_parser["GuessRanges"]["guess_range_doppler"] = self.convert_list_to_str(self.guess_range_doppler)
+
+        if self.config_location[-4:] == ".txt":
+            converted_config_location = f"{self.config_location[-4:]}"
+        else:
+            converted_config_location = f"{self.config_location}"
+
+        print("Converting old config into new one")
+
+        while os.path.exists(f"{converted_config_location}.cfg"):
+            print(f"{converted_config_location}.cfg already exists trying {converted_config_location}0.cfg")
+            converted_config_location = f"{converted_config_location}0"
+
+        with open(converted_config_location, "w") as new_config_file:
+            new_config_file.write(f"# Converted from old file {self.config_location} to a new format")
+            self.config_parser.write(new_config_file)
+
+        warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning)
 
     def check_valid_input(self):
         self.atmosphere_type = self.atmosphere_type.upper()
@@ -2466,7 +2518,8 @@ class TSFitPyConfig:
         spectra_object.line_centers_sorted = self.line_centers_sorted
 
         spectra_object.linemask_file = self.linemask_file
-        #spectra_object.segment_file = self.segment_file  # TODO create segment file
+        #self.segment_file = os.path.join()
+        spectra_object.segment_file = self.segment_file  # TODO create segment file
         spectra_object.seg_begins = self.seg_begins
         spectra_object.seg_ends = self.seg_ends
 
@@ -2484,7 +2537,7 @@ class TSFitPyConfig:
         spectra_object.marcs_values = self.marcs_values
 
     @staticmethod
-    def split_string_to_float(string_to_split: str) -> list[float]:
+    def split_string_to_float_list(string_to_split: str) -> list[float]:
         # remove commas from the string if they exist and split the string into a list
         string_to_split = string_to_split.replace(",", " ").split()
         # convert the list of strings to a list of floats
@@ -2492,7 +2545,7 @@ class TSFitPyConfig:
         return string_to_split
 
     @staticmethod
-    def split_string_to_string(string_to_split: str) -> list[str]:
+    def split_string_to_string_list(string_to_split: str) -> list[str]:
         # remove commas from the string if they exist and split the string into a list
         string_to_split = string_to_split.replace(",", " ").split()
         return string_to_split
@@ -3180,5 +3233,6 @@ if __name__ == '__main__':
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
 # - fix pathing in scripts_for_plotting and corresponding jupyter notebook
-# - add conversion of old config into new one
+# - add conversion of old config into new one <- To check
 # - test other fitting modes: all, teff
+# - save segments in a file
