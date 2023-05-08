@@ -2203,8 +2203,6 @@ class TSFitPyConfig:
                             self.experimental_parallelisation = False
                 line = fp.readline()
 
-        self.convert_old_config()
-
     def load_new_config(self):
         # read the configuration file
         self.config_parser.read(self.config_location)
@@ -2696,6 +2694,9 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.check_valid_input()
 
+    if not config_location[-4:] == ".cfg":
+        tsfitpy_configuration.convert_old_config()
+
     print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
 
     # set directories
@@ -2905,8 +2906,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     #prevent overwriting
     if os.path.exists(tsfitpy_configuration.output_folder_path):
-        print("Error: output folder already exists. Run was stopped to prevent overwriting")
-        return
+        raise FileExistsError("Error: output folder already exists. Run was stopped to prevent overwriting")
 
     tsfitpy_configuration.linemask_file = os.path.join(tsfitpy_configuration.linemasks_path, tsfitpy_configuration.linemask_file)
     #Spectra.segment_file = f"{segment_file_og}{segment_file}"
@@ -3285,4 +3285,5 @@ if __name__ == '__main__':
 # - fix pathing in scripts_for_plotting and corresponding jupyter notebook
 # - add conversion of old config into new one <- To check
 # - test other fitting modes: all, teff
-# - save segments in a file
+# - save segments in a file <- To check
+# - add changing name of the output folder to what is being done
