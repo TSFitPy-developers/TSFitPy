@@ -2139,8 +2139,8 @@ class TSFitPyConfig:
                         self.rotation = float(fields[2])
                     if field_name == "temporary_directory":
                         temp_directory = fields[2]
-                        self.global_temporary_directory = os.path.join("..", temp_directory, "")
-                        temp_directory = os.path.join(temp_directory, self.output_folder_title, '')
+                        self.global_temporary_directory = os.path.join(".", temp_directory, "")
+                        temp_directory = os.path.join(os.path.join("..", temp_directory, ""), self.output_folder_title, '')
                         self.temporary_directory_path = os.path.join("..", temp_directory, "")
                     if field_name == "input_file":
                         self.input_fitlist_filename = fields[2]
