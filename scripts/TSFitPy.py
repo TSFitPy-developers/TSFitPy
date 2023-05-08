@@ -1977,6 +1977,7 @@ class TSFitPyConfig:
         self.marcs_values = None
 
         self.global_temporary_directory = None  # used only to convert old config to new config
+        self.output_folder_path_global = None  # used only to convert old config to new config
 
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -2375,7 +2376,7 @@ class TSFitPyConfig:
 
         self.config_parser.add_section("InputAndOutputFiles")
         self.config_parser["InputAndOutputFiles"]["input_filename"] = self.input_fitlist_filename
-        self.config_parser["InputAndOutputFiles"]["output_filename"] = self.output_filename
+        self.config_parser["InputAndOutputFiles"]["output_filename"] = self.output_folder_path_global
 
         self.config_parser.add_section("SpectraParameters")
         self.config_parser["SpectraParameters"]["resolution"] = str(self.resolution)
@@ -2486,6 +2487,7 @@ class TSFitPyConfig:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
         self.model_atoms_path = self.check_if_path_exists(self.model_atoms_path)
         self.departure_file_path = self.check_if_path_exists(self.departure_file_path)
+        self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path)
         self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path),
                                                     self.output_folder_title)
         self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path)
