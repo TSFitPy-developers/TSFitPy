@@ -2005,6 +2005,9 @@ class TSFitPyConfig:
         self.bounds_teff = [2000, 8000] # default value
         self.guess_range_teff = [-250, 250] # default value
 
+        self.turbospectrum_path = "../turbospectrum/"
+        self.cluster_name = "None"
+
         #nlte_config_outdated = False
         #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
 
@@ -2030,6 +2033,7 @@ class TSFitPyConfig:
                         self.model_atoms_path = fields[2]
                     if field_name == "departure_file_path":
                         self.departure_file_path = fields[2]
+                        self.departure_file_config_path = os.path.join(self.departure_file_path, "nlte_filenames.cfg")
                     if field_name == "output_folder":
                         self.output_folder_path = fields[2]
                     if field_name == "linemask_file_folder_location":
@@ -2199,6 +2203,8 @@ class TSFitPyConfig:
                             self.experimental_parallelisation = False
                 line = fp.readline()
 
+        self.convert_old_config()
+
     def load_new_config(self):
         # read the configuration file
         self.config_parser.read(self.config_location)
@@ -2304,7 +2310,7 @@ class TSFitPyConfig:
         self.config_parser["MainPaths"]["temporary_directory_path"] = self.global_temporary_directory
 
         self.config_parser.add_section("FittingParameters")
-        self.config_parser["FittingParameters"]["atmosphere_type"] = self.atmosphere_type
+        self.config_parser["FittingParameters"]["atmosphere_type"] = self.atmosphere_type.upper()
         self.config_parser["FittingParameters"]["fitting_mode"] = self.fitting_mode
         self.config_parser["FittingParameters"]["include_molecules"] = str(self.include_molecules)
         self.config_parser["FittingParameters"]["nlte"] = str(self.nlte_flag)
@@ -2316,13 +2322,52 @@ class TSFitPyConfig:
         else:
             vmac_fitting_mode = "No"
         self.config_parser["FittingParameters"]["fit_vmac"] = vmac_fitting_mode
-        self.config_parser["FittingParameters"]["fit_rotation"] = str(self.fit_rotation)
+        if self.fit_rotation:
+            rotation_fitting_mode = "Input"
+        elif self.fit_rotation:
+            rotation_fitting_mode = "Yes"
+        else:
+            rotation_fitting_mode = "No"
+        self.config_parser["FittingParameters"]["fit_rotation"] = rotation_fitting_mode
         self.config_parser["FittingParameters"]["element_to_fit"] = self.convert_list_to_str(self.elements_to_fit)
 
-        self.nlte_elements = self.split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
-        self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
-        self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
-        self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
+        nlte_elements_to_write = []
+        if self.oldconfig_need_to_add_new_nlte_config:
+            for element in self.oldconfig_model_atom_file + self.oldconfig_model_atom_file_input_elem:
+                if ".ba" in element:
+                    nlte_elements_to_write.append("Ba")
+                if ".ca" in element:
+                    nlte_elements_to_write.append("Ca")
+                if ".co" in element:
+                    nlte_elements_to_write.append("Co")
+                if ".fe" in element:
+                    nlte_elements_to_write.append("Fe")
+                if ".h" in element:
+                    nlte_elements_to_write.append("H")
+                if ".mg" in element:
+                    nlte_elements_to_write.append("Mg")
+                if ".mn" in element:
+                    nlte_elements_to_write.append("Mn")
+                if ".na" in element:
+                    nlte_elements_to_write.append("Na")
+                if ".ni" in element:
+                    nlte_elements_to_write.append("Ni")
+                if ".o" in element:
+                    nlte_elements_to_write.append("O")
+                if ".si" in element:
+                    nlte_elements_to_write.append("Si")
+                if ".sr" in element:
+                    nlte_elements_to_write.append("Sr")
+                if ".ti" in element:
+                    nlte_elements_to_write.append("Ti")
+                if ".y" in element:
+                    nlte_elements_to_write.append("Y")
+        else:
+            nlte_elements_to_write = self.nlte_elements
+        self.config_parser["FittingParameters"]["nlte_elements"] = self.convert_list_to_str(nlte_elements_to_write)
+        self.config_parser["FittingParameters"]["linemask_file"] = self.linemask_file
+        self.config_parser["FittingParameters"]["wavelength_delta"] = str(self.wavelength_delta)
+        self.config_parser["FittingParameters"]["segment_size"] = str(self.segment_size)
 
         self.config_parser.add_section("ExtraParameters")
         self.config_parser["ExtraParameters"]["debug_mode"] = str(self.debug_mode)
@@ -2369,21 +2414,23 @@ class TSFitPyConfig:
         self.config_parser["GuessRanges"]["guess_range_doppler"] = self.convert_list_to_str(self.guess_range_doppler)
 
         if self.config_location[-4:] == ".txt":
-            converted_config_location = f"{self.config_location[-4:]}"
+            converted_config_location = f"{self.config_location[:-4]}"
         else:
             converted_config_location = f"{self.config_location}"
 
-        print("Converting old config into new one")
+        print("\n\nConverting old config into new one")
 
         while os.path.exists(f"{converted_config_location}.cfg"):
             print(f"{converted_config_location}.cfg already exists trying {converted_config_location}0.cfg")
             converted_config_location = f"{converted_config_location}0"
+        converted_config_location = f"{converted_config_location}.cfg"
 
         with open(converted_config_location, "w") as new_config_file:
-            new_config_file.write(f"# Converted from old file {self.config_location} to a new format")
+            new_config_file.write(f"# Converted from old file {self.config_location} to a new format\n")
             self.config_parser.write(new_config_file)
 
-        warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning)
+        print(f"Converted old config file into new one and save at {converted_config_location}\n\n")
+        warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
 
     def check_valid_input(self):
         self.atmosphere_type = self.atmosphere_type.upper()
@@ -2402,6 +2449,8 @@ class TSFitPyConfig:
         self.rotation = float(self.rotation)
         self.temporary_directory_path = self.find_path_temporary_directory(self.temporary_directory_path)
         self.number_of_cpus = int(self.number_of_cpus)
+
+        self.segment_file = os.path.join(self.temporary_directory_path, "segment_file.txt")
 
         self.debug_mode = self.debug_mode
         self.experimental_parallelisation = self.experimental_parallelisation
@@ -2518,8 +2567,7 @@ class TSFitPyConfig:
         spectra_object.line_centers_sorted = self.line_centers_sorted
 
         spectra_object.linemask_file = self.linemask_file
-        #self.segment_file = os.path.join()
-        spectra_object.segment_file = self.segment_file  # TODO create segment file
+        spectra_object.segment_file = self.segment_file
         spectra_object.seg_begins = self.seg_begins
         spectra_object.seg_ends = self.seg_ends
 
@@ -2973,6 +3021,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         tsfitpy_configuration.line_centers_sorted = np.array([line_centers])
 
     tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends = create_segment_file(tsfitpy_configuration.segment_size, tsfitpy_configuration.line_begins_sorted, tsfitpy_configuration.line_ends_sorted)
+    # save segment in a separate file where each line is an index of the seg_begins and seg_ends
+    np.savetxt(tsfitpy_configuration.segment_file, np.column_stack((tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)), fmt="%d")
     #if tsfitpy_configuration.seg_begins.size == 1:
     #    tsfitpy_configuration.seg_begins = np.array([tsfitpy_configuration.seg_begins])
     #    tsfitpy_configuration.seg_ends = np.array([tsfitpy_configuration.seg_ends])
