@@ -470,6 +470,9 @@ class Spectra:
         self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
                                                 dtype=float)  # observed spectra
 
+        # sort the observed spectra according to wavelength
+        self.wave_ob, self.flux_ob = zip(*sorted(zip(self.wave_ob, self.flux_ob)))
+
         if self.debug_mode >= 1:
             self.python_verbose = True
         else:
@@ -3293,8 +3296,8 @@ if __name__ == '__main__':
 # - fix pathing in calculate_nlte_correction_line
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
-# - fix pathing in scripts_for_plotting and corresponding jupyter notebook
+# - fix pathing in scripts_for_plotting and corresponding jupyter notebook and loading of config
 # - add conversion of old config into new one <- To check
 # - test other fitting modes: all, teff
 # - save segments in a file <- To check
-# - add changing name of the output folder to what is being done
+# - add changing name of the output folder to what is being done <- Done
