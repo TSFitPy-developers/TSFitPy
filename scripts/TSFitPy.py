@@ -2302,7 +2302,7 @@ class TSFitPyConfig:
         self.config_parser["MainPaths"]["model_atoms_path"] = self.model_atoms_path
         self.config_parser["MainPaths"]["departure_file_path"] = self.departure_file_path
         self.config_parser["MainPaths"]["departure_file_config_path"] = self.departure_file_config_path
-        self.config_parser["MainPaths"]["output_path"] = self.output_folder_path
+        self.config_parser["MainPaths"]["output_path"] = self.output_folder_path_global
         self.config_parser["MainPaths"]["linemasks_path"] = self.linemasks_path
         self.config_parser["MainPaths"]["spectra_input_path"] = self.spectra_input_path
         self.config_parser["MainPaths"]["fitlist_input_path"] = self.fitlist_input_path
@@ -2376,7 +2376,7 @@ class TSFitPyConfig:
 
         self.config_parser.add_section("InputAndOutputFiles")
         self.config_parser["InputAndOutputFiles"]["input_filename"] = self.input_fitlist_filename
-        self.config_parser["InputAndOutputFiles"]["output_filename"] = self.output_folder_path_global
+        self.config_parser["InputAndOutputFiles"]["output_filename"] = self.output_filename
 
         self.config_parser.add_section("SpectraParameters")
         self.config_parser["SpectraParameters"]["resolution"] = str(self.resolution)
@@ -2924,7 +2924,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     create_dir(tsfitpy_configuration.output_folder_path)
 
     # copy config file into output folder (for easier plotting)
-    shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, "configuration.txt"))
+    if not config_location[-4:] == ".cfg":
+        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, "configuration.txt"))
+    else:
+        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, "configuration.cfg"))
 
     fitlist = os.path.join(tsfitpy_configuration.fitlist_input_path, tsfitpy_configuration.input_fitlist_filename)
 
