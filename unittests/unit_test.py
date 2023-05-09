@@ -48,28 +48,28 @@ class MyTestCase(unittest.TestCase):
         lmin, lmax = 4200.0, 4205.0
 
         # remove directory if it exists
-        if os.path.exists("linelist_testing/test_output/0/"):
-            shutil.rmtree("linelist_testing/test_output/0/")
+        if os.path.exists("unittests/linelist_testing/test_output/0/"):
+            shutil.rmtree("unittests/linelist_testing/test_output/0/")
 
-        create_window_linelist([lmin], [lmax], "linelist_testing/", "linelist_testing/test_output/", molecules_flag=True, lbl=True)
+        create_window_linelist([lmin], [lmax], "unittests/linelist_testing/", "unittests/linelist_testing/test_output/", molecules_flag=True, lbl=True)
         print(os.getcwd())
-        self.assertTrue(compare_files_ignore_consecutive_spaces("linelist_testing/expected_result/atomic_test_data_expected", "linelist_testing/test_output/0/linelist-0.bsyn"))
-        self.assertTrue(compare_files_ignore_consecutive_spaces("linelist_testing/expected_result/molecular_test_data_expected", "linelist_testing/test_output/0/linelist-1.bsyn"))
+        self.assertTrue(compare_files_ignore_consecutive_spaces("unittests/linelist_testing/expected_result/atomic_test_data_expected", "unittests/linelist_testing/test_output/0/linelist-0.bsyn"))
+        self.assertTrue(compare_files_ignore_consecutive_spaces("unittests/linelist_testing/expected_result/molecular_test_data_expected", "unittests/linelist_testing/test_output/0/linelist-3.bsyn"))
         # get number of files in directory
-        num_files = len([f for f in os.listdir("linelist_testing/test_output/0/") if os.path.isfile(os.path.join("linelist_testing/test_output/0/", f))])
+        num_files = len([f for f in os.listdir("unittests/linelist_testing/test_output/0/") if os.path.isfile(os.path.join("unittests/linelist_testing/test_output/0/", f))])
         self.assertEqual(2, num_files)
 
-        shutil.rmtree("linelist_testing/test_output/0/")
+        shutil.rmtree("unittests/linelist_testing/test_output/0/")
 
         # check that molecules are not included
-        create_window_linelist([lmin], [lmax], "linelist_testing/", "linelist_testing/test_output/",
+        create_window_linelist([lmin], [lmax], "unittests/linelist_testing/", "unittests/linelist_testing/test_output/",
                                molecules_flag=False, lbl=True)
 
-        num_files = len([f for f in os.listdir("linelist_testing/test_output/0/") if
-                         os.path.isfile(os.path.join("linelist_testing/test_output/0/", f))])
+        num_files = len([f for f in os.listdir("unittests/linelist_testing/test_output/0/") if
+                         os.path.isfile(os.path.join("unittests/linelist_testing/test_output/0/", f))])
         self.assertEqual(1, num_files)
 
-        shutil.rmtree("linelist_testing/test_output/0/")
+        shutil.rmtree("unittests/linelist_testing/test_output/0/")
 
     def test_get_simplex_guess(self):
         for i in range(1000):
@@ -157,9 +157,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Eu": "Eu2", "Fe": "Fe2"}
         expec_dict3 = {"Eu": "Eu3", "Fe": "Fe3"}
 
-        TSFitPy.Spectra.fit_feh = True
-
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, True)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -173,9 +171,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe": "Fe2", "Eu": "Eu2"}
         expec_dict3 = {"Fe": "Fe3", "Eu": "Eu3"}
 
-        TSFitPy.Spectra.fit_feh = True
-
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, True)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -189,9 +185,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Eu": "Eu2", "Fe5": "Fe2", "Fe": "Fe02"}
         expec_dict3 = {"Eu": "Eu3", "Fe5": "Fe3", "Fe": "Fe03"}
 
-        TSFitPy.Spectra.fit_feh = False
-
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, False)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -205,9 +199,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe5": "Fe2", "Eu": "Eu2", "Fe": "Fe02"}
         expec_dict3 = {"Fe5": "Fe3", "Eu": "Eu3", "Fe": "Fe03"}
 
-        TSFitPy.Spectra.fit_feh = False
-
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, False)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -221,9 +213,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe5": "Fe2", "Eu": "", "Fe": "Fe02"}
         expec_dict3 = {"Fe5": "Fe3", "Eu": "", "Fe": "Fe03"}
 
-        TSFitPy.Spectra.fit_feh = False
-
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3)
+        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, False)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
