@@ -35,9 +35,10 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
         # new_linelist: str = os_path.join(f"{new_path_name}", f"linelist-{i}.bsyn")
         # with open(new_linelist, "w") as new_file_to_write:
         with open(line_list_file) as fp:
-            lines_file: list[str] = fp.readlines()
+            # so that we dont read full file if we are not sure that we use it (if it is a molecule)
+            first_line: str = fp.readline()
 
-            fields = lines_file[0].strip().split()
+            fields = first_line.strip().split()
             sep = '.'
             element = fields[0] + fields[1]
             elements = element.split(sep, 1)[0]
@@ -45,6 +46,10 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
             # keep it, otherwise ignore molecules
 
             if len(elements) > 3 and molecules_flag or len(elements) <= 3:
+                # now read the whole file
+                lines_file: list[str] = fp.readlines()
+                # append the first line to the lines_file
+                lines_file.insert(0, first_line)
                 all_lines_to_write: dict = {}
                 line_number_read_for_element: int = 0
                 line_number_read_file: int = 0
