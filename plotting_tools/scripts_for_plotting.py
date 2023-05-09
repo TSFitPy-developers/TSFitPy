@@ -365,9 +365,10 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
                 print(f"Specname: {specname}")
                 if print_columns is not None:
                     if column in print_columns:
-                        print(f"The mean value of the '{column}' column is: {df_results[specname][column].mean()} pm {df_results[specname][column].std() / np.sqrt(df_results[specname][column].size)}")
+                        # take only rows with the specname
+                        print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
                 else:
-                    print(f"The mean value of the '{column}' column is: {df_results[specname][column].mean()} pm {df_results[specname][column].std() / np.sqrt(df_results[specname][column].size)}")
+                    print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
                 #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
                 #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
