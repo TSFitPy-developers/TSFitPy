@@ -1982,6 +1982,7 @@ class TSFitPyConfig:
 
         self.global_temporary_directory = None  # used only to convert old config to new config
         self.output_folder_path_global = None  # used only to convert old config to new config
+        self.turbospectrum_global_path = None  # used only to convert old config to new config
 
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -2298,7 +2299,7 @@ class TSFitPyConfig:
         self.config_parser["turbospectrum_compiler"]["compiler"] = self.compiler
 
         self.config_parser.add_section("MainPaths")
-        self.config_parser["MainPaths"]["turbospectrum_path"] = self.turbospectrum_path
+        self.config_parser["MainPaths"]["turbospectrum_path"] = self.turbospectrum_global_path
         self.config_parser["MainPaths"]["interpolators_path"] = self.interpolators_path
         self.config_parser["MainPaths"]["line_list_path"] = self.line_list_path
         self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"] = self.model_atmosphere_grid_path_1d
@@ -2462,6 +2463,7 @@ class TSFitPyConfig:
 
         if self.turbospectrum_path is None:
             self.turbospectrum_path = "../turbospectrum/"
+        self.turbospectrum_global_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path))
         if self.compiler.lower() == "intel":
             self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path),
                                                    "exec", "")

@@ -14,7 +14,7 @@ from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-
+from scripts.TSFitPy import TSFitPyConfig
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
@@ -42,6 +42,11 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             print(f"Loading config from {os.path.join(old_variable, 'configuration.txt')}")
             config_file_location = os.path.join(old_variable, "configuration.txt")
             output_folder_location = old_variable
+        elif os.path.isfile(os.path.join(old_variable, "configuration.cfg")):
+            # trying new way of loading: first variable is output folder with config in it
+            print(f"Loading config from {os.path.join(old_variable, 'configuration.cfg')}")
+            config_file_location = os.path.join(old_variable, "configuration.cfg")
+            output_folder_location = old_variable
         else:
             # this was an old way of loading. first variable: config file, second variable: output folder
             print(f"Loading config from {output_folder_location}")
@@ -49,92 +54,23 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             output_folder_location = old_variable
     else:
         # new way of loading: first variable is output folder with config in it
-        config_file_location = os.path.join(output_folder_location, "configuration.txt")
-    with open(config_file_location) as fp:
-        line = fp.readline()
-        while line:
-            if len(line) > 1:
-                fields = line.strip().split()
-                field_name = fields[0].lower()
-                if field_name == "output_folder":
-                    output_folder_og = fields[2]
-                if field_name == "linemask_file_folder_location":
-                    linemask_file_og = fields[2]
-                if field_name == "segment_file_folder_location":
-                    segment_file_og = fields[2]
-                if field_name == "spec_input_path":
-                    spec_input_path = fields[2]
-                    #if obs_location is not None:
-                    #    spec_input_path = obs_location
-                if field_name == "fitlist_input_folder":
-                    fitlist_input_folder = fields[2]
-                if field_name == "atmosphere_type":
-                    atmosphere_type = fields[2]
-                if field_name == "mode":
-                    fitting_mode = fields[2].lower()
-                if field_name == "include_molecules":
-                    include_molecules = fields[2]
-                if field_name == "nlte":
-                    nlte_flag = fields[2].lower()
-                    if nlte_flag == "true":
-                        nlte_flag = True
-                    else:
-                        nlte_flag = False
-                if field_name == "fit_microturb":  # Yes No Input
-                    fit_microturb = fields[2]
-                if field_name == "fit_macroturb":  # Yes No Input
-                    if fields[2].lower() == "yes":
-                        fit_macroturb = True
-                    else:
-                        fit_macroturb = False
-                    if fields[2].lower() == "input":
-                        input_macro = True
-                    else:
-                        input_macro = False
-                if field_name == "fit_rotation":
-                    if fields[2].lower() == "yes":
-                        fit_rotation = True
-                    else:
-                        fit_rotation = False
-                if field_name == "element":
-                    elements_to_fit = []
-                    for i in range(len(fields) - 2):
-                        elements_to_fit.append(fields[2 + i])
-                    elem_to_fit = np.asarray(elements_to_fit)
-                    if "Fe" in elements_to_fit:
-                        fit_met = True
-                    else:
-                        fit_met = False
-                    nelement = len(elem_to_fit)
-                if field_name == "linemask_file":
-                    linemask_file = fields[2]
-                if field_name == "wavelength_minimum":
-                    lmin = float(fields[2])
-                if field_name == "wavelength_maximum":
-                    lmax = float(fields[2])
-                if field_name == "wavelength_delta":
-                    ldelta = float(fields[2])
-                if field_name == "resolution":
-                    resolution = float(fields[2])
-                if field_name == "macroturbulence":
-                    macroturb_input = float(fields[2])
-                if field_name == "rotation":
-                    rotation = float(fields[2])
-                if field_name == "input_file":
-                    fitlist = fields[2]
-                if field_name == "output_file":
-                    output = fields[2]
-            line = fp.readline()
-    #output_data = np.loadtxt(os.path.join(output_folder_location, output), dtype=str)
+        if os.path.isfile(os.path.join(output_folder_location, "configuration.txt")):
+            config_file_location = os.path.join(output_folder_location, "configuration.txt")
+        else:
+            config_file_location = os.path.join(output_folder_location, "configuration.cfg")
 
-    if fitting_mode != "lbl":
+    tsfitpy_config = TSFitPyConfig(config_file_location, None, "none")
+    tsfitpy_config.load_config()
+    tsfitpy_config.check_valid_input()
+
+    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic']:
         raise ValueError("Non-lbl fitting methods are not supported yet")
 
     output_elem_column = f"Fe_H"
 
-    for i in range(nelement):
+    for i in range(tsfitpy_config.nelement):
         # Spectra.elem_to_fit[i] = element name
-        elem_name = elem_to_fit[i]
+        elem_name = tsfitpy_config.elements_to_fit[i]
         if elem_name != "Fe":
             output_elem_column += f"\t{elem_name}_Fe"
 
@@ -146,7 +82,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
         if "_convolved.spec" in filename:
             filenames_output_folder_convolved.append(os.path.join(output_folder_location, filename))
 
-    with open(os.path.join(output_folder_location, output), 'r') as output_file_reading:
+    with open(os.path.join(output_folder_location, tsfitpy_config.output_filename), 'r') as output_file_reading:
         output_file_lines = output_file_reading.readlines()
 
     # Extract the header and data lines
@@ -163,16 +99,16 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     # Convert columns to appropriate data types
     output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
 
-    specname_fitlist = np.loadtxt(os.path.join(fitlist_input_folder, fitlist), dtype=str, unpack=True, usecols=(0))
-    rv_fitlist = np.loadtxt(os.path.join(fitlist_input_folder, fitlist), dtype=float, unpack=True, usecols=(1))
+    specname_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=str, unpack=True, usecols=(0))
+    rv_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=float, unpack=True, usecols=(1))
     if specname_fitlist.ndim == 0:
         specname_fitlist = np.array([specname_fitlist])
         rv_fitlist = np.array([rv_fitlist])
 
     config_dict = {}
     config_dict["filenames_output_folder"]: list[dir] = filenames_output_folder_convolved
-    config_dict["linemask_location"]: str = os.path.join(linemask_file_og, linemask_file)
-    config_dict["observed_spectra_location"]: str = spec_input_path
+    config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
+    config_dict["observed_spectra_location"]: str = tsfitpy_config.spectra_input_path
     config_dict["specname_fitlist"]: np.ndarray = specname_fitlist
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
     config_dict["output_folder_location"] = output_folder_location
