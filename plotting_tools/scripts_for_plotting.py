@@ -359,13 +359,17 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
     columns = df_results.columns.values
     for column in columns:
         if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
-            if print_columns is not None:
-                if column in print_columns:
-                    print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
-            else:
-                print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
-            #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
-            #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
+            # go through each unique specname and get the average of the column
+            unique_specnames = df_results["specname"].unique()
+            for specname in unique_specnames:
+                print(f"Specname: {specname}")
+                if print_columns is not None:
+                    if column in print_columns:
+                        print(f"The mean value of the '{column}' column is: {df_results[specname][column].mean()} pm {df_results[specname][column].std() / np.sqrt(df_results[specname][column].size)}")
+                else:
+                    print(f"The mean value of the '{column}' column is: {df_results[specname][column].mean()} pm {df_results[specname][column].std() / np.sqrt(df_results[specname][column].size)}")
+                #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
+                #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
 
 def check_if_path_exists(path_to_check: str) -> str:
