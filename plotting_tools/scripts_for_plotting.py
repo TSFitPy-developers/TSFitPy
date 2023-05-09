@@ -357,20 +357,20 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
             df_results = df_results[(df_results[one_abund_to_limit] >= min(abund_limit)) & (df_results[one_abund_to_limit] <= max(abund_limit))]
 
     columns = df_results.columns.values
-    for column in columns:
-        if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
-            # go through each unique specname and get the average of the column
-            unique_specnames = df_results["specname"].unique()
-            for specname in unique_specnames:
-                print(f"Specname: {specname}")
-                if print_columns is not None:
-                    if column in print_columns:
-                        # take only rows with the specname
+    unique_specnames = df_results["specname"].unique()
+    for specname in unique_specnames:
+        print(f"Specname: {specname}")
+        for column in columns:
+            if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
+                # go through each unique specname and get the average of the column
+                    if print_columns is not None:
+                        if column in print_columns:
+                            # take only rows with the specname
+                            print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
+                    else:
                         print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
-                else:
-                    print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
-                #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
-                #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
+                    #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
+                    #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
 
 def check_if_path_exists(path_to_check: str) -> str:
