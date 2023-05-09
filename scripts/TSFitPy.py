@@ -2810,10 +2810,11 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                                         'atom.y423',
                                         'Y/NLTEgrid4TS_Y_MARCS_Mar-27-2023.bin',
                                         'Y/auxData_Y_MARCS_Mar-27-2023.dat',
-                                        '',
-                                        ''
+                                        'Y/NLTEgrid4TS_Y_STAGGERmean3D_May-08-2023.bin',
+                                        'Y/auxData_Y_STAGGERmean3D_May-08-2023_marcs_names.dat'
                                     ]
                                      }
+
 
                 for elements_to_save in nlte_items_config:
                     nlte_config_to_write.add_section(elements_to_save)
