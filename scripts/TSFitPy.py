@@ -2126,9 +2126,9 @@ class TSFitPyConfig:
                             elements_to_do_in_nlte.append(fields[2 + i])
                         self.nlte_elements = elements_to_do_in_nlte
                     if field_name == "wavelength_minimum":
-                        self.wavelength_max = float(fields[2])
-                    if field_name == "wavelength_maximum":
                         self.wavelength_min = float(fields[2])
+                    if field_name == "wavelength_maximum":
+                        self.wavelength_max = float(fields[2])
                     if field_name == "wavelength_delta":
                         self.wavelength_delta = float(fields[2])
                     if field_name == "resolution":
