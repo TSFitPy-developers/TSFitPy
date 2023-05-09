@@ -470,8 +470,9 @@ class Spectra:
         self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
                                                 dtype=float)  # observed spectra
 
-        # sort the observed spectra according to wavelength
-        self.wave_ob, self.flux_ob = zip(*sorted(zip(self.wave_ob, self.flux_ob)))
+        # sort the observed spectra according to wavelength using numpy argsort
+        sorted_obs_wavelength_index = np.argsort(self.wave_ob)
+        self.wave_ob, self.flux_ob = self.wave_ob[sorted_obs_wavelength_index], self.flux_ob[sorted_obs_wavelength_index]
 
         if self.debug_mode >= 1:
             self.python_verbose = True
