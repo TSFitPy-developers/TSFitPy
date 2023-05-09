@@ -2489,7 +2489,9 @@ class TSFitPyConfig:
         self.departure_file_path = self.check_if_path_exists(self.departure_file_path)
         self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path)
 
-        self.output_folder_title = f"{self.output_folder_title}_{str(self.nlte_flag)}_{self.convert_list_to_str(self.elements_to_fit).replace(' ', '')}"
+        nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
+
+        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.convert_list_to_str(self.elements_to_fit).replace(' ', '')}"
 
         self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path),
                                                     self.output_folder_title)
