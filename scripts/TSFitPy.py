@@ -2488,6 +2488,9 @@ class TSFitPyConfig:
         self.model_atoms_path = self.check_if_path_exists(self.model_atoms_path)
         self.departure_file_path = self.check_if_path_exists(self.departure_file_path)
         self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path)
+
+        self.output_folder_title = f"{self.output_folder_title}_{str(self.nlte_flag)}_{self.convert_list_to_str(self.elements_to_fit).replace(' ', '')}"
+
         self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path),
                                                     self.output_folder_title)
         self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path)
