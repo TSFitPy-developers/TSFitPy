@@ -267,7 +267,10 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
     #res.fun: float = function value (chi squared) after the fit
 
     # using Scipy. Nelder-Mead or L-BFGS- algorithm
-    res = minimize(function_to_minimize, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
+    if method == 'Nelder-Mead':
+        res = minimize(function_to_minimize, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options, xatol=0.001, fatol=1e-6)
+    else:
+        res = minimize(function_to_minimize, input_param_guess, args=function_arguments, bounds=bounds, method=method, options=options)
 
     """
     cma: might work for high dimensions, doesn't work for 1D easily. so the implementation below doesn't work at all
@@ -1161,7 +1164,7 @@ class Spectra:
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
-        minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': True}
+        minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': True}
         res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if self.fit_feh:
