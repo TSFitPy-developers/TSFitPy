@@ -1657,7 +1657,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rotation={rotation} chisqr={chi_square}")
+    print(f"{output_print} rv={rv} vmac={vmac} rotation={rotation} chisqr={np.abs(chi_square - offset_chisqr)}")
 
     return np.abs(chi_square - offset_chisqr)
 
