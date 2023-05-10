@@ -6,7 +6,7 @@ from warnings import warn
 import numpy as np
 from scipy import integrate
 from scipy.interpolate import interp1d
-from scipy.optimize import minimize
+from scipy.optimize import minimize, root_scalar
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import time
 import os
@@ -1261,11 +1261,12 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
+        #param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
-        minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
+        #minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
-            res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+            res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
+            #res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
             print(res.x)
             if self.fit_feh:
                 met_index = np.where(self.elem_to_fit == "Fe")[0][0]
@@ -1657,9 +1658,9 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={rv} vmac={vmac} rotation={rotation} chisqr={np.abs(chi_square - offset_chisqr)}")
+    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} chisqr={np.abs(chi_square - offset_chisqr)}")
 
-    return np.abs(chi_square - offset_chisqr)
+    return (chi_square - offset_chisqr)
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
