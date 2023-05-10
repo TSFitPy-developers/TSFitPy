@@ -555,7 +555,7 @@ class Spectra:
 
 
     def get_elem_micro_guess(self, min_guess_microturb: float, max_guess_microturb: float, min_guess_abundance: float,
-                             max_guess_abundance: float, bound_min_abund=None) -> tuple[np.ndarray, list[tuple]]:
+                             max_guess_abundance: float, bound_min_abund=None, bound_max_abund=None) -> tuple[np.ndarray, list[tuple]]:
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
 
@@ -570,13 +570,16 @@ class Spectra:
         if bound_min_abund is None:
             bound_min_abund = self.bound_min_abund
 
+        if bound_max_abund is None:
+            bound_max_abund = self.bound_max_abund
+
         for i in range(0, self.nelement):
             if self.elem_to_fit[i] == "Fe":
                 guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_guess_abundance, max_guess_abundance,
                                                                 self.bound_min_feh, self.bound_max_feh)
             else:
                 guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_guess_abundance, max_guess_abundance,
-                                                                bound_min_abund, self.bound_max_abund)
+                                                                bound_min_abund, bound_max_abund)
             if self.init_guess_dict is not None and self.elem_to_fit[i] in self.init_guess_dict[self.spec_name]:
                 abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i]]
                 abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, guess_length + 1)
@@ -990,8 +993,9 @@ class Spectra:
         Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
         """
         result = {}
-        result_5sig = {}
-        do_5sigma = False
+        result_upper_limit = {}
+        find_upper_limit = False
+        sigmas_upper_limit = 5
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
@@ -1014,20 +1018,21 @@ class Spectra:
 
                 time_end = time.perf_counter()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-            if do_5sigma:
+
+        if find_upper_limit:
+            for line_number in range(len(self.line_begins_sorted)):
+                time_start = time.perf_counter()
+                print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
+
+                result_upper_limit[line_number] = self.fit_one_line(line_number, offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=100)
+
+                time_end = time.perf_counter()
+                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+
+            # save 5 sigma results
+            with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
                 for line_number in range(len(self.line_begins_sorted)):
-                    time_start = time.perf_counter()
-                    print(f"Fitting 5 sigma at {self.line_centers_sorted[line_number]} angstroms")
-
-                    result_5sig[line_number] = self.fit_one_line(line_number, offset_chisqr=(result[line_number]["chi_sqr"] + 25), bound_min_abund=result[line_number]["fitted_abund"])
-
-                    time_end = time.perf_counter()
-                    print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-                # save 5 sigma results
-                with open(os.path.join(self.output_folder, f"result_5sigma"), 'a') as file_5sig:
-                    for line_number in range(len(self.line_begins_sorted)):
-                        print(f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_5sig[line_number]['fitted_abund']} {result_5sig[line_number]['chi_sqr']}", file=file_5sig)
+                    print(f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}", file=file_upper_limit)
 
 
         result_list = []
@@ -1157,7 +1162,7 @@ class Spectra:
             print("Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         return one_result
 
-    def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None) -> dict:
+    def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         :param line_number: Which line number/index in line_center_sorted is being fitted
@@ -1172,7 +1177,7 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund)
+        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number, offset_chisqr)
         minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
