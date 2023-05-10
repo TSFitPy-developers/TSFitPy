@@ -1550,7 +1550,7 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     param_guess, min_bounds = spectra_to_fit.get_rv_guess()
 
     function_args = (spectra_to_fit, lmin, lmax, wave_mod_conv, flux_mod_conv)
-    minimize_options = {'maxiter': 50, 'disp': False}
+    minimize_options = {'maxiter': 50, 'disp': False, 'gtol': 1e-8, 'ftol': 1e-6}
     res = minimize_function(lbl_rv, np.median(param_guess, axis=0),
                             function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1630,7 +1630,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig, line_number)
-        minimize_options = {'maxiter': 50, 'disp': False}
+        minimize_options = {'maxiter': 50, 'disp': False, 'gtol': 1e-6, 'ftol': 1e-3}
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1755,7 +1755,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
                                                   usecols=(0, 1), unpack=True)
         param_guess, min_bounds = spectra_to_fit.get_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig, line_number)
-        minimize_options = {'maxiter': 50, 'disp': False}
+        minimize_options = {'maxiter': 50, 'disp': False, 'gtol': 1e-6, 'ftol': 1e-3}
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
@@ -1823,7 +1823,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float)
         # Thus macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig, 0)
-        minimize_options = {'maxiter': 50, 'disp': False}
+        minimize_options = {'maxiter': 50, 'disp': False, 'gtol': 1e-6, 'ftol': 1e-3}
         try:
             res = minimize_function(lbl_rv_vmac_rot, param_guess[0],
                                     function_args, min_bounds, 'L-BFGS-B', minimize_options)
