@@ -1024,7 +1024,7 @@ class Spectra:
                 time_start = time.perf_counter()
                 print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
-                result_upper_limit[line_number] = self.fit_one_line(line_number, offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=100)
+                result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=100)
 
                 time_end = time.perf_counter()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
@@ -1243,8 +1243,51 @@ class Spectra:
             flux_norm_result = np.array([])
             flux_result = np.array([])
         shutil.rmtree(temp_directory)
-        return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
+        return {"result": one_result, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]]} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+
+    def find_upper_limit_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_abund=None, bound_max_abund=None) -> dict:
+        """
+        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
+        :param line_number: Which line number/index in line_center_sorted is being fitted
+        :return: best fit result string for that line
+        """
+        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
+
+        ts = self.create_ts_object()
+
+        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+        print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
+        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
+
+        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
+        try:
+            res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+            print(res.x)
+            if self.fit_feh:
+                met_index = np.where(self.elem_to_fit == "Fe")[0][0]
+                met = res.x[met_index]
+            else:
+                met = self.met
+            elem_abund_dict = {"Fe": met}
+            for i in range(self.nelement):
+                # self.elem_to_fit[i] = element name
+                # param[1:nelement] = abundance of the element
+                elem_name = self.elem_to_fit[i]
+                if elem_name != "Fe":
+                    elem_abund_dict[elem_name] = res.x[i]  # + met
+
+            chi_squared = res.fun
+        except IndexError as error:
+            print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
+            elem_abund_dict = {"Fe": 9999, f"{self.elem_to_fit[0]}": 9999}
+            chi_squared = 9999
+
+        shutil.rmtree(temp_directory)
+        return {"chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]]} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
     def fit_one_line_vmic(self, line_number: int) -> dict:
         """
@@ -1557,6 +1600,66 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     print(f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
 
     return chi_square
+
+
+def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
+                          temp_directory: str, rv: float, vmac: float, rotation: float,
+                          vmic: float, offset_chisqr: float) -> float:
+    """
+    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
+    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
+    doppker inside
+    :param param: Parameters list with the current evaluation guess
+    :param spectra_to_fit: Spectra to fit
+    :param lmin: Start of the line [AA]
+    :param lmax: End of the line [AA]
+    :return: best fit chi squared
+    """
+    # new: now includes several elements
+    # param[0:nelements - 1] = met or abund
+
+    if spectra_to_fit.fit_feh:
+        met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
+        met = param[met_index]  # no offset, first is always element
+    else:
+        met = spectra_to_fit.met
+    elem_abund_dict = {"Fe": met}
+
+    #abundances = [met]
+
+    for i in range(spectra_to_fit.nelement):
+        # spectra_to_fit.elem_to_fit[i] = element name
+        # param[0:nelement - 1] = abundance of the element
+        elem_name = spectra_to_fit.elem_to_fit[i]
+        if elem_name != "Fe":
+            elem_abund_dict[elem_name] = param[i] + met     # convert [X/Fe] to [X/H]
+            #abundances.append(param[i])
+
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
+
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
+
+    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+
+    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+        wave_mod_orig = apply_doppler_correction(wave_mod_orig, rv + spectra_to_fit.doppler_shift)
+        chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+
+    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
+        chi_square = 999.99
+        print("empty spectrum file.")
+    else:
+        chi_square = 9999.9999
+        print("didn't generate spectra or atmosphere")
+
+    output_print = f""
+    for key in elem_abund_dict:
+        output_print += f" [{key}/H]={elem_abund_dict[key]}"
+    print(f"{output_print} rotation={rotation} chisqr={chi_square}")
+
+    return np.abs(chi_square - offset_chisqr)
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
