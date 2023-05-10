@@ -1621,7 +1621,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
 
     if spectra_to_fit.fit_feh:
         met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
-        met = param[met_index]  # no offset, first is always element
+        met = param
     else:
         met = spectra_to_fit.met
     elem_abund_dict = {"Fe": met}
@@ -1633,7 +1633,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         # param[0:nelement - 1] = abundance of the element
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
-            elem_abund_dict[elem_name] = param[i] + met     # convert [X/Fe] to [X/H]
+            elem_abund_dict[elem_name] = param + met     # convert [X/Fe] to [X/H]
             #abundances.append(param[i])
 
     for element in spectra_to_fit.input_abund:
