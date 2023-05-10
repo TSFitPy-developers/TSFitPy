@@ -1019,7 +1019,7 @@ class Spectra:
                     time_start = time.perf_counter()
                     print(f"Fitting 5 sigma at {self.line_centers_sorted[line_number]} angstroms")
 
-                    result_5sig[line_number] = self.fit_one_line(line_number, offset_chisqr=-(result[line_number]["chi_sqr"] + 25), bound_min_abund=result[line_number]["fitted_abund"])
+                    result_5sig[line_number] = self.fit_one_line(line_number, offset_chisqr=(result[line_number]["chi_sqr"] + 25), bound_min_abund=result[line_number]["fitted_abund"])
 
                     time_end = time.perf_counter()
                     print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
