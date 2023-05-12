@@ -2131,6 +2131,7 @@ class TSFitPyConfig:
 
         self.turbospectrum_path = "../turbospectrum/"
         self.cluster_name = "None"
+        self.debug_mode = 0
 
         #nlte_config_outdated = False
         #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
