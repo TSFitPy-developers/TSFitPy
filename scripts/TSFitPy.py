@@ -2850,7 +2850,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                                             'Ba/NLTEgrid_Ba_MARCS_May-10-2021.bin',
                                             'Ba/auxData_Ba_MARCS_May-10-2021.txt',
                                             'Ba/NLTEgrid_Ba_STAGGERmean3D_May-10-2021.bin',
-                                            'Ba/auxData_output_Ba_mean3D_May-10-2021_marcs_names.txt'
+                                            'Ba/auxData_Ba_mean3D_May-10-2021_marcs_names.txt'
                                         ],
                                      "Ca": [
                                          'atom.ca105b',
