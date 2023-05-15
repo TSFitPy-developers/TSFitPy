@@ -45,7 +45,7 @@ def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resol
     #item_abund["Y"] = 0 + met
     #item_abund["Ni"] = 0.0 + met
     #item_abund["Ba"] = 0.0 + met
-    temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    temp_directory = os.path.join(os.getcwd(), f"temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)

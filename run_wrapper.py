@@ -69,19 +69,19 @@ if __name__ == '__main__':
 
     #set directories
     if ts_compiler == "intel":
-        turbospec_path = "../turbospectrum/exec/"
+        turbospec_path = "/turbospectrum/exec/"
     elif ts_compiler == "gnu":
-        turbospec_path = "../turbospectrum/exec-gf/"
-    interpol_path = "./model_interpolators/"
-    line_list_path = "../input_files/linelists/linelist_for_fitting/"
+        turbospec_path = "/turbospectrum/exec-gf/"
+    interpol_path = "./scripts/model_interpolators/"
+    line_list_path = "/input_files/linelists/linelist_for_fitting/"
     if atmosphere_type == "1D":
-        model_atmosphere_grid_path = "../input_files/model_atmospheres/1D/"
+        model_atmosphere_grid_path = "/input_files/model_atmospheres/1D/"
         model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
     elif atmosphere_type == "3D":
-        model_atmosphere_grid_path = "../input_files/model_atmospheres/3D/"
+        model_atmosphere_grid_path = "/input_files/model_atmospheres/3D/"
         model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    model_atom_path = "../input_files/nlte_data/model_atoms/"
-    departure_file_path = "../input_files/nlte_data/"
+    model_atom_path = "/input_files/nlte_data/model_atoms/"
+    departure_file_path = "/input_files/nlte_data/"
 
     teff = 5777
     logg = 4.4
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     ts_config = {"turbospec_path": turbospec_path,
                  "interpol_path": interpol_path,
-                 "line_list_path": line_list_path_trimmed,
+                 "line_list_paths": line_list_path_trimmed,
                  "model_atmosphere_grid_path": model_atmosphere_grid_path,
                  "model_atmosphere_grid_list": model_atmosphere_list,
                  "model_atom_path": model_atom_path,
