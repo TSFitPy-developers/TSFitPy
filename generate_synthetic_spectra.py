@@ -15,7 +15,7 @@ from time import perf_counter
 from scripts.TSFitPy import create_segment_file
 
 class SyntheticSpectraConfig:
-    def __init__(self, config_location: str, spectra_location: str, output_folder_title: str):
+    def __init__(self, config_location: str, output_folder_title: str):
         self.config_parser = ConfigParser()
         self.config_location: str = config_location
         self.output_folder_title: str = output_folder_title
@@ -30,10 +30,7 @@ class SyntheticSpectraConfig:
 
         self.temporary_directory_path: str = None
         self.fitlist_input_path: str = None
-        if spectra_location is not None:
-            self.spectra_input_path: str = spectra_location
-        else:
-            self.spectra_input_path: str = None
+        self.spectra_input_path: str = None
         self.linemasks_path: str = None
         self.output_folder_path: str = None
         self.departure_file_config_path: str = None
@@ -165,37 +162,22 @@ class SyntheticSpectraConfig:
 
     def check_valid_input(self):
         self.atmosphere_type = self.atmosphere_type.upper()
-        self.fitting_mode = self.fitting_mode.lower()
         self.include_molecules = self.include_molecules
         self.nlte_flag = self.nlte_flag
-        self.fit_vmic = self.fit_vmic
-        self.fit_vmac = self.fit_vmac
-        self.fit_rotation = self.fit_rotation
-        self.elements_to_fit = np.asarray(self.elements_to_fit)
-        self.fit_feh = self.fit_feh
         self.wavelength_min = float(self.wavelength_min)
         self.wavelength_max = float(self.wavelength_max)
         self.wavelength_delta = float(self.wavelength_delta)
         self.resolution = float(self.resolution)
         self.rotation = float(self.rotation)
-        self.temporary_directory_path = self.find_path_temporary_directory(self.temporary_directory_path)
+        self.temporary_directory_path = self.convert_to_absolute_path(self.temporary_directory_path)
         self.number_of_cpus = int(self.number_of_cpus)
 
-        self.segment_file = os.path.join(self.temporary_directory_path, "segment_file.txt")
-
-        self.debug_mode = self.debug_mode
-        self.experimental_parallelisation = self.experimental_parallelisation
-
-        self.nelement = len(self.elements_to_fit)
-
-        if self.turbospectrum_path is None:
-            self.turbospectrum_path = "../turbospectrum/"
-        self.turbospectrum_global_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path))
+        self.debug_mode = int(self.debug_mode)
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path),
+            self.turbospectrum_path = os.path.join(self.convert_to_absolute_path(self.turbospectrum_path),
                                                    "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path),
+            self.turbospectrum_path = os.path.join(self.convert_to_absolute_path(self.turbospectrum_path),
                                                    "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
@@ -207,27 +189,27 @@ class SyntheticSpectraConfig:
             raise ValueError(f"Interpolators path {self.interpolators_path} does not exist")
 
         if self.atmosphere_type.upper() == "1D":
-            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d)
+            self.model_atmosphere_grid_path = self.convert_to_absolute_path(self.model_atmosphere_grid_path_1d)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         elif self.atmosphere_type.upper() == "3D":
-            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_3d)
+            self.model_atmosphere_grid_path = self.convert_to_absolute_path(self.model_atmosphere_grid_path_3d)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         else:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
-        self.model_atoms_path = self.check_if_path_exists(self.model_atoms_path)
-        self.departure_file_path = self.check_if_path_exists(self.departure_file_path)
-        self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path)
+        self.model_atoms_path = self.convert_to_absolute_path(self.model_atoms_path)
+        self.departure_file_path = self.convert_to_absolute_path(self.departure_file_path)
+        self.output_folder_path_global = self.convert_to_absolute_path(self.output_folder_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.input_parameters_filename}"
 
-        self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path),
+        self.output_folder_path = os.path.join(self.convert_to_absolute_path(self.output_folder_path),
                                                     self.output_folder_title)
-        self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path)
-        self.line_list_path = self.check_if_path_exists(self.line_list_path)
+        self.spectra_input_path = self.convert_to_absolute_path(self.spectra_input_path)
+        self.line_list_path = self.convert_to_absolute_path(self.line_list_path)
 
 
     @staticmethod
@@ -263,45 +245,19 @@ class SyntheticSpectraConfig:
             raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
 
     @staticmethod
-    def check_if_path_exists(path_to_check: str) -> str:
-        # check if path is absolute
-        if os.path.isabs(path_to_check):
-            if os.path.exists(os.path.join(path_to_check, "")):
-                return path_to_check
+    def convert_to_absolute_path(path):
+        if os.path.isabs(path):
+            if os.path.exists(path):
+                return path
             else:
-                raise ValueError(f"Configuration: {path_to_check} does not exist")
-        # if path is relative, check if it exists in the current directory
-        if os.path.exists(os.path.join(path_to_check, "")):
-            # returns absolute path
-            return os.path.join(os.getcwd(), path_to_check, "")
-        else:
-            # if it starts with ../ convert to ./ and check again
-            if path_to_check.startswith("../"):
-                path_to_check = path_to_check[3:]
-                if os.path.exists(os.path.join(path_to_check, "")):
-                    return os.path.join(os.getcwd(), path_to_check, "")
-                else:
-                    raise ValueError(f"Configuration: {path_to_check} does not exist")
-            else:
-                raise ValueError(f"Configuration: {path_to_check} does not exist")
-
-    @staticmethod
-    def find_path_temporary_directory(temp_directory):
-        # find the path to the temporary directory by finding if /scripts/ is located adjacent to the input directory
-        # if it is, change temp_directory path to that one
-        # check if path is absolute then return it
-        if os.path.isabs(temp_directory):
-            return temp_directory
-
-        # first check if path above path directory contains /scripts/
-        if os.path.exists(os.path.join(temp_directory, "..", "scripts", "")):
-            return os.path.join(os.getcwd(), temp_directory)
-        elif temp_directory.startswith("../"):
-            # if it doesnt, and temp_directory contains ../ remove the ../ and return that
-            return os.path.join(os.getcwd(), temp_directory[3:])
+                raise ValueError(f"Configuration: {path} does not exist")
         else:
             # otherwise just return the temp_directory
-            return os.path.join(os.getcwd(), temp_directory)
+            new_path = os.path.join(os.getcwd(), path)
+            if os.path.exists(new_path):
+                return new_path
+            else:
+                raise ValueError(f"Configuration: {new_path} does not exist")
 
     @staticmethod
     def convert_list_to_str(list_to_convert: list) -> str:
@@ -312,16 +268,17 @@ class SyntheticSpectraConfig:
 
 if __name__ == '__main__':
     # load config file from command line
-    config_file = sys.argv[1]
-
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     today = f"{today}_{np.random.random(1)[0]}"
 
-    ts_compiler = "intel" #needs to be "intel" or "gnu"
+    config_file = sys.argv[1]
+    config_synthetic_spectra = SyntheticSpectraConfig(config_file, today)
+    config_synthetic_spectra.load_config()
+    config_synthetic_spectra.check_valid_input()
+
+    """ts_compiler = "intel" #needs to be "intel" or "gnu"
     atmosphere_type = "1D"
     nlte_elements = [] # e.g. ["Mg", "Si", "Ca", "Mn", "Ti", "Fe", "Y", "Ni", "Ba"]
-
-    windows_flag = False
 
     #set directories
     if ts_compiler == "intel":
@@ -337,7 +294,7 @@ if __name__ == '__main__':
         model_atmosphere_grid_path = "/input_files/model_atmospheres/3D/"
         model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
     model_atom_path = "/input_files/nlte_data/model_atoms/"
-    departure_file_path = "/input_files/nlte_data/"
+    departure_file_path = "/input_files/nlte_data/""""
 
     teff = 5777
     logg = 4.4
@@ -345,20 +302,20 @@ if __name__ == '__main__':
     met_list = [0.0]  # metallicities to generate
     vturb = 1.0
 
-    nlte_flag = False
+    #nlte_flag = False
 
-    line_to_check = 4883
+    """line_to_check = 4883
     lmin = line_to_check - 20  # change lmin/lmax here
     lmax = line_to_check + 20
     lmin = 4800  # or change lmin/lmax here
     lmax = 5500
     ldelta = 0.005
 
-    cpus_to_use = 1  # how many cpus to use (Dask workers)
+    cpus_to_use = 1  # how many cpus to use (Dask workers)"""
 
-    output_dir = os.path.join("./synt_spectra_to_fit/", today, "")
-    temp_directory = './temp_direectory/'
-    login_node_address = "gemini-login.mpia.de"
+    output_dir = os.path.join(, today, "")
+    #temp_directory = './temp_direectory/'
+    #login_node_address = "gemini-login.mpia.de"
 
     # load NLTE data
     nlte_config = ConfigParser()
@@ -426,26 +383,26 @@ if __name__ == '__main__':
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
     print("Preparing workers")
-    client = Client(threads_per_worker=1, n_workers=cpus_to_use)  # if # of threads are not equal to 1, then may break the program
+    client = Client(threads_per_worker=1, n_workers=config_synthetic_spectra.number_of_cpus)  # if # of threads are not equal to 1, then may break the program
     print(client)
 
     host = client.run_on_scheduler(socket.gethostname)
     port = client.scheduler_info()['services']['dashboard']
-    print(f"Assuming that the cluster is ran at {login_node_address} (change in config if not the case)")
+    print(f"Assuming that the cluster is ran at {config_synthetic_spectra.cluster_name} (change in config if not the case)")
 
     # print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
-    print(f"ssh -N -L {port}:{host}:{port} {login_node_address}")
+    print(f"ssh -N -L {port}:{host}:{port} {config_synthetic_spectra.cluster_name}")
 
     print("Worker preparation complete")
 
     resolution, macro, rotation = 0, 0, 0
 
-    ts_config = {"turbospec_path": turbospec_path,
-                 "interpol_path": interpol_path,
+    ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
+                 "interpol_path": config_synthetic_spectra.interpolators_path,
                  "line_list_paths": line_list_path_trimmed,
-                 "model_atmosphere_grid_path": model_atmosphere_grid_path,
-                 "model_atmosphere_grid_list": model_atmosphere_list,
-                 "model_atom_path": model_atom_path,
+                 "model_atmosphere_grid_path": config_synthetic_spectra.model_atmosphere_grid_path,
+                 "model_atmosphere_grid_list": config_synthetic_spectra.model_atmosphere_list,
+                 "model_atom_path": config_synthetic_spectra.model_atoms_path,
                  "model_temperatures": model_temperatures,
                  "model_logs": model_logs,
                  "model_mets": model_mets,
@@ -453,11 +410,11 @@ if __name__ == '__main__':
                  "marcs_models": marcs_models,
                  "marcs_values": marcs_values,
                  "aux_file_length_dict": aux_file_length_dict,
-                 "departure_file_path": departure_file_path,
-                 "atmosphere_type": atmosphere_type,
-                 "windows_flag": windows_flag,
-                 "segment_file": segment_file,
-                 "line_mask_file": linemask_file,
+                 "departure_file_path": config_synthetic_spectra.departure_file_path,
+                 "atmosphere_type": config_synthetic_spectra.atmosphere_type,
+                 "windows_flag": False,
+                 "segment_file": None,
+                 "line_mask_file": None,
                  "depart_bin_file": depart_bin_file,
                  "depart_aux_file": depart_aux_file,
                  "model_atom_file": model_atom_file}
@@ -468,7 +425,9 @@ if __name__ == '__main__':
     futures = []
     for metal in met_list:
         spectrum_name = f"spectra_output_{teff}_{logg}_"
-        future = client.submit(run_and_save_wrapper, ts_config, teff, logg, metal, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, output_dir, vturb)
+        future = client.submit(run_and_save_wrapper, ts_config, teff, logg, metal, config_synthetic_spectra.wavelength_min,
+                               config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
+                               spectrum_name, config_synthetic_spectra.nlte_flag, resolution, macro, rotation, output_dir, vturb)
         futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
