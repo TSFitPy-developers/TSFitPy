@@ -239,4 +239,4 @@ periodic_table = [
     "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn",
     "Fr", "Ra", "Ac", "Th", "Pa", "U"]
 
-molecules_atomic_number = {"CH": "0106.000000", "CN": "0607.000000"}
+molecules_atomic_number = {"CH": ["0106.000000", "C H"], "CN": ["0607.000000", "C N"]}

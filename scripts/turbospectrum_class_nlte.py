@@ -868,10 +868,12 @@ class TurboSpectrum:
                 # write all nlte elements
                 if element in molecules_atomic_number:
                     # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
-                    atomic_number = molecules_atomic_number[element]
+                    atomic_number = molecules_atomic_number[element][0]
+                    element_name_to_write = molecules_atomic_number[element][1]
                 else:
                     atomic_number = periodic_table.index(element)
-                file.write(f"{atomic_number}  '{element}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
+                    element_name_to_write = element
+                file.write(f"{atomic_number}  '{element_name_to_write}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
             for element in self.free_abundances:
                 # now check for any lte elements which have a specific given abundance and write them too
                 atomic_number = periodic_table.index(element)
