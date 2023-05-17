@@ -995,7 +995,7 @@ class Spectra:
         result = {}
         result_upper_limit = {}
         find_upper_limit = True
-        sigmas_upper_limit = 5
+        sigmas_upper_limit = 1
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
@@ -1267,28 +1267,14 @@ class Spectra:
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
             #res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
-            print(res.x)
-            if self.fit_feh:
-                met_index = np.where(self.elem_to_fit == "Fe")[0][0]
-                met = res.x[met_index]
-            else:
-                met = self.met
-            elem_abund_dict = {"Fe": met}
-            for i in range(self.nelement):
-                # self.elem_to_fit[i] = element name
-                # param[1:nelement] = abundance of the element
-                elem_name = self.elem_to_fit[i]
-                if elem_name != "Fe":
-                    elem_abund_dict[elem_name] = res.x[i]  # + met
-
-            chi_squared = res.fun
+            print(res)
+            fitted_abund = res.root
         except IndexError as error:
             print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
-            elem_abund_dict = {"Fe": 9999, f"{self.elem_to_fit[0]}": 9999}
-            chi_squared = 9999
+            fitted_abund = 9999
 
         shutil.rmtree(temp_directory)
-        return {"chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]]} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+        return {"chi_sqr": -100, "fitted_abund":fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
     def fit_one_line_vmic(self, line_number: int) -> dict:
         """
