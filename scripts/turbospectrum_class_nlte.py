@@ -326,7 +326,7 @@ class TurboSpectrum:
             self.line_mask_file = line_mask_file
         if self.atmosphere_dimension == "3D":
             self.turbulent_velocity = 2.0
-            print("turbulent_velocity is not used since model atmosphere is 3D")
+            #print("turbulent_velocity is not used since model atmosphere is 3D")
         if lpoint is not None:
             self.lpoint = lpoint
 
