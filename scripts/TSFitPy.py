@@ -995,7 +995,7 @@ class Spectra:
         result = {}
         result_upper_limit = {}
         find_upper_limit = True
-        sigmas_upper_limit = 1
+        sigmas_upper_limit = 0.333
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
@@ -1277,7 +1277,7 @@ class Spectra:
             fitted_abund = 9999
 
         shutil.rmtree(temp_directory)
-        return {"chi_sqr": -100, "fitted_abund":fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+        return {"chi_sqr": offset_chisqr, "fitted_abund":fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
     def fit_one_line_vmic(self, line_number: int) -> dict:
         """
