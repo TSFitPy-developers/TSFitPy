@@ -994,7 +994,7 @@ class Spectra:
         """
         result = {}
         result_upper_limit = {}
-        find_upper_limit = True
+        find_upper_limit = False
         sigmas_upper_limit = 0.333
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
