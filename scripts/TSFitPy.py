@@ -1024,7 +1024,10 @@ class Spectra:
                 time_start = time.perf_counter()
                 print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
-                result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30)
+                try:
+                    result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30)
+                except ValueError:
+                    result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
 
                 time_end = time.perf_counter()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
