@@ -1,6 +1,7 @@
 from __future__ import annotations
 import datetime
 import os
+import pickle
 import shutil
 import socket
 from configparser import ConfigParser
@@ -132,7 +133,7 @@ class AbusingClasses:
         pass
 
 
-def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
+def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
     # parameters to adjust
 
     teff = teff
@@ -143,35 +144,35 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
     ldelta = ldelta
     item_abund = {"Fe": met, element: abundance + met}
     #temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
-    temp_directory = os.path.join(AbusingClasses.global_temp_dir, f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
+    temp_directory = os.path.join(abusingclasses.global_temp_dir, f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
 
     ts = TurboSpectrum(
-        turbospec_path=AbusingClasses.turbospec_path,
-        interpol_path=AbusingClasses.interpol_path,
+        turbospec_path=abusingclasses.turbospec_path,
+        interpol_path=abusingclasses.interpol_path,
         line_list_paths=line_list_path,
-        marcs_grid_path=AbusingClasses.model_atmosphere_grid_path,
-        marcs_grid_list=AbusingClasses.model_atmosphere_list,
-        model_atom_path=AbusingClasses.model_atom_path,
-        departure_file_path=AbusingClasses.departure_file_path,
-        aux_file_length_dict=AbusingClasses.aux_file_length_dict,
-        model_temperatures=AbusingClasses.model_temperatures,
-        model_logs=AbusingClasses.model_logs,
-        model_mets=AbusingClasses.model_mets,
-        marcs_value_keys=AbusingClasses.marcs_value_keys,
-        marcs_models=AbusingClasses.marcs_models,
-        marcs_values=AbusingClasses.marcs_values)
+        marcs_grid_path=abusingclasses.model_atmosphere_grid_path,
+        marcs_grid_list=abusingclasses.model_atmosphere_list,
+        model_atom_path=abusingclasses.model_atom_path,
+        departure_file_path=abusingclasses.departure_file_path,
+        aux_file_length_dict=abusingclasses.aux_file_length_dict,
+        model_temperatures=abusingclasses.model_temperatures,
+        model_logs=abusingclasses.model_logs,
+        model_mets=abusingclasses.model_mets,
+        marcs_value_keys=abusingclasses.marcs_value_keys,
+        marcs_models=abusingclasses.marcs_models,
+        marcs_values=abusingclasses.marcs_values)
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
                  free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
-                 atmosphere_dimension=AbusingClasses.atmosphere_type, windows_flag=False,
-                 segment_file=AbusingClasses.segment_file,
-                 line_mask_file=AbusingClasses.linemask_file, depart_bin_file=AbusingClasses.depart_bin_file_dict,
-                 depart_aux_file=AbusingClasses.depart_aux_file_dict,
-                 model_atom_file=AbusingClasses.model_atom_file_dict)
+                 atmosphere_dimension=abusingclasses.atmosphere_type, windows_flag=False,
+                 segment_file=abusingclasses.segment_file,
+                 line_mask_file=abusingclasses.linemask_file, depart_bin_file=abusingclasses.depart_bin_file_dict,
+                 depart_aux_file=abusingclasses.depart_aux_file_dict,
+                 model_atom_file=abusingclasses.model_atom_file_dict)
 
     ts.run_turbospectrum_and_atmosphere()
     # ts.run_turbospectrum()
@@ -192,9 +193,9 @@ def generate_atmosphere(teff, logg, vturb, met, lmin, lmax, ldelta, line_list_pa
     return wave_mod_orig, flux_norm_mod_orig
 
 
-def get_nlte_ew(param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
+def get_nlte_ew(abusingclasses, param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
     abundance = param[0]
-    wavelength_nlte, norm_flux_nlte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
+    wavelength_nlte, norm_flux_nlte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                           line_list_path, element, abundance, True)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
@@ -207,15 +208,18 @@ def get_nlte_ew(param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list
 
 
 
-def generate_and_fit_atmosphere(specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
+def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
                                 abundance, line_center):
-    wavelength_lte, norm_flux_lte = generate_atmosphere(teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
+    # load pickle file
+    with open(pickle_file_path, 'rb') as f:
+        abusingclasses = pickle.load(f)
+    wavelength_lte, norm_flux_lte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                         line_list_path, element, abundance, False)
     if wavelength_lte is not None:
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
         print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
         result = minimize(get_nlte_ew, [abundance - 0.3, abundance + 0.3],
-                          args=(teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
+                          args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
                           bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
                           options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
@@ -301,7 +305,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         print("Error: output folder already exists. Run was stopped to prevent overwriting")
         return
 
-    AbusingClasses.linemask_file = tsfitpy_configuration.linemask_file
+    AbusingClasses.linemask_file = os.path.join(tsfitpy_configuration.linemasks_path, tsfitpy_configuration.linemask_file)
 
     print(f"Temporary directory name: {AbusingClasses.global_temp_dir}")
     create_dir(AbusingClasses.global_temp_dir)
@@ -378,12 +382,16 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     print("Worker preparation complete")
 
+    with open(os.path.join(tsfitpy_configuration.temporary_directory_path, 'AbusingClasses.pkl'), 'wb') as f:
+        # Pickle the 'data' dictionary using the highest protocol available.
+        pickle.dump(AbusingClasses, f)
+
     futures = []
     for i in range(specname_fitlist.size):
         specname1, teff1, logg1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], met_fitlist[
             i], microturb_fitlist[i]
         for j in range(len(AbusingClasses.line_begins_sorted)):
-            future = client.submit(generate_and_fit_atmosphere, specname1, teff1, logg1, microturb1, met1,
+            future = client.submit(generate_and_fit_atmosphere, os.path.join(tsfitpy_configuration.temporary_directory_path, 'AbusingClasses.pkl'), specname1, teff1, logg1, microturb1, met1,
                                    AbusingClasses.line_begins_sorted[j] - 2, AbusingClasses.line_ends_sorted[j] + 2,
                                    AbusingClasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), AbusingClasses.elem_to_fit[0],
