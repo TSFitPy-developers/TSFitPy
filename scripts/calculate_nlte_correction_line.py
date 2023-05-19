@@ -3,6 +3,7 @@ import datetime
 import os
 import shutil
 import socket
+from configparser import ConfigParser
 from os import path as os_path
 import glob
 from sys import argv
@@ -242,7 +243,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     tsfitconfig = TSFitPyConfig(config_file_name, output_folder_title)
     tsfitconfig.load_config()
     tsfitconfig.validate_input()
-
+    tsfitconfig.convert_old_config()
 
     AbusingClasses.nlte_flag = tsfitconfig.nlte_flag
     AbusingClasses.elem_to_fit = tsfitconfig.elements_to_fit
@@ -265,38 +266,35 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     AbusingClasses.spec_input_path = tsfitconfig.spectra_input_path
 
     # load NLTE data dicts
-    if AbusingClasses.nlte_flag:
-        depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(AbusingClasses.elem_to_fit,
-                                                                                                   depart_bin_file,
-                                                                                                   depart_aux_file,
-                                                                                                   model_atom_file, True)
+    if tsfitconfig.nlte_flag:
+        nlte_config = ConfigParser()
+        nlte_config.read(os.path.join(tsfitconfig.departure_file_path, "nlte_filenames.cfg"))
 
-        input_elem_depart_bin_file_dict, input_elem_depart_aux_file_dict, input_elem_model_atom_file_dict = load_nlte_files_in_dict(
-            input_elem_abundance,
-            depart_bin_file_input_elem,
-            depart_aux_file_input_elem,
-            model_atom_file_input_elem, True, load_fe=False)
+        depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
-        depart_bin_file_dict = {**depart_bin_file_dict, **input_elem_depart_bin_file_dict}
-        depart_aux_file_dict = {**depart_aux_file_dict, **input_elem_depart_aux_file_dict}
-        model_atom_file_dict = {**model_atom_file_dict, **input_elem_model_atom_file_dict}
+        for element in tsfitconfig.nlte_elements:
+            if tsfitconfig.atmosphere_type == "1D":
+                bin_config_name, aux_config_name = "1d_bin", "1d_aux"
+            else:
+                bin_config_name, aux_config_name = "3d_bin", "3d_aux"
+            depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
+            depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
+            model_atom_file_dict[element] = nlte_config[element]["atom_file"]
 
         print("NLTE loaded. Please check that elements correspond to their correct binary files:")
         for key in depart_bin_file_dict:
             print(f"{key}: {depart_bin_file_dict[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
 
-        print("If files do not correspond, please check config file. Fitted elements should go in the same order as "
-              "the NLTE file locations. If Fe is not fitted, then it should be added last to the NLTE file location. "
-              "Elements without NLTE binary files do not need them.")
+        print(
+            f"If files do not correspond, please check config file {os.path.join(tsfitconfig.departure_file_path, 'nlte_filenames.cfg')}. "
+            f"Elements without NLTE binary files do not need them.")
 
+        tsfitconfig.depart_bin_file_dict = depart_bin_file_dict
+        tsfitconfig.depart_aux_file_dict = depart_aux_file_dict
+        tsfitconfig.model_atom_file_dict = model_atom_file_dict
         AbusingClasses.depart_bin_file_dict = depart_bin_file_dict
         AbusingClasses.depart_aux_file_dict = depart_aux_file_dict
         AbusingClasses.model_atom_file_dict = model_atom_file_dict
-        AbusingClasses.aux_file_length_dict = {}
-
-        for element in model_atom_file_dict:
-            AbusingClasses.aux_file_length_dict[element] = len(
-                np.loadtxt(os_path.join(tsfitconfig.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
     # prevent overwriting
     if os.path.exists(AbusingClasses.output_folder):
