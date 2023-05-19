@@ -263,7 +263,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     line_list_path_trimmed = os.path.join(tsfitpy_configuration.global_temporary_directory,
                                           f'linelist_for_fitting_trimmed_{output_folder_title}', "")
     AbusingClasses.model_atmosphere_grid_path = tsfitpy_configuration.model_atmosphere_grid_path
-    AbusingClasses.model_atmosphere_list = tsfitpy_configuration.model_atmosphere_grid_path
+    AbusingClasses.model_atmosphere_list = tsfitpy_configuration.model_atmosphere_list
     AbusingClasses.model_atom_path = tsfitpy_configuration.model_atoms_path
     AbusingClasses.departure_file_path = tsfitpy_configuration.departure_file_path
     AbusingClasses.output_folder = tsfitpy_configuration.output_folder_path
