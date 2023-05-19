@@ -1982,10 +1982,13 @@ def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart
     return depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
 
 class TSFitPyConfig:
-    def __init__(self, config_location: str, spectra_location: str, output_folder_title: str):
+    def __init__(self, config_location: str, output_folder_title=None, spectra_location=None):
         self.config_parser = ConfigParser()
         self.config_location: str = config_location
-        self.output_folder_title: str = output_folder_title
+        if output_folder_title is not None:
+            self.output_folder_title: str = output_folder_title
+        else:
+            self.output_folder_title: str = "none"
 
         self.compiler: str = None
         self.turbospectrum_path: str = None
@@ -2154,14 +2157,14 @@ class TSFitPyConfig:
                     if field_name == "output_folder":
                         self.output_folder_path = fields[2]
                     if field_name == "linemask_file_folder_location":
-                        self.linemasks_path = self.check_if_path_exists(fields[2])
+                        self.linemasks_path = self._check_if_path_exists(fields[2])
                     #if field_name == "segment_file_folder_location":
                         #self.segment_file_og = fields[2]
                     if field_name == "spec_input_path":
                         if self.spectra_input_path is None:
                             self.spectra_input_path = fields[2]
                     if field_name == "fitlist_input_folder":
-                        self.fitlist_input_path = self.check_if_path_exists(fields[2])
+                        self.fitlist_input_path = self._check_if_path_exists(fields[2])
                     if field_name == "turbospectrum_compiler":
                         self.compiler = fields[2]
                     if field_name == "atmosphere_type":
@@ -2324,7 +2327,7 @@ class TSFitPyConfig:
         # read the configuration file
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
-        self.compiler = self.validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
+        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
         self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
@@ -2334,18 +2337,18 @@ class TSFitPyConfig:
         self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
         self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
         self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.linemasks_path = self.check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
+        self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
         if self.spectra_input_path is None:
             self.spectra_input_path = self.config_parser["MainPaths"]["spectra_input_path"]
-        self.fitlist_input_path = self.check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
+        self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
         self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
-        self.atmosphere_type = self.validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
-        self.fitting_mode = self.validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
-        self.include_molecules = self.convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
-        self.nlte_flag = self.convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
-        self.fit_vmic = self.validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
-        vmac_fitting_mode = self.validate_string_input(self.config_parser["FittingParameters"]["fit_vmac"], ["yes", "no", "input"])
+        self.atmosphere_type = self._validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
+        self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
+        self.include_molecules = self._convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
+        self.nlte_flag = self._convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
+        self.fit_vmic = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
+        vmac_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmac"], ["yes", "no", "input"])
         if vmac_fitting_mode == "Yes":
             self.fit_vmac = True
             self.vmac_input = False
@@ -2357,21 +2360,21 @@ class TSFitPyConfig:
             self.vmac_input = True
         else:
             raise ValueError(f"Vmac fitting mode {vmac_fitting_mode} not recognized")
-        self.fit_rotation = self.convert_string_to_bool(self.config_parser["FittingParameters"]["fit_rotation"])
-        self.elements_to_fit = self.split_string_to_string_list(self.config_parser["FittingParameters"]["element_to_fit"])
+        self.fit_rotation = self._convert_string_to_bool(self.config_parser["FittingParameters"]["fit_rotation"])
+        self.elements_to_fit = self._split_string_to_string_list(self.config_parser["FittingParameters"]["element_to_fit"])
         if 'Fe' in self.elements_to_fit:
             self.fit_feh = True
         else:
             self.fit_feh = False
 
-        self.nlte_elements = self.split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
+        self.nlte_elements = self._split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
         self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
         self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
         self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
 
         self.debug_mode = int(self.config_parser["ExtraParameters"]["debug_mode"])
         self.number_of_cpus = int(self.config_parser["ExtraParameters"]["number_of_cpus"])
-        self.experimental_parallelisation = self.convert_string_to_bool(self.config_parser["ExtraParameters"]["experimental_parallelisation"])
+        self.experimental_parallelisation = self._convert_string_to_bool(self.config_parser["ExtraParameters"]["experimental_parallelisation"])
         self.cluster_name = self.config_parser["ExtraParameters"]["cluster_name"]
 
         self.input_fitlist_filename = self.config_parser["InputAndOutputFiles"]["input_filename"]
@@ -2380,30 +2383,30 @@ class TSFitPyConfig:
         self.resolution = float(self.config_parser["SpectraParameters"]["resolution"])
         self.vmac = float(self.config_parser["SpectraParameters"]["vmac"])
         self.rotation = float(self.config_parser["SpectraParameters"]["rotation"])
-        self.init_guess_elements = self.split_string_to_string_list(self.config_parser["SpectraParameters"]["init_guess_elements"])
-        self.init_guess_elements_path = self.split_string_to_string_list(self.config_parser["SpectraParameters"]["init_guess_elements_path"])
-        self.input_elements_abundance = self.split_string_to_string_list(self.config_parser["SpectraParameters"]["input_elements_abundance"])
-        self.input_elements_abundance_path = self.split_string_to_string_list(self.config_parser["SpectraParameters"]["input_elements_abundance_path"])
+        self.init_guess_elements = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["init_guess_elements"])
+        self.init_guess_elements_path = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["init_guess_elements_path"])
+        self.input_elements_abundance = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["input_elements_abundance"])
+        self.input_elements_abundance_path = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["input_elements_abundance_path"])
 
         self.wavelength_min = float(self.config_parser["ParametersForModeAll"]["wavelength_min"])
         self.wavelength_max = float(self.config_parser["ParametersForModeAll"]["wavelength_max"])
 
-        self.bounds_vmic = self.split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_vmic"])
-        self.guess_range_vmic = self.split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["guess_range_vmic"])
+        self.bounds_vmic = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_vmic"])
+        self.guess_range_vmic = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["guess_range_vmic"])
 
-        self.bounds_teff = self.split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
-        self.guess_range_teff = self.split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
+        self.bounds_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
+        self.guess_range_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
 
-        self.bounds_vmac = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
-        self.bounds_rotation = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])
-        self.bounds_abundance = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_abundance"])
-        self.bounds_feh = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_feh"])
-        self.bounds_doppler = self.split_string_to_float_list(self.config_parser["Bounds"]["bounds_doppler"])
+        self.bounds_vmac = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
+        self.bounds_rotation = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])
+        self.bounds_abundance = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_abundance"])
+        self.bounds_feh = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_feh"])
+        self.bounds_doppler = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_doppler"])
 
-        self.guess_range_vmac = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_vmac"])
-        self.guess_range_rotation = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
-        self.guess_range_abundance = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
-        self.guess_range_doppler = self.split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
+        self.guess_range_vmac = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_vmac"])
+        self.guess_range_rotation = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
+        self.guess_range_abundance = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
+        self.guess_range_doppler = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
 
     def convert_old_config(self):
         self.config_parser.add_section("turbospectrum_compiler")
@@ -2444,7 +2447,7 @@ class TSFitPyConfig:
         else:
             rotation_fitting_mode = "No"
         self.config_parser["FittingParameters"]["fit_rotation"] = rotation_fitting_mode
-        self.config_parser["FittingParameters"]["element_to_fit"] = self.convert_list_to_str(self.elements_to_fit)
+        self.config_parser["FittingParameters"]["element_to_fit"] = self._convert_list_to_str(self.elements_to_fit)
 
         nlte_elements_to_write = []
         if self.oldconfig_need_to_add_new_nlte_config:
@@ -2479,7 +2482,7 @@ class TSFitPyConfig:
                     nlte_elements_to_write.append("Y")
         else:
             nlte_elements_to_write = self.nlte_elements
-        self.config_parser["FittingParameters"]["nlte_elements"] = self.convert_list_to_str(nlte_elements_to_write)
+        self.config_parser["FittingParameters"]["nlte_elements"] = self._convert_list_to_str(nlte_elements_to_write)
         self.config_parser["FittingParameters"]["linemask_file"] = self.linemask_file
         self.config_parser["FittingParameters"]["wavelength_delta"] = str(self.wavelength_delta)
         self.config_parser["FittingParameters"]["segment_size"] = str(self.segment_size)
@@ -2498,35 +2501,35 @@ class TSFitPyConfig:
         self.config_parser["SpectraParameters"]["resolution"] = str(self.resolution)
         self.config_parser["SpectraParameters"]["vmac"] = str(self.vmac)
         self.config_parser["SpectraParameters"]["rotation"] = str(self.rotation)
-        self.config_parser["SpectraParameters"]["init_guess_elements"] = self.convert_list_to_str(self.init_guess_elements)
-        self.config_parser["SpectraParameters"]["init_guess_elements_path"] = self.convert_list_to_str(self.init_guess_elements_path)
-        self.config_parser["SpectraParameters"]["input_elements_abundance"] = self.convert_list_to_str(self.input_elements_abundance)
-        self.config_parser["SpectraParameters"]["input_elements_abundance_path"] = self.convert_list_to_str(self.input_elements_abundance_path)
+        self.config_parser["SpectraParameters"]["init_guess_elements"] = self._convert_list_to_str(self.init_guess_elements)
+        self.config_parser["SpectraParameters"]["init_guess_elements_path"] = self._convert_list_to_str(self.init_guess_elements_path)
+        self.config_parser["SpectraParameters"]["input_elements_abundance"] = self._convert_list_to_str(self.input_elements_abundance)
+        self.config_parser["SpectraParameters"]["input_elements_abundance_path"] = self._convert_list_to_str(self.input_elements_abundance_path)
 
         self.config_parser.add_section("ParametersForModeAll")
         self.config_parser["ParametersForModeAll"]["wavelength_min"] = str(self.wavelength_min)
         self.config_parser["ParametersForModeAll"]["wavelength_max"] = str(self.wavelength_max)
 
         self.config_parser.add_section("ParametersForModeLbl")
-        self.config_parser["ParametersForModeLbl"]["bounds_vmic"] = self.convert_list_to_str(self.bounds_vmic)
-        self.config_parser["ParametersForModeLbl"]["guess_range_vmic"] = self.convert_list_to_str(self.guess_range_vmic)
+        self.config_parser["ParametersForModeLbl"]["bounds_vmic"] = self._convert_list_to_str(self.bounds_vmic)
+        self.config_parser["ParametersForModeLbl"]["guess_range_vmic"] = self._convert_list_to_str(self.guess_range_vmic)
 
         self.config_parser.add_section("ParametersForModeTeff")
-        self.config_parser["ParametersForModeTeff"]["bounds_teff"] = self.convert_list_to_str(self.bounds_teff)
-        self.config_parser["ParametersForModeTeff"]["guess_range_teff"] = self.convert_list_to_str(self.guess_range_teff)
+        self.config_parser["ParametersForModeTeff"]["bounds_teff"] = self._convert_list_to_str(self.bounds_teff)
+        self.config_parser["ParametersForModeTeff"]["guess_range_teff"] = self._convert_list_to_str(self.guess_range_teff)
 
         self.config_parser.add_section("Bounds")
-        self.config_parser["Bounds"]["bounds_vmac"] = self.convert_list_to_str(self.bounds_vmac)
-        self.config_parser["Bounds"]["bounds_rotation"] = self.convert_list_to_str(self.bounds_rotation)
-        self.config_parser["Bounds"]["bounds_abundance"] = self.convert_list_to_str(self.bounds_abundance)
-        self.config_parser["Bounds"]["bounds_feh"] = self.convert_list_to_str(self.bounds_feh)
-        self.config_parser["Bounds"]["bounds_doppler"] = self.convert_list_to_str(self.bounds_doppler)
+        self.config_parser["Bounds"]["bounds_vmac"] = self._convert_list_to_str(self.bounds_vmac)
+        self.config_parser["Bounds"]["bounds_rotation"] = self._convert_list_to_str(self.bounds_rotation)
+        self.config_parser["Bounds"]["bounds_abundance"] = self._convert_list_to_str(self.bounds_abundance)
+        self.config_parser["Bounds"]["bounds_feh"] = self._convert_list_to_str(self.bounds_feh)
+        self.config_parser["Bounds"]["bounds_doppler"] = self._convert_list_to_str(self.bounds_doppler)
 
         self.config_parser.add_section("GuessRanges")
-        self.config_parser["GuessRanges"]["guess_range_vmac"] = self.convert_list_to_str(self.guess_range_vmac)
-        self.config_parser["GuessRanges"]["guess_range_rotation"] = self.convert_list_to_str(self.guess_range_rotation)
-        self.config_parser["GuessRanges"]["guess_range_abundance"] = self.convert_list_to_str(self.guess_range_abundance)
-        self.config_parser["GuessRanges"]["guess_range_doppler"] = self.convert_list_to_str(self.guess_range_doppler)
+        self.config_parser["GuessRanges"]["guess_range_vmac"] = self._convert_list_to_str(self.guess_range_vmac)
+        self.config_parser["GuessRanges"]["guess_range_rotation"] = self._convert_list_to_str(self.guess_range_rotation)
+        self.config_parser["GuessRanges"]["guess_range_abundance"] = self._convert_list_to_str(self.guess_range_abundance)
+        self.config_parser["GuessRanges"]["guess_range_doppler"] = self._convert_list_to_str(self.guess_range_doppler)
 
         if self.config_location[-4:] == ".txt":
             converted_config_location = f"{self.config_location[:-4]}"
@@ -2547,7 +2550,7 @@ class TSFitPyConfig:
         print(f"Converted old config file into new one and save at {converted_config_location}\n\n")
         warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
 
-    def check_valid_input(self, check_valid_path=True):
+    def validate_input(self, check_valid_path=True):
         self.atmosphere_type = self.atmosphere_type.upper()
         self.fitting_mode = self.fitting_mode.lower()
         self.include_molecules = self.include_molecules
@@ -2562,7 +2565,7 @@ class TSFitPyConfig:
         self.wavelength_delta = float(self.wavelength_delta)
         self.resolution = float(self.resolution)
         self.rotation = float(self.rotation)
-        self.temporary_directory_path = self.find_path_temporary_directory(self.temporary_directory_path)
+        self.temporary_directory_path = self._find_path_temporary_directory(self.temporary_directory_path)
         self.number_of_cpus = int(self.number_of_cpus)
 
         self.segment_file = os.path.join(self.temporary_directory_path, "segment_file.txt")
@@ -2574,12 +2577,12 @@ class TSFitPyConfig:
 
         if self.turbospectrum_path is None:
             self.turbospectrum_path = "../turbospectrum/"
-        self.turbospectrum_global_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path, check_valid_path))
+        self.turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path))
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path, check_valid_path),
+            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
                                                    "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path, check_valid_path),
+            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
                                                    "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
@@ -2593,27 +2596,27 @@ class TSFitPyConfig:
                 self.interpolators_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
 
         if self.atmosphere_type.upper() == "1D":
-            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d, check_valid_path)
+            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_1d, check_valid_path)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         elif self.atmosphere_type.upper() == "3D":
-            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_3d, check_valid_path)
+            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_3d, check_valid_path)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         else:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
-        self.model_atoms_path = self.check_if_path_exists(self.model_atoms_path, check_valid_path)
-        self.departure_file_path = self.check_if_path_exists(self.departure_file_path, check_valid_path)
-        self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path, check_valid_path)
+        self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path, check_valid_path)
+        self.departure_file_path = self._check_if_path_exists(self.departure_file_path, check_valid_path)
+        self.output_folder_path_global = self._check_if_path_exists(self.output_folder_path, check_valid_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
-        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
+        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self._convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
 
-        self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path, check_valid_path),
-                                                    self.output_folder_title)
-        self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path, check_valid_path)
-        self.line_list_path = self.check_if_path_exists(self.line_list_path, check_valid_path)
+        self.output_folder_path = os.path.join(self._check_if_path_exists(self.output_folder_path, check_valid_path),
+                                               self.output_folder_title)
+        self.spectra_input_path = self._check_if_path_exists(self.spectra_input_path, check_valid_path)
+        self.line_list_path = self._check_if_path_exists(self.line_list_path, check_valid_path)
 
         if self.fitting_mode == "teff":
             self.fit_teff = True
@@ -2707,7 +2710,7 @@ class TSFitPyConfig:
         spectra_object.marcs_values = self.marcs_values
 
     @staticmethod
-    def split_string_to_float_list(string_to_split: str) -> list[float]:
+    def _split_string_to_float_list(string_to_split: str) -> list[float]:
         # remove commas from the string if they exist and split the string into a list
         string_to_split = string_to_split.replace(",", " ").split()
         # convert the list of strings to a list of floats
@@ -2715,13 +2718,13 @@ class TSFitPyConfig:
         return string_to_split
 
     @staticmethod
-    def split_string_to_string_list(string_to_split: str) -> list[str]:
+    def _split_string_to_string_list(string_to_split: str) -> list[str]:
         # remove commas from the string if they exist and split the string into a list
         string_to_split = string_to_split.replace(",", " ").split()
         return string_to_split
 
     @staticmethod
-    def convert_string_to_bool(string_to_convert: str) -> bool:
+    def _convert_string_to_bool(string_to_convert: str) -> bool:
         if string_to_convert.lower() in ["true", "yes", "y", "1"]:
             return True
         elif string_to_convert.lower() in ["false", "no", "n", "0"]:
@@ -2730,7 +2733,7 @@ class TSFitPyConfig:
             raise ValueError(f"Configuration: could not convert {string_to_convert} to a boolean")
 
     @staticmethod
-    def validate_string_input(input_to_check: str, allowed_values: list[str]) -> str:
+    def _validate_string_input(input_to_check: str, allowed_values: list[str]) -> str:
         # check if input is in the list of allowed values
         if input_to_check.lower() in allowed_values:
             # return string in lower case with first letter capitalised
@@ -2739,7 +2742,7 @@ class TSFitPyConfig:
             raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
 
     @staticmethod
-    def check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
+    def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
         # check if path is absolute
         if os.path.isabs(path_to_check):
             if os.path.exists(os.path.join(path_to_check, "")):
@@ -2761,7 +2764,7 @@ class TSFitPyConfig:
             return ""
 
     @staticmethod
-    def find_path_temporary_directory(temp_directory):
+    def _find_path_temporary_directory(temp_directory):
         # find the path to the temporary directory by finding if /scripts/ is located adjacent to the input directory
         # if it is, change temp_directory path to that one
         # check if path is absolute then return it
@@ -2779,7 +2782,7 @@ class TSFitPyConfig:
             return os.path.join(os.getcwd(), temp_directory)
 
     @staticmethod
-    def convert_list_to_str(list_to_convert: list) -> str:
+    def _convert_list_to_str(list_to_convert: list) -> str:
         string_to_return = ""
         for element in list_to_convert:
             string_to_return = f"{string_to_return} {element}"
@@ -2813,9 +2816,9 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     #initial_guess_string = None
 
     # read the configuration file
-    tsfitpy_configuration = TSFitPyConfig(config_location, spectra_location, output_folder_title)
+    tsfitpy_configuration = TSFitPyConfig(config_location, output_folder_title, spectra_location)
     tsfitpy_configuration.load_config()
-    tsfitpy_configuration.check_valid_input()
+    tsfitpy_configuration.validate_input()
 
     if not config_location[-4:] == ".cfg":
         tsfitpy_configuration.convert_old_config()

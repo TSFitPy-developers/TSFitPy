@@ -59,9 +59,9 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
         else:
             config_file_location = os.path.join(output_folder_location, "configuration.cfg")
 
-    tsfitpy_config = TSFitPyConfig(config_file_location, None, "none")
+    tsfitpy_config = TSFitPyConfig(config_file_location, "none")
     tsfitpy_config.load_config()
-    tsfitpy_config.check_valid_input(check_valid_path=False)
+    tsfitpy_config.validate_input(check_valid_path=False)
 
     if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic']:
         raise ValueError("Non-lbl fitting methods are not supported yet")
