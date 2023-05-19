@@ -193,7 +193,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     return wave_mod_orig, flux_norm_mod_orig
 
 
-def get_nlte_ew(abusingclasses, param, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
+def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
     abundance = param[0]
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                           line_list_path, element, abundance, True)
