@@ -240,40 +240,40 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     depart_aux_file_input_elem = []
     model_atom_file_input_elem = []
 
-    tsfitconfig = TSFitPyConfig(config_file_name, output_folder_title)
-    tsfitconfig.load_config()
-    tsfitconfig.validate_input()
-    tsfitconfig.convert_old_config()
+    tsfitpy_configuration = TSFitPyConfig(config_file_name, output_folder_title)
+    tsfitpy_configuration.load_config()
+    tsfitpy_configuration.validate_input()
+    tsfitpy_configuration.convert_old_config()
 
-    AbusingClasses.nlte_flag = tsfitconfig.nlte_flag
-    AbusingClasses.elem_to_fit = tsfitconfig.elements_to_fit
-    AbusingClasses.ldelta = tsfitconfig.wavelength_delta
-    AbusingClasses.global_temp_dir = tsfitconfig.global_temporary_directory
-    AbusingClasses.dask_workers = tsfitconfig.number_of_cpus
+    AbusingClasses.nlte_flag = tsfitpy_configuration.nlte_flag
+    AbusingClasses.elem_to_fit = tsfitpy_configuration.elements_to_fit
+    AbusingClasses.ldelta = tsfitpy_configuration.wavelength_delta
+    AbusingClasses.global_temp_dir = tsfitpy_configuration.global_temporary_directory
+    AbusingClasses.dask_workers = tsfitpy_configuration.number_of_cpus
 
     print(
-        f"Fitting data at {tsfitconfig.spectra_input_path} with resolution {tsfitconfig.resolution} and rotation {tsfitconfig.rotation}")
+        f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
 
-    AbusingClasses.turbospec_path = tsfitconfig.turbospectrum_path
-    AbusingClasses.interpol_path = tsfitconfig.interpolators_path
-    line_list_path_trimmed = os.path.join(tsfitconfig.global_temporary_directory,
+    AbusingClasses.turbospec_path = tsfitpy_configuration.turbospectrum_path
+    AbusingClasses.interpol_path = tsfitpy_configuration.interpolators_path
+    line_list_path_trimmed = os.path.join(tsfitpy_configuration.global_temporary_directory,
                                           f'linelist_for_fitting_trimmed_{output_folder_title}', "")
-    AbusingClasses.model_atmosphere_grid_path = tsfitconfig.model_atmosphere_grid_path
-    AbusingClasses.model_atmosphere_list = tsfitconfig.model_atmosphere_grid_path
-    AbusingClasses.model_atom_path = tsfitconfig.model_atoms_path
-    AbusingClasses.departure_file_path = tsfitconfig.departure_file_path
-    AbusingClasses.output_folder = tsfitconfig.output_folder_path
-    AbusingClasses.spec_input_path = tsfitconfig.spectra_input_path
+    AbusingClasses.model_atmosphere_grid_path = tsfitpy_configuration.model_atmosphere_grid_path
+    AbusingClasses.model_atmosphere_list = tsfitpy_configuration.model_atmosphere_grid_path
+    AbusingClasses.model_atom_path = tsfitpy_configuration.model_atoms_path
+    AbusingClasses.departure_file_path = tsfitpy_configuration.departure_file_path
+    AbusingClasses.output_folder = tsfitpy_configuration.output_folder_path
+    AbusingClasses.spec_input_path = tsfitpy_configuration.spectra_input_path
 
     # load NLTE data dicts
-    if tsfitconfig.nlte_flag:
+    if tsfitpy_configuration.nlte_flag:
         nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(tsfitconfig.departure_file_path, "nlte_filenames.cfg"))
+        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"))
 
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
-        for element in tsfitconfig.nlte_elements:
-            if tsfitconfig.atmosphere_type == "1D":
+        for element in tsfitpy_configuration.nlte_elements:
+            if tsfitpy_configuration.atmosphere_type == "1D":
                 bin_config_name, aux_config_name = "1d_bin", "1d_aux"
             else:
                 bin_config_name, aux_config_name = "3d_bin", "3d_aux"
@@ -286,12 +286,12 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
             print(f"{key}: {depart_bin_file_dict[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
 
         print(
-            f"If files do not correspond, please check config file {os.path.join(tsfitconfig.departure_file_path, 'nlte_filenames.cfg')}. "
+            f"If files do not correspond, please check config file {os.path.join(tsfitpy_configuration.departure_file_path, 'nlte_filenames.cfg')}. "
             f"Elements without NLTE binary files do not need them.")
 
-        tsfitconfig.depart_bin_file_dict = depart_bin_file_dict
-        tsfitconfig.depart_aux_file_dict = depart_aux_file_dict
-        tsfitconfig.model_atom_file_dict = model_atom_file_dict
+        tsfitpy_configuration.depart_bin_file_dict = depart_bin_file_dict
+        tsfitpy_configuration.depart_aux_file_dict = depart_aux_file_dict
+        tsfitpy_configuration.model_atom_file_dict = model_atom_file_dict
         AbusingClasses.depart_bin_file_dict = depart_bin_file_dict
         AbusingClasses.depart_aux_file_dict = depart_aux_file_dict
         AbusingClasses.model_atom_file_dict = model_atom_file_dict
@@ -301,13 +301,13 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         print("Error: output folder already exists. Run was stopped to prevent overwriting")
         return
 
-    AbusingClasses.linemask_file = tsfitconfig.linemask_file
+    AbusingClasses.linemask_file = tsfitpy_configuration.linemask_file
 
     print(f"Temporary directory name: {AbusingClasses.global_temp_dir}")
     create_dir(AbusingClasses.global_temp_dir)
     create_dir(AbusingClasses.output_folder)
 
-    fitlist = tsfitconfig.input_fitlist_filename
+    fitlist = os.path.join(tsfitpy_configuration.fitlist_input_path, tsfitpy_configuration.input_fitlist_filename)
 
     fitlist_data = np.loadtxt(fitlist, dtype='str')
 
@@ -352,7 +352,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
           "crashes.\n\n")
 
     print("Trimming")
-    cut_linelist(AbusingClasses.line_begins_sorted, AbusingClasses.line_ends_sorted, tsfitconfig.line_list_path,
+    cut_linelist(AbusingClasses.line_begins_sorted, AbusingClasses.line_ends_sorted, tsfitpy_configuration.line_list_path,
                  line_list_path_trimmed, AbusingClasses.elem_to_fit[0])
     print("Finished trimming linelist")
 
@@ -401,7 +401,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     # shutil.rmtree(AbusingClasses.global_temp_dir)  # clean up temp directory
     # shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
 
-    output = os.path.join(AbusingClasses.output_folder, tsfitconfig.output_file_name)
+    output = os.path.join(AbusingClasses.output_folder, tsfitpy_configuration.output_file_name)
 
     f = open(output, 'a')
     # specname, line_center, ew_lte, ew_nlte, nlte_correction
