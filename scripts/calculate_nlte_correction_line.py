@@ -256,6 +256,8 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     abusingclasses.ldelta = tsfitpy_configuration.wavelength_delta
     abusingclasses.global_temp_dir = tsfitpy_configuration.temporary_directory_path
     abusingclasses.dask_workers = tsfitpy_configuration.number_of_cpus
+    abusingclasses.atmosphere_type = tsfitpy_configuration.atmosphere_type
+    abusingclasses.segment_file = None
 
     print(
         f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
