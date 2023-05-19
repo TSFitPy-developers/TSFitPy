@@ -256,7 +256,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     AbusingClasses.turbospec_path = tsfitconfig.turbospectrum_path
     AbusingClasses.interpol_path = tsfitconfig.interpolators_path
     line_list_path_trimmed = os.path.join(tsfitconfig.global_temporary_directory,
-                                          f'linelist_for_fitting_trimmed_{output_folder_title_date}', "")
+                                          f'linelist_for_fitting_trimmed_{output_folder_title}', "")
     AbusingClasses.model_atmosphere_grid_path = tsfitconfig.model_atmosphere_grid_path
     AbusingClasses.model_atmosphere_list = tsfitconfig.model_atmosphere_grid_path
     AbusingClasses.model_atom_path = tsfitconfig.model_atoms_path
@@ -422,21 +422,3 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     f.close()
 
-
-if __name__ == '__main__':
-    # elements_to_use: list[str] = ["39.000"]
-    # element_to_fit: str = "Y"
-    abundance: float = 0.0  # abundance of element in LTE [X/Fe]; scaled with metallicity
-
-    if len(argv) > 1:  # when calling the program, can now add extra argument with location of config file, easier to call
-        config_location = argv[1]
-    else:
-        config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
-
-    output_folder_title_date = datetime.datetime.now().strftime(
-        "%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
-    output_folder_title_date = f"{output_folder_title_date}_{np.random.random(1)[0]}"  # in case if someone calls the function several times per second
-    print(f"Start of the fitting: {output_folder_title_date}")
-
-
-    run_nlte_corrections(config_location, output_folder_title_date)
