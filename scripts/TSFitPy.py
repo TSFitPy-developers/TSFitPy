@@ -2093,6 +2093,10 @@ class TSFitPyConfig:
         self.marcs_models = None
         self.marcs_values = None
 
+        # dictionaries with either abundance guess or abundance input
+        self.init_guess_spectra_dict: dict = None
+        self.input_elem_abundance_dict: dict = None
+
         self.old_global_temporary_directory = None  # used only to convert old config to new config
         self.old_output_folder_path_global = None  # used only to convert old config to new config
         self.old_turbospectrum_global_path = None  # used only to convert old config to new config
@@ -2708,6 +2712,9 @@ class TSFitPyConfig:
         spectra_object.marcs_value_keys = self.marcs_value_keys
         spectra_object.marcs_models = self.marcs_models
         spectra_object.marcs_values = self.marcs_values
+
+        spectra_object.init_guess_dict = self.init_guess_spectra_dict
+        spectra_object.input_elem_abundance = self.input_elem_abundance_dict
 
     @staticmethod
     def _split_string_to_float_list(string_to_split: str) -> list[float]:
