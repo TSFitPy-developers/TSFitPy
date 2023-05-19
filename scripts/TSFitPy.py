@@ -3416,13 +3416,9 @@ if __name__ == '__main__':
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
 
 # TODO:
-# - fix pathing in calculate_nlte_correction_line
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
 # - fix pathing in scripts_for_plotting and corresponding jupyter notebook and loading of config
-# - add conversion of old config into new one <- To check
 # - test other fitting modes: all, teff
 # - save segments in a file <- To check
-# - add changing name of the output folder to what is being done <- Done
-# - fix bug where adding constant abundance element does not work
 # - say file doesn't exist for config

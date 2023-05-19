@@ -419,7 +419,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     # shutil.rmtree(abusingclasses.global_temp_dir)  # clean up temp directory
     # shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
 
-    output = os.path.join(abusingclasses.output_folder, tsfitpy_configuration.output_file_name)
+    output = os.path.join(abusingclasses.output_folder, tsfitpy_configuration.output_filename)
 
     f = open(output, 'a')
     # specname, line_center, ew_lte, ew_nlte, nlte_correction
