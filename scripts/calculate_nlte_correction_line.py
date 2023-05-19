@@ -10,7 +10,7 @@ import glob
 from sys import argv
 from dask.distributed import Client
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, root_scalar
 from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
 from scripts.TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width, TSFitPyConfig, create_segment_file
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
@@ -194,12 +194,12 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
 
 
 def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
-    abundance = param[0]
+    abundance = param
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                           line_list_path, element, abundance, True)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
-        diff = np.square((nlte_ew - lte_ew))
+        diff = (nlte_ew - lte_ew)
     else:
         nlte_ew = 9999999
         diff = 9999999
@@ -218,14 +218,21 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
     if wavelength_lte is not None:
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
         print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
-        result = minimize(get_nlte_ew, [abundance - 0.1, abundance + 0.5],
-                          args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
-                          bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
-                          options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
+        try:
+            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
+                                 bracket=[abundance - 3, abundance + 3], method='brentq')
+            #result = minimize(get_nlte_ew, [abundance - 0.1, abundance + 0.5],
+            #                  args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
+            #                  bounds=[(abundance - 3, abundance + 3)], method="Nelder-Mead",
+            #                  options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
-        nlte_correction = result.x[0]
-        ew_nlte = np.sqrt(result.fun) + ew_lte
-        print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte} EW_nlte={ew_nlte} EW_diff={result.fun}")
+            nlte_correction = result.root
+            ew_nlte = ew_lte
+            print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte}")
+        except ValueError:
+            print("Fitting failed")
+            ew_nlte = -99999
+            nlte_correction = -99999
     else:
         ew_lte = -99999
         ew_nlte = -99999
@@ -235,15 +242,6 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
 
 def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     login_node_address = "gemini-login.mpia.de"
-
-    depart_bin_file = []
-    depart_aux_file = []
-    model_atom_file = []
-    input_elem_abundance = []
-    depart_bin_file_input_elem = []
-    depart_aux_file_input_elem = []
-    model_atom_file_input_elem = []
-
     tsfitpy_configuration = TSFitPyConfig(config_file_name, output_folder_title)
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.validate_input()
