@@ -302,6 +302,12 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         abusingclasses.depart_aux_file_dict = depart_aux_file_dict
         abusingclasses.model_atom_file_dict = model_atom_file_dict
 
+        abusingclasses.aux_file_length_dict = {}
+
+        for element in model_atom_file_dict:
+            abusingclasses.aux_file_length_dict[element] = len(
+                np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+
     # prevent overwriting
     if os.path.exists(abusingclasses.output_folder):
         print("Error: output folder already exists. Run was stopped to prevent overwriting")
