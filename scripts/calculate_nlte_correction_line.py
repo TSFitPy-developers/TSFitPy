@@ -269,13 +269,13 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = load_nlte_files_in_dict(AbusingClasses.elem_to_fit,
                                                                                                    depart_bin_file,
                                                                                                    depart_aux_file,
-                                                                                                   model_atom_file, False)
+                                                                                                   model_atom_file, True)
 
         input_elem_depart_bin_file_dict, input_elem_depart_aux_file_dict, input_elem_model_atom_file_dict = load_nlte_files_in_dict(
             input_elem_abundance,
             depart_bin_file_input_elem,
             depart_aux_file_input_elem,
-            model_atom_file_input_elem, False, load_fe=False)
+            model_atom_file_input_elem, True, load_fe=False)
 
         depart_bin_file_dict = {**depart_bin_file_dict, **input_elem_depart_bin_file_dict}
         depart_aux_file_dict = {**depart_aux_file_dict, **input_elem_depart_aux_file_dict}
