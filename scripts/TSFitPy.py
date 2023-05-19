@@ -2093,9 +2093,9 @@ class TSFitPyConfig:
         self.marcs_models = None
         self.marcs_values = None
 
-        self.global_temporary_directory = None  # used only to convert old config to new config
-        self.output_folder_path_global = None  # used only to convert old config to new config
-        self.turbospectrum_global_path = None  # used only to convert old config to new config
+        self.old_global_temporary_directory = None  # used only to convert old config to new config
+        self.old_output_folder_path_global = None  # used only to convert old config to new config
+        self.old_turbospectrum_global_path = None  # used only to convert old config to new config
 
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -2258,7 +2258,7 @@ class TSFitPyConfig:
                         self.rotation = float(fields[2])
                     if field_name == "temporary_directory":
                         temp_directory = fields[2]
-                        self.global_temporary_directory = os.path.join(".", temp_directory, "")
+                        self.old_global_temporary_directory = os.path.join(".", temp_directory, "")
                         temp_directory = os.path.join(os.path.join("..", temp_directory, ""), self.output_folder_title, '')
                         self.temporary_directory_path = os.path.join("..", temp_directory, "")
                     if field_name == "input_file":
@@ -2413,7 +2413,7 @@ class TSFitPyConfig:
         self.config_parser["turbospectrum_compiler"]["compiler"] = self.compiler
 
         self.config_parser.add_section("MainPaths")
-        self.config_parser["MainPaths"]["turbospectrum_path"] = self.turbospectrum_global_path
+        self.config_parser["MainPaths"]["turbospectrum_path"] = self.old_turbospectrum_global_path
         self.config_parser["MainPaths"]["interpolators_path"] = self.interpolators_path
         self.config_parser["MainPaths"]["line_list_path"] = self.line_list_path
         self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"] = self.model_atmosphere_grid_path_1d
@@ -2421,11 +2421,11 @@ class TSFitPyConfig:
         self.config_parser["MainPaths"]["model_atoms_path"] = self.model_atoms_path
         self.config_parser["MainPaths"]["departure_file_path"] = self.departure_file_path
         self.config_parser["MainPaths"]["departure_file_config_path"] = self.departure_file_config_path
-        self.config_parser["MainPaths"]["output_path"] = self.output_folder_path_global
+        self.config_parser["MainPaths"]["output_path"] = self.old_output_folder_path_global
         self.config_parser["MainPaths"]["linemasks_path"] = self.linemasks_path
         self.config_parser["MainPaths"]["spectra_input_path"] = self.spectra_input_path
         self.config_parser["MainPaths"]["fitlist_input_path"] = self.fitlist_input_path
-        self.config_parser["MainPaths"]["temporary_directory_path"] = self.global_temporary_directory
+        self.config_parser["MainPaths"]["temporary_directory_path"] = self.old_global_temporary_directory
 
         self.config_parser.add_section("FittingParameters")
         self.config_parser["FittingParameters"]["atmosphere_type"] = self.atmosphere_type.upper()
@@ -2577,7 +2577,7 @@ class TSFitPyConfig:
 
         if self.turbospectrum_path is None:
             self.turbospectrum_path = "../turbospectrum/"
-        self.turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path))
+        self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path))
         if self.compiler.lower() == "intel":
             self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
                                                    "exec", "")
@@ -2607,7 +2607,7 @@ class TSFitPyConfig:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
         self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path, check_valid_path)
         self.departure_file_path = self._check_if_path_exists(self.departure_file_path, check_valid_path)
-        self.output_folder_path_global = self._check_if_path_exists(self.output_folder_path, check_valid_path)
+        self.old_output_folder_path_global = self._check_if_path_exists(self.output_folder_path, check_valid_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
