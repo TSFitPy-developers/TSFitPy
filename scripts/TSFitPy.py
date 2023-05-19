@@ -2547,7 +2547,7 @@ class TSFitPyConfig:
         print(f"Converted old config file into new one and save at {converted_config_location}\n\n")
         warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
 
-    def check_valid_input(self):
+    def check_valid_input(self, check_valid_path=True):
         self.atmosphere_type = self.atmosphere_type.upper()
         self.fitting_mode = self.fitting_mode.lower()
         self.include_molecules = self.include_molecules
@@ -2574,12 +2574,12 @@ class TSFitPyConfig:
 
         if self.turbospectrum_path is None:
             self.turbospectrum_path = "../turbospectrum/"
-        self.turbospectrum_global_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path))
+        self.turbospectrum_global_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path, check_valid_path))
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path),
+            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path, check_valid_path),
                                                    "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path),
+            self.turbospectrum_path = os.path.join(os.getcwd(), self.check_if_path_exists(self.turbospectrum_path, check_valid_path),
                                                    "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
@@ -2593,27 +2593,27 @@ class TSFitPyConfig:
                 self.interpolators_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
 
         if self.atmosphere_type.upper() == "1D":
-            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d)
+            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_1d, check_valid_path)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         elif self.atmosphere_type.upper() == "3D":
-            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_3d)
+            self.model_atmosphere_grid_path = self.check_if_path_exists(self.model_atmosphere_grid_path_3d, check_valid_path)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         else:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
-        self.model_atoms_path = self.check_if_path_exists(self.model_atoms_path)
-        self.departure_file_path = self.check_if_path_exists(self.departure_file_path)
-        self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path)
+        self.model_atoms_path = self.check_if_path_exists(self.model_atoms_path, check_valid_path)
+        self.departure_file_path = self.check_if_path_exists(self.departure_file_path, check_valid_path)
+        self.output_folder_path_global = self.check_if_path_exists(self.output_folder_path, check_valid_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
 
-        self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path),
+        self.output_folder_path = os.path.join(self.check_if_path_exists(self.output_folder_path, check_valid_path),
                                                     self.output_folder_title)
-        self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path)
-        self.line_list_path = self.check_if_path_exists(self.line_list_path)
+        self.spectra_input_path = self.check_if_path_exists(self.spectra_input_path, check_valid_path)
+        self.line_list_path = self.check_if_path_exists(self.line_list_path, check_valid_path)
 
         if self.fitting_mode == "teff":
             self.fit_teff = True
@@ -2739,27 +2739,26 @@ class TSFitPyConfig:
             raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
 
     @staticmethod
-    def check_if_path_exists(path_to_check: str) -> str:
+    def check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
         # check if path is absolute
         if os.path.isabs(path_to_check):
             if os.path.exists(os.path.join(path_to_check, "")):
                 return path_to_check
-            else:
-                raise ValueError(f"Configuration: {path_to_check} does not exist")
-        # if path is relative, check if it exists in the current directory
-        if os.path.exists(os.path.join(path_to_check, "")):
-            # returns absolute path
-            return os.path.join(os.getcwd(), path_to_check, "")
         else:
-            # if it starts with ../ convert to ./ and check again
-            if path_to_check.startswith("../"):
-                path_to_check = path_to_check[3:]
-                if os.path.exists(os.path.join(path_to_check, "")):
-                    return os.path.join(os.getcwd(), path_to_check, "")
-                else:
-                    raise ValueError(f"Configuration: {path_to_check} does not exist")
+            # if path is relative, check if it exists in the current directory
+            if os.path.exists(os.path.join(path_to_check, "")):
+                # returns absolute path
+                return os.path.join(os.getcwd(), path_to_check, "")
             else:
-                raise ValueError(f"Configuration: {path_to_check} does not exist")
+                # if it starts with ../ convert to ./ and check again
+                if path_to_check.startswith("../"):
+                    path_to_check = path_to_check[3:]
+                    if os.path.exists(os.path.join(path_to_check, "")):
+                        return os.path.join(os.getcwd(), path_to_check, "")
+        if check_valid_path:
+            raise OSError(f"Configuration: {path_to_check} does not exist")
+        else:
+            return ""
 
     @staticmethod
     def find_path_temporary_directory(temp_directory):

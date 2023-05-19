@@ -61,7 +61,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
 
     tsfitpy_config = TSFitPyConfig(config_file_location, None, "none")
     tsfitpy_config.load_config()
-    tsfitpy_config.check_valid_input()
+    tsfitpy_config.check_valid_input(check_valid_path=False)
 
     if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic']:
         raise ValueError("Non-lbl fitting methods are not supported yet")
@@ -90,8 +90,8 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     output_file_header[0] = output_file_header[0].replace("#", "")
     output_file_data_lines = [line.strip().split() for line in output_file_lines[1:]]
 
-    if len(output_file_data_lines) == 1:
-        output_file_data_lines = [output_file_data_lines]
+    #if len(output_file_data_lines) == 1:
+    #    output_file_data_lines = output_file_data_lines[0]
 
     # Create a DataFrame from the processed data
     output_file_df = pd.DataFrame(output_file_data_lines, columns=output_file_header)
