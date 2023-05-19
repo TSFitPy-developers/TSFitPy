@@ -382,8 +382,8 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     print("Worker preparation complete")
 
+    create_dir(tsfitpy_configuration.temporary_directory_path)
     with open(os.path.join(tsfitpy_configuration.temporary_directory_path, 'AbusingClasses.pkl'), 'wb') as f:
-        # Pickle the 'data' dictionary using the highest protocol available.
         pickle.dump(AbusingClasses, f)
 
     futures = []
