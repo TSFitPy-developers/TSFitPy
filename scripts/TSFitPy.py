@@ -1062,7 +1062,7 @@ class Spectra:
                         print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
             else:
                 equivalent_width = 9999
-            equivalent_width_dict[line_number] = equivalent_width
+            equivalent_width_dict[line_number] = equivalent_width * 1000
             result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
 
 
@@ -1639,7 +1639,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
         wave_mod_orig = apply_doppler_correction(wave_mod_orig, rv + spectra_to_fit.doppler_shift)
         #chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
-        chi_square = calculate_equivalent_width(wave_mod_orig, flux_mod_orig, lmin, lmax)
+        chi_square = calculate_equivalent_width(wave_mod_orig, flux_mod_orig, lmin, lmax) * 1000
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         chi_square = 999.99
         print("empty spectrum file.")
