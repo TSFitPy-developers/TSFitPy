@@ -307,7 +307,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     create_dir(AbusingClasses.global_temp_dir)
     create_dir(AbusingClasses.output_folder)
 
-    fitlist = tsfitconfig.fitlist_input_path
+    fitlist = tsfitconfig.input_fitlist_filename
 
     fitlist_data = np.loadtxt(fitlist, dtype='str')
 
