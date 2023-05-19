@@ -14,7 +14,7 @@ from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-from scripts.TSFitPy import TSFitPyConfig
+from scripts.TSFitPy import TSFitPyConfig, calculate_equivalent_width
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
