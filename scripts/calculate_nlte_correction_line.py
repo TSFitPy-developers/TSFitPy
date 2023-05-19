@@ -247,7 +247,8 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     tsfitpy_configuration = TSFitPyConfig(config_file_name, output_folder_title)
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.validate_input()
-    tsfitpy_configuration.convert_old_config()
+    if not config_file_name[-4:] == ".cfg":
+        tsfitpy_configuration.convert_old_config()
 
     abusingclasses = AbusingClasses()
     abusingclasses.nlte_flag = tsfitpy_configuration.nlte_flag
