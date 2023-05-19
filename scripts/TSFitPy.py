@@ -1268,7 +1268,7 @@ class Spectra:
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         #param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr + ew_fitted_line)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, ew_fitted_line)
         #minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
@@ -1597,7 +1597,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
 def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
                           temp_directory: str, rv: float, vmac: float, rotation: float,
-                          vmic: float, offset_chisqr: float) -> float:
+                          vmic: float, offset_chisqr: float, line_ew) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1650,9 +1650,9 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} chisqr={(chi_square - offset_chisqr)}")
+    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} current_ew={chi_square} initial_ew={line_ew} offset_chisqr={offset_chisqr} chisqr={chi_square - offset_chisqr - line_ew}")
 
-    return (chi_square - offset_chisqr)
+    return (chi_square - offset_chisqr - line_ew)
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
