@@ -994,7 +994,7 @@ class Spectra:
         """
         result = {}
         result_upper_limit = {}
-        find_upper_limit = True
+        find_upper_limit = False
         sigmas_upper_limit = 3
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
@@ -3124,7 +3124,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                 spectra_loc_index = np.where(init_guess_spectra_names == spectra)[0][0]
                 init_guess_spectra_dict[spectra][init_guess_elem] = init_guess_values[spectra_loc_index]
 
-        tsfitpy_configuration.init_guess_dict = dict(init_guess_spectra_dict)
+        tsfitpy_configuration.init_guess_spectra_dict = dict(init_guess_spectra_dict)
 
     if np.size(tsfitpy_configuration.input_elements_abundance) > 0:
         input_elem_abundance_dict = collections.defaultdict(dict)
@@ -3143,7 +3143,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                     print(f"{spectra} does not have element {input_elem} in the input spectra. Using [{input_elem}/Fe]=0")
                     input_elem_abundance_dict[spectra][input_elem] = 0
 
-        tsfitpy_configuration.input_elem_abundance = dict(input_elem_abundance_dict)
+        tsfitpy_configuration.input_elem_abundance_dict = dict(input_elem_abundance_dict)
 
     line_centers, line_begins, line_ends = np.loadtxt(tsfitpy_configuration.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
