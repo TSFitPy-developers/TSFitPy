@@ -1641,7 +1641,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
         wave_mod_orig = apply_doppler_correction(wave_mod_orig, rv + spectra_to_fit.doppler_shift)
-        chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+        chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
 
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         chi_square = 999.99
