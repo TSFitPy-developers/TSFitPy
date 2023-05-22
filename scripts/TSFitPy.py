@@ -215,7 +215,11 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     indices_to_use_mod = np.where((wave_mod_orig <= lmax) & (wave_mod_orig >= lmin))
     indices_to_use_obs = np.where((wave_obs <= lmax) & (wave_obs >= lmin))
 
-    wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
+    try:
+        wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
+    except TypeError:
+        print("WARNING: TypeError in calculate_lbl_chi_squared")
+        print(lmin, lmax, wave_mod_orig, wave_obs, resolution, macro, rot, indices_to_use_mod, indices_to_use_obs)
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
 
     wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
