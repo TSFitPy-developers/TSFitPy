@@ -1498,6 +1498,14 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
 
     wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
+    if np.isnan(macroturb):
+        print("macroturb is nan")
+        print(param)
+        print(spectra_to_fit.vmac)
+        print(spectra_to_fit.fit_vmac)
+        print(lmin, lmax)
+        print(spectra_to_fit.wave_ob)
+        print(spectra_to_fit.flux_ob)
     chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
                                            spectra_to_fit.resolution, lmin, lmax, macroturb, rotation,
                                            save_convolved=False)
