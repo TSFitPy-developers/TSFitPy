@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pickle
+import warnings
 from configparser import ConfigParser
 from warnings import warn
 import numpy as np
@@ -229,7 +230,16 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-    chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
+    with warnings.catch_warnings(record=True) as w:
+        warnings.filterwarnings('always')
+        try:
+            chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
+        except Warning as e:
+            print("WARNING: Warning in calculate_lbl_chi_squared")
+            print(e)
+            print(lmin, lmax, wave_mod_orig, wave_obs, resolution, macro, rot, indices_to_use_mod, indices_to_use_obs)
+            print(flux_line_obs, flux_line_mod, error_obs_variance)
+            chi_square = 9999.9999
     # os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
     if save_convolved:
