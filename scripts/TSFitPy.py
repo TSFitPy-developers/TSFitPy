@@ -995,8 +995,8 @@ class Spectra:
         """
         result = {}
         result_upper_limit = {}
-        find_upper_limit = False
-        sigmas_upper_limit = 3
+        find_upper_limit = True
+        sigmas_upper_limit = 5
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
@@ -1020,8 +1020,26 @@ class Spectra:
                 time_end = time.perf_counter()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
+        if find_upper_limit:
+            for line_number in range(len(self.line_begins_sorted)):
+                time_start = time.perf_counter()
+                print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
+
+                try:
+                    result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30)
+                except ValueError:
+                    result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
+
+                time_end = time.perf_counter()
+                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+
+            # save 5 sigma results
+            with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
+                for line_number in range(len(self.line_begins_sorted)):
+                    print(f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}", file=file_upper_limit)
+
+
         result_list = []
-        equivalent_width_dict = {}
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(self.line_begins_sorted)):
             if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
@@ -1063,28 +1081,7 @@ class Spectra:
                         print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
             else:
                 equivalent_width = 9999
-            equivalent_width_dict[line_number] = equivalent_width * 1000
             result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
-
-
-        if find_upper_limit:
-            for line_number in range(len(self.line_begins_sorted)):
-                time_start = time.perf_counter()
-                print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
-
-                try:
-                    result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=((sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30, ew_fitted_line=equivalent_width_dict[line_number])
-                except ValueError:
-                    result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
-
-                time_end = time.perf_counter()
-                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-            # save 5 sigma results
-            with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
-                for line_number in range(len(self.line_begins_sorted)):
-                    print(f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}", file=file_upper_limit)
-
 
         return result_list
 
@@ -1253,7 +1250,7 @@ class Spectra:
         return {"result": one_result, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]]} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
-    def find_upper_limit_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_abund=None, bound_max_abund=None, ew_fitted_line=0) -> dict:
+    def find_upper_limit_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_abund=None, bound_max_abund=None) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         :param line_number: Which line number/index in line_center_sorted is being fitted
@@ -1269,7 +1266,7 @@ class Spectra:
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         #param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, ew_fitted_line)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         #minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
@@ -1598,7 +1595,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
 def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
                           temp_directory: str, rv: float, vmac: float, rotation: float,
-                          vmic: float, offset_chisqr: float, line_ew) -> float:
+                          vmic: float, offset_chisqr: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1639,8 +1636,8 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
         wave_mod_orig = apply_doppler_correction(wave_mod_orig, rv + spectra_to_fit.doppler_shift)
-        #chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
-        chi_square = calculate_equivalent_width(wave_mod_orig, flux_mod_orig, lmin + 5, lmax - 5) * 1000
+        chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         chi_square = 999.99
         print("empty spectrum file.")
@@ -1651,9 +1648,9 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} current_ew={chi_square} initial_ew={line_ew} offset_chisqr={offset_chisqr} chisqr={chi_square - offset_chisqr - line_ew}")
+    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} chisqr={(chi_square - offset_chisqr)}")
 
-    return (chi_square - offset_chisqr - line_ew)
+    return (chi_square - offset_chisqr)
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
