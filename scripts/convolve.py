@@ -77,7 +77,6 @@ def conv_macroturbulence(wave, flux, vmac):
             wave_conv = wave
     else:
         print(F"Unexpected Vmac={vmac} [km/s]")
-        print(wave, flux)
 
     if wave_conv is None:   # otherwise there was a bug that no wave/flux returned with invalid vmac
         wave_conv, flux_conv = wave, flux

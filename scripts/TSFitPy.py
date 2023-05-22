@@ -216,11 +216,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     indices_to_use_mod = np.where((wave_mod_orig <= lmax) & (wave_mod_orig >= lmin))
     indices_to_use_obs = np.where((wave_obs <= lmax) & (wave_obs >= lmin))
 
-    try:
-        wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
-    except TypeError:
-        print("WARNING: TypeError in calculate_lbl_chi_squared")
-        print(lmin, lmax, wave_mod_orig, wave_obs, resolution, macro, rot, indices_to_use_mod, indices_to_use_obs)
+    wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
 
     wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
@@ -230,16 +226,8 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-    with warnings.catch_warnings(record=True) as w:
-        warnings.filterwarnings('always')
-        try:
-            chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
-        except Warning as e:
-            print("WARNING: Warning in calculate_lbl_chi_squared")
-            print(e)
-            print(lmin, lmax, wave_mod_orig, wave_obs, resolution, macro, rot, indices_to_use_mod, indices_to_use_obs)
-            print(flux_line_obs, flux_line_mod, error_obs_variance)
-            chi_square = 9999.9999
+    chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
+    print(flux_line_obs, flux_line_mod, error_obs_variance, chi_square)
     # os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
     if save_convolved:
@@ -1498,14 +1486,6 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
 
     wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
-    if np.isnan(macroturb):
-        print("macroturb is nan")
-        print(param)
-        print(spectra_to_fit.vmac)
-        print(spectra_to_fit.fit_vmac)
-        print(lmin, lmax)
-        print(spectra_to_fit.wave_ob)
-        print(spectra_to_fit.flux_ob)
     chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
                                            spectra_to_fit.resolution, lmin, lmax, macroturb, rotation,
                                            save_convolved=False)
