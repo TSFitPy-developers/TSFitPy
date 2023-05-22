@@ -192,7 +192,7 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_obs: np.ndarray,
+def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_obs: np.ndarray, error_obs_variance: np.ndarray,
                               wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, resolution: float, lmin: float,
                               lmax: float, macro: float, rot: float, save_convolved=True) -> float:
     """
@@ -201,6 +201,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     :param temp_directory:
     :param wave_obs: Observed wavelength
     :param flux_obs: Observed normalised flux
+    :param error_obs_variance: Observed error variance
     :param wave_mod_orig: Synthetic wavelength
     :param flux_mod_orig: Synthetic normalised flux
     :param resolution: resolution, zero if not required
@@ -216,21 +217,15 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
 
     wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
+    error_obs_variance = error_obs_variance[indices_to_use_obs]
 
     wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
-    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
-        flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-        wave_line = wave_obs[
-            np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
-        flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-        flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-        chi_square = np.sum(((flux_line_obs - flux_line_mod) * (flux_line_obs - flux_line_mod)) / flux_line_mod)
-    else:
-        flux_obs_interp = np.interp(wave_mod, wave_obs, flux_obs)
-        wave_line = wave_mod[np.where((wave_mod <= lmax - 5.) & (wave_mod >= lmin + 5.))]
-        flux_line_obs = flux_obs_interp[np.where((wave_mod <= lmax - 5.) & (wave_mod >= lmin + 5.))]
-        flux_line_mod = flux_mod[np.where((wave_mod <= lmax - 5.) & (wave_mod >= lmin + 5.))]
-        chi_square = np.sum(((flux_line_obs - flux_line_mod) * (flux_line_obs - flux_line_mod)) / flux_line_mod)
+
+    flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
+    wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
+    flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
     # os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
     if save_convolved:
@@ -469,6 +464,12 @@ class Spectra:
 
         self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
                                                 dtype=float)  # observed spectra
+        try:
+            # if error sigma is given, load it
+            self.error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
+        except IndexError:
+            # if no error variance is given, set it to 1
+            self.error_obs_variance = np.ones(len(self.wave_ob))
 
         # sort the observed spectra according to wavelength using numpy argsort
         sorted_obs_wavelength_index = np.argsort(self.wave_ob)
@@ -1485,7 +1486,7 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
 
     wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
-    chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, wave_mod_orig, flux_mod_orig,
+    chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
                                            spectra_to_fit.resolution, lmin, lmax, macroturb, rotation,
                                            save_convolved=False)
     #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
