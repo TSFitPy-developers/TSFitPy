@@ -217,7 +217,6 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
 
     wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
-    error_obs_variance = error_obs_variance[indices_to_use_obs]
 
     wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
 
@@ -225,6 +224,7 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
     flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
     # os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
@@ -470,6 +470,7 @@ class Spectra:
         except IndexError:
             # if no error variance is given, set it to 1
             self.error_obs_variance = np.ones(len(self.wave_ob))
+            print("No error sigma given in 3rd column, setting to 1")
 
         # sort the observed spectra according to wavelength using numpy argsort
         sorted_obs_wavelength_index = np.argsort(self.wave_ob)
