@@ -1029,6 +1029,7 @@ class Spectra:
                 print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
                 try:
+                    print(f"test: {(result[line_number]['chi_sqr'] + np.square(sigmas_upper_limit))}")
                     result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30)
                 except ValueError:
                     result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
@@ -1651,7 +1652,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} chisqr={(chi_square - offset_chisqr)}")
+    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr} chisqr={(chi_square - offset_chisqr)}")
 
     return (chi_square - offset_chisqr)
 
