@@ -231,7 +231,7 @@ def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis
     plt.close()
 
 def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
-    if np.size(x_axis_column) == 1:
+    if np.size(df_results[x_axis_column]) == 1:
         print("Only one point is found, so doing normal scatter plot")
         plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim, **pltargs)
         return
