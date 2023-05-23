@@ -1029,7 +1029,6 @@ class Spectra:
                 print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
                 try:
-                    print(f"test: {(result[line_number]['chi_sqr'] + np.square(sigmas_upper_limit))}")
                     result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30)
                 except ValueError:
                     result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
@@ -1639,8 +1638,8 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
-        wave_mod_orig = apply_doppler_correction(wave_mod_orig, rv + spectra_to_fit.doppler_shift)
-        chi_square = calculate_lbl_chi_squared(None, spectra_to_fit.wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+        wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
+        chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
 
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         chi_square = 999.99
