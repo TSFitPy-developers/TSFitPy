@@ -176,10 +176,9 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
         chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
                                                      line_ends_sorted, seg_begins, seg_ends)
 
-        os.system(
-            f"mv {temp_directory}spectrum_00000000.spec {output_dir}spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
-        out = open(f"{output_dir}spectrum_fit_convolved_{obs_name.replace('../input_files/observed_spectra/', '')}",
-                   'w')
+        os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, obs_name)}")
+
+        out = open(f"{os.path.join(output_dir, f'spectrum_fit_convolved_{obs_name}')}",'w')
         for l in range(len(wave_mod)):
             print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
         out.close()
@@ -1891,7 +1890,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
     spectra_to_fit.configure_and_run_ts(ts, met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
-    chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_path, spectra_to_fit.temp_dir,
+    chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_name, spectra_to_fit.temp_dir,
                                            spectra_to_fit.output_folder,
                                            wave_obs, spectra_to_fit.flux_ob,
                                            macroturb, spectra_to_fit.resolution, spectra_to_fit.rotation,
@@ -3428,4 +3427,4 @@ if __name__ == '__main__':
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
 # - test other fitting modes: all, teff
-# - say file doesn't exist for config
+# - fix chisqr for method all
