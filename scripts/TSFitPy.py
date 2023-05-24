@@ -2329,6 +2329,10 @@ class TSFitPyConfig:
                 line = fp.readline()
 
     def load_new_config(self):
+        # check if the config file exists
+        if not os.path.isfile(self.config_location):
+            raise ValueError(f"The configuration file {self.config_location} does not exist.")
+
         # read the configuration file
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
@@ -3419,7 +3423,7 @@ if __name__ == '__main__':
 # TODO:
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
-# - fix pathing in scripts_for_plotting and corresponding jupyter notebook and loading of config
+# - fix pathing in scripts_for_plotting and corresponding jupyter notebook and loading of config <-
 # - test other fitting modes: all, teff
 # - save segments in a file <- To check
 # - say file doesn't exist for config
