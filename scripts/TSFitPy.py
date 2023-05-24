@@ -2822,6 +2822,10 @@ def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -
     return np.asarray(segments_left), np.asarray(segments_right)
 
 def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed):
+    print("IMPORTANT UPDATE:")
+    print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma"
+          "i.e. the error in the observed spectra (sqrt(variance)). If this is not the case, please change the spectra."
+          "If none is given, the error will be assumed to be 1.0. This error is taken into account in chisqr calculation\n\n\n")
     #nlte_config_outdated = False
     #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
 
@@ -3423,7 +3427,5 @@ if __name__ == '__main__':
 # TODO:
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
-# - fix pathing in scripts_for_plotting and corresponding jupyter notebook and loading of config <-
 # - test other fitting modes: all, teff
-# - save segments in a file <- To check
 # - say file doesn't exist for config
