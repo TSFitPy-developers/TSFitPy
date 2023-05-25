@@ -3322,6 +3322,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
         # print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
         print(f"ssh -N -L {port}:{host}:{port} {tsfitpy_configuration.cluster_name}")
+        print(f"Then go to http://localhost:{port}/status to check the status of the workers")
 
         print("Worker preparation complete")
 
