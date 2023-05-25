@@ -404,6 +404,9 @@ class Spectra:
         self.guess_plus_minus_neg_teff = -1000
         self.guess_plus_minus_pos_teff = 1000
 
+        self.find_upper_limit = False
+        self.sigmas_upper_limit = 5
+
         self.model_temperatures: np.ndarray = None
         self.model_logs: np.ndarray = None
         self.model_mets: np.ndarray = None
@@ -997,8 +1000,8 @@ class Spectra:
         """
         result = {}
         result_upper_limit = {}
-        find_upper_limit = False
-        sigmas_upper_limit = 5
+        find_upper_limit = self.find_upper_limit
+        sigmas_upper_limit = self.sigmas_upper_limit
 
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
@@ -1028,7 +1031,12 @@ class Spectra:
                 print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
                 try:
-                    result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"], result[line_number]["macroturb"], result[line_number]["rotation"], result[line_number]["vmic"],  offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)), bound_min_abund=result[line_number]["fitted_abund"], bound_max_abund=30)
+                    result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"],
+                                                                                     result[line_number]["macroturb"], result[line_number]["rotation"],
+                                                                                     result[line_number]["vmic"],
+                                                                                     offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)),
+                                                                                     bound_min_abund=result[line_number]["fitted_abund"],
+                                                                                     bound_max_abund=result[line_number]["fitted_abund"]+7)
                 except ValueError:
                     result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
 
@@ -2101,6 +2109,9 @@ class TSFitPyConfig:
         self.old_output_folder_path_global = None  # used only to convert old config to new config
         self.old_turbospectrum_global_path = None  # used only to convert old config to new config
 
+        self.find_upper_limit: bool = False
+        self.sigmas_upper_limit: float = 5
+
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -2401,6 +2412,12 @@ class TSFitPyConfig:
 
         self.bounds_vmic = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_vmic"])
         self.guess_range_vmic = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["guess_range_vmic"])
+        try:
+            self.find_upper_limit = self._convert_string_to_bool(self.config_parser["ParametersForModeLbl"]["find_upper_limit"])
+            self.sigmas_upper_limit = float(self.config_parser["ParametersForModeLbl"]["upper_limit_sigma"])
+        except ValueError:
+            self.find_upper_limit = False
+            self.sigmas_upper_limit = 5.0
 
         self.bounds_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
         self.guess_range_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
@@ -2521,6 +2538,8 @@ class TSFitPyConfig:
         self.config_parser.add_section("ParametersForModeLbl")
         self.config_parser["ParametersForModeLbl"]["bounds_vmic"] = self._convert_list_to_str(self.bounds_vmic)
         self.config_parser["ParametersForModeLbl"]["guess_range_vmic"] = self._convert_list_to_str(self.guess_range_vmic)
+        self.config_parser["ParametersForModeLbl"]["find_upper_limit"] = 'False'
+        self.config_parser["ParametersForModeLbl"]["upper_limit_sigma"] = '5.0'
 
         self.config_parser.add_section("ParametersForModeTeff")
         self.config_parser["ParametersForModeTeff"]["bounds_teff"] = self._convert_list_to_str(self.bounds_teff)
@@ -2719,6 +2738,9 @@ class TSFitPyConfig:
 
         spectra_object.init_guess_dict = self.init_guess_spectra_dict
         spectra_object.input_elem_abundance = self.input_elem_abundance_dict
+
+        spectra_object.find_upper_limit = self.find_upper_limit
+        spectra_object.sigmas_upper_limit = self.sigmas_upper_limit
 
     @staticmethod
     def _split_string_to_float_list(string_to_split: str) -> list[float]:
@@ -3428,5 +3450,5 @@ if __name__ == '__main__':
 # TODO:
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
-# - test other fitting modes: teff
+# - test other fitting modes: teff, need to fix saving of convoluted spectra and something about not printing results
 # - fix chisqr for method all
