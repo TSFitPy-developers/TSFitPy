@@ -1102,9 +1102,6 @@ class Spectra:
         :return: List with the results. Each element is a string containing file name, center start and end of the line,
         Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
         """
-        if self.fit_vmac and self.vmac == 0:
-            self.vmac = 10
-
         result = []
 
         for line_number in range(len(self.line_begins_sorted)):
@@ -1155,8 +1152,9 @@ class Spectra:
             microturb = calculate_vturb(self.teff, self.logg, met)
 
         macroturb = self.vmac
+        rotation = self.rotation
         result_output = f"{self.spec_name} {teff} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {res.fun}"
+                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {res.fun}"
 
         one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
         try:
@@ -1166,12 +1164,13 @@ class Spectra:
                 # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-            wave_result, flux_norm_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000_convolved.spec", unpack=True)
+            wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wave_result, flux_norm_result, self.resolution,
+                                                                       macroturb, rotation)
+
             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
                 # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
-            # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
+                for k in range(len(wavelength_fit_conv)):
+                    print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
         except (OSError, ValueError) as error:
             print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         return one_result
@@ -3385,7 +3384,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         # f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared"
         print(output_columns, file=f)
     elif tsfitpy_configuration.fitting_mode == "teff":
-        output_columns = "#specname\tTeff\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\tchi_squared"
+        output_columns = "#specname\tTeff\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared"
         print(output_columns, file=f)
 
     results = np.array(results)
