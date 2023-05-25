@@ -3022,7 +3022,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             tsfitpy_configuration.nlte_elements = nlte_elements_add_to_og_config
 
         nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"))
+        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_config_path))
 
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
@@ -3383,6 +3383,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     except FileNotFoundError:
         pass    # because now trimmed files are in the temp directory, might give error
 
+    print("TSFitPy had normal termination")
+
 
 if __name__ == '__main__':
     raise RuntimeError("This file is not meant to be run as main. Please run TSFitPy/main.py instead.")  # this is a module
@@ -3426,5 +3428,5 @@ if __name__ == '__main__':
 # TODO:
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
-# - test other fitting modes: all, teff
+# - test other fitting modes: teff
 # - fix chisqr for method all
