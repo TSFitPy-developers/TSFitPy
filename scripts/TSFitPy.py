@@ -1165,7 +1165,7 @@ class Spectra:
                     print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
             # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
         except (OSError, ValueError) as error:
-            print("Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+            print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
         return one_result
 
     def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
