@@ -8,8 +8,7 @@ import numpy as np
 def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
                            molecules_flag: bool, lbl=False):
     line_list_path: str = old_path_name
-    line_list_files: list = [
-        i for i in glob.glob(os.path.join(line_list_path, "*")) if not i.endswith(".txt") and os.path.isfile(i)]
+    line_list_files: list = [i for i in glob.glob(os.path.join(line_list_path, "*")) if os.path.isfile(i)]
     # print(line_list_files)
 
     segment_to_use_begins: np.ndarray = np.asarray(seg_begins)
