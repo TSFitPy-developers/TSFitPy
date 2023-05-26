@@ -3366,10 +3366,11 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             if elem_name != "Fe":
                 output_elem_column += f"\t{elem_name}_Fe"
     else:
-        if tsfitpy_configuration.fit_feh:
-            output_elem_column = "Fe_H"
-        else:
-            output_elem_column = f"{tsfitpy_configuration.elements_to_fit[0]}_Fe"
+        if not tsfitpy_configuration.fitting_mode == "teff":
+            if tsfitpy_configuration.fit_feh:
+                output_elem_column = "Fe_H"
+            else:
+                output_elem_column = f"{tsfitpy_configuration.elements_to_fit[0]}_Fe"
 
     if tsfitpy_configuration.fitting_mode == "all":
         print(f"#specname\t{output_elem_column}\tDoppler_Shift_add_to_RV\tchi_squared\tMacroturb", file=f)
