@@ -3408,7 +3408,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     print("TSFitPy had normal termination")
 
-
 if __name__ == '__main__':
     raise RuntimeError("This file is not meant to be run as main. Please run TSFitPy/main.py instead.")  # this is a module
     """major_version_scipy, minor_version_scipy, patch_version_scipy = scipy.__version__.split(".")

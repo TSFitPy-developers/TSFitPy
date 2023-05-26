@@ -3,7 +3,6 @@ import os
 import glob
 import numpy as np
 
-
 def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
                            molecules_flag: bool, lbl=False):
     line_list_path: str = old_path_name
