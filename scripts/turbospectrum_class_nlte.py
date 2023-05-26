@@ -10,8 +10,8 @@ from operator import itemgetter
 import numpy as np
 import math
 
-from solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
-from solar_isotopes import solar_isotopes
+from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
+from scripts.solar_isotopes import solar_isotopes
 
 
 def closest_available_value(target: float, options: list[float]) -> float:
@@ -326,7 +326,7 @@ class TurboSpectrum:
             self.line_mask_file = line_mask_file
         if self.atmosphere_dimension == "3D":
             self.turbulent_velocity = 2.0
-            print("turbulent_velocity is not used since model atmosphere is 3D")
+            #print("turbulent_velocity is not used since model atmosphere is 3D")
         if lpoint is not None:
             self.lpoint = lpoint
 
@@ -518,7 +518,14 @@ class TurboSpectrum:
                     # else, take solar abundance and scale with metallicity
                     # solar_abundances[element] = abundance as A(X)
                     # self.metallicity = [Fe/H]
-                    element_abundance = float(solar_abundances[element]) + self.metallicity
+                    if element in molecules_atomic_number:
+                        # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                        if element == "CN":
+                            element_abundance = float(solar_abundances["N"]) + self.metallicity
+                        elif element == "CH":
+                            element_abundance = float(solar_abundances["C"]) + self.metallicity
+                    else:
+                        element_abundance = float(solar_abundances[element]) + self.metallicity
 
                 if self.verbose:
                     stdout = None
@@ -861,10 +868,12 @@ class TurboSpectrum:
                 # write all nlte elements
                 if element in molecules_atomic_number:
                     # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
-                    atomic_number = molecules_atomic_number[element]
+                    atomic_number = molecules_atomic_number[element][0]
+                    element_name_to_write = molecules_atomic_number[element][1]
                 else:
                     atomic_number = periodic_table.index(element)
-                file.write(f"{atomic_number}  '{element}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
+                    element_name_to_write = element
+                file.write(f"{atomic_number}  '{element_name_to_write}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
             for element in self.free_abundances:
                 # now check for any lte elements which have a specific given abundance and write them too
                 atomic_number = periodic_table.index(element)

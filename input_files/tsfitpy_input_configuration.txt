@@ -39,7 +39,7 @@ nlte = False
 #
 #elements to have in NLTE (just choose whichever elements you want, whether you fit them or not, as few or many as you want). E.g. :
 # nlte_elements = Mg Ca Fe
-nlte_elements =
+nlte_elements = Fe
 #
 #linemask and segment files. the segment file is used in "all" line fitting mode to reduce the amount of spectra computed.
 #TS will only generate spectra in the given segments to reduce calculation time.
@@ -83,6 +83,6 @@ guess_range_abundance = -1 0.4 # either [Fe/H] or [X/Fe] here
 guess_range_rv = -1 1 # km/s i
 #if fitting teff:
 bounds_teff = 2500 8000 # K, hard bound, will never go beyond it
-guess_range_teff = -1000 1000 # K, will fit depending on input of Teff +/- guess-ranges. E.g. having star with 5000K and setting guess -1000 1000 will result in guesses 4000 and 6000 K
+guess_range_teff = -250 250 # K, will fit depending on input of Teff +/- guess-ranges. E.g. having star with 5000K and setting guess -1000 1000 will result in guesses 4000 and 6000 K
 #Experimental: for lbl Dask will distribute all lines between all processes. Might break something with some Dask updates. True - makes faster fitting though.
 experimental = False

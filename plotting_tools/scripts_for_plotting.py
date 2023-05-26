@@ -11,10 +11,10 @@ import pandas as pd
 from scipy.stats import gaussian_kde
 from warnings import warn
 
-from convolve import conv_macroturbulence, conv_rotation, conv_res
-from create_window_linelist_function import create_window_linelist
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-
+from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
+from scripts.create_window_linelist_function import create_window_linelist
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.TSFitPy import TSFitPyConfig, calculate_equivalent_width
 
 def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
@@ -42,6 +42,11 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             print(f"Loading config from {os.path.join(old_variable, 'configuration.txt')}")
             config_file_location = os.path.join(old_variable, "configuration.txt")
             output_folder_location = old_variable
+        elif os.path.isfile(os.path.join(old_variable, "configuration.cfg")):
+            # trying new way of loading: first variable is output folder with config in it
+            print(f"Loading config from {os.path.join(old_variable, 'configuration.cfg')}")
+            config_file_location = os.path.join(old_variable, "configuration.cfg")
+            output_folder_location = old_variable
         else:
             # this was an old way of loading. first variable: config file, second variable: output folder
             print(f"Loading config from {output_folder_location}")
@@ -49,92 +54,23 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             output_folder_location = old_variable
     else:
         # new way of loading: first variable is output folder with config in it
-        config_file_location = os.path.join(output_folder_location, "configuration.txt")
-    with open(config_file_location) as fp:
-        line = fp.readline()
-        while line:
-            if len(line) > 1:
-                fields = line.strip().split()
-                field_name = fields[0].lower()
-                if field_name == "output_folder":
-                    output_folder_og = fields[2]
-                if field_name == "linemask_file_folder_location":
-                    linemask_file_og = fields[2]
-                if field_name == "segment_file_folder_location":
-                    segment_file_og = fields[2]
-                if field_name == "spec_input_path":
-                    spec_input_path = fields[2]
-                    #if obs_location is not None:
-                    #    spec_input_path = obs_location
-                if field_name == "fitlist_input_folder":
-                    fitlist_input_folder = fields[2]
-                if field_name == "atmosphere_type":
-                    atmosphere_type = fields[2]
-                if field_name == "mode":
-                    fitting_mode = fields[2].lower()
-                if field_name == "include_molecules":
-                    include_molecules = fields[2]
-                if field_name == "nlte":
-                    nlte_flag = fields[2].lower()
-                    if nlte_flag == "true":
-                        nlte_flag = True
-                    else:
-                        nlte_flag = False
-                if field_name == "fit_microturb":  # Yes No Input
-                    fit_microturb = fields[2]
-                if field_name == "fit_macroturb":  # Yes No Input
-                    if fields[2].lower() == "yes":
-                        fit_macroturb = True
-                    else:
-                        fit_macroturb = False
-                    if fields[2].lower() == "input":
-                        input_macro = True
-                    else:
-                        input_macro = False
-                if field_name == "fit_rotation":
-                    if fields[2].lower() == "yes":
-                        fit_rotation = True
-                    else:
-                        fit_rotation = False
-                if field_name == "element":
-                    elements_to_fit = []
-                    for i in range(len(fields) - 2):
-                        elements_to_fit.append(fields[2 + i])
-                    elem_to_fit = np.asarray(elements_to_fit)
-                    if "Fe" in elements_to_fit:
-                        fit_met = True
-                    else:
-                        fit_met = False
-                    nelement = len(elem_to_fit)
-                if field_name == "linemask_file":
-                    linemask_file = fields[2]
-                if field_name == "wavelength_minimum":
-                    lmin = float(fields[2])
-                if field_name == "wavelength_maximum":
-                    lmax = float(fields[2])
-                if field_name == "wavelength_delta":
-                    ldelta = float(fields[2])
-                if field_name == "resolution":
-                    resolution = float(fields[2])
-                if field_name == "macroturbulence":
-                    macroturb_input = float(fields[2])
-                if field_name == "rotation":
-                    rotation = float(fields[2])
-                if field_name == "input_file":
-                    fitlist = fields[2]
-                if field_name == "output_file":
-                    output = fields[2]
-            line = fp.readline()
-    #output_data = np.loadtxt(os.path.join(output_folder_location, output), dtype=str)
+        if os.path.isfile(os.path.join(output_folder_location, "configuration.txt")):
+            config_file_location = os.path.join(output_folder_location, "configuration.txt")
+        else:
+            config_file_location = os.path.join(output_folder_location, "configuration.cfg")
 
-    if fitting_mode != "lbl":
+    tsfitpy_config = TSFitPyConfig(config_file_location, "none")
+    tsfitpy_config.load_config()
+    tsfitpy_config.validate_input(check_valid_path=False)
+
+    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic']:
         raise ValueError("Non-lbl fitting methods are not supported yet")
 
     output_elem_column = f"Fe_H"
 
-    for i in range(nelement):
+    for i in range(tsfitpy_config.nelement):
         # Spectra.elem_to_fit[i] = element name
-        elem_name = elem_to_fit[i]
+        elem_name = tsfitpy_config.elements_to_fit[i]
         if elem_name != "Fe":
             output_elem_column += f"\t{elem_name}_Fe"
 
@@ -146,7 +82,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
         if "_convolved.spec" in filename:
             filenames_output_folder_convolved.append(os.path.join(output_folder_location, filename))
 
-    with open(os.path.join(output_folder_location, output), 'r') as output_file_reading:
+    with open(os.path.join(output_folder_location, tsfitpy_config.output_filename), 'r') as output_file_reading:
         output_file_lines = output_file_reading.readlines()
 
     # Extract the header and data lines
@@ -154,22 +90,25 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     output_file_header[0] = output_file_header[0].replace("#", "")
     output_file_data_lines = [line.strip().split() for line in output_file_lines[1:]]
 
+    #if len(output_file_data_lines) == 1:
+    #    output_file_data_lines = output_file_data_lines[0]
+
     # Create a DataFrame from the processed data
     output_file_df = pd.DataFrame(output_file_data_lines, columns=output_file_header)
 
     # Convert columns to appropriate data types
     output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
 
-    specname_fitlist = np.loadtxt(os.path.join(fitlist_input_folder, fitlist), dtype=str, unpack=True, usecols=(0))
-    rv_fitlist = np.loadtxt(os.path.join(fitlist_input_folder, fitlist), dtype=float, unpack=True, usecols=(1))
+    specname_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=str, unpack=True, usecols=(0))
+    rv_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=float, unpack=True, usecols=(1))
     if specname_fitlist.ndim == 0:
         specname_fitlist = np.array([specname_fitlist])
         rv_fitlist = np.array([rv_fitlist])
 
     config_dict = {}
     config_dict["filenames_output_folder"]: list[dir] = filenames_output_folder_convolved
-    config_dict["linemask_location"]: str = os.path.join(linemask_file_og, linemask_file)
-    config_dict["observed_spectra_location"]: str = spec_input_path
+    config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
+    config_dict["observed_spectra_location"]: str = tsfitpy_config.spectra_input_path
     config_dict["specname_fitlist"]: np.ndarray = specname_fitlist
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
     config_dict["output_folder_location"] = output_folder_location
@@ -177,7 +116,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
 
     return config_dict
 
-def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None):
+def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None, xlim=None, ylim=None, font_size=None):
     # unpack the config dict into separate variables
     filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
     observed_spectra_location: str = config_dict["observed_spectra_location"]
@@ -258,15 +197,27 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.plot(wavelength, flux, color='red')
         plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
         # xlimit is wavelength left/right +/- 0.3 AA
-        plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
-        plt.ylim(0, 1.05)
+        if xlim is not None:
+            plt.xlim(xlim)
+        else:
+            plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
+        if ylim is not None:
+            plt.ylim(ylim)
+        else:
+            plt.ylim(0, 1.05)
+        # plot x-ticks without scientific notation
+        plt.ticklabel_format(useOffset=False)
+        # change font size
+        if font_size is not None:
+            plt.rcParams.update({'font.size': font_size})
         plt.plot([linemask_left_wavelength, linemask_left_wavelength], [0, 2], color='green', alpha=0.2)
         plt.plot([linemask_right_wavelength, linemask_right_wavelength], [0, 2], color='green', alpha=0.2)
         plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
         plt.xlabel("Wavelength [Å]")
         plt.ylabel("Normalised flux")
         if save_figure is not None:
-            plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}")
+            # save figure without cutting off labels
+            plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}", bbox_inches='tight')
         plt.show()
         plt.close()
 
@@ -280,7 +231,7 @@ def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis
     plt.close()
 
 def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
-    if np.size(x_axis_column) == 1:
+    if np.size(df_results[x_axis_column]) == 1:
         print("Only one point is found, so doing normal scatter plot")
         plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim, **pltargs)
         return
@@ -342,22 +293,52 @@ def get_average_of_table(df_results: pd.DataFrame, rv_limits=None, chi_sqr_limit
             df_results = df_results[(df_results[one_abund_to_limit] >= min(abund_limit)) & (df_results[one_abund_to_limit] <= max(abund_limit))]
 
     columns = df_results.columns.values
-    for column in columns:
-        if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
-            if print_columns is not None:
-                if column in print_columns:
-                    print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
-            else:
-                print(f"The mean value of the '{column}' column is: {df_results[column].mean()} pm {df_results[column].std() / np.sqrt(df_results[column].size)}")
-            #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
-            #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
+    unique_specnames = df_results["specname"].unique()
+    for specname in unique_specnames:
+        print(f"Specname: {specname}")
+        for column in columns:
+            if column not in ["specname", "wave_center", "wave_start", "wave_end"]:
+                # go through each unique specname and get the average of the column
+                    if print_columns is not None:
+                        if column in print_columns:
+                            # take only rows with the specname
+                            print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
+                    else:
+                        print(f"The mean value of the '{column}' column is: {df_results[df_results['specname'] == specname][column].mean()} pm {df_results[df_results['specname'] == specname][column].std() / np.sqrt(df_results[df_results['specname'] == specname][column].size)}")
+                    #print(f"The median value of the '{column}' column is: {df_results[column].median()}")
+                    #print(f"The std value of the '{column}' column is: {df_results[column].std()}")
 
+
+def check_if_path_exists(path_to_check: str) -> str:
+    # check if path is absolute
+    if os.path.isabs(path_to_check):
+        if os.path.exists(os.path.join(path_to_check, "")):
+            return path_to_check
+        else:
+            raise ValueError(f"Configuration: {path_to_check} does not exist")
+    # if path is relative, check if it exists in the current directory
+    if os.path.exists(os.path.join(path_to_check, "")):
+        # returns absolute path
+        return os.path.join(os.getcwd(), path_to_check, "")
+    else:
+        # if it starts with ../ convert to ./ and check again
+        if path_to_check.startswith("../"):
+            path_to_check = path_to_check[3:]
+            if os.path.exists(os.path.join(path_to_check, "")):
+                return os.path.join(os.getcwd(), path_to_check, "")
+            else:
+                raise ValueError(f"Configuration: {path_to_check} does not exist")
+        else:
+            raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
-                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0):
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+
+    for path in turbospectrum_paths:
+        turbospectrum_paths[path] = check_if_path_exists(turbospectrum_paths[path])
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
@@ -421,44 +402,47 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin - 3, lambda_max=lmax + 3,
-                 free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
+                 free_abundances=element_abundances, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
     ts.run_turbospectrum_and_atmosphere()
     print("TS completed")
-    wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
+    try:
+        wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
                                                                   usecols=(0, 1), unpack=True)
+        wave_mod_filled = wave_mod_orig
+        flux_norm_mod_filled = flux_norm_mod_orig
+
+        if resolution != 0.0:
+            wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+        else:
+            wave_mod_conv = wave_mod_filled
+            flux_norm_mod_conv = flux_norm_mod_filled
+
+        if macro != 0.0:
+            wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+        else:
+            wave_mod_macro = wave_mod_conv
+            flux_norm_mod_macro = flux_norm_mod_conv
+
+        if rotation != 0.0:
+            wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+        else:
+            wave_mod = wave_mod_macro
+            flux_norm_mod = flux_norm_mod_macro
+
+        plt.plot(wave_mod, flux_norm_mod)
+        plt.xlim(lmin - 0.2, lmax + 0.2)
+        plt.ylim(0, 1.05)
+        plt.xlabel("Wavelength")
+        plt.ylabel("Normalised flux")
+    except FileNotFoundError:
+        print("TS failed")
+        wave_mod, flux_norm_mod = np.array([]), np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
-
-    wave_mod_filled = wave_mod_orig
-    flux_norm_mod_filled = flux_norm_mod_orig
-
-    if resolution != 0.0:
-        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-    else:
-        wave_mod_conv = wave_mod_filled
-        flux_norm_mod_conv = flux_norm_mod_filled
-
-    if macro != 0.0:
-        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-    else:
-        wave_mod_macro = wave_mod_conv
-        flux_norm_mod_macro = flux_norm_mod_conv
-
-    if rotation != 0.0:
-        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-    else:
-        wave_mod = wave_mod_macro
-        flux_norm_mod = flux_norm_mod_macro
-
-    plt.plot(wave_mod, flux_norm_mod)
-    plt.xlim(lmin - 0.2, lmax + 0.2)
-    plt.ylim(0, 1.05)
-    plt.xlabel("Wavelength")
-    plt.ylabel("Normalised flux")
 
     return wave_mod, flux_norm_mod
 

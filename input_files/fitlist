@@ -1,1 +1,2 @@
 #name_of_spectrum_to_fit     rv      teff  logg  [Fe/H] (skip if not fitting Fe)  Input_vmicroturb Input_vmacroturb
+UVES_Sun-1_cleaned_norm.txt 0.000000  5771  4.44  0.03
