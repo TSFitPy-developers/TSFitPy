@@ -2414,7 +2414,7 @@ class TSFitPyConfig:
         try:
             self.find_upper_limit = self._convert_string_to_bool(self.config_parser["ParametersForModeLbl"]["find_upper_limit"])
             self.sigmas_upper_limit = float(self.config_parser["ParametersForModeLbl"]["upper_limit_sigma"])
-        except ValueError:
+        except KeyError:
             self.find_upper_limit = False
             self.sigmas_upper_limit = 5.0
 
