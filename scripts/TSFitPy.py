@@ -3451,5 +3451,4 @@ if __name__ == '__main__':
 # TODO:
 # - fix pathing in run_wrapper
 # - fix pathing in run_wrapper_v2
-# - test other fitting modes: teff, need to fix saving of convoluted spectra and something about not printing results
 # - fix chisqr for method all
