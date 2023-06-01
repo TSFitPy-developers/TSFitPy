@@ -1,14 +1,11 @@
-from turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-import math
-import time
-import numpy as np
-import os
-from convolve import *
+from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.convolve import *
 import datetime
-from create_window_linelist_function import create_window_linelist
+from scripts.create_window_linelist_function import create_window_linelist
 import shutil
 from dask.distributed import Client
 import socket
+import os
 
 def calculate_vturb(teff, logg, met):
     t0 = 5500.
@@ -23,7 +20,7 @@ def calculate_vturb(teff, logg, met):
 
     return vturb
 
-def run_wrapper(teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution=0, macro=0, rotation=0, vturb=None):
+def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution=0, macro=0, rotation=0, vturb=None):
     #parameters to adjust
 
     teff = teff
@@ -48,39 +45,43 @@ def run_wrapper(teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution=0, ma
     #item_abund["Y"] = 0 + met
     #item_abund["Ni"] = 0.0 + met
     #item_abund["Ba"] = 0.0 + met
-    temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    temp_directory = os.path.join(os.getcwd(), f"temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
 
     ts = TurboSpectrum(
-                turbospec_path=turbospec_path,
-                interpol_path=interpol_path,
-                line_list_paths=line_list_path_trimmed,
-                marcs_grid_path=model_atmosphere_grid_path,
-                marcs_grid_list=model_atmosphere_list,
-                model_atom_path=model_atom_path,
-                departure_file_path=departure_file_path,
-                aux_file_length_dict=aux_file_length_dict,
-                model_temperatures=model_temperatures,
-                model_logs=model_logs,
-                model_mets=model_mets,
-                marcs_value_keys=marcs_value_keys,
-                marcs_models=marcs_models,
-                marcs_values=marcs_values)
+                turbospec_path=ts_config["turbospec_path"],
+                interpol_path=ts_config["interpol_path"],
+                line_list_paths=ts_config["line_list_paths"],
+                marcs_grid_path=ts_config["model_atmosphere_grid_path"],
+                marcs_grid_list=ts_config["model_atmosphere_grid_list"],
+                model_atom_path=ts_config["model_atom_path"],
+                departure_file_path=ts_config["departure_file_path"],
+                aux_file_length_dict=ts_config["aux_file_length_dict"],
+                model_temperatures=ts_config["model_temperatures"],
+                model_logs=ts_config["model_logs"],
+                model_mets=ts_config["model_mets"],
+                marcs_value_keys=ts_config["marcs_value_keys"],
+                marcs_models=ts_config["marcs_models"],
+                marcs_values=ts_config["marcs_values"],)
 
     ts.configure(t_eff = teff, log_g = logg, metallicity = met,
                                 turbulent_velocity = vturb, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax,
                                 free_abundances=item_abund, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=False,
-                                atmosphere_dimension=atmosphere_type, windows_flag=windows_flag, segment_file=segment_file,
-                                line_mask_file=linemask_file, depart_bin_file=depart_bin_file,
-                                depart_aux_file=depart_aux_file, model_atom_file=model_atom_file)
+                                atmosphere_dimension=ts_config["atmosphere_type"],
+                 windows_flag=ts_config["windows_flag"],
+                 segment_file=ts_config["segment_file"],
+                 line_mask_file=ts_config["line_mask_file"],
+                 depart_bin_file=ts_config["depart_bin_file"],
+                 depart_aux_file=ts_config["depart_aux_file"],
+                 model_atom_file=ts_config["model_atom_file"])
 
     ts.run_turbospectrum_and_atmosphere()
 
-    wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory), usecols=(0,1,2), unpack=True)
-    if windows_flag:
-        seg_begins, seg_ends = np.loadtxt(segment_file, comments = ";", usecols=(0,1), unpack=True)
+    wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt(os.path.join(temp_directory, 'spectrum_00000000.spec'), usecols=(0,1,2), unpack=True)
+    if ts_config["windows_flag"]:
+        seg_begins, seg_ends = np.loadtxt(ts_config['segment_file'], comments = ";", usecols=(0,1), unpack=True)
         wave_mod_filled = []
         flux_norm_mod_filled = []
         flux_mod_filled = []
@@ -122,8 +123,8 @@ def run_wrapper(teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution=0, ma
         flux_mod_macro = flux_mod_conv
 
     if rotation != 0.0:
-        wave_mod, flux_norm_mod = conv_macroturbulence(wave_mod_macro, flux_norm_mod_macro, rotation)
-        wave_mod, flux_mod = conv_macroturbulence(wave_mod_macro, flux_mod_macro, rotation)
+        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+        wave_mod, flux_mod = conv_rotation(wave_mod_macro, flux_mod_macro, rotation)
     else:
         wave_mod = wave_mod_macro
         flux_norm_mod = flux_norm_mod_macro
@@ -134,14 +135,13 @@ def run_wrapper(teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution=0, ma
     return wave_mod, flux_norm_mod, flux_mod
 
 
-def run_and_save_wrapper(teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb):
-    wave_mod, flux_norm_mod, flux_mod = run_wrapper(teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution, macro, rotation, vturb)
+def run_and_save_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb):
+    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution, macro, rotation, vturb)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}_{met}_{str(nlte_flag)}.spec")
     f = open(file_location_output, 'w')
     for i in range(len(wave_mod)):
         print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
     f.close()
-
 
 if __name__ == '__main__':
     ts_compiler = "intel" #needs to be "intel" or "gnu"

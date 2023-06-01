@@ -1,6 +1,4 @@
 import numpy as np
-import os
-import subprocess
 from astropy import convolution
 from astropy import constants as const
 from astropy.modeling import Fittable1DModel, Parameter
@@ -78,8 +76,7 @@ def conv_macroturbulence(wave, flux, vmac):
             flux_conv = convolution.convolve(flux, macro_kernel, fill_value=1)
             wave_conv = wave
     else:
-        print(F"Unexpected Vmac={vmac} [km/s]. Stopped.")
-        exit(1)
+        print(F"Unexpected Vmac={vmac} [km/s]")
 
     if wave_conv is None:   # otherwise there was a bug that no wave/flux returned with invalid vmac
         wave_conv, flux_conv = wave, flux
