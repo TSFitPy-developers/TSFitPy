@@ -29,7 +29,7 @@ if __name__ == '__main__':
     if len(argv) > 2:  # when calling the program, can now add extra argument with location of observed spectra, easier to call
         obs_location = argv[2]
     else:
-        obs_location = None  # otherwise defaults to the input one
+        obs_location = None  # otherwise defaults to the input one 
     print(config_location)
     # TODO explain lbl quick
     output_folder_title_date = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
