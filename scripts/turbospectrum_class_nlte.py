@@ -10,8 +10,8 @@ from operator import itemgetter
 import numpy as np
 import math
 
-from solar_abundances import solar_abundances, periodic_table
-from solar_isotopes import solar_isotopes
+from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
+from scripts.solar_isotopes import solar_isotopes
 
 
 def closest_available_value(target: float, options: list[float]) -> float:
@@ -326,7 +326,7 @@ class TurboSpectrum:
             self.line_mask_file = line_mask_file
         if self.atmosphere_dimension == "3D":
             self.turbulent_velocity = 2.0
-            print("turbulent_velocity is not used since model atmosphere is 3D")
+            #print("turbulent_velocity is not used since model atmosphere is 3D")
         if lpoint is not None:
             self.lpoint = lpoint
 
@@ -368,15 +368,6 @@ class TurboSpectrum:
         else:
             marcs_parameters['spherical'] = "p"
             marcs_parameters['mass'] = 0  # All plane-parallel models have mass set to zero
-
-        # quick setting to reduce temperature in case temperature is higher than grid allows, will give warning that it has happened
-        # TODO: logg == 4.0? should be inequality sign maybe?
-        if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":
-            print(
-                "warning temp was {} and the highest value available is 6500. setting temp to 6500 to interpolate model atmosphere. will be {:.2f} for spectrum generation".format(
-                    self.t_eff, self.t_eff))
-            temp_teff = self.t_eff
-            self.t_eff = 6499
 
         # Pick MARCS settings which bracket requested stellar parameters
         interpolate_parameters = ("metallicity", "log_g", "temperature")
@@ -482,353 +473,109 @@ class TurboSpectrum:
                 options = self.marcs_values[parameter_to_move]
                 parameter_descriptor = marcs_parameters[parameter_to_move]
 
-                if self.atmosphere_dimension == "1D" or self.atmosphere_dimension == "3D":
-                    if option_no == 0:
-                        parameter_descriptor[2] -= 1
-                        if parameter_descriptor[2] < 0:
-                            return {
-                                "errors":
-                                    "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
-                                    "and due to missing models we could not interpolate.". \
-                                        format(parameter_to_move, options[0], options[-1],
-                                               interpolate_parameters_around[parameter_to_move])
-                            }
-                        # logging.info("Moving lower bound of parameter <{}> from {} to {} and trying again. "
-                        #             "This setting previously had {} failures.".
-                        #             format(parameter_to_move, parameter_descriptor[0],
-                        #                    options[parameter_descriptor[2]], failure_count))
-                        parameter_descriptor[0] = options[parameter_descriptor[2]]
-                    else:
-                        parameter_descriptor[3] += 1
-                        if parameter_descriptor[3] >= len(options):
-                            return {
-                                "errors":
-                                    "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
-                                    "and due to missing models we could not interpolate.". \
-                                        format(parameter_to_move, options[0], options[-1],
-                                               interpolate_parameters_around[parameter_to_move])
-                            }
-                        # logging.info("Moving upper bound of parameter <{}> from {} to {} and trying again. "
-                        #             "This setting previously had {} failures.".
-                        #             format(parameter_to_move, parameter_descriptor[1],
-                        #                    options[parameter_descriptor[3]], failure_count))
-                        parameter_descriptor[1] = options[parameter_descriptor[3]]
-                elif self.atmosphere_dimension == "3D":
-                    # TODO: remove? refactor?
-                    # This part was written to be able to interpolate 3D models when they are not at equal vertices.
-                    # Now it seems like it is not needed? Not removing, but this part of the code will currently
-                    # never run.
-                    marcs_values_new = {}
-                    marcs_values_new["temperature"] = self.model_temperatures
-                    marcs_values_new["log_g"] = self.model_logs
-                    marcs_values_new["metallicity"] = self.model_mets
-
-                    interpolate_parameters = ("temperature", "log_g", "metallicity")
-
-                    def get_args(value_to_search: float, array: np.ndarray[float], values_to_dlt: np.ndarray[float]) -> \
-                    tuple[int, int]:
-                        uniq_array = np.unique(array)
-                        new_uniq_array = uniq_array[np.isin(uniq_array, values_to_dlt, invert=True)]
-                        if value_to_search in new_uniq_array:
-                            args_to_use_first = np.where(array == value_to_search)[0]
-                            args_to_use_second = args_to_use_first
-                        else:
-                            new_uniq_array = uniq_array[np.where(uniq_array < value_to_search)[0]]
-                            new_uniq_array = new_uniq_array[np.isin(new_uniq_array, values_to_dlt, invert=True)]
-                            first_closest_value = new_uniq_array[
-                                (np.abs(new_uniq_array - value_to_search)).argmin()]
-
-                            new_uniq_array = uniq_array[np.where(uniq_array > value_to_search)[0]]
-                            new_uniq_array = new_uniq_array[np.isin(new_uniq_array, values_to_dlt, invert=True)]
-                            second_closest_value = new_uniq_array[
-                                (np.abs(new_uniq_array - value_to_search)).argmin()]
-
-                            args_to_use_first = np.where(array == first_closest_value)[0]
-                            args_to_use_second = np.where(array == second_closest_value)[0]
-                        # print(args_to_use_first, args_to_use_second)
-                        return args_to_use_first, args_to_use_second
-
-                    def find_interp_indices(value: float, options: np.ndarray[float],
-                                            values_to_ignore: np.ndarray[float]) -> tuple[int, int, list[float, float]]:
-                        # value = interpolate_parameters_around[key]
-                        # options = marcs_values[key]
-                        # options = options[args_to_use]
-                        if (value < np.min(options[np.isin(options, values_to_ignore, invert=True)])) or (
-                                value > np.max(options[np.isin(options, values_to_ignore,
-                                                               invert=True)])):  # checks that the value is within the marcs possible values
-                            return None, None, {
-                                "errors": f"Value of parameter  needs to be in range {np.min(options)} to {np.max(options)}. You requested {value}. OR the other parameters are not within the range"
-                            }
-                        args_to_use_first, args_to_use_second = get_args(value, options, values_to_ignore)
-                        return args_to_use_first, args_to_use_second, [options[args_to_use_first][0],
-                                                                       options[args_to_use_second][0]]
-
-                    temperatures_to_ignore = np.array([])
-                    loggs_to_ignore = np.array([])
-                    metallicities_to_ignore = np.array([])
-
-                    def find_new_marcs_models(temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore):
-                        # temperature
-                        value_temp = interpolate_parameters_around[interpolate_parameters[0]]
-                        options_temp = marcs_values_new[interpolate_parameters[0]]
-                        args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                     options_temp,
-                                                                                                     temperatures_to_ignore)
-
-                        # logg
-                        value_logg = interpolate_parameters_around[interpolate_parameters[1]]
-                        options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                        args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                           options_logg_first,
-                                                                                                           loggs_to_ignore)
-
-                        if args_to_use_first_1 is None:
-                            return np.append(temperatures_to_ignore,
-                                             out_values_temp[0]), loggs_to_ignore, metallicities_to_ignore, False
-
-                        options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                        args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                           options_logg_second,
-                                                                                                           loggs_to_ignore)
-
-                        if args_to_use_first_2 is None:
-                            return np.append(temperatures_to_ignore,
-                                             out_values_temp[1]), loggs_to_ignore, metallicities_to_ignore, False
-
-                        """if args_to_use_first_1 is None:
-                            #options_temp = marcs_values_new[interpolate_parameters[0]]
-                            options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[0]), axis=0)
-                            args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                         options_temp)
-
-                            # logg
-                            options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                            args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                               options_logg_first)
-
-                            options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                            args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                               options_logg_second)
-
-                        if args_to_use_first_2 is None:
-                            #options_temp = marcs_values_new[interpolate_parameters[0]]
-                            options_temp = np.delete(options_temp, np.where(options_temp == out_values_temp[1]), axis=0)
-                            args_to_use_first, args_to_use_second, out_values_temp = find_interp_indices(value_temp,
-                                                                                                         options_temp)
-
-                            # logg
-                            options_logg_first = marcs_values_new[interpolate_parameters[1]][args_to_use_first]
-                            args_to_use_first_1, args_to_use_second_1, out_values_logg_1 = find_interp_indices(value_logg,
-                                                                                                               options_logg_first)
-
-                            options_logg_second = marcs_values_new[interpolate_parameters[1]][args_to_use_second]
-                            args_to_use_first_2, args_to_use_second_2, out_values_logg_2 = find_interp_indices(value_logg,
-                                                                                                               options_logg_second)"""
-
-                        # metallicity
-                        value_met = interpolate_parameters_around[interpolate_parameters[2]]
-                        options_met_11 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
-                            args_to_use_first_1]
-                        args_to_use_first_10, args_to_use_second_10, out_values_met_10 = find_interp_indices(value_met,
-                                                                                                             options_met_11,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_10 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[
-                                0]), metallicities_to_ignore, False
-
-                        options_met_12 = marcs_values_new[interpolate_parameters[2]][args_to_use_first][
-                            args_to_use_second_1]
-                        args_to_use_first_20, args_to_use_second_20, out_values_met_20 = find_interp_indices(value_met,
-                                                                                                             options_met_12,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_20 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_1[
-                                1]), metallicities_to_ignore, False
-
-                        options_met_21 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
-                            args_to_use_first_2]
-                        args_to_use_first_30, args_to_use_second_30, out_values_met_30 = find_interp_indices(value_met,
-                                                                                                             options_met_21,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_30 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[
-                                0]), metallicities_to_ignore, False
-
-                        options_met_22 = marcs_values_new[interpolate_parameters[2]][args_to_use_second][
-                            args_to_use_second_2]
-                        args_to_use_first_40, args_to_use_second_40, out_values_met_40 = find_interp_indices(value_met,
-                                                                                                             options_met_22,
-                                                                                                             metallicities_to_ignore)
-
-                        if args_to_use_first_40 is None:
-                            return temperatures_to_ignore, np.append(loggs_to_ignore, out_values_logg_2[
-                                1]), metallicities_to_ignore, False
-
-                        return [out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10,
-                                out_values_met_20, out_values_met_30, out_values_met_40], None, None, True
-
-                    while True:
-                        temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore, completed = find_new_marcs_models(
-                            temperatures_to_ignore, loggs_to_ignore, metallicities_to_ignore)
-                        if completed:
-                            out_values_temp, out_values_logg_1, out_values_logg_2, out_values_met_10, \
-                                out_values_met_20, out_values_met_30, out_values_met_40 = temperatures_to_ignore[0], \
-                            temperatures_to_ignore[1], temperatures_to_ignore[2], temperatures_to_ignore[3], \
-                            temperatures_to_ignore[4], temperatures_to_ignore[5], temperatures_to_ignore[6]
-                            break
-                        else:
-                            if collections.Counter(temperatures_to_ignore) == collections.Counter(
-                                    marcs_values_new[interpolate_parameters[0]]) \
-                                    or np.min(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore \
-                                    or np.max(marcs_values_new[interpolate_parameters[0]]) in temperatures_to_ignore:
-                                return {"errors": "Could not find the models for interpolation"}
-
-                    def get_marcs_model_atmosphere(model):
-                        dict_iter = self.marcs_models
-
-                        for parameter in self.marcs_value_keys:
-                            if parameter == "spherical":
-                                try:
-                                    value = 'p'
-                                    dict_iter = dict_iter[value]
-                                except KeyError:
-                                    value = 's'
-                                    dict_iter = dict_iter[value]
-                            elif parameter == "mass":
-                                try:
-                                    value = 1.0
-                                    dict_iter = dict_iter[value]
-                                except KeyError:
-                                    value = 0.0
-                                    dict_iter = dict_iter[value]
-                            else:
-                                value = model[parameter]
-                                dict_iter = dict_iter[value]
-
-                        dict_iter = dict_iter['filename']
-                        return dict_iter
-
-                    marcs_models = []
-
-                    try:
-                        model = {"temperature": out_values_temp[0], "log_g": out_values_logg_1[0],
-                                 "metallicity": out_values_met_10[0],
-                                 "model_type": 'st', "spherical": 'p', 'turbulence': 2.0, 'mass': 0.0}
-
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_10[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["log_g"] = out_values_logg_1[1]
-                        model["metallicity"] = out_values_met_20[0]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_20[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["temperature"] = out_values_temp[1]
-                        model["log_g"] = out_values_logg_2[0]
-                        model["metallicity"] = out_values_met_30[0]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_30[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["log_g"] = out_values_logg_2[1]
-                        model["metallicity"] = out_values_met_40[0]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                        model["metallicity"] = out_values_met_40[1]
-                        marcs_models.append(get_marcs_model_atmosphere(model))
-                    except KeyError:
-                        return {"errors": f"Value of parameter needs to be in range. No clue where though haha"}
-
-                    print("NEWW models:")
-                    for model in marcs_models:
-                        print(model)
-
-                    marcs_model_list = marcs_models
-                    failures = False
+                if option_no == 0:
+                    parameter_descriptor[2] -= 1
+                    if parameter_descriptor[2] < 0:
+                        return {
+                            "errors":
+                                "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
+                                "and due to missing models we could not interpolate.". \
+                                    format(parameter_to_move, options[0], options[-1],
+                                           interpolate_parameters_around[parameter_to_move])
+                        }
+                    # logging.info("Moving lower bound of parameter <{}> from {} to {} and trying again. "
+                    #             "This setting previously had {} failures.".
+                    #             format(parameter_to_move, parameter_descriptor[0],
+                    #                    options[parameter_descriptor[2]], failure_count))
+                    parameter_descriptor[0] = options[parameter_descriptor[2]]
+                else:
+                    parameter_descriptor[3] += 1
+                    if parameter_descriptor[3] >= len(options):
+                        return {
+                            "errors":
+                                "Value of parameter <{}> needs to be in range {} to {}. You requested {}, " \
+                                "and due to missing models we could not interpolate.". \
+                                    format(parameter_to_move, options[0], options[-1],
+                                           interpolate_parameters_around[parameter_to_move])
+                        }
+                    # logging.info("Moving upper bound of parameter <{}> from {} to {} and trying again. "
+                    #             "This setting previously had {} failures.".
+                    #             format(parameter_to_move, parameter_descriptor[1],
+                    #                    options[parameter_descriptor[3]], failure_count))
+                    parameter_descriptor[1] = options[parameter_descriptor[3]]
 
             # print(marcs_model_list)
 
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
-        if self.nlte_flag == True:
-            for element, abundance in self.free_abundances.items():
-                # print(element,self.model_atom_file[element])
-                # print("*******************")
-                # print(abundance, self.free_abundances[element])
-                # print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
-                # print("{:.2f}".format(round(float(abundance),2) + float(solar_abundances[element])))
-                # print("{}".format(float(self.metallicity)))
-                # print("{:.2f}".format(round(float(self.metallicity),2)))
-                # print("{}".format(abundance))
-                # print("{:.2f}".format(round(float(abundance),2)))
-                # print("{:.2f}".format(round(float(self.free_abundances[element]),2)+float(solar_abundances[element])))
-                # print("*******************")
-                # print(element,self.model_atom_file[element])
-                if element not in self.model_atom_file:
-                    self.model_atom_file[element] = ""
-                if self.model_atom_file[element] != "":
-                    if self.verbose:
-                        stdout = None
-                        stderr = subprocess.STDOUT
+        if self.nlte_flag:
+            for element in self.model_atom_file:
+                if element in self.free_abundances:
+                    # if element abundance was given, then pass it to the NLTE
+                    # self.free_abundances[element] = [X/Fe] + [Fe/H] = [X/H] (already scaled from before)
+                    # solar_abundances[element] = abundance as A(X)
+                    element_abundance = self.free_abundances[element] + float(solar_abundances[element])
+                else:
+                    # else, take solar abundance and scale with metallicity
+                    # solar_abundances[element] = abundance as A(X)
+                    # self.metallicity = [Fe/H]
+                    if element in molecules_atomic_number:
+                        # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                        if element == "CN":
+                            element_abundance = float(solar_abundances["N"]) + self.metallicity
+                        elif element == "CH":
+                            element_abundance = float(solar_abundances["C"]) + self.metallicity
                     else:
-                        stdout = open('/dev/null', 'w')
-                        stderr = subprocess.STDOUT
-                    # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
-                    # Write configuration input for interpolator
-                    output = os_path.join(self.tmp_dir, self.marcs_model_name)
-                    # output = os_path.join('Testout/', self.marcs_model_name)
-                    # print(output)
-                    model_test = "{}.test".format(output)
-                    interpol_config = ""
-                    self.marcs_model_list_global = marcs_model_list
-                    # print(marcs_model_list)
-                    # print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
-                    for line in marcs_model_list:
-                        interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-                    interpol_config += "'{}.interpol'\n".format(output)
-                    interpol_config += "'{}.alt'\n".format(output)
-                    interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
-                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
-                        element]))  # needed for nlte interpolator
-                    interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
-                        element]))  # needed for nlte interpolator
-                    # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
-                    # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
-                    # interpol_config += "'1D_NLTE_grid_Fe_MARCSfullGrid.bin'\n" #needed for nlte interpolator
-                    # interpol_config += "'auxData_Fe_MARCSfullGrid.txt'\n" #needed for nlte interpolator
-                    interpol_config += "{}\n".format(self.aux_file_length_dict[element])
-                    interpol_config += "{}\n".format(self.t_eff)
-                    interpol_config += "{}\n".format(self.log_g)
-                    interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-                    interpol_config += "{:.6f}\n".format(
-                        round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
-                    interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-                    interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-                    interpol_config += "'{}'\n".format(model_test)
+                        element_abundance = float(solar_abundances[element]) + self.metallicity
 
-                    # Now we run the FORTRAN model interpolator
-                    # print(self.free_abundances["Ba"])
-                    try:
-                        if self.atmosphere_dimension == "1D":
-                            p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
-                                                 stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                            p.stdin.write(bytes(interpol_config, 'utf-8'))
-                            stdout, stderr = p.communicate()
-                        elif self.atmosphere_dimension == "3D":
-                            p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
-                                                 stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                            p.stdin.write(bytes(interpol_config, 'utf-8'))
-                            stdout, stderr = p.communicate()
-                    except subprocess.CalledProcessError:
-                        # print("spud")
-                        return {
-                            "interpol_config": interpol_config,
-                            "errors": "MARCS model atmosphere interpolation failed."
-                        }
-                    # print("spud")
-                    if spherical:
-                        self.turbulent_velocity = microturbulence
-        elif self.nlte_flag == False:
+                if self.verbose:
+                    stdout = None
+                    stderr = subprocess.STDOUT
+                else:
+                    stdout = open('/dev/null', 'w')
+                    stderr = subprocess.STDOUT
+                # Write configuration input for interpolator
+                output = os_path.join(self.tmp_dir, self.marcs_model_name)
+                model_test = "{}.test".format(output)
+                interpol_config = ""
+                self.marcs_model_list_global = marcs_model_list
+                for line in marcs_model_list:
+                    interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
+                interpol_config += "'{}.interpol'\n".format(output)
+                interpol_config += "'{}.alt'\n".format(output)
+                interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
+                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
+                    element]))  # needed for nlte interpolator
+                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
+                    element]))  # needed for nlte interpolator
+                interpol_config += "{}\n".format(self.aux_file_length_dict[element])
+                interpol_config += "{}\n".format(self.t_eff)
+                interpol_config += "{}\n".format(self.log_g)
+                interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
+                interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
+                interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
+                interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
+                interpol_config += "'{}'\n".format(model_test)
+
+                # Now we run the FORTRAN model interpolator
+                try:
+                    if self.atmosphere_dimension == "1D":
+                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                        p.stdin.write(bytes(interpol_config, 'utf-8'))
+                        stdout, stderr = p.communicate()
+                    elif self.atmosphere_dimension == "3D":
+                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                        p.stdin.write(bytes(interpol_config, 'utf-8'))
+                        stdout, stderr = p.communicate()
+                except subprocess.CalledProcessError:
+                    return {
+                        "interpol_config": interpol_config,
+                        "errors": "MARCS model atmosphere interpolation failed."
+                    }
+                if spherical:
+                    self.turbulent_velocity = microturbulence
+        else:
             if self.verbose:
                 stdout = None
                 stderr = subprocess.STDOUT
@@ -878,9 +625,6 @@ class TurboSpectrum:
             # print("spud")
             if spherical:
                 self.turbulent_velocity = microturbulence
-        # TODO: equality with logg 4.0 here again?
-        if self.t_eff >= 6500 and self.log_g == 4.0 and self.atmosphere_dimension == "3D":  # reset temp to what it was before
-            self.t_eff = temp_teff
 
         return {
             "interpol_config": interpol_config,
@@ -1024,14 +768,9 @@ class TurboSpectrum:
 
             # generate models for low and high parts
             if self.nlte_flag:
-                for element, abundance in self.free_abundances.items():
-                    if element not in self.model_atom_file:
-                        self.model_atom_file[element] = ""
-                    if self.model_atom_file[element] != "":
+                for element in self.model_atom_file:
                         atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
                                                                                 element)
-                        # low_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        # low_coef_dat_name += '_{}_coef.dat'.format(element)
                         low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
                         f_coef_low = open(low_coef_dat_name, 'r')
                         lines_coef_low = f_coef_low.read().splitlines()
@@ -1039,6 +778,7 @@ class TurboSpectrum:
 
                         high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                         high_coef_dat_name += '_{}_coef.dat'.format(element)
+
                         high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
                         f_coef_high = open(high_coef_dat_name, 'r')
                         lines_coef_high = f_coef_high.read().splitlines()
@@ -1106,19 +846,8 @@ class TurboSpectrum:
         """
         Generate the SPECIES_LTE_NLTE.dat file for TS to determine what elements are NLTE
         """
-        # data_path = self.turbospec_path.replace("exec/","DATA/")
         data_path = self.tmp_dir
-
-        nlte = "nlte" if self.nlte_flag == True else "lte"
-
-        # if len(self.free_abundances.items()) == 1:
-        #    nlte_fe = nlte
-        # else:
-        #    nlte_fe =
-
         file = open("{}/SPECIES_LTE_NLTE_{:08d}.dat".format(data_path, self.counter_spectra), 'w')
-        # print("# This file controls which species are treated in LTE/NLTE", file=file)
-        # print("# It also gives the path to the model atom and the departure files", file=file)
         file.write("# This file controls which species are treated in LTE/NLTE\n")
         file.write("# It also gives the path to the model atom and the departure files\n")
         file.write("# First created 2021-02-22\n")
@@ -1128,31 +857,32 @@ class TurboSpectrum:
         file.write("# atomic number / name / (n)lte / model atom / departure file / binary or ascii departure file\n")
         file.write("#\n")
         file.write("# path for model atom files     ! don't change this line !\n")
-        file.write("{}\n".format(self.model_atom_path))
+        file.write(f"{self.model_atom_path}\n")
         file.write("#\n")
         file.write("# path for departure files      ! don't change this line !\n")
-        file.write("{}\n".format(self.tmp_dir))
+        file.write(f"{self.tmp_dir}\n")
         file.write("#\n")
         file.write("# atomic (N)LTE setup\n")
-        # file.write("1    'H' 'lte'   'atom.h20'  ' ' 'binary'\n")
-        if self.nlte_flag == True:
-            for element, abundance in self.free_abundances.items():
+        if self.nlte_flag:
+            for element in self.model_atom_file:
+                # write all nlte elements
+                if element in molecules_atomic_number:
+                    # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                    atomic_number = molecules_atomic_number[element][0]
+                    element_name_to_write = molecules_atomic_number[element][1]
+                else:
+                    atomic_number = periodic_table.index(element)
+                    element_name_to_write = element
+                file.write(f"{atomic_number}  '{element_name_to_write}'  'nlte'  '{self.model_atom_file[element]}'   '{self.marcs_model_name}_{element}_coef.dat' 'ascii'\n")
+            for element in self.free_abundances:
+                # now check for any lte elements which have a specific given abundance and write them too
                 atomic_number = periodic_table.index(element)
                 if element not in self.model_atom_file:
-                    self.model_atom_file[element] = ""
-                if self.model_atom_file[element] == "":
-                    file.write("{}  '{}'  'lte'  ''   '' 'ascii'\n".format(atomic_number, element, nlte,
-                                                                           self.model_atom_file[element],
-                                                                           self.marcs_model_name, element))
-                else:
-                    file.write("{}  '{}'  '{}'  '{}'   '{}_{}_coef.dat' 'ascii'\n".format(atomic_number, element, nlte,
-                                                                                          self.model_atom_file[element],
-                                                                                          self.marcs_model_name,
-                                                                                          element))
-        elif self.nlte_flag == False:
-            for element, abundance in self.free_abundances.items():
+                    file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
+        else:
+            for element in self.free_abundances:
                 atomic_number = periodic_table.index(element)
-                file.write("{}  '{}'  '{}'  ''   '' 'ascii'\n".format(atomic_number, element, nlte))
+                file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
         file.close()
 
     def make_babsma_bsyn_file(self, spherical):
@@ -1170,41 +900,22 @@ class TurboSpectrum:
             else:
                 alpha = 0
 
-        # Allow for user input abundances as a dictionary of the form {element: abundance}
-        # deprecated 8-2022
-        """
-        if self.free_abundances is None:
-            individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '0'\n"
-        else:
-            individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(self.free_abundances))
-
-            for element, abundance in self.free_abundances.items():
-                assert element in solar_abundances, "Cannot proceed as solar abundance for element <{}> is unknown". \
-                    format(element)
-
-                atomic_number = periodic_table.index(element)
-                individual_abundances += "{:d}  {:.2f}\n".format(int(atomic_number),
-                                                                 float(solar_abundances[element]) + round(float(abundance),2))
-        #print(individual_abundances.strip())
-        #print(individual_abundances)
-        """
-
         # Updated abundances to below to allow user to set solar abundances through solar_abundances.py and not have to adjust make_abund.f
 
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
         
         item_abund = {}
         item_abund['H'] = 12.00
-        item_abund[periodic_table[2]] = float(
-            solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+        item_abund[periodic_table[2]] = float(solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
         for i in range(3, len(periodic_table)):
+            # first take solar scaled abundances as A(X)
             item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 6)
         if self.free_abundances is not None:
+            # and if any abundance is passed, take it and convert to A(X)
             for element, abundance in self.free_abundances.items():
                 item_abund[element] = float(solar_abundances[element]) + round(float(abundance), 6)
         for i in range(1, len(periodic_table)):
             individual_abundances += "{:d}  {:.6f}\n".format(i, item_abund[periodic_table[i]])
-        # print(individual_abundances)
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
 
@@ -1218,19 +929,6 @@ class TurboSpectrum:
             for isotope, ratio in solar_isotopes.items():
                 individual_isotopes += "{}  {:6f}\n".format(isotope, ratio)
 
-        # if self.free_isotopes is None:
-        #    free_isotopes = "'ISOTOPES : ' '{:d}'\n".format(len(self.))
-        # else:
-        #    individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(self.free_abundances))
-
-        #    for element, abundance in self.free_abundances.items():
-        #        assert element in solar_abundances, "Cannot proceed as solar abundance for element <{}> is unknown". \
-        #            format(element)
-
-        #        atomic_number = periodic_table.index(element)
-        #        individual_abundances += "{:d}  {:.2f}\n".format(int(atomic_number),
-        #                                                        float(solar_abundances[element]) + float(abundance))
-        # print(individual_abundances.strip())
         # Make a list of line-list files
         # We start by getting a list of all files in the line list directories we've been pointed towards,
         # excluding any text files we find.
@@ -1247,9 +945,6 @@ class TurboSpectrum:
         line_lists = "'NFILES   :' '{:d}'\n".format(len(line_list_files))
         for item in line_list_files:
             line_lists += "{}\n".format(item)
-
-        # print(self.line_list_paths)
-        # print(line_list_files)
 
         # Build bsyn configuration file
         spherical_boolean_code = "T" if spherical else "F"

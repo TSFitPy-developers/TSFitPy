@@ -135,49 +135,52 @@ def read_atoms():
                                             nlte_label_up = atom_label[j]
                                             convid_high = 'a'
                             else: #what to do when no label information from the lte linelist matches the label naming format in the model atom (use accessory file or energy levels)
-                                if accessory_match:
-                                    acc_level, acc_energy, acc_label, acc_energy_nist, acc_term, acc_config, acc_percent, acc_ion = np.loadtxt(accessory_matching_files[i], dtype='str', unpack=True)
-                                lte_config = fields[len(fields)-2]
-                                place = 0
-                                while lte_config:
-                                    if lte_config[len(lte_config)-1-place] == "." or lte_config[len(lte_config)-1-place] == "-" or lte_config[len(lte_config)-1-place] == ":":
-                                        break
-                                    place+=1
-                                lte_config = lte_config[-place:len(lte_config)]
-                                lte_config = lte_config.replace("(","")
-                                lte_config = lte_config.replace(")","")
-                                if accessory_match == False:
-                                    lte_label_up = lte_label_up.replace("*","")
-                                nlte_level_low = 0
-                                nlte_label_low = 'none'
-                                nlte_level_up = 0
-                                nlte_label_up = 'none'
-                                convid_low = 'x'
-                                convid_high = 'x'
-                                for j in range(len(atom_EC)):
-                                    if lte_EC_low <= atom_EC[j]*energy_factor and lte_EC_low >= atom_EC[j]/energy_factor:
-                                        nlte_level_low = atom_level[j]
-                                        nlte_label_low = atom_label[j]
-                                        nlte_EC_low = atom_EC[j]
-                                        convid_low = 'c'
-                                if accessory_match:
-                                    for j in range(len(acc_level)):
-                                        if lte_label_up == acc_term[j] and lte_config == acc_config[j] and lte_EC_up <= float(acc_energy[j])*energy_factor and lte_EC_up >= float(acc_energy[j])/energy_factor:
-                                            nlte_level_up = int(acc_level[j])
-                                            nlte_label_up = acc_label[j]
-                                            convid_high = 'a'
-                                elif match_multiplicity:
+                                try:
+                                    if accessory_match:
+                                        acc_level, acc_energy, acc_label, acc_energy_nist, acc_term, acc_config, acc_percent, acc_ion = np.loadtxt(accessory_matching_files[i], dtype='str', unpack=True)
+                                    lte_config = fields[len(fields)-2]
+                                    place = 0
+                                    while lte_config:
+                                        if lte_config[len(lte_config)-1-place] == "." or lte_config[len(lte_config)-1-place] == "-" or lte_config[len(lte_config)-1-place] == ":":
+                                            break
+                                        place+=1
+                                    lte_config = lte_config[-place:len(lte_config)]
+                                    lte_config = lte_config.replace("(","")
+                                    lte_config = lte_config.replace(")","")
+                                    if accessory_match == False:
+                                        lte_label_up = lte_label_up.replace("*","")
+                                    nlte_level_low = 0
+                                    nlte_label_low = 'none'
+                                    nlte_level_up = 0
+                                    nlte_label_up = 'none'
+                                    convid_low = 'x'
+                                    convid_high = 'x'
                                     for j in range(len(atom_EC)):
-                                        if (lte_label_up in atom_label[j] or lte_label_up.lower() in atom_label[j]) and lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor and lte_up2j1 == atom_upper2j1[j]:
-                                            nlte_level_up = atom_level[j]
-                                            nlte_label_up = atom_label[j]
-                                            convid_high = 'a'
-                                else:
-                                    for j in range(len(atom_EC)):
-                                        if (lte_label_up in atom_label[j] or lte_label_up.lower() in atom_label[j]) and lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor:
-                                            nlte_level_up = atom_level[j]
-                                            nlte_label_up = atom_label[j]
-                                            convid_high = 'a'
+                                        if lte_EC_low <= atom_EC[j]*energy_factor and lte_EC_low >= atom_EC[j]/energy_factor:
+                                            nlte_level_low = atom_level[j]
+                                            nlte_label_low = atom_label[j]
+                                            nlte_EC_low = atom_EC[j]
+                                            convid_low = 'c'
+                                    if accessory_match:
+                                        for j in range(len(acc_level)):
+                                            if lte_label_up == acc_term[j] and lte_config == acc_config[j] and lte_EC_up <= float(acc_energy[j])*energy_factor and lte_EC_up >= float(acc_energy[j])/energy_factor:
+                                                nlte_level_up = int(acc_level[j])
+                                                nlte_label_up = acc_label[j]
+                                                convid_high = 'a'
+                                    elif match_multiplicity:
+                                        for j in range(len(atom_EC)):
+                                            if (lte_label_up in atom_label[j] or lte_label_up.lower() in atom_label[j]) and lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor and lte_up2j1 == atom_upper2j1[j]:
+                                                nlte_level_up = atom_level[j]
+                                                nlte_label_up = atom_label[j]
+                                                convid_high = 'a'
+                                    else:
+                                        for j in range(len(atom_EC)):
+                                            if (lte_label_up in atom_label[j] or lte_label_up.lower() in atom_label[j]) and lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor:
+                                                nlte_level_up = atom_level[j]
+                                                nlte_label_up = atom_label[j]
+                                                convid_high = 'a'
+                                except IndexError:
+                                    pass
 
                             nlte_line = "  "+line.strip()[0:48]+"  "+line.strip()[49:len(line.strip())-1]+"'"+"  "+str(nlte_level_low)+" "+str(nlte_level_up)+"  '"+str(nlte_label_low)+"' '"+str(nlte_label_up)+"'  '"+str(convid_low)+"' '"+str(convid_high)+"'"
                             count_total+=1

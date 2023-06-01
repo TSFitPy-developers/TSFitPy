@@ -3,3 +3,4 @@ put all nlte files here (such as auxiliary text files and binary files of depart
 TS will read these to create NLTE spectra
 
 My suggestion is to create a folder for each element. There is also a folder to put model atoms.
+

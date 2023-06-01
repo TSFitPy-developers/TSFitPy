@@ -18,7 +18,7 @@ solar_abundances = {
     "[s/Fe]": 0.00,
     "C/O": 0.54954,
     "X": 0.73826,
-    "Y": 0.24954,
+    "Y_": 0.24954,  # because Yttrium is also Y, so Y_ is used for Helium
     "Z": 1.22E-02,
     "H": 12.00,
     "He": 10.93,
@@ -238,3 +238,5 @@ periodic_table = [
     "Ce", "Pr", "Nd", "Pm", "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
     "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl", "Pb", "Bi", "Po", "At", "Rn",
     "Fr", "Ra", "Ac", "Th", "Pa", "U"]
+
+molecules_atomic_number = {"CH": ["0106.000000", "C H"], "CN": ["0607.000000", "C N"]}
