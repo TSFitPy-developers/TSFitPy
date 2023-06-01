@@ -294,7 +294,7 @@ if __name__ == '__main__':
         model_atmosphere_grid_path = "/input_files/model_atmospheres/3D/"
         model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
     model_atom_path = "/input_files/nlte_data/model_atoms/"
-    departure_file_path = "/input_files/nlte_data/""""
+    departure_file_path = "/input_files/nlte_data/"""
 
     teff = 5777
     logg = 4.4
@@ -355,7 +355,7 @@ if __name__ == '__main__':
         standard_name = name_dict.get(col.lower(), col)
         df.rename(columns={col: standard_name}, inplace=True)
 
-    df.columns = df.columns.str.lower()
+    df.columns = df.columns.str.lower().capitalize()
 
     """met = np.arange(-1.5, 0.5, 0.1)
     nlte_flag = np.array([True, False])
