@@ -25,7 +25,7 @@ if __name__ == '__main__':
     if len(argv) > 1:   # when calling the program, can now add extra argument with location of config file, easier to call
         config_location = argv[1]
     else:
-        config_location = "./input_files/tsfitpy_input_configuration.txt"  # location of config file
+        config_location = "./input_files/tsfitpy_input_configuration.cfg"  # location of config file
     if len(argv) > 2:  # when calling the program, can now add extra argument with location of observed spectra, easier to call
         obs_location = argv[2]
     else:
