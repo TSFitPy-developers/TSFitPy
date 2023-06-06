@@ -1052,7 +1052,7 @@ class Spectra:
         result_list = []
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(self.line_begins_sorted)):
-            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
+            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                     # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                     for k in range(len(result[line_number]["fit_wavelength"])):
@@ -2577,7 +2577,7 @@ class TSFitPyConfig:
         warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
 
     def validate_input(self, check_valid_path=True):
-        self.departure_file_config_path = self._check_if_path_exists(self.departure_file_config_path)
+        self.departure_file_config_path = self._check_if_path_exists(self.departure_file_config_path, check_valid_path=check_valid_path)
 
         self.atmosphere_type = self.atmosphere_type.upper()
         self.fitting_mode = self.fitting_mode.lower()
@@ -2779,21 +2779,22 @@ class TSFitPyConfig:
     def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
         # check if path is absolute
         if os.path.isabs(path_to_check):
-            if os.path.exists(os.path.join(path_to_check, "")):
+            # check if path exists or file exists
+            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                 return path_to_check
         else:
             # if path is relative, check if it exists in the current directory
-            if os.path.exists(os.path.join(path_to_check, "")):
+            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                 # returns absolute path
                 return os.path.join(os.getcwd(), path_to_check, "")
             else:
                 # if it starts with ../ convert to ./ and check again
                 if path_to_check.startswith("../"):
                     path_to_check = path_to_check[3:]
-                    if os.path.exists(os.path.join(path_to_check, "")):
+                    if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                         return os.path.join(os.getcwd(), path_to_check, "")
         if check_valid_path:
-            raise OSError(f"Configuration: {path_to_check} does not exist")
+            raise FileNotFoundError(f"Configuration: {path_to_check} does not exist")
         else:
             return ""
 
