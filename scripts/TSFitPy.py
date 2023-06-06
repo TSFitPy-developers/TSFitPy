@@ -2779,21 +2779,22 @@ class TSFitPyConfig:
     def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
         # check if path is absolute
         if os.path.isabs(path_to_check):
-            if os.path.exists(os.path.join(path_to_check, "")):
+            # check if path exists or file exists
+            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                 return path_to_check
         else:
             # if path is relative, check if it exists in the current directory
-            if os.path.exists(os.path.join(path_to_check, "")):
+            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                 # returns absolute path
                 return os.path.join(os.getcwd(), path_to_check, "")
             else:
                 # if it starts with ../ convert to ./ and check again
                 if path_to_check.startswith("../"):
                     path_to_check = path_to_check[3:]
-                    if os.path.exists(os.path.join(path_to_check, "")):
+                    if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                         return os.path.join(os.getcwd(), path_to_check, "")
         if check_valid_path:
-            raise OSError(f"Configuration: {path_to_check} does not exist")
+            raise FileNotFoundError(f"Configuration: {path_to_check} does not exist")
         else:
             return ""
 
