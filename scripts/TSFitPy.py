@@ -1052,7 +1052,7 @@ class Spectra:
         result_list = []
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
         for line_number in range(len(self.line_begins_sorted)):
-            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
+            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                     # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                     for k in range(len(result[line_number]["fit_wavelength"])):
