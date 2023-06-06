@@ -2577,7 +2577,7 @@ class TSFitPyConfig:
         warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
 
     def validate_input(self, check_valid_path=True):
-        self.departure_file_config_path = self._check_if_path_exists(self.departure_file_config_path)
+        self.departure_file_config_path = self._check_if_path_exists(self.departure_file_config_path, check_valid_path=check_valid_path)
 
         self.atmosphere_type = self.atmosphere_type.upper()
         self.fitting_mode = self.fitting_mode.lower()
