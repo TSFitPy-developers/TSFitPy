@@ -471,7 +471,7 @@ class Spectra:
         try:
             # if error sigma is given, load it
             self.error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
-        except IndexError:
+        except (IndexError, ValueError) as e:
             # if no error variance is given, set it to 1
             self.error_obs_variance = np.ones(len(self.wave_ob))
             print("No error sigma given in 3rd column, setting to 1")
