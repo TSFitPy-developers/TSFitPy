@@ -236,7 +236,8 @@ if __name__ == '__main__':
     spectra_parameters_class = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False)
     spectra_parameters = spectra_parameters_class.get_spectra_parameters_for_grid_generation()
 
-    output_dir = config_synthetic_spectra.output_folder_path_global
+    output_dir = config_synthetic_spectra.output_folder_path
+    os.makedirs(output_dir)
 
     # load NLTE data
     nlte_config = ConfigParser()
@@ -260,9 +261,6 @@ if __name__ == '__main__':
     if config_synthetic_spectra.nlte_flag:
         for element in model_atom_file:
             aux_file_length_dict[element] = len(np.loadtxt(os.path.join(config_synthetic_spectra.departure_file_path, depart_aux_file[element]), dtype='str'))
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
 
     line_list_path_trimmed = os.path.join(config_synthetic_spectra.temporary_directory_path, "linelist_for_fitting_trimmed", "")
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
