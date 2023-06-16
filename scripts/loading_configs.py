@@ -6,8 +6,6 @@ class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
         # read in the atmosphere grid to compute for the synthetic spectra
         # Read the file
-        # argument in pd.read_csv to read first column not as index but as a column
-        # https://stackoverflow.com/questions/36519086/pandas-read-csv-skips-first-column-names
         df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False)
 
         # Create a dictionary that maps non-standard names to standard ones
