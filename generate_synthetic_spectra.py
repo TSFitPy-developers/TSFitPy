@@ -140,13 +140,13 @@ class SyntheticSpectraConfig:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
         self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path)
         self.departure_file_path = self._check_if_path_exists(self.departure_file_path)
-        self.output_folder_path_global = self._check_if_path_exists(self.output_folder_path)
+        self.output_folder_path_global = self.convert_to_absolute_path(self.output_folder_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.input_parameters_filename}"
 
-        self.output_folder_path = os.path.join(self.convert_to_absolute_path(self.output_folder_path), self.output_folder_title)
+        self.output_folder_path = os.path.join(self.output_folder_path_global, self.output_folder_title, "")
         self.input_parameter_path = os.path.join(self._check_if_path_exists(self.input_parameter_path), self.input_parameters_filename)
 
 
