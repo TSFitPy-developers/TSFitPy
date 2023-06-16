@@ -144,16 +144,15 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
     print("#spectrum_name: {}".format(spectrum_name), file=f)
     print("#teff: {}".format(teff), file=f)
     print("#logg: {}".format(logg), file=f)
-    print("#feh: {}".format(met), file=f)
-    print("#vmac: {}".format(macro), file=f)
+    print("#[Fe/H]: {}".format(met), file=f)
     print("#vmic: {}".format(vturb), file=f)
+    print("#vmac: {}".format(macro), file=f)
     print("#resolution: {}".format(resolution), file=f)
     print("#rotation: {}".format(rotation), file=f)
     print("#nlte_flag: {}".format(nlte_flag), file=f)
     for key, value in abundances_dict.items():
-        print("#{}: {}".format(key, value), file=f)
+        print("#[{}/Fe]={}".format(key, value), file=f)
     print("#", file=f)
-
 
     if save_unnormalised_spectra:
         print("#Wavelength Normalised_flux Unnormalised_flux", file=f)
