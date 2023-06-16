@@ -1,3 +1,5 @@
+import pickle
+
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 from scripts.convolve import *
 import datetime
@@ -127,7 +129,10 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
     return wave_mod, flux_norm_mod, flux_mod
 
 
-def run_and_save_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict):
+def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict):
+    with open(tsfitpy_pickled_configuration_path, 'rb') as f:
+        ts_config = pickle.load(f)
+
     wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
     f = open(file_location_output, 'w')
