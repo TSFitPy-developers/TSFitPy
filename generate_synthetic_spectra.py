@@ -146,7 +146,7 @@ class SyntheticSpectraConfig:
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.input_parameters_filename}"
 
-        self.output_folder_path = os.path.join(self._check_if_path_exists(self.output_folder_path), self.output_folder_title)
+        self.output_folder_path = os.path.join(self.convert_to_absolute_path(self.output_folder_path), self.output_folder_title)
         self.input_parameter_path = os.path.join(self._check_if_path_exists(self.input_parameter_path), self.input_parameters_filename)
 
 
