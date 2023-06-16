@@ -11,8 +11,7 @@ import shutil
 from dask.distributed import Client
 import socket
 import os
-from scripts.run_wrapper_v2 import run_and_save_wrapper
-import pandas as pd
+from scripts.run_wrapper import run_and_save_wrapper
 from time import perf_counter
 from scripts.loading_configs import SpectraParameters
 
@@ -244,6 +243,10 @@ if __name__ == '__main__':
 
     output_dir = config_synthetic_spectra.output_folder_path
     os.makedirs(output_dir)
+
+    print(f"Output directory: {output_dir}")
+    print(f"Input parameters file: {config_synthetic_spectra.input_parameter_path}")
+    print(f"Starting grid generation at {datetime.datetime.now().strftime('%H:%M:%S')}")
 
     # load NLTE data
     nlte_config = ConfigParser()
