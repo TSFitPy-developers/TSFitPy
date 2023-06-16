@@ -153,3 +153,7 @@ user's machine. The Python packages needed are as follows (they should all be in
     - Each spectrum is `index.spec` where `index` is the index of the spectrum (same order as in `fitlist`)
   - It will also save the .csv file with the grid parameters (including the name of spectrum)
   - Each spectra also has comments on top with the parameters used to generate it
+
+## Extra notes
+
+Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-todo
