@@ -114,10 +114,10 @@ class SyntheticSpectraConfig:
 
         self.debug_mode = int(self.debug_mode)
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(self.convert_to_absolute_path(self.turbospectrum_path),
+            self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(self.convert_to_absolute_path(self.turbospectrum_path),
+            self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec-gf", "")
         else:
             raise ValueError("Compiler not recognized")
@@ -129,26 +129,25 @@ class SyntheticSpectraConfig:
             raise ValueError(f"Interpolators path {self.interpolators_path} does not exist")
 
         if self.atmosphere_type.upper() == "1D":
-            self.model_atmosphere_grid_path = self.convert_to_absolute_path(self.model_atmosphere_grid_path_1d)
+            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_1d)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         elif self.atmosphere_type.upper() == "3D":
-            self.model_atmosphere_grid_path = self.convert_to_absolute_path(self.model_atmosphere_grid_path_3d)
+            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_3d)
             self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
                                                                 "model_atmosphere_list.txt")
         else:
             raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
-        self.model_atoms_path = self.convert_to_absolute_path(self.model_atoms_path)
-        self.departure_file_path = self.convert_to_absolute_path(self.departure_file_path)
-        self.output_folder_path_global = self.convert_to_absolute_path(self.output_folder_path)
+        self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path)
+        self.departure_file_path = self._check_if_path_exists(self.departure_file_path)
+        self.output_folder_path_global = self._check_if_path_exists(self.output_folder_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.input_parameters_filename}"
 
-        self.output_folder_path = os.path.join(self.convert_to_absolute_path(self.output_folder_path),
-                                                    self.output_folder_title)
-        self.input_parameter_path = os.path.join(self.convert_to_absolute_path(self.input_parameter_path), self.input_parameters_filename)
+        self.output_folder_path = os.path.join(self._check_if_path_exists(self.output_folder_path), self.output_folder_title)
+        self.input_parameter_path = os.path.join(self._check_if_path_exists(self.input_parameter_path), self.input_parameters_filename)
 
 
     @staticmethod
@@ -188,21 +187,40 @@ class SyntheticSpectraConfig:
         if os.path.isabs(path):
             if os.path.exists(path):
                 return path
-            else:
-                raise ValueError(f"Configuration: {path} does not exist")
         else:
             # otherwise just return the temp_directory
             new_path = os.path.join(os.getcwd(), path)
             if os.path.exists(new_path):
                 return new_path
+
+    @staticmethod
+    def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
+        # check if path is absolute
+        if os.path.isabs(path_to_check):
+            # check if path exists or file exists
+            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
+                return path_to_check
+        else:
+            # if path is relative, check if it exists in the current directory
+            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
+                # returns absolute path
+                return os.path.join(os.getcwd(), path_to_check, "")
             else:
-                raise ValueError(f"Configuration: {new_path} does not exist")
+                # if it starts with ../ convert to ./ and check again
+                if path_to_check.startswith("../"):
+                    path_to_check = path_to_check[3:]
+                    if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
+                        return os.path.join(os.getcwd(), path_to_check, "")
+        if check_valid_path:
+            raise FileNotFoundError(f"Configuration: {path_to_check} does not exist")
+        else:
+            return ""
 
     @staticmethod
     def convert_list_to_str(list_to_convert: list) -> str:
         string_to_return = ""
-        for element in list_to_convert:
-            string_to_return = f"{string_to_return} {element}"
+        for element_ in list_to_convert:
+            string_to_return = f"{string_to_return} {element_}"
         return string_to_return
 
 if __name__ == '__main__':
