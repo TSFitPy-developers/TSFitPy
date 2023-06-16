@@ -1181,7 +1181,8 @@ class Spectra:
                                                                                      offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
                                                                                      bound_min_teff=teff,
                                                                                      bound_max_teff=teff + 1000)
-                except ValueError:
+                except ValueError as err:
+                    print(err)
                     try:
                         teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
                                                                     macroturb, rotation,
@@ -1189,7 +1190,8 @@ class Spectra:
                                                                     offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
                                                                     bound_min_teff=teff - 1000,
                                                                     bound_max_teff=teff)
-                    except ValueError:
+                    except ValueError as err:
+                        print(err)
                         teff_error = 1000
             else:
                 teff_error = -9999
