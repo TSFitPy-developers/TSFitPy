@@ -20,7 +20,7 @@ def calculate_vturb(teff, logg, met):
 
     return vturb
 
-def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution=0, macro=0, rotation=0, vturb=None):
+def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vturb=None):
     #parameters to adjust
 
     teff = teff
@@ -33,18 +33,6 @@ def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resol
     lmin = lmin
     lmax = lmax
     ldelta = ldelta
-    item_abund = {}
-    #item_abund["H"] = 0.0
-    #item_abund["O"] = 0.0 + met
-    item_abund["Mg"] = 0.0 + met
-    #item_abund["Si"] = 0.0 + met
-    #item_abund["Ca"] = 0.0 + met
-    #item_abund["Mn"] = 0.0 + met
-    item_abund["Ti"] = 0.0 + met
-    item_abund["Fe"] = met
-    #item_abund["Y"] = 0 + met
-    #item_abund["Ni"] = 0.0 + met
-    #item_abund["Ba"] = 0.0 + met
     temp_directory = os.path.join(os.getcwd(), f"temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
     if not os.path.exists(temp_directory):
@@ -68,7 +56,7 @@ def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resol
 
     ts.configure(t_eff = teff, log_g = logg, metallicity = met,
                                 turbulent_velocity = vturb, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax,
-                                free_abundances=item_abund, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=False,
+                                free_abundances=abundances_dict, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=False,
                                 atmosphere_dimension=ts_config["atmosphere_type"],
                  windows_flag=ts_config["windows_flag"],
                  segment_file=ts_config["segment_file"],
@@ -135,16 +123,16 @@ def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resol
     return wave_mod, flux_norm_mod, flux_mod
 
 
-def run_and_save_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb):
-    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, resolution, macro, rotation, vturb)
-    file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}_{met}_{str(nlte_flag)}.spec")
+def run_and_save_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict):
+    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb)
+    file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
     f = open(file_location_output, 'w')
     for i in range(len(wave_mod)):
         print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
     f.close()
 
 if __name__ == '__main__':
-    ts_compiler = "intel" #needs to be "intel" or "gnu"
+    """ts_compiler = "intel" #needs to be "intel" or "gnu"
     atmosphere_type = "1D"
 
     windows_flag = False
@@ -235,12 +223,6 @@ if __name__ == '__main__':
 
     cpus_to_use = 1     # how many cpus to use (Dask workers)
 
-    """met = np.arange(-1.5, 0.5, 0.1)
-    nlte_flag = np.array([True, False])
-    one, two = np.meshgrid(met, nlte_flag)
-    met_list = one.flatten()
-    nlte_flag_list = two.flatten()"""
-
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
     aux_file_length_dict = {}
     if nlte_flag:
@@ -294,4 +276,4 @@ if __name__ == '__main__':
     print("Worker calculation done")  # when done, save values
 
 
-    shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+    shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list"""

@@ -12,7 +12,7 @@ import os
 from scripts.run_wrapper_v2 import run_and_save_wrapper
 import pandas as pd
 from time import perf_counter
-from scripts.TSFitPy import create_segment_file
+from scripts.loading_configs import SpectraParameters
 
 class SyntheticSpectraConfig:
     def __init__(self, config_location: str, output_folder_title: str):
@@ -27,88 +27,36 @@ class SyntheticSpectraConfig:
         self.model_atmosphere_grid_path_1d: str = None
         self.model_atmosphere_grid_path_3d: str = None
         self.model_atoms_path: str = None
-
-        self.temporary_directory_path: str = None
-        self.fitlist_input_path: str = None
-        self.spectra_input_path: str = None
-        self.linemasks_path: str = None
-        self.output_folder_path: str = None
-        self.departure_file_config_path: str = None
         self.departure_file_path: str = None
+        self.departure_file_config_path: str = None
+        self.output_folder_path: str = None
+        self.input_parameter_path: str = None
+        self.temporary_directory_path: str = None
 
         self.atmosphere_type: str = None
-        self.fitting_mode: str = None
         self.include_molecules: bool = None
         self.nlte_flag: bool = None
-        self.fit_vmac: bool = None
-        self.vmac_input: bool = None
-        self.elements_to_fit: list[str] = None
-        self.fit_feh: bool = None
         self.nlte_elements: list[str] = []
-        self.linemask_file: str = None
+        self.wavelength_min: float = None
+        self.wavelength_max: float = None
         self.wavelength_delta: float = None
-        self.segment_size: float = 5  # default value
-
-        self.segment_file: str = None  # path to the temp place where segment is saved
 
         self.debug_mode: int = None
         self.number_of_cpus: int = None
-        self.experimental_parallelisation: bool = None
         self.cluster_name: str = None
 
         self.input_parameters_filename: str = None
-        self.output_filename: str = None
-
         self.resolution: float = None
-        self.vmac: float = None
-        self.rotation: float = None
-        self.init_guess_elements: list[str] = []
-        self.init_guess_elements_path: list[str] = []
-        self.input_elements_abundance: list[str] = []
-        self.input_elements_abundance_path: list[str] = []
 
-        self.wavelength_min: float = None
-        self.wavelength_max: float = None
+        # other things not in config
+        self.output_folder_path_global: str = None
 
-        self.fit_vmic: str = None
-        self.fit_rotation: bool = None
-        self.bounds_vmic: list[float] = None
-        self.guess_range_vmic: list[float] = None
-
-        self.bounds_teff: list[float] = None
-        self.guess_range_teff: list[float] = None
-
-        self.bounds_vmac: list[float] = None
-        self.bounds_rotation: list[float] = None
-        self.bounds_abundance: list[float] = None
-        self.bounds_feh: list[float] = None
-        self.bounds_doppler: list[float] = None
-
-        self.guess_range_vmac: list[float] = None
-        self.guess_range_rotation: list[float] = None
-        self.guess_range_abundance: list[float] = None
-        self.guess_range_doppler: list[float] = None
-
-        self.oldconfig_nlte_config_outdated: bool = False
-        self.oldconfig_need_to_add_new_nlte_config: bool = True  # only if nlte_config_outdated == True
-        self.oldconfig_model_atom_file: list[str] = []
-        self.oldconfig_model_atom_file_input_elem: list[str] = []
-
-        self.fit_teff: bool = None
-        self.nelement: int = None
         self.model_atmosphere_list: str = None
         self.model_atmosphere_grid_path: str = None
 
         self.depart_bin_file_dict: dict = None
         self.depart_aux_file_dict: dict = None
         self.model_atom_file_dict: dict = None
-
-        self.line_begins_sorted: list[float] = None
-        self.line_ends_sorted: list[float] = None
-        self.line_centers_sorted: list[float] = None
-
-        self.seg_begins: list[float] = None
-        self.seg_ends: list[float] = None
 
         self.aux_file_length_dict: dict = None
         self.ndimen: int = None
@@ -120,10 +68,6 @@ class SyntheticSpectraConfig:
         self.marcs_models = None
         self.marcs_values = None
 
-        self.global_temporary_directory = None  # used only to convert old config to new config
-        self.output_folder_path_global = None  # used only to convert old config to new config
-        self.turbospectrum_global_path = None  # used only to convert old config to new config
-
     def load_config(self):
         # read the configuration file
         self.config_parser.read(self.config_location)
@@ -131,14 +75,13 @@ class SyntheticSpectraConfig:
         self.compiler = self.validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
         self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
-        self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
         self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
         self.model_atmosphere_grid_path_3d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_3d"]
         self.model_atoms_path = self.config_parser["MainPaths"]["model_atoms_path"]
         self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
         self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
         self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.spectra_input_path = self.config_parser["MainPaths"]["input_parameter_path"]
+        self.input_parameter_path = self.config_parser["MainPaths"]["input_parameter_path"]
         self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
         self.atmosphere_type = self.validate_string_input(self.config_parser["AtmosphereParameters"]["atmosphere_type"], ["1d", "3d"])
@@ -148,6 +91,7 @@ class SyntheticSpectraConfig:
         self.wavelength_min = float(self.config_parser["AtmosphereParameters"]["wavelength_min"])
         self.wavelength_max = float(self.config_parser["AtmosphereParameters"]["wavelength_max"])
         self.wavelength_delta = float(self.config_parser["AtmosphereParameters"]["wavelength_delta"])
+        self.resolution = float(self.config_parser["AtmosphereParameters"]["resolution"])
 
         self.debug_mode = int(self.config_parser["ExtraParameters"]["debug_mode"])
         self.number_of_cpus = int(self.config_parser["ExtraParameters"]["number_of_cpus"])
@@ -155,9 +99,6 @@ class SyntheticSpectraConfig:
 
         self.input_parameters_filename = self.config_parser["InputFile"]["input_filename"]
 
-        self.resolution = float(self.config_parser["SpectraParameters"]["resolution"])
-        self.vmac = float(self.config_parser["SpectraParameters"]["vmac"])
-        self.rotation = float(self.config_parser["SpectraParameters"]["rotation"])
 
 
     def check_valid_input(self):
@@ -168,7 +109,6 @@ class SyntheticSpectraConfig:
         self.wavelength_max = float(self.wavelength_max)
         self.wavelength_delta = float(self.wavelength_delta)
         self.resolution = float(self.resolution)
-        self.rotation = float(self.rotation)
         self.temporary_directory_path = self.convert_to_absolute_path(self.temporary_directory_path)
         self.number_of_cpus = int(self.number_of_cpus)
 
@@ -208,8 +148,7 @@ class SyntheticSpectraConfig:
 
         self.output_folder_path = os.path.join(self.convert_to_absolute_path(self.output_folder_path),
                                                     self.output_folder_title)
-        self.spectra_input_path = self.convert_to_absolute_path(self.spectra_input_path)
-        self.line_list_path = self.convert_to_absolute_path(self.line_list_path)
+        self.input_parameter_path = os.path.join(self.convert_to_absolute_path(self.input_parameter_path), self.input_parameters_filename)
 
 
     @staticmethod
@@ -276,55 +215,18 @@ if __name__ == '__main__':
     config_synthetic_spectra.load_config()
     config_synthetic_spectra.check_valid_input()
 
-    """ts_compiler = "intel" #needs to be "intel" or "gnu"
-    atmosphere_type = "1D"
-    nlte_elements = [] # e.g. ["Mg", "Si", "Ca", "Mn", "Ti", "Fe", "Y", "Ni", "Ba"]
+    spectra_parameters = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False).get_spectra_parameters_for_grid_generation()
 
-    #set directories
-    if ts_compiler == "intel":
-        turbospec_path = "/turbospectrum/exec/"
-    elif ts_compiler == "gnu":
-        turbospec_path = "/turbospectrum/exec-gf/"
-    interpol_path = "./scripts/model_interpolators/"
-    line_list_path = "/input_files/linelists/linelist_for_fitting/"
-    if atmosphere_type == "1D":
-        model_atmosphere_grid_path = "/input_files/model_atmospheres/1D/"
-        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    elif atmosphere_type == "3D":
-        model_atmosphere_grid_path = "/input_files/model_atmospheres/3D/"
-        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
-    model_atom_path = "/input_files/nlte_data/model_atoms/"
-    departure_file_path = "/input_files/nlte_data/"""
-
-    teff = 5777
-    logg = 4.4
-    # met = 0.0      # met chosen below
-    met_list = [0.0]  # metallicities to generate
-    vturb = 1.0
-
-    #nlte_flag = False
-
-    """line_to_check = 4883
-    lmin = line_to_check - 20  # change lmin/lmax here
-    lmax = line_to_check + 20
-    lmin = 4800  # or change lmin/lmax here
-    lmax = 5500
-    ldelta = 0.005
-
-    cpus_to_use = 1  # how many cpus to use (Dask workers)"""
-
-    output_dir = os.path.join(, today, "")
-    #temp_directory = './temp_direectory/'
-    #login_node_address = "gemini-login.mpia.de"
+    output_dir = config_synthetic_spectra.output_folder_path_global
 
     # load NLTE data
     nlte_config = ConfigParser()
-    nlte_config.read(os.path.join(departure_file_path, "nlte_filenames.cfg"))
+    nlte_config.read(config_synthetic_spectra.departure_file_config_path)
 
     depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
-    for element in nlte_elements:
-        if atmosphere_type == "1D":
+    for element in config_synthetic_spectra.nlte_elements:
+        if config_synthetic_spectra.atmosphere_type == "1D":
             bin_config_name, aux_config_name = "1d_bin", "1d_aux"
         else:
             bin_config_name, aux_config_name = "3d_bin", "3d_aux"
@@ -334,50 +236,21 @@ if __name__ == '__main__':
 
     depart_bin_file, depart_aux_file, model_atom_file = depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
 
-
-    # read in the atmosphere grid to compute for the synthetic spectra
-    # Read the file
-    df = pd.read_csv('input.txt', delim_whitespace=True)
-
-    # Create a dictionary that maps non-standard names to standard ones
-    name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm'],
-                     'teff': ['temp', 'temperature', 't'],
-                     'vmac': ['vmacroturb', 'vmacro', 'vmacro_turb', 'vmacro_turbulence', 'vmacroturbulence'],
-                     'logg': ['logg', 'grav'],
-                     'feh': ['met'],
-                     'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini']}
-
-    # Reverse the dictionary: map variants to standard names
-    name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
-
-    for col in df.columns:
-        # Replace the column name if it's in the dictionary, otherwise leave it unchanged
-        standard_name = name_dict.get(col.lower(), col)
-        df.rename(columns={col: standard_name}, inplace=True)
-
-    df.columns = df.columns.str.lower().capitalize()
-
-    """met = np.arange(-1.5, 0.5, 0.1)
-    nlte_flag = np.array([True, False])
-    one, two = np.meshgrid(met, nlte_flag)
-    met_list = one.flatten()
-    nlte_flag_list = two.flatten()"""
-
-    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(config_synthetic_spectra.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
     aux_file_length_dict = {}
-    if nlte_flag:
+    if config_synthetic_spectra.nlte_flag:
         for element in model_atom_file:
-            aux_file_length_dict[element] = len(np.loadtxt(os.path.join(departure_file_path, depart_aux_file[element]), dtype='str'))
+            aux_file_length_dict[element] = len(np.loadtxt(os.path.join(config_synthetic_spectra.departure_file_path, depart_aux_file[element]), dtype='str'))
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    line_list_path_trimmed = os.path.join(temp_directory, "linelist_for_fitting_trimmed", "")
+    line_list_path_trimmed = os.path.join(config_synthetic_spectra.temporary_directory_path, "linelist_for_fitting_trimmed", "")
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
     include_molecules = True
-    create_window_linelist([lmin], [lmax], line_list_path, line_list_path_trimmed, include_molecules, False)
+    create_window_linelist([config_synthetic_spectra.wavelength_min], [config_synthetic_spectra.wavelength_max], config_synthetic_spectra.line_list_path, line_list_path_trimmed, include_molecules, False)
     print("trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
@@ -394,8 +267,6 @@ if __name__ == '__main__':
     print(f"ssh -N -L {port}:{host}:{port} {config_synthetic_spectra.cluster_name}")
 
     print("Worker preparation complete")
-
-    resolution, macro, rotation = 0, 0, 0
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
@@ -423,11 +294,12 @@ if __name__ == '__main__':
     time_start = perf_counter()
 
     futures = []
-    for metal in met_list:
-        spectrum_name = f"spectra_output_{teff}_{logg}_"
-        future = client.submit(run_and_save_wrapper, ts_config, teff, logg, metal, config_synthetic_spectra.wavelength_min,
+    for one_spectra_parameter in spectra_parameters:
+        specname, teff, logg, feh, vmic, vmac, rotation, abundances_dict = one_spectra_parameter
+        spectrum_name = f"{specname}.spec"
+        future = client.submit(run_and_save_wrapper, ts_config, teff, logg, feh, config_synthetic_spectra.wavelength_min,
                                config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
-                               spectrum_name, config_synthetic_spectra.nlte_flag, resolution, macro, rotation, output_dir, vturb)
+                               spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict)
         futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different

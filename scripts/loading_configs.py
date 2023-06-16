@@ -2,17 +2,17 @@ import pandas as pd
 import numpy as np
 from scripts.solar_abundances import periodic_table, solar_abundances
 
-class FitList:
+class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
         # read in the atmosphere grid to compute for the synthetic spectra
         # Read the file
         # argument in pd.read_csv to read first column not as index but as a column
         # https://stackoverflow.com/questions/36519086/pandas-read-csv-skips-first-column-names
-        df = pd.read_csv(input_file_path, delim_whitespace=True)
+        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False)
 
         # Create a dictionary that maps non-standard names to standard ones
         name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'input_vmicroturb', 'input_vmic'],
-                         'rv': ['radvel', 'radialvelocity', 'radial_velocity'],
+                         'rv': ['radvel', 'radialvelocity', 'radial_velocity', "#rv", "#radvel", "#radialvelocity", "#radial_velocity"],
                          'teff': ['temp', 'temperature', 't'],
                          'vmac': ['vmacroturb', 'vmacro', 'vmacro_turb', 'vmacro_turbulence', 'vmacroturbulence', 'input_vmacroturb', 'input_vmacroturbulence'],
                          'logg': ['logg', 'grav'],
@@ -84,12 +84,31 @@ class FitList:
         if first_row_name:
             # replace first column name with 'name'
             df.rename(columns={df.columns[0]: 'specname'}, inplace=True)
+        else:
+            # add column name 'name'
+            df.insert(0, 'specname', df.index)
+
+        # if rv is not present, add it
+        if 'rv' not in df.columns:
+            df.insert(1, 'rv', 0.0)
 
         self.spectra_parameters_df = df
 
         # get amount of rows
         self.number_of_rows = len(self.spectra_parameters_df.index)
 
+        # check if all columns are present
+        self._check_if_all_columns_present(['specname', 'rv', 'teff', 'logg', 'feh'])
+
+    def _check_if_all_columns_present(self, columns: list[str]):
+        """
+        checks if all columns are present in the dataframe
+        :param columns: list of column names to check
+        :return:
+        """
+        for column in columns:
+            if column not in self.spectra_parameters_df.columns:
+                raise ValueError(f"Column {column} is not present in the dataframe")
 
 
     def get_spectra_parameters_for_fit(self) -> np.ndarray:
@@ -105,13 +124,48 @@ class FitList:
         feh_list = self.spectra_parameters_df['feh'].values
         vmic_list = self.spectra_parameters_df['vmic'].values
         vmac_list = self.spectra_parameters_df['vmac'].values
-        # get abundance elements and set them in input_abundance_dict dictionary
-        input_abundance_dict = {}
-        for element in self.abundance_elements_given:
-            input_abundance_dict[element] = self.spectra_parameters_df[element].values
+        # get abundance elements, put in dictionary and then list, where each entry is a dictionary
+        abundance_list = []
+        for i in range(self.number_of_rows):
+            abundance_dict = {}
+            for element in self.abundance_elements_given:
+                abundance_dict[element] = self.spectra_parameters_df[element][i]
+            abundance_list.append(abundance_dict)
 
+        # stack all parameters
+        stacked_parameters = np.stack((specname_list, rv_list, teff_list, feh_list, vmic_list, vmac_list, abundance_list), axis=1)
 
-        stacked_parameters = np.stack((specname_list, rv_list, teff_list, feh_list, vmic_list, vmac_list, input_abundance_dict), axis=1)
+        return stacked_parameters
+
+    def get_spectra_parameters_for_grid_generation(self) -> np.ndarray:
+        """
+        returns spectra parameters as a numpy array, where each entry is:
+        specname, rv, teff, logg, met, vmic, vmac, input_abundance_dict
+        :return:  [[specname, teff, logg, feh, vmic, vmac, rotation, input_abundance_dict], ...]
+        """
+
+        specname_list = self.spectra_parameters_df['specname'].values
+        teff_list = self.spectra_parameters_df['teff'].values
+        feh_list = self.spectra_parameters_df['feh'].values
+        vmic_list = self.spectra_parameters_df['vmic'].values
+        if 'vmac' in self.spectra_parameters_df.columns:
+            vmac_list = self.spectra_parameters_df['vmac'].values
+        else:
+            vmac_list = np.zeros(len(specname_list))
+        if 'rotation' in self.spectra_parameters_df.columns:
+            rotation_list = self.spectra_parameters_df['rotation'].values
+        else:
+            rotation_list = np.zeros(len(specname_list))
+        # get abundance elements, put in dictionary and then list, where each entry is a dictionary
+        abundance_list = []
+        for i in range(self.number_of_rows):
+            abundance_dict = {}
+            for element in self.abundance_elements_given:
+                abundance_dict[element] = self.spectra_parameters_df[element][i]
+            abundance_list.append(abundance_dict)
+
+        # stack all parameters
+        stacked_parameters = np.stack((specname_list, teff_list, feh_list, vmic_list, vmac_list, rotation_list,abundance_list), axis=1)
 
         return stacked_parameters
 
@@ -128,6 +182,6 @@ class FitList:
         return self.spectra_parameters_df.to_string()
 
 if __name__ == '__main__':
-    fitlist = FitList('../input_files/fitlist_test', True)
+    fitlist = SpectraParameters('../input_files/fitlist_test', False)
     print(fitlist)
     print(fitlist.get_spectra_parameters_for_fit())
