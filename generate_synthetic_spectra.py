@@ -215,7 +215,8 @@ if __name__ == '__main__':
     config_synthetic_spectra.load_config()
     config_synthetic_spectra.check_valid_input()
 
-    spectra_parameters = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False).get_spectra_parameters_for_grid_generation()
+    spectra_parameters_class = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False)
+    spectra_parameters = spectra_parameters_class.get_spectra_parameters_for_grid_generation()
 
     output_dir = config_synthetic_spectra.output_folder_path_global
 
@@ -306,6 +307,12 @@ if __name__ == '__main__':
     futures = np.array(client.gather(futures))  # starts the calculations (takes a long time here)
     results = futures
     print("Worker calculation done")  # when done, save values
+
+    # in spectra_parameters_class.spectra_parameters_df change the column names and add .spec to the specname
+    spectra_parameters_class.spectra_parameters_df["specname"] = spectra_parameters_class.spectra_parameters_df["specname"].apply(lambda x: f"{x}.spec")
+
+    # save the spectra parameters 
+    spectra_parameters_class.spectra_parameters_df.to_csv(os.path.join(output_dir, "spectra_parameters.csv"), index=False)
 
     time_end = perf_counter()
     # with 4 decimals, the time is converted to hours, minutes and seconds
