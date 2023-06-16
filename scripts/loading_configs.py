@@ -121,6 +121,7 @@ class SpectraParameters:
         specname_list = self.spectra_parameters_df['specname'].values
         rv_list = self.spectra_parameters_df['rv'].values
         teff_list = self.spectra_parameters_df['teff'].values
+        logg_list = self.spectra_parameters_df['logg'].values
         feh_list = self.spectra_parameters_df['feh'].values
         vmic_list = self.spectra_parameters_df['vmic'].values
         vmac_list = self.spectra_parameters_df['vmac'].values
@@ -133,7 +134,7 @@ class SpectraParameters:
             abundance_list.append(abundance_dict)
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, rv_list, teff_list, feh_list, vmic_list, vmac_list, abundance_list), axis=1)
+        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list), axis=1)
 
         return stacked_parameters
 
@@ -146,6 +147,7 @@ class SpectraParameters:
 
         specname_list = self.spectra_parameters_df['specname'].values
         teff_list = self.spectra_parameters_df['teff'].values
+        logg_list = self.spectra_parameters_df['logg'].values
         feh_list = self.spectra_parameters_df['feh'].values
         vmic_list = self.spectra_parameters_df['vmic'].values
         if 'vmac' in self.spectra_parameters_df.columns:
@@ -165,7 +167,7 @@ class SpectraParameters:
             abundance_list.append(abundance_dict)
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, teff_list, feh_list, vmic_list, vmac_list, rotation_list,abundance_list), axis=1)
+        stacked_parameters = np.stack((specname_list, teff_list, feh_list, logg_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
 
         return stacked_parameters
 
