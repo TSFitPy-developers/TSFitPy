@@ -22,6 +22,13 @@ class SpectraParameters:
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
 
+        if first_row_name:
+            # replace first column name with 'name'
+            df.rename(columns={df.columns[0]: 'specname'}, inplace=True)
+        else:
+            # add column name 'name'
+            df.insert(0, 'specname', df.index)
+
         abundances_xfe_given = []
         abundances_xh_given = []
         abundances_x_given = []
@@ -39,7 +46,7 @@ class SpectraParameters:
                     standard_name = f"{starting_element.lower()}"
                     abundances_xfe_given.append(standard_name)
                     self.abundance_elements_given.append(standard_name.capitalize())
-                elif ending_element[-1] == 'h' and starting_element[:-1] in periodic_table:
+                elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table:
                     # means X/H
                     standard_name = f"{starting_element[:-1].lower()}"
                     abundances_xh_given.append(standard_name)
@@ -80,13 +87,6 @@ class SpectraParameters:
             df[element] = df[element] - solar_abundances[element.capitalize()] - df['feh']
             # convert to capital letter
             df.rename(columns={element: element.capitalize()}, inplace=True)
-
-        if first_row_name:
-            # replace first column name with 'name'
-            df.rename(columns={df.columns[0]: 'specname'}, inplace=True)
-        else:
-            # add column name 'name'
-            df.insert(0, 'specname', df.index)
 
         # if rv is not present, add it
         if 'rv' not in df.columns:
@@ -174,7 +174,7 @@ class SpectraParameters:
 
     @staticmethod
     def _strip_string(string_to_strip: str) -> str:
-        bad_characters = ["[", "]", "/", "\\", "(", ")", "{", "}"]
+        bad_characters = ["[", "]", "/", "\\", "(", ")", "{", "}", "_"]
         for character_to_remove in bad_characters:
             string_to_strip = string_to_strip.replace(character_to_remove, '')
         return string_to_strip
@@ -186,4 +186,4 @@ class SpectraParameters:
 if __name__ == '__main__':
     fitlist = SpectraParameters('../input_files/fitlist_test', False)
     print(fitlist)
-    print(fitlist.get_spectra_parameters_for_fit())
+    print(fitlist.get_spectra_parameters_for_grid_generation())
