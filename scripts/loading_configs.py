@@ -17,7 +17,8 @@ class SpectraParameters:
                          'vmac': ['vmacroturb', 'vmacro', 'vmacro_turb', 'vmacro_turbulence', 'vmacroturbulence', 'input_vmacroturb', 'input_vmacroturbulence'],
                          'logg': ['logg', 'grav'],
                          'feh': ['met', 'fe/h', '[fe/h]', 'feh', 'metallicity', 'metallicity_fe_h', 'metallicity_feh', 'mh', 'm/h', '[m/h]'],
-                         'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini']}
+                         'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini'],
+                         'specname': ['specname', 'spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrum_name', 'spectrumname']}
 
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
@@ -64,6 +65,8 @@ class SpectraParameters:
                 else:
                     # could not parse, not element?
                     standard_name = col
+                    if col not in name_variants.keys():
+                        raise ValueError(f"Could not parse {col} as any known parameter or element")
             df.rename(columns={col: standard_name}, inplace=True)
 
         # make all columns lower
