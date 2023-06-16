@@ -20,7 +20,7 @@ def calculate_vturb(teff, logg, met):
 
     return vturb
 
-def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vturb=None):
+def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vturb=None):
     #parameters to adjust
 
     teff = teff
@@ -67,56 +67,60 @@ def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abund
 
     ts.run_turbospectrum_and_atmosphere()
 
-    wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt(os.path.join(temp_directory, 'spectrum_00000000.spec'), usecols=(0,1,2), unpack=True)
-    if ts_config["windows_flag"]:
-        seg_begins, seg_ends = np.loadtxt(ts_config['segment_file'], comments = ";", usecols=(0,1), unpack=True)
-        wave_mod_filled = []
-        flux_norm_mod_filled = []
-        flux_mod_filled = []
-        for i in range(len(seg_begins)):
-            j = 0
-            while wave_mod_orig[j] < seg_begins[i]:
-                j+=1
-            while wave_mod_orig[j] >= seg_begins[i] and wave_mod_orig[j] <= seg_ends[i]:
-                wave_mod_filled.append(wave_mod_orig[j])
-                flux_norm_mod_filled.append(flux_norm_mod_orig[j])
-                flux_mod_filled.append(flux_mod_orig[j])
-                j+=1
-            if i < len(seg_begins)-1:
-                k = 1
-                while (seg_begins[i+1] - 0.001 > seg_ends[i]+k*0.005):
-                    wave_mod_filled.append(seg_ends[i]+0.005*k)
-                    flux_norm_mod_filled.append(1.0)
-                    flux_mod_filled.append(np.mean(flux_mod_orig))
-                    k+=1
-    else:
-        wave_mod_filled = wave_mod_orig
-        flux_norm_mod_filled = flux_norm_mod_orig
-        flux_mod_filled = flux_mod_orig
+    try:
+        wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt(os.path.join(temp_directory, 'spectrum_00000000.spec'), usecols=(0,1,2), unpack=True)
+        if ts_config["windows_flag"]:
+            seg_begins, seg_ends = np.loadtxt(ts_config['segment_file'], comments = ";", usecols=(0,1), unpack=True)
+            wave_mod_filled = []
+            flux_norm_mod_filled = []
+            flux_mod_filled = []
+            for i in range(len(seg_begins)):
+                j = 0
+                while wave_mod_orig[j] < seg_begins[i]:
+                    j+=1
+                while wave_mod_orig[j] >= seg_begins[i] and wave_mod_orig[j] <= seg_ends[i]:
+                    wave_mod_filled.append(wave_mod_orig[j])
+                    flux_norm_mod_filled.append(flux_norm_mod_orig[j])
+                    flux_mod_filled.append(flux_mod_orig[j])
+                    j+=1
+                if i < len(seg_begins)-1:
+                    k = 1
+                    while (seg_begins[i+1] - 0.001 > seg_ends[i]+k*0.005):
+                        wave_mod_filled.append(seg_ends[i]+0.005*k)
+                        flux_norm_mod_filled.append(1.0)
+                        flux_mod_filled.append(np.mean(flux_mod_orig))
+                        k+=1
+        else:
+            wave_mod_filled = wave_mod_orig
+            flux_norm_mod_filled = flux_norm_mod_orig
+            flux_mod_filled = flux_mod_orig
 
-    if resolution != 0.0:
-        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-        wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, resolution)
-    else:
-        wave_mod_conv = wave_mod_filled
-        flux_norm_mod_conv = flux_norm_mod_filled
-        flux_mod_conv = flux_mod_filled
+        if resolution != 0.0:
+            wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+            wave_mod_conv, flux_mod_conv = conv_res(wave_mod_filled, flux_mod_filled, resolution)
+        else:
+            wave_mod_conv = wave_mod_filled
+            flux_norm_mod_conv = flux_norm_mod_filled
+            flux_mod_conv = flux_mod_filled
 
-    if macro != 0.0:
-        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-        wave_mod_macro, flux_mod_macro = conv_macroturbulence(wave_mod_conv, flux_mod_conv, macro)
-    else:
-        wave_mod_macro = wave_mod_conv
-        flux_norm_mod_macro = flux_norm_mod_conv
-        flux_mod_macro = flux_mod_conv
+        if macro != 0.0:
+            wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+            wave_mod_macro, flux_mod_macro = conv_macroturbulence(wave_mod_conv, flux_mod_conv, macro)
+        else:
+            wave_mod_macro = wave_mod_conv
+            flux_norm_mod_macro = flux_norm_mod_conv
+            flux_mod_macro = flux_mod_conv
 
-    if rotation != 0.0:
-        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-        wave_mod, flux_mod = conv_rotation(wave_mod_macro, flux_mod_macro, rotation)
-    else:
-        wave_mod = wave_mod_macro
-        flux_norm_mod = flux_norm_mod_macro
-        flux_mod = flux_mod_macro
+        if rotation != 0.0:
+            wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+            wave_mod, flux_mod = conv_rotation(wave_mod_macro, flux_mod_macro, rotation)
+        else:
+            wave_mod = wave_mod_macro
+            flux_norm_mod = flux_norm_mod_macro
+            flux_mod = flux_mod_macro
+    except FileNotFoundError:
+        print(f"FileNotFoundError: {spectrum_name}. Failed to generate spectrum.")
+        wave_mod, flux_norm_mod, flux_mod = [], [], []
 
     shutil.rmtree(temp_directory)
 
@@ -124,7 +128,7 @@ def run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abund
 
 
 def run_and_save_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict):
-    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb)
+    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
     f = open(file_location_output, 'w')
     for i in range(len(wave_mod)):
