@@ -271,7 +271,7 @@ if __name__ == '__main__':
 
     print("Trimming")
     include_molecules = True
-    create_window_linelist([config_synthetic_spectra.wavelength_min], [config_synthetic_spectra.wavelength_max], config_synthetic_spectra.line_list_path, line_list_path_trimmed, include_molecules, False)
+    create_window_linelist([config_synthetic_spectra.wavelength_min - 5], [config_synthetic_spectra.wavelength_max + 5], config_synthetic_spectra.line_list_path, line_list_path_trimmed, include_molecules, False)
     print("trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
