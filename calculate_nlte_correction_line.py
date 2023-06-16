@@ -11,7 +11,7 @@ if __name__ == '__main__':
     if len(argv) > 1:  # when calling the program, can now add extra argument with location of config file, easier to call
         config_location = argv[1]
     else:
-        config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
+        config_location = "../input_files/tsfitpy_input_configuration.cfg"  # location of config file
 
     output_folder_title_date = datetime.datetime.now().strftime(
         "%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
