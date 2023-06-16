@@ -185,13 +185,11 @@ class SyntheticSpectraConfig:
     @staticmethod
     def convert_to_absolute_path(path):
         if os.path.isabs(path):
-            if os.path.exists(path):
-                return path
+            return path
         else:
             # otherwise just return the temp_directory
             new_path = os.path.join(os.getcwd(), path)
-            if os.path.exists(new_path):
-                return new_path
+            return new_path
 
     @staticmethod
     def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
