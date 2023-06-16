@@ -126,7 +126,11 @@ class SpectraParameters:
         teff_list = self.spectra_parameters_df['teff'].values
         logg_list = self.spectra_parameters_df['logg'].values
         feh_list = self.spectra_parameters_df['feh'].values
-        vmic_list = self.spectra_parameters_df['vmic'].values
+        if 'vmic' in self.spectra_parameters_df.columns:
+            vmic_list = self.spectra_parameters_df['vmic'].values
+        else:
+            # else is list of None
+            vmic_list = [None] * self.number_of_rows
         vmac_list = self.spectra_parameters_df['vmac'].values
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
         abundance_list = []
@@ -152,7 +156,11 @@ class SpectraParameters:
         teff_list = self.spectra_parameters_df['teff'].values
         logg_list = self.spectra_parameters_df['logg'].values
         feh_list = self.spectra_parameters_df['feh'].values
-        vmic_list = self.spectra_parameters_df['vmic'].values
+        if 'vmic' in self.spectra_parameters_df.columns:
+            vmic_list = self.spectra_parameters_df['vmic'].values
+        else:
+            # else is list of None
+            vmic_list = [None] * self.number_of_rows
         if 'vmac' in self.spectra_parameters_df.columns:
             vmac_list = self.spectra_parameters_df['vmac'].values
         else:
