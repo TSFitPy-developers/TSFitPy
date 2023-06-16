@@ -2863,8 +2863,8 @@ class TSFitPyConfig:
 
         spectra_object.find_upper_limit = self.find_upper_limit
         spectra_object.sigmas_upper_limit = self.sigmas_upper_limit
-        spectra_object.find_teff_errors = False
-        spectra_object.teff_error_sigma = 5.0
+        spectra_object.find_teff_errors = self.find_teff_errors
+        spectra_object.teff_error_sigma = self.teff_error_sigma
 
     @staticmethod
     def _split_string_to_float_list(string_to_split: str) -> list[float]:
