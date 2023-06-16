@@ -112,6 +112,8 @@ class SyntheticSpectraConfig:
         self.nlte_flag = self.nlte_flag
         self.wavelength_min = float(self.wavelength_min)
         self.wavelength_max = float(self.wavelength_max)
+        if self.wavelength_min > self.wavelength_max:
+            raise ValueError("Wavelength min is greater than wavelength max")
         self.wavelength_delta = float(self.wavelength_delta)
         self.resolution = float(self.resolution)
         self.temporary_directory_path = self.convert_to_absolute_path(self.temporary_directory_path)
