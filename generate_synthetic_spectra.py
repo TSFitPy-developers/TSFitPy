@@ -96,11 +96,11 @@ class SyntheticSpectraConfig:
         self.wavelength_max = float(self.config_parser["AtmosphereParameters"]["wavelength_max"])
         self.wavelength_delta = float(self.config_parser["AtmosphereParameters"]["wavelength_delta"])
         self.resolution = float(self.config_parser["AtmosphereParameters"]["resolution"])
-        self.save_unnormalised_spectra = self.convert_string_to_bool(self.config_parser["AtmosphereParameters"]["save_unnormalised_spectra"])
 
         self.debug_mode = int(self.config_parser["ExtraParameters"]["debug_mode"])
         self.number_of_cpus = int(self.config_parser["ExtraParameters"]["number_of_cpus"])
         self.cluster_name = self.config_parser["ExtraParameters"]["cluster_name"]
+        self.save_unnormalised_spectra = self.convert_string_to_bool(self.config_parser["ExtraParameters"]["save_unnormalised_spectra"])
 
         self.input_parameters_filename = self.config_parser["InputFile"]["input_filename"]
 
