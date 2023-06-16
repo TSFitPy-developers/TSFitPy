@@ -167,7 +167,7 @@ class SpectraParameters:
             abundance_list.append(abundance_dict)
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, teff_list, feh_list, logg_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
+        stacked_parameters = np.stack((specname_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
 
         return stacked_parameters
 
