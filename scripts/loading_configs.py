@@ -48,7 +48,7 @@ class SpectraParameters:
                     self.abundance_elements_given.append(standard_name.capitalize())
                 elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table:
                     # means X/H
-                    standard_name = f"{starting_element[:-1].lower()}"
+                    standard_name = f"{testing_col[:-1].lower()}"
                     abundances_xh_given.append(standard_name)
                     self.abundance_elements_given.append(standard_name.capitalize())
                 elif np.size(testing_col) <= 2 and testing_col in periodic_table:
