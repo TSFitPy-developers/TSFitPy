@@ -49,6 +49,7 @@ class SyntheticSpectraConfig:
 
         self.input_parameters_filename: str = None
         self.resolution: float = None
+        self.save_unnormalised_spectra: bool = None
 
         # other things not in config
         self.output_folder_path_global: str = None
@@ -95,6 +96,7 @@ class SyntheticSpectraConfig:
         self.wavelength_max = float(self.config_parser["AtmosphereParameters"]["wavelength_max"])
         self.wavelength_delta = float(self.config_parser["AtmosphereParameters"]["wavelength_delta"])
         self.resolution = float(self.config_parser["AtmosphereParameters"]["resolution"])
+        self.save_unnormalised_spectra = self.convert_string_to_bool(self.config_parser["AtmosphereParameters"]["save_unnormalised_spectra"])
 
         self.debug_mode = int(self.config_parser["ExtraParameters"]["debug_mode"])
         self.number_of_cpus = int(self.config_parser["ExtraParameters"]["number_of_cpus"])
@@ -322,7 +324,7 @@ if __name__ == '__main__':
         spectrum_name = f"{specname}.spec"
         future = client.submit(run_and_save_wrapper, tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
                                config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
-                               spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict)
+                               spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, save_unnormalised_spectra)
         futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different

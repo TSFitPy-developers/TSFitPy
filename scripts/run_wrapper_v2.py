@@ -129,15 +129,40 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
     return wave_mod, flux_norm_mod, flux_mod
 
 
-def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict):
+def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict: dict, save_unnormalised_spectra):
     with open(tsfitpy_pickled_configuration_path, 'rb') as f:
         ts_config = pickle.load(f)
 
     wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
     f = open(file_location_output, 'w')
-    for i in range(len(wave_mod)):
-        print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
+
+    # save the parameters used to generate the spectrum
+    # print when spectra was generated
+    print("#Generated using TurboSpectrum and TSFitPy wrapper", file=f)
+    print("#date: {}".format(datetime.datetime.now()), file=f)
+    print("#spectrum_name: {}".format(spectrum_name), file=f)
+    print("#teff: {}".format(teff), file=f)
+    print("#logg: {}".format(logg), file=f)
+    print("#feh: {}".format(met), file=f)
+    print("#vmac: {}".format(macro), file=f)
+    print("#vmic: {}".format(vturb), file=f)
+    print("#resolution: {}".format(resolution), file=f)
+    print("#rotation: {}".format(rotation), file=f)
+    print("#nlte_flag: {}".format(nlte_flag), file=f)
+    for key, value in abundances_dict.items():
+        print("#{}: {}".format(key, value), file=f)
+    print("#", file=f)
+
+
+    if save_unnormalised_spectra:
+        print("#Wavelength Normalised_flux Unnormalised_flux", file=f)
+        for i in range(len(wave_mod)):
+            print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
+    else:
+        print("#Wavelength Normalised_flux", file=f)
+        for i in range(len(wave_mod)):
+            print("{}  {}".format(wave_mod[i], flux_norm_mod[i]), file=f)
     f.close()
 
 if __name__ == '__main__':
