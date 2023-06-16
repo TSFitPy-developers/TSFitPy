@@ -75,6 +75,7 @@ class SyntheticSpectraConfig:
         self.compiler = self.validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
         self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
+        self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
         self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
         self.model_atmosphere_grid_path_3d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_3d"]
         self.model_atoms_path = self.config_parser["MainPaths"]["model_atoms_path"]
@@ -141,6 +142,7 @@ class SyntheticSpectraConfig:
         self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path)
         self.departure_file_path = self._check_if_path_exists(self.departure_file_path)
         self.output_folder_path_global = self.convert_to_absolute_path(self.output_folder_path)
+        self.line_list_path = self._check_if_path_exists(self.line_list_path)
 
         nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
 
