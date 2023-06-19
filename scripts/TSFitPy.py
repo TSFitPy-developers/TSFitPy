@@ -405,7 +405,10 @@ class Spectra:
         self.guess_plus_minus_pos_teff = 1000
 
         self.find_upper_limit = False
-        self.sigmas_upper_limit = 5
+        self.sigmas_upper_limit = 5.0
+
+        self.find_teff_errors = False
+        self.teff_error_sigma = 5.0
 
         self.model_temperatures: np.ndarray = None
         self.model_logs: np.ndarray = None
@@ -1153,10 +1156,7 @@ class Spectra:
 
         macroturb = self.vmac
         rotation = self.rotation
-        result_output = f"{self.spec_name} {teff} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {res.fun}"
 
-        one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
                                                                     unpack=True)
@@ -1171,9 +1171,72 @@ class Spectra:
                 # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
                 for k in range(len(wavelength_fit_conv)):
                     print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
+
+            if self.find_teff_errors:
+                print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
+                try:
+                    teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                                                                                     macroturb, rotation,
+                                                                                     microturb,
+                                                                                     offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                                                     bound_min_teff=teff,
+                                                                                     bound_max_teff=teff + 1000)
+                except ValueError as err:
+                    print(err)
+                    try:
+                        teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                                                                    macroturb, rotation,
+                                                                    microturb,
+                                                                    offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                                    bound_min_teff=teff - 1000,
+                                                                    bound_max_teff=teff)
+                    except ValueError as err:
+                        print(err)
+                        teff_error = 1000
+            else:
+                teff_error = -9999
         except (OSError, ValueError) as error:
             print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+            teff_error = -9999
+
+        result_output = f"{self.spec_name} {teff} {teff_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
+                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {res.fun}"
+
+        one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+
         return one_result
+
+
+    def find_teff_error_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_teff, bound_max_teff) -> dict:
+        """
+        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
+        :param line_number: Which line number/index in line_center_sorted is being fitted
+        :return: best fit result string for that line
+        """
+        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
+
+        ts = self.create_ts_object()
+
+        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+        print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
+        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
+
+        #param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        #minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
+        try:
+            res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
+            #res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+            print(res)
+            fitted_teff = res.root
+        except IndexError as error:
+            print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
+            fitted_teff = -9999
+
+        shutil.rmtree(temp_directory)
+        return fitted_teff #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+
 
     def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
         """
@@ -1600,6 +1663,53 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     print(f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
 
     return chi_square
+
+
+def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
+                          temp_directory: str, rv: float, vmac: float, rotation: float,
+                          vmic: float, offset_chisqr: float) -> float:
+    """
+    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
+    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
+    doppker inside
+    :param param: Parameters list with the current evaluation guess
+    :param spectra_to_fit: Spectra to fit
+    :param lmin: Start of the line [AA]
+    :param lmax: End of the line [AA]
+    :return: best fit chi squared
+    """
+    # new: now includes several elements
+    # param[0:nelements - 1] = met or abund
+
+    met = spectra_to_fit.met
+    elem_abund_dict = {"Fe": met}
+    teff = param
+
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
+
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory, teff=teff)     # generates spectra
+
+    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+
+    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+        wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
+        chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+
+    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
+        chi_square = 999.99
+        print("empty spectrum file.")
+    else:
+        chi_square = 9999.9999
+        print("didn't generate spectra or atmosphere")
+
+    output_print = f""
+    for key in elem_abund_dict:
+        output_print += f" [{key}/H]={elem_abund_dict[key]}"
+    print(f"{output_print} teff={teff} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr} chisqr={(chi_square - offset_chisqr)}")
+
+    return (chi_square - offset_chisqr)
 
 
 def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
@@ -2111,6 +2221,9 @@ class TSFitPyConfig:
         self.find_upper_limit: bool = False
         self.sigmas_upper_limit: float = 5
 
+        self.find_teff_errors: bool = False
+        self.teff_error_sigma: float = 3
+
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -2420,6 +2533,14 @@ class TSFitPyConfig:
 
         self.bounds_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
         self.guess_range_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
+        try:
+            self.find_teff_errors = self._convert_string_to_bool(self.config_parser["ParametersForModeTeff"]["find_teff_errors"])
+            self.teff_error_sigma = float(self.config_parser["ParametersForModeTeff"]["teff_error_sigma"])
+            if self.find_teff_errors:
+                print("Currently, the find_teff_errors option is not working properly. Please, use it with caution. (most likely, it will not work)")
+        except KeyError:
+            self.find_teff_errors = False
+            self.teff_error_sigma = 5.0
 
         self.bounds_vmac = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
         self.bounds_rotation = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])
@@ -2543,6 +2664,8 @@ class TSFitPyConfig:
         self.config_parser.add_section("ParametersForModeTeff")
         self.config_parser["ParametersForModeTeff"]["bounds_teff"] = self._convert_list_to_str(self.bounds_teff)
         self.config_parser["ParametersForModeTeff"]["guess_range_teff"] = self._convert_list_to_str(self.guess_range_teff)
+        self.config_parser["ParametersForModeTeff"]["find_teff_errors"] = 'False'
+        self.config_parser["ParametersForModeTeff"]["teff_error_sigma"] = '1.0'
 
         self.config_parser.add_section("Bounds")
         self.config_parser["Bounds"]["bounds_vmac"] = self._convert_list_to_str(self.bounds_vmac)
@@ -2742,6 +2865,8 @@ class TSFitPyConfig:
 
         spectra_object.find_upper_limit = self.find_upper_limit
         spectra_object.sigmas_upper_limit = self.sigmas_upper_limit
+        spectra_object.find_teff_errors = self.find_teff_errors
+        spectra_object.teff_error_sigma = self.teff_error_sigma
 
     @staticmethod
     def _split_string_to_float_list(string_to_split: str) -> list[float]:
@@ -3388,7 +3513,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         # f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared"
         print(output_columns, file=f)
     elif tsfitpy_configuration.fitting_mode == "teff":
-        output_columns = "#specname\tTeff\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared"
+        output_columns = "#specname\tTeff\tTeff_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared"
         print(output_columns, file=f)
 
     results = np.array(results)
