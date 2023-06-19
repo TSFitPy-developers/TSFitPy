@@ -2536,6 +2536,8 @@ class TSFitPyConfig:
         try:
             self.find_teff_errors = self._convert_string_to_bool(self.config_parser["ParametersForModeTeff"]["find_teff_errors"])
             self.teff_error_sigma = float(self.config_parser["ParametersForModeTeff"]["teff_error_sigma"])
+            if self.find_teff_errors:
+                print("Currently, the find_teff_errors option is not working properly. Please, use it with caution. (most likely, it will not work)")
         except KeyError:
             self.find_teff_errors = False
             self.teff_error_sigma = 5.0
