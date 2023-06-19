@@ -157,3 +157,8 @@ user's machine. The Python packages needed are as follows (they should all be in
 ## Extra notes
 
 Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-todo
+
+## Some debugging tips:
+
+- If you get a Fortran error `forrtl: severe (24): end-of-file during read, unit -5, file Internal List-Directed Read` in the `bsyn_lu            000000000041DB92  getlele_                   38  getlele.f` just after it trying to `  starting scan of linelist` with some molecular name, then the issue is probably the following one:
+  - Your abundance of the element is too low (e.g. I had that issue with [X/Fe] = -30) and it skips that element in the molecular line identification. In that case remove the molecular linelist containing that element, or increase your element abundance (e.g. to [X/Fe] = -3)
