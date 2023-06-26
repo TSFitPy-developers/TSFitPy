@@ -226,7 +226,11 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-    chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance)
+    # TODO: proper calculation of DOF
+    dof = len(flux_line_obs) - 1
+    if dof <= 0:
+        dof = 1
+    chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance) / dof
     # os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
     if save_convolved:
