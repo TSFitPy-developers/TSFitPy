@@ -2930,6 +2930,9 @@ class TSFitPyConfig:
                     path_to_check = path_to_check[3:]
                     if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
                         return os.path.join(os.getcwd(), path_to_check, "")
+        # try to add ../ to the path and check if it exists
+        if os.path.exists(os.path.join("..", path_to_check, "")) or os.path.isfile(os.path.join("..", path_to_check)):
+            return os.path.join(os.getcwd(), "..", path_to_check, "")
         if check_valid_path:
             raise FileNotFoundError(f"Configuration: {path_to_check} does not exist")
         else:
