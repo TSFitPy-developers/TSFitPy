@@ -1761,19 +1761,27 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
         chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
 
+
+        dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax - 5.) & (spectra_to_fit.flux_ob >= lmin + 5.))]) - 1
+        # TODO: proper calculation of DOF
+        if dof <= 0:
+            dof = 1
+
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         chi_square = 999.99
+        dof = 1
         print("empty spectrum file.")
     else:
         chi_square = 9999.9999
+        dof = 1
         print("didn't generate spectra or atmosphere")
 
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr} chisqr={(chi_square - offset_chisqr)}")
+    print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr / dof} chisqr={(chi_square - offset_chisqr / dof)}")
 
-    return (chi_square - offset_chisqr)
+    return (chi_square - offset_chisqr / dof)
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
