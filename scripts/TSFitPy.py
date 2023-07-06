@@ -2712,7 +2712,7 @@ class TSFitPyConfig:
         warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
 
     def validate_input(self, check_valid_path=True):
-        self.departure_file_config_path = self._check_if_path_exists(self.departure_file_config_path, check_valid_path=check_valid_path)
+        self.departure_file_config_path = self._check_if_file_exists(self.departure_file_config_path, check_valid_path=check_valid_path)
 
         self.atmosphere_type = self.atmosphere_type.upper()
         self.fitting_mode = self.fitting_mode.lower()
@@ -2913,28 +2913,54 @@ class TSFitPyConfig:
             raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
 
     @staticmethod
+    def _check_if_file_exists(path_to_check: str, check_valid_path=True) -> str:
+        # check if path is absolute
+        if os.path.isabs(path_to_check):
+            # check if path exists or file exists
+            if os.path.isfile(path_to_check):
+                return path_to_check
+        else:
+            # if path is relative, check if it exists in the current directory
+            if os.path.isfile(path_to_check):
+                # returns absolute path
+                return os.path.join(os.getcwd(), path_to_check)
+            else:
+                # if it starts with ../ convert to ./ and check again
+                if path_to_check.startswith("../"):
+                    path_to_check = path_to_check[3:]
+                    if os.path.isfile(path_to_check):
+                        return os.path.join(os.getcwd(), path_to_check)
+        # try to add ../ to the path and check if it exists
+        if os.path.isfile(os.path.join("..", path_to_check)):
+            return os.path.join(os.getcwd(), "..", path_to_check)
+        if check_valid_path:
+            raise FileNotFoundError(f"Configuration: {path_to_check} file does not exist")
+        else:
+            return ""
+
+    @staticmethod
     def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
         # check if path is absolute
         if os.path.isabs(path_to_check):
             # check if path exists or file exists
-            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
+            if os.path.exists(os.path.join(path_to_check, "")):
                 return path_to_check
         else:
             # if path is relative, check if it exists in the current directory
-            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
+            if os.path.exists(os.path.join(path_to_check, "")):
                 # returns absolute path
                 return os.path.join(os.getcwd(), path_to_check, "")
             else:
                 # if it starts with ../ convert to ./ and check again
                 if path_to_check.startswith("../"):
                     path_to_check = path_to_check[3:]
-                    if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
+                    if os.path.exists(os.path.join(path_to_check, "")):
                         return os.path.join(os.getcwd(), path_to_check, "")
         # try to add ../ to the path and check if it exists
-        if os.path.exists(os.path.join("..", path_to_check, "")) or os.path.isfile(os.path.join("..", path_to_check)):
+        if os.path.exists(os.path.join("..", path_to_check, "")):
             return os.path.join(os.getcwd(), "..", path_to_check, "")
         if check_valid_path:
-            raise FileNotFoundError(f"Configuration: {path_to_check} does not exist")
+            raise FileNotFoundError(f"Configuration: {path_to_check} folder does not exist")
         else:
             return ""
 
