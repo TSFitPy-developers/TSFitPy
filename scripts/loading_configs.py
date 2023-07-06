@@ -22,11 +22,11 @@ class SpectraParameters:
         name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'input_vmicroturb', 'input_vmic'],
                          'rv': ['radvel', 'radialvelocity', 'radial_velocity', "#rv", "#radvel", "#radialvelocity", "#radial_velocity"],
                          'teff': ['temp', 'temperature', 't'],
-                         'vmac': ['vmacroturb', 'vmacro', 'vmacro_turb', 'vmacro_turbulence', 'vmacroturbulence', 'input_vmacroturb', 'input_vmacroturbulence'],
-                         'logg': ['logg', 'grav'],
-                         'feh': ['met', 'fe/h', '[fe/h]', 'feh', 'metallicity', 'metallicity_fe_h', 'metallicity_feh', 'mh', 'm/h', '[m/h]'],
+                         'vmac': ['vmac', 'vmacroturb', 'vmacro', 'vmacro_turb', 'vmacro_turbulence', 'vmacroturbulence', 'input_vmacroturb', 'input_vmacroturbulence'],
+                         'logg': ['grav'],
+                         'feh': ['met', 'fe/h', '[fe/h]', 'metallicity', 'metallicity_fe_h', 'metallicity_feh', 'mh', 'm/h', '[m/h]'],
                          'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini'],
-                         'specname': ['specname', 'spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrum_name', 'spectrumname']}
+                         'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrum_name', 'spectrumname']}
 
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
@@ -45,35 +45,35 @@ class SpectraParameters:
 
         for col in df.columns:
             # Replace the column name if it's in the dictionary, otherwise leave it unchanged
-            standard_name = name_dict.get(col.lower())
+            standard_name = name_dict.get(self._strip_string(col.lower()))
             if standard_name is None:
-                testing_col = self._strip_string(col.lower())
-                ending_element = testing_col[-2:]
-                starting_element = testing_col[:-2].capitalize()
-                if ending_element == "fe" and starting_element in periodic_table:
-                    # means X/Fe
-                    standard_name = f"{starting_element.lower()}"
-                    abundances_xfe_given.append(standard_name)
-                    self.abundance_elements_given.append(standard_name.capitalize())
-                elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table:
-                    # means X/H
-                    standard_name = f"{testing_col[:-1].lower()}"
-                    abundances_xh_given.append(standard_name)
-                    self.abundance_elements_given.append(standard_name.capitalize())
-                elif np.size(testing_col) <= 2 and testing_col in periodic_table:
-                    # means just elemental abundance perhaps
-                    standard_name = f"{testing_col.lower()}"
-                    abundances_x_given.append(standard_name)
-                    self.abundance_elements_given.append(standard_name.capitalize())
-                elif np.size(testing_col) <= 3 and testing_col[1:].capitalize() in periodic_table and testing_col[0].lower() == 'a':
-                    # means just elemental abundance perhaps because A(X) is given
-                    standard_name = f"{testing_col[1:].lower()}"
-                    abundances_x_given.append(standard_name)
-                    self.abundance_elements_given.append(standard_name.capitalize())
-                else:
-                    # could not parse, not element?
-                    standard_name = col
-                    if col not in name_variants.keys():
+                standard_name = self._strip_string(col.lower())
+                if standard_name not in name_variants.keys():
+                    testing_col = self._strip_string(col.lower())
+                    ending_element = testing_col[-2:]
+                    starting_element = testing_col[:-2].capitalize()
+                    if ending_element == "fe" and starting_element in periodic_table:
+                        # means X/Fe
+                        standard_name = f"{starting_element.lower()}"
+                        abundances_xfe_given.append(standard_name)
+                        self.abundance_elements_given.append(standard_name.capitalize())
+                    elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table:
+                        # means X/H
+                        standard_name = f"{testing_col[:-1].lower()}"
+                        abundances_xh_given.append(standard_name)
+                        self.abundance_elements_given.append(standard_name.capitalize())
+                    elif np.size(testing_col) <= 2 and testing_col in periodic_table:
+                        # means just elemental abundance perhaps
+                        standard_name = f"{testing_col.lower()}"
+                        abundances_x_given.append(standard_name)
+                        self.abundance_elements_given.append(standard_name.capitalize())
+                    elif np.size(testing_col) <= 3 and testing_col[1:].capitalize() in periodic_table and testing_col[0].lower() == 'a':
+                        # means just elemental abundance perhaps because A(X) is given
+                        standard_name = f"{testing_col[1:].lower()}"
+                        abundances_x_given.append(standard_name)
+                        self.abundance_elements_given.append(standard_name.capitalize())
+                    else:
+                        # could not parse, not element?
                         raise ValueError(f"Could not parse {col} as any known parameter or element")
             df.rename(columns={col: standard_name}, inplace=True)
 
@@ -203,7 +203,7 @@ class SpectraParameters:
 
     @staticmethod
     def _strip_string(string_to_strip: str) -> str:
-        bad_characters = ["[", "]", "/", "\\", "(", ")", "{", "}", "_"]
+        bad_characters = ["[", "]", "/", "\\", "(", ")", "{", "}", "_", "#", 'lte', 'nlte', 'mean', 'median']
         for character_to_remove in bad_characters:
             string_to_strip = string_to_strip.replace(character_to_remove, '')
         return string_to_strip
