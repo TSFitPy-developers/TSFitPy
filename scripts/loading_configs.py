@@ -112,11 +112,14 @@ class SpectraParameters:
                 raise ValueError(f"Column {column} is not present in the dataframe")
 
 
-    def get_spectra_parameters_for_fit(self) -> np.ndarray:
+    def get_spectra_parameters_for_fit(self, vmic_output: bool, vmac_output: bool, rotation_output: bool) -> np.ndarray:
         """
         returns spectra parameters as a numpy array, where each entry is:
         specname, rv, teff, logg, met, vmic, vmac, input_abundance_dict
-        :return:  [[specname, rv, teff, logg, feh, vmic, vmac, input_abundance_dict], ...]
+        :param vmic_output: if True, vmic is outputted, otherwise None
+        :param vmac_output: if True, vmac is outputted, otherwise 0
+        :param rotation_output: if True, rotation is outputted, otherwise 0
+        :return:  [[specname, rv, teff, logg, feh, vmic, vmac, rotation, input_abundance_dict], ...]
         """
 
         specname_list = self.spectra_parameters_df['specname'].values
@@ -124,12 +127,19 @@ class SpectraParameters:
         teff_list = self.spectra_parameters_df['teff'].values
         logg_list = self.spectra_parameters_df['logg'].values
         feh_list = self.spectra_parameters_df['feh'].values
-        if 'vmic' in self.spectra_parameters_df.columns:
+        if 'vmic' in self.spectra_parameters_df.columns and vmic_output:
             vmic_list = self.spectra_parameters_df['vmic'].values
         else:
             # else is list of None
             vmic_list = [None] * self.number_of_rows
-        vmac_list = self.spectra_parameters_df['vmac'].values
+        if 'vmac' in self.spectra_parameters_df.columns and vmac_output:
+            vmac_list = self.spectra_parameters_df['vmac'].values
+        else:
+            vmac_list = np.zeros(len(specname_list))
+        if 'rotation' in self.spectra_parameters_df.columns and rotation_output:
+            rotation_list = self.spectra_parameters_df['rotation'].values
+        else:
+            rotation_list = np.zeros(len(specname_list))
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
         abundance_list = []
         for i in range(self.number_of_rows):
@@ -139,7 +149,7 @@ class SpectraParameters:
             abundance_list.append(abundance_dict)
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list), axis=1)
+        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
 
         return stacked_parameters
 
