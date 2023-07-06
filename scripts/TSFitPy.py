@@ -3227,7 +3227,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             tsfitpy_configuration.nlte_elements = nlte_elements_add_to_og_config
 
         nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_config_path))
+        # check if nlte_filenames.cfg exists
+        if not os.path.isfile(tsfitpy_configuration.departure_file_config_path):
+            raise FileNotFoundError(f"NLTE config file not found in {tsfitpy_configuration.departure_file_config_path}. Please download it from the GitHub")
+        nlte_config.read(tsfitpy_configuration.departure_file_config_path)
 
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
