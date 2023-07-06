@@ -203,7 +203,7 @@ class SpectraParameters:
 
     @staticmethod
     def _strip_string(string_to_strip: str) -> str:
-        bad_characters = ["[", "]", "/", "\\", "(", ")", "{", "}", "_", "#", 'lte', 'nlte', 'mean', 'median']
+        bad_characters = ["[", "]", "/", "\\", "(", ")", "{", "}", "_", "#", 'nlte', 'lte', 'mean', 'median']
         for character_to_remove in bad_characters:
             string_to_strip = string_to_strip.replace(character_to_remove, '')
         return string_to_strip
