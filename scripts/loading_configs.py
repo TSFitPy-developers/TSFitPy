@@ -6,7 +6,7 @@ class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
         # read in the atmosphere grid to compute for the synthetic spectra
         # Read the file
-        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False, skiprows=1)
+        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False)
 
         with open(input_file_path, 'r') as f:
             header = f.readline()
@@ -14,6 +14,8 @@ class SpectraParameters:
         header = header.split()
         if header[0] == '#':
             header.pop(0)
+            # also remove the first column from the df
+            df.drop(df.columns[0], axis=1, inplace=True)
 
         # put header into the df
         df.columns = header
@@ -213,6 +215,7 @@ class SpectraParameters:
         return self.spectra_parameters_df.to_string()
 
 if __name__ == '__main__':
-    fitlist = SpectraParameters('../input_files/fitlist_test', False)
+    fitlist = SpectraParameters('../input_files/fitlist_test', True)
     print(fitlist)
-    print(fitlist.get_spectra_parameters_for_grid_generation())
+    print(fitlist.get_spectra_parameters_for_fit(False, False, False))
+    specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = fitlist.get_spectra_parameters_for_fit(False, False, False)
