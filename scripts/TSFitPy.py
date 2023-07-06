@@ -3488,13 +3488,13 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         print("Worker preparation complete")
 
         futures = []
-        for one_spectra_parameters in fitlist_spectra_parameters:
+        for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             input_abundance = None  # TODO: fix for lbl_quick eventually
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                    rotation1, abundances_dict1,
-                                   line_list_path_trimmed, input_abundance, i, tsfitpy_pickled_configuration_path)
+                                   line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -3503,12 +3503,12 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         print("Worker calculation done")  # when done, save values
     else:
         results = []
-        for one_spectra_parameters in fitlist_spectra_parameters:
+        for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             input_abundance = None  # TODO: fix for lbl_quick eventually
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   rotation1, abundances_dict1,
-                                                  line_list_path_trimmed, input_abundance, i, tsfitpy_pickled_configuration_path))
+                                                  line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path))
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
 
