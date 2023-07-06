@@ -6,7 +6,7 @@ class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
         # read in the atmosphere grid to compute for the synthetic spectra
         # Read the file
-        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False)
+        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False, comment=';')
 
         with open(input_file_path, 'r') as f:
             header = f.readline()
@@ -33,14 +33,14 @@ class SpectraParameters:
         df.columns = header
 
         # Create a dictionary that maps non-standard names to standard ones
-        name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'input_vmicroturb', 'input_vmic'],
-                         'rv': ['radvel', 'radialvelocity', 'radial_velocity', "#rv", "#radvel", "#radialvelocity", "#radial_velocity"],
+        name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'inputvmicroturb', 'inputvmic'],
+                         'rv': ['radvel', 'radialvelocity', 'radial_velocity', "rv", "radvel", "radialvelocity", "radialvelocity"],
                          'teff': ['temp', 'temperature', 't'],
-                         'vmac': ['vmac', 'vmacroturb', 'vmacro', 'vmacro_turb', 'vmacro_turbulence', 'vmacroturbulence', 'input_vmacroturb', 'input_vmacroturbulence'],
+                         'vmac': ['vmac', 'vmacroturb', 'vmacro', 'vmacroturb', 'vmacroturbulence', 'vmacroturbulence', 'inputvmacroturb', 'inputvmacroturbulence'],
                          'logg': ['grav'],
-                         'feh': ['met', 'fe/h', '[fe/h]', 'metallicity', 'metallicity_fe_h', 'metallicity_feh', 'mh', 'm/h', '[m/h]'],
+                         'feh': ['met', 'metallicity', 'metallicityfeh', 'metallicityfeh', 'mh', 'mh', 'mh'],
                          'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini'],
-                         'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrum_name', 'spectrumname']}
+                         'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrumname', 'spectrumname']}
 
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
