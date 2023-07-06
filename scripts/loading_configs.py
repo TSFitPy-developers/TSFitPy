@@ -22,10 +22,12 @@ class SpectraParameters:
         # need to also remove following words from header: (not needed if fitting fe)
         words_to_remove = ['(not', 'needed', 'if', 'fitting', 'fe)']
         for word in words_to_remove:
-            # remove word from header
-            header = np.delete(header, np.where(header == word))
-            # remove column from df
-            df.drop(df.columns[-1], axis=1, inplace=True)
+            # check if word is in header
+            if word in header:
+                # remove word from header
+                header = np.delete(header, np.where(header == word))
+                # remove column from df
+                df.drop(df.columns[-1], axis=1, inplace=True)
 
         # put header into the df
         df.columns = header
