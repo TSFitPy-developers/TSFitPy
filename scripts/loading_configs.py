@@ -14,8 +14,8 @@ class SpectraParameters:
         header = header.split()
         if header[0] == '#':
             header.pop(0)
-            # also remove the first column from the df
-            df.drop(df.columns[0], axis=1, inplace=True)
+            # also remove the last column in the df
+            df.drop(df.columns[len(df.columns) - 1], axis=1, inplace=True)
 
         # put header into the df
         df.columns = header
@@ -218,4 +218,3 @@ if __name__ == '__main__':
     fitlist = SpectraParameters('../input_files/fitlist_test', True)
     print(fitlist)
     print(fitlist.get_spectra_parameters_for_fit(False, False, False))
-    specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = fitlist.get_spectra_parameters_for_fit(False, False, False)
