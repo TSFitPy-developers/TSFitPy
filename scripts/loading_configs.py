@@ -6,7 +6,17 @@ class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
         # read in the atmosphere grid to compute for the synthetic spectra
         # Read the file
-        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False)
+        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False, skiprows=1)
+
+        with open(input_file_path, 'r') as f:
+            header = f.readline()
+
+        header = header.split()
+        if header[0] == '#':
+            header.pop(0)
+
+        # put header into the df
+        df.columns = header
 
         # Create a dictionary that maps non-standard names to standard ones
         name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'input_vmicroturb', 'input_vmic'],
