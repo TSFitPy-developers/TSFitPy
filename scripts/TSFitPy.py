@@ -448,7 +448,7 @@ class Spectra:
             self.input_abund: dict = {}
         else:
             try:
-                self.input_abund = {**self.input_elem_abundance[self.spec_name], **abundances_dict}
+                self.input_abund = {**abundances_dict, **self.input_elem_abundance[self.spec_name]}
             except KeyError: # if no spec_name in self.input_elem_abundance
                 self.input_abund: dict = abundances_dict
 
