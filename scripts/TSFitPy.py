@@ -25,6 +25,7 @@ import scipy
 from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.loading_configs import SpectraParameters
+import logging
 
 
 def create_dir(directory: str):
@@ -2169,7 +2170,7 @@ class TSFitPyConfig:
 
         self.debug_mode: int = None
         self.number_of_cpus: int = None
-        self.experimental_parallelisation: bool = None
+        self.experimental_parallelisation: bool = False
         self.cluster_name: str = None
 
         self.input_fitlist_filename: str = None
@@ -2512,7 +2513,6 @@ class TSFitPyConfig:
         self.fit_vmac, self.vmac_input = self._get_fitting_mode(vmac_fitting_mode)
         rotation_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_rotation"], ["yes", "no", "input"])
         self.fit_rotation, self.rotation_input = self._get_fitting_mode(rotation_fitting_mode)
-        # TODO: rotation make it possible to be input
         self.elements_to_fit = self._split_string_to_string_list(self.config_parser["FittingParameters"]["element_to_fit"])
         if 'Fe' in self.elements_to_fit:
             self.fit_feh = True
@@ -2763,6 +2763,10 @@ class TSFitPyConfig:
         self.segment_file = os.path.join(self.temporary_directory_path, "segment_file.txt")
 
         self.debug_mode = self.debug_mode
+        if self.debug_mode >= 1:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.WARNING)
         self.experimental_parallelisation = self.experimental_parallelisation
 
         self.nelement = len(self.elements_to_fit)
@@ -3040,7 +3044,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.validate_input()
 
+    logging.debug(f"Configuration: {tsfitpy_configuration.__dict__}")
+
     if not config_location[-4:] == ".cfg":
+        logging.debug("Configuration: Config file does not end with .cfg. Converting to new format.")
         tsfitpy_configuration.convert_old_config()
 
     print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
@@ -3051,6 +3058,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     # load NLTE data dicts
     if tsfitpy_configuration.nlte_flag:
+        logging.debug("Configuration: NLTE flag is set to True. Loading NLTE data.")
         nlte_elements_add_to_og_config = []
         if tsfitpy_configuration.oldconfig_nlte_config_outdated is not False:
             print("\n\nDEPRECATION WARNING PLEASE CHECK IT\n\n")
@@ -3291,6 +3299,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     else:
         print("Fitting Teff based on the linelist provided. Ignoring element fitting.")
 
+    logging.debug("Reading fitlist")
+
     fitlist_data = SpectraParameters(fitlist, True)
 
     if tsfitpy_configuration.fit_vmic == "Input":
@@ -3338,6 +3348,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                     input_elem_abundance_dict[spectra][input_elem] = 0
 
         tsfitpy_configuration.input_elem_abundance_dict = dict(input_elem_abundance_dict)
+
+    logging.debug("Reading linemask")
 
     line_centers, line_begins, line_ends = np.loadtxt(tsfitpy_configuration.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
@@ -3467,6 +3479,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         pickle.dump(tsfitpy_configuration, f)
     tsfitpy_pickled_configuration_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl")
 
+    logging.debug("Finished preparing the configuration file")
+
     if tsfitpy_configuration.number_of_cpus != 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         if dask_mpi_installed:
@@ -3512,6 +3526,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   rotation1, abundances_dict1,
                                                   line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path))
+
+    logging.debug("Finished fitting, now saving results")
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
 
@@ -3563,6 +3579,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                 print(results[i][j], file=f)
 
     f.close()
+
+    logging.debug("Finished saving results, now removing temporary files")
 
     shutil.rmtree(tsfitpy_configuration.temporary_directory_path)  # clean up temp directory
     try:

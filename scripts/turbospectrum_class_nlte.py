@@ -9,7 +9,7 @@ import re
 from operator import itemgetter
 import numpy as np
 import math
-
+import logging
 from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
 from scripts.solar_isotopes import solar_isotopes
 
@@ -504,7 +504,7 @@ class TurboSpectrum:
                     #                    options[parameter_descriptor[3]], failure_count))
                     parameter_descriptor[1] = options[parameter_descriptor[3]]
 
-            # print(marcs_model_list)
+        logging.debug(marcs_model_list)
 
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
         if self.nlte_flag:
@@ -689,6 +689,8 @@ class TurboSpectrum:
 
         if self.log_g < 3:
             flag_dont_interp_microturb = True
+
+        logging.debug(f"flag_dont_interp_microturb: {flag_dont_interp_microturb}")
 
         if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
                 self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
@@ -1113,6 +1115,9 @@ class TurboSpectrum:
         self.make_species_lte_nlte_file()  # TODO: not create this file every time (same one for each run anyway)
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
 
+        logging.debug("babsma input:\n{}".format(babsma_in))
+        logging.debug("bsyn input:\n{}".format(bsyn_in))
+
         # print(babsma_in)
         # print(bsyn_in)
 
@@ -1244,8 +1249,10 @@ class TurboSpectrum:
 
     def run_turbospectrum_and_atmosphere(self):
         try:
+            logging.debug("Running Turbospectrum and atmosphere")
             self.calculate_atmosphere()
             try:
+                logging.debug("Running Turbospectrum")
                 self.run_turbospectrum()
             except AttributeError:
                 print("No attribute, fail of generation?")
