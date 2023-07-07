@@ -3314,7 +3314,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         output_rotation: bool = True
     else:
         output_rotation: bool = False
-
+    logging.debug(f"Input vmic: {output_vmic}, input rotation: {output_rotation}, input vmac: {tsfitpy_configuration.vmac_input}")
     fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(output_vmic, tsfitpy_configuration.vmac_input, output_rotation)
 
     if np.size(tsfitpy_configuration.init_guess_elements) > 0:
@@ -3510,6 +3510,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+            logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}")
             input_abundance = None  # TODO: fix for lbl_quick eventually
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                    rotation1, abundances_dict1,
