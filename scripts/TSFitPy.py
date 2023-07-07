@@ -1606,6 +1606,12 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     elem_abund_dict = {"Fe": met}
 
     #abundances = [met]
+    # first it takes the input abundances and then adds the fit abundances to it, so priority is given to fitted abundances
+    for element in spectra_to_fit.input_abund:
+        if element != "Fe":
+            elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
+        else:
+            raise ValueError("Fe is not allowed as input abundance")
 
     for i in range(spectra_to_fit.nelement):
         # spectra_to_fit.elem_to_fit[i] = element name
@@ -1615,8 +1621,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
             elem_abund_dict[elem_name] = param[i] + met     # convert [X/Fe] to [X/H]
             #abundances.append(param[i])
 
-    for element in spectra_to_fit.input_abund:
-        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
 
     if spectra_to_fit.vmic is not None:  # Input given
         microturb = spectra_to_fit.vmic
