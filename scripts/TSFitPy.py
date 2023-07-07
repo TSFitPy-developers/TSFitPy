@@ -3305,12 +3305,12 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     logging.debug(f"{fitlist_data}")
 
-    if tsfitpy_configuration.fit_vmic == "Input":
+    if tsfitpy_configuration.vmic_input:
         output_vmic: bool = True
     else:
         output_vmic: bool = False
 
-    if tsfitpy_configuration.fit_rotation == "Input":
+    if tsfitpy_configuration.rotation_input:
         output_rotation: bool = True
     else:
         output_rotation: bool = False
