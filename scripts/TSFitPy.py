@@ -3303,6 +3303,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     fitlist_data = SpectraParameters(fitlist, True)
 
+    logging.debug(f"{fitlist_data}")
+
     if tsfitpy_configuration.fit_vmic == "Input":
         output_vmic: bool = True
     else:
