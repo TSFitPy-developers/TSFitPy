@@ -133,7 +133,7 @@ class AbusingClasses:
         pass
 
 
-def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
+def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag, verbose=False):
     # parameters to adjust
 
     teff = teff
@@ -167,7 +167,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                 free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
+                 free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=abusingclasses.atmosphere_type, windows_flag=False,
                  segment_file=abusingclasses.segment_file,
                  line_mask_file=abusingclasses.linemask_file, depart_bin_file=abusingclasses.depart_bin_file_dict,
@@ -196,10 +196,10 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     return wave_mod_orig, flux_norm_mod_orig
 
 
-def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
+def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose):
     abundance = param
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
-                                                          line_list_path, element, abundance, True)
+                                                          line_list_path, element, abundance, True, verbose)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
         diff = (nlte_ew - lte_ew)
@@ -212,17 +212,17 @@ def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, l
 
 
 def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
-                                abundance, line_center):
+                                abundance, line_center, verbose=False):
     # load pickle file
     with open(pickle_file_path, 'rb') as f:
         abusingclasses = pickle.load(f)
     wavelength_lte, norm_flux_lte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
-                                                        line_list_path, element, abundance, False)
+                                                        line_list_path, element, abundance, False, verbose)
     if wavelength_lte is not None:
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
         print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
         try:
-            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
+            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
                                  bracket=[abundance - 3, abundance + 3], method='brentq')
             #result = minimize(get_nlte_ew, [abundance - 0.1, abundance + 0.5],
             #                  args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
@@ -277,7 +277,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     # load NLTE data dicts
     if tsfitpy_configuration.nlte_flag:
         nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"))
+        nlte_config.read(tsfitpy_configuration.departure_file_config_path)
 
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
@@ -380,6 +380,11 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     abusingclasses.marcs_models = marcs_models
     abusingclasses.marcs_values = marcs_values
 
+    if tsfitpy_configuration.debug_mode >= 2:
+        verbose = True
+    else:
+        verbose = False
+
     print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
     client = Client(threads_per_worker=1, n_workers=abusingclasses.dask_workers)
     print(client)
@@ -406,7 +411,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
                                    abusingclasses.line_begins_sorted[j] - 2, abusingclasses.line_ends_sorted[j] + 2,
                                    abusingclasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), abusingclasses.elem_to_fit[0],
-                                   abundance, abusingclasses.line_centers_sorted[j])
+                                   abundance, abusingclasses.line_centers_sorted[j], verbose)
             futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different

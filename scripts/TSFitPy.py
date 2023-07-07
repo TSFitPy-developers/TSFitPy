@@ -355,7 +355,7 @@ class Spectra:
         self.ldelta: float = None
         self.resolution: float = None  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
         # macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
-        #self.rotation: float = float(rotation)  # rotation km/s, constant for all stars
+        self.rotation: float = 0  # rotation km/s, constant for all stars
         self.fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
         self.output_folder: str = None
 
