@@ -143,7 +143,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     lmin = lmin
     lmax = lmax
     ldelta = ldelta
-    item_abund = abundances_dict1
+    item_abund = abundances_dict1.copy()
     for element1 in item_abund:
         # scale to [X/H] from [X/Fe]
         item_abund[element1] = item_abund[element1] + met
@@ -240,7 +240,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
 
             nlte_correction = result.root
             ew_nlte = ew_lte
-            print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte}")
+            print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte}")
         except ValueError:
             print("Fitting failed")
             ew_nlte = -99999
@@ -249,7 +249,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
         ew_lte = -99999
         ew_nlte = -99999
         nlte_correction = -99999
-    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction}"]
+    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction - abundance}"]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
