@@ -13,6 +13,7 @@ import numpy as np
 from scipy.optimize import minimize, root_scalar
 from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
 from scripts.TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width, TSFitPyConfig, create_segment_file
+from scripts.loading_configs import SpectraParameters
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
@@ -133,7 +134,7 @@ class AbusingClasses:
         pass
 
 
-def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag, verbose=False):
+def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, abundances_dict1, nlte_flag, verbose=False):
     # parameters to adjust
 
     teff = teff
@@ -142,7 +143,13 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     lmin = lmin
     lmax = lmax
     ldelta = ldelta
-    item_abund = {"Fe": met, element: abundance + met}
+    item_abund = abundances_dict1
+    for element1 in item_abund:
+        # scale to [X/H] from [X/Fe]
+        item_abund[element1] = item_abund[element1] + met
+    item_abund["Fe"] = met
+    if element not in item_abund:
+        item_abund[element] = abundance + met
     #temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
     temp_directory = os.path.join(abusingclasses.global_temp_dir, f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
@@ -199,7 +206,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
 def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose):
     abundance = param
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
-                                                          line_list_path, element, abundance, True, verbose)
+                                                          line_list_path, element, abundance, {}, True, verbose)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
         diff = (nlte_ew - lte_ew)
@@ -212,15 +219,17 @@ def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, l
 
 
 def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
-                                abundance, line_center, verbose=False):
+                                abundance, abundances_dict1, line_center, verbose=False):
     # load pickle file
     with open(pickle_file_path, 'rb') as f:
         abusingclasses = pickle.load(f)
     wavelength_lte, norm_flux_lte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
-                                                        line_list_path, element, abundance, False, verbose)
+                                                        line_list_path, element, abundance, abundances_dict1, False, verbose)
+    if element in abundances_dict1:
+        abundance = abundances_dict1[element]
     if wavelength_lte is not None:
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
-        print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
+        print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte} LTE_abund={abundance}")
         try:
             result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
                                  bracket=[abundance - 3, abundance + 3], method='brentq')
@@ -324,14 +333,20 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     fitlist = os.path.join(tsfitpy_configuration.fitlist_input_path, tsfitpy_configuration.input_fitlist_filename)
 
-    fitlist_data = np.loadtxt(fitlist, dtype='str')
+    fitlist_data = SpectraParameters(fitlist, True)
 
-    if fitlist_data.ndim == 1:
-        fitlist_data = np.array([fitlist_data])
+    if tsfitpy_configuration.vmic_input:
+        output_vmic: bool = True
+    else:
+        output_vmic: bool = False
 
-    specname_fitlist, teff_fitlist, logg_fitlist, met_fitlist, microturb_fitlist = fitlist_data[:, 0], fitlist_data[:,
-                                                                                                       2].astype(float), \
-        fitlist_data[:, 3].astype(float), fitlist_data[:, 4].astype(float), fitlist_data[:, 5].astype(float)
+    if tsfitpy_configuration.rotation_input:
+        output_rotation: bool = True
+    else:
+        output_rotation: bool = False
+    fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(output_vmic,
+                                                                             tsfitpy_configuration.vmac_input,
+                                                                             output_rotation)
 
     line_centers, line_begins, line_ends = np.loadtxt(abusingclasses.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
@@ -403,15 +418,15 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         pickle.dump(abusingclasses, f)
 
     futures = []
-    for i in range(specname_fitlist.size):
-        specname1, teff1, logg1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], met_fitlist[
-            i], microturb_fitlist[i]
+    for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
+        # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
+        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
         for j in range(len(abusingclasses.line_begins_sorted)):
             future = client.submit(generate_and_fit_atmosphere, os.path.join(tsfitpy_configuration.temporary_directory_path, 'abusingclasses.pkl'), specname1, teff1, logg1, microturb1, met1,
                                    abusingclasses.line_begins_sorted[j] - 2, abusingclasses.line_ends_sorted[j] + 2,
                                    abusingclasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), abusingclasses.elem_to_fit[0],
-                                   abundance, abusingclasses.line_centers_sorted[j], verbose)
+                                   abundance, abundances_dict1, abusingclasses.line_centers_sorted[j], verbose)
             futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
