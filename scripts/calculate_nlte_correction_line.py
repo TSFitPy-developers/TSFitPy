@@ -345,6 +345,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(output_vmic,
                                                                              tsfitpy_configuration.vmac_input,
                                                                              output_rotation)
+    print(fitlist_data)
 
     line_centers, line_begins, line_ends = np.loadtxt(abusingclasses.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
