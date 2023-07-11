@@ -509,23 +509,7 @@ class TurboSpectrum:
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
         if self.nlte_flag:
             for element in self.model_atom_file:
-                if element in self.free_abundances:
-                    # if element abundance was given, then pass it to the NLTE
-                    # self.free_abundances[element] = [X/Fe] + [Fe/H] = [X/H] (already scaled from before)
-                    # solar_abundances[element] = abundance as A(X)
-                    element_abundance = self.free_abundances[element] + float(solar_abundances[element])
-                else:
-                    # else, take solar abundance and scale with metallicity
-                    # solar_abundances[element] = abundance as A(X)
-                    # self.metallicity = [Fe/H]
-                    if element in molecules_atomic_number:
-                        # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
-                        if element == "CN":
-                            element_abundance = float(solar_abundances["N"]) + self.metallicity
-                        elif element == "CH":
-                            element_abundance = float(solar_abundances["C"]) + self.metallicity
-                    else:
-                        element_abundance = float(solar_abundances[element]) + self.metallicity
+                element_abundance = self._get_element_abundance(element)
 
                 if self.verbose:
                     stdout = None
@@ -632,6 +616,28 @@ class TurboSpectrum:
             "errors": None
         }
 
+    def _get_element_abundance(self, element):
+        if element in self.free_abundances:
+            # if element abundance was given, then pass it to the NLTE
+            # self.free_abundances[element] = [X/Fe] + [Fe/H] = [X/H] (already scaled from before)
+            # solar_abundances[element] = abundance as A(X)
+            element_abundance = self.free_abundances[element] + float(solar_abundances[element])
+        else:
+            # else, take solar abundance and scale with metallicity
+            # solar_abundances[element] = abundance as A(X)
+            # self.metallicity = [Fe/H]
+            if element in molecules_atomic_number:
+                # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                if element == "CN":
+                    element_abundance = float(solar_abundances["N"]) + self.metallicity
+                elif element == "CH":
+                    element_abundance = float(solar_abundances["C"]) + self.metallicity
+                else:
+                    raise ValueError(f"Molecule {element} not supported.")
+            else:
+                element_abundance = float(solar_abundances[element]) + self.metallicity
+        return element_abundance
+
     def make_atmosphere_properties(self, spherical, element):
         logging.debug(f"make_atmosphere_properties: spherical={spherical}, element={element}, {self.free_abundances}")
         if self.nlte_flag == True:
@@ -652,17 +658,8 @@ class TurboSpectrum:
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
             interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-            if element == "H" or element == "He":
-                # if H or He, use solar abundances, constant with metallicity
-                interpol_config += "{:.6f}\n".format(round(float(solar_abundances[element]), 6))
-            else:
-                # if other element, use input abundance [X/H], converted to A(X) by adding solar abundance
-                if element in self.free_abundances:
-                    interpol_config += "{:.6f}\n".format(
-                        round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
-                else:
-                    # if element not in free_abundances, use solar abundances, scaled by metallicity
-                    interpol_config += "{:.6f}\n".format(round(float(solar_abundances[element] + self.metallicity), 6))
+            element_abundance = self._get_element_abundance(element)
+            interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
             interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
             interpol_config += "'{}'\n".format(model_test)
