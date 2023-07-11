@@ -18,6 +18,7 @@ user's machine. The Python packages needed are as follows (they should all be in
 - Clone or download code to your favourite directory
 - Download actual [TurboSpectrum fortran code](https://github.com/bertrandplez/Turbospectrum_NLTE) and put it into folder `TSFitPy/turbospectrum/`
 - Compile TS fortran code using the make file in `turbospectrum/exec/` (or in `turbospectrum/exec-gf/` if using the gnu compiler)
+  - You might need to uncomment `mcmodel=medium` in the makefile
 - Copy fortran files (can copy everything in unsure) from `TSFitPy/turbospectrum/interpolator/` to `TSFitPy/scripts/model_interpolators/`
 - Run `TSFitPy/scripts/compile_fortran_codes.py` to compile model interpolators
 - Download all desired linelists and put them into `TSFitPy/input_files/linelists/linelist_for_fitting/`

@@ -20,7 +20,7 @@ def calculate_vturb(teff, logg, met):
 
     return vturb
 
-def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vmic=None):
+def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vmic=None, verbose=False, **kwargs):
     #parameters to adjust
 
     teff = teff
@@ -56,7 +56,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
 
     ts.configure(t_eff = teff, log_g = logg, metallicity = met,
                  turbulent_velocity = vmic, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax,
-                 free_abundances=abundances_dict, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=False,
+                 free_abundances=abundances_dict, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=ts_config["atmosphere_type"],
                  windows_flag=ts_config["windows_flag"],
                  segment_file=ts_config["segment_file"],
@@ -127,11 +127,11 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
     return wave_mod, flux_norm_mod, flux_mod
 
 
-def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict: dict, save_unnormalised_spectra):
+def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lmin, lmax, ldelta, spectrum_name, nlte_flag, resolution, macro, rotation, new_directory_to_save_to, vturb, abundances_dict: dict, save_unnormalised_spectra, verbose):
     with open(tsfitpy_pickled_configuration_path, 'rb') as f:
         ts_config = pickle.load(f)
 
-    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb)
+    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb, verbose=verbose)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
     f = open(file_location_output, 'w')
 

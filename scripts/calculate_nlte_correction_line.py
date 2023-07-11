@@ -13,6 +13,7 @@ import numpy as np
 from scipy.optimize import minimize, root_scalar
 from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
 from scripts.TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width, TSFitPyConfig, create_segment_file
+from scripts.loading_configs import SpectraParameters
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 
@@ -133,7 +134,7 @@ class AbusingClasses:
         pass
 
 
-def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, nlte_flag):
+def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, abundances_dict1, nlte_flag, verbose=False):
     # parameters to adjust
 
     teff = teff
@@ -142,7 +143,13 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     lmin = lmin
     lmax = lmax
     ldelta = ldelta
-    item_abund = {"Fe": met, element: abundance + met}
+    item_abund = abundances_dict1.copy()
+    for element1 in item_abund:
+        # scale to [X/H] from [X/Fe]
+        item_abund[element1] = item_abund[element1] + met
+    item_abund["Fe"] = met
+    if element not in item_abund:
+        item_abund[element] = abundance + met
     #temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
     temp_directory = os.path.join(abusingclasses.global_temp_dir, f"{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
@@ -167,7 +174,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
-                 free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=False,
+                 free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=abusingclasses.atmosphere_type, windows_flag=False,
                  segment_file=abusingclasses.segment_file,
                  line_mask_file=abusingclasses.linemask_file, depart_bin_file=abusingclasses.depart_bin_file_dict,
@@ -196,10 +203,10 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     return wave_mod_orig, flux_norm_mod_orig
 
 
-def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew):
+def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose):
     abundance = param
     wavelength_nlte, norm_flux_nlte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
-                                                          line_list_path, element, abundance, True)
+                                                          line_list_path, element, abundance, {}, True, verbose)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
         diff = (nlte_ew - lte_ew)
@@ -212,17 +219,19 @@ def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, l
 
 
 def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
-                                abundance, line_center):
+                                abundance, abundances_dict1, line_center, verbose=False):
     # load pickle file
     with open(pickle_file_path, 'rb') as f:
         abusingclasses = pickle.load(f)
     wavelength_lte, norm_flux_lte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
-                                                        line_list_path, element, abundance, False)
+                                                        line_list_path, element, abundance, abundances_dict1, False, verbose)
+    if element in abundances_dict1:
+        abundance = abundances_dict1[element]
     if wavelength_lte is not None:
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
-        print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte}")
+        print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte} LTE_abund={abundance}")
         try:
-            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
+            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
                                  bracket=[abundance - 3, abundance + 3], method='brentq')
             #result = minimize(get_nlte_ew, [abundance - 0.1, abundance + 0.5],
             #                  args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
@@ -231,7 +240,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
 
             nlte_correction = result.root
             ew_nlte = ew_lte
-            print(f"Fitted with NLTE correction={nlte_correction} EW_lte={ew_lte}")
+            print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte}")
         except ValueError:
             print("Fitting failed")
             ew_nlte = -99999
@@ -240,7 +249,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
         ew_lte = -99999
         ew_nlte = -99999
         nlte_correction = -99999
-    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction}"]
+    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction - abundance}"]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
@@ -274,42 +283,40 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     abusingclasses.output_folder = tsfitpy_configuration.output_folder_path
     abusingclasses.spec_input_path = tsfitpy_configuration.spectra_input_path
 
-    # load NLTE data dicts
-    if tsfitpy_configuration.nlte_flag:
-        nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"))
+    nlte_config = ConfigParser()
+    nlte_config.read(tsfitpy_configuration.departure_file_config_path)
 
-        depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
+    depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
-        for element in tsfitpy_configuration.nlte_elements:
-            if tsfitpy_configuration.atmosphere_type == "1D":
-                bin_config_name, aux_config_name = "1d_bin", "1d_aux"
-            else:
-                bin_config_name, aux_config_name = "3d_bin", "3d_aux"
-            depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
-            depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
-            model_atom_file_dict[element] = nlte_config[element]["atom_file"]
+    for element in tsfitpy_configuration.elements_to_fit:
+        if tsfitpy_configuration.atmosphere_type == "1D":
+            bin_config_name, aux_config_name = "1d_bin", "1d_aux"
+        else:
+            bin_config_name, aux_config_name = "3d_bin", "3d_aux"
+        depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
+        depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
+        model_atom_file_dict[element] = nlte_config[element]["atom_file"]
 
-        print("NLTE loaded. Please check that elements correspond to their correct binary files:")
-        for key in depart_bin_file_dict:
-            print(f"{key}: {depart_bin_file_dict[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
+    print("NLTE loaded. Please check that elements correspond to their correct binary files:")
+    for key in depart_bin_file_dict:
+        print(f"{key}: {depart_bin_file_dict[key]} {depart_aux_file_dict[key]} {model_atom_file_dict[key]}")
 
-        print(
-            f"If files do not correspond, please check config file {os.path.join(tsfitpy_configuration.departure_file_path, 'nlte_filenames.cfg')}. "
-            f"Elements without NLTE binary files do not need them.")
+    print(
+        f"If files do not correspond, please check config file {os.path.join(tsfitpy_configuration.departure_file_path, 'nlte_filenames.cfg')}. "
+        f"Elements without NLTE binary files do not need them.")
 
-        tsfitpy_configuration.depart_bin_file_dict = depart_bin_file_dict
-        tsfitpy_configuration.depart_aux_file_dict = depart_aux_file_dict
-        tsfitpy_configuration.model_atom_file_dict = model_atom_file_dict
-        abusingclasses.depart_bin_file_dict = depart_bin_file_dict
-        abusingclasses.depart_aux_file_dict = depart_aux_file_dict
-        abusingclasses.model_atom_file_dict = model_atom_file_dict
+    tsfitpy_configuration.depart_bin_file_dict = depart_bin_file_dict
+    tsfitpy_configuration.depart_aux_file_dict = depart_aux_file_dict
+    tsfitpy_configuration.model_atom_file_dict = model_atom_file_dict
+    abusingclasses.depart_bin_file_dict = depart_bin_file_dict
+    abusingclasses.depart_aux_file_dict = depart_aux_file_dict
+    abusingclasses.model_atom_file_dict = model_atom_file_dict
 
-        abusingclasses.aux_file_length_dict = {}
+    abusingclasses.aux_file_length_dict = {}
 
-        for element in model_atom_file_dict:
-            abusingclasses.aux_file_length_dict[element] = len(
-                np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+    for element in model_atom_file_dict:
+        abusingclasses.aux_file_length_dict[element] = len(
+            np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
     # prevent overwriting
     if os.path.exists(abusingclasses.output_folder):
@@ -324,14 +331,21 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     fitlist = os.path.join(tsfitpy_configuration.fitlist_input_path, tsfitpy_configuration.input_fitlist_filename)
 
-    fitlist_data = np.loadtxt(fitlist, dtype='str')
+    fitlist_data = SpectraParameters(fitlist, True)
 
-    if fitlist_data.ndim == 1:
-        fitlist_data = np.array([fitlist_data])
+    if tsfitpy_configuration.vmic_input:
+        output_vmic: bool = True
+    else:
+        output_vmic: bool = False
 
-    specname_fitlist, teff_fitlist, logg_fitlist, met_fitlist, microturb_fitlist = fitlist_data[:, 0], fitlist_data[:,
-                                                                                                       2].astype(float), \
-        fitlist_data[:, 3].astype(float), fitlist_data[:, 4].astype(float), fitlist_data[:, 5].astype(float)
+    if tsfitpy_configuration.rotation_input:
+        output_rotation: bool = True
+    else:
+        output_rotation: bool = False
+    fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(output_vmic,
+                                                                             tsfitpy_configuration.vmac_input,
+                                                                             output_rotation)
+    print(fitlist_data)
 
     line_centers, line_begins, line_ends = np.loadtxt(abusingclasses.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
@@ -380,6 +394,11 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     abusingclasses.marcs_models = marcs_models
     abusingclasses.marcs_values = marcs_values
 
+    if tsfitpy_configuration.debug_mode >= 2:
+        verbose = True
+    else:
+        verbose = False
+
     print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
     client = Client(threads_per_worker=1, n_workers=abusingclasses.dask_workers)
     print(client)
@@ -398,15 +417,15 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         pickle.dump(abusingclasses, f)
 
     futures = []
-    for i in range(specname_fitlist.size):
-        specname1, teff1, logg1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], met_fitlist[
-            i], microturb_fitlist[i]
+    for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
+        # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
+        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
         for j in range(len(abusingclasses.line_begins_sorted)):
             future = client.submit(generate_and_fit_atmosphere, os.path.join(tsfitpy_configuration.temporary_directory_path, 'abusingclasses.pkl'), specname1, teff1, logg1, microturb1, met1,
                                    abusingclasses.line_begins_sorted[j] - 2, abusingclasses.line_ends_sorted[j] + 2,
                                    abusingclasses.ldelta,
                                    os.path.join(line_list_path_trimmed, str(j), ''), abusingclasses.elem_to_fit[0],
-                                   abundance, abusingclasses.line_centers_sorted[j])
+                                   abundance, abundances_dict1, abusingclasses.line_centers_sorted[j], verbose)
             futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different

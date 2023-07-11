@@ -24,6 +24,8 @@ import collections
 import scipy
 from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
+from scripts.loading_configs import SpectraParameters
+import logging
 
 
 def create_dir(directory: str):
@@ -323,7 +325,8 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
-                 line_list_path_trimmed: str, index_temp_dir: float, tsfitpy_config, elem_abund=None):
+                 rotation: float, abundances_dict: dict, line_list_path_trimmed: str, index_temp_dir: float,
+                 tsfitpy_config, elem_abund=None):
         # Default values
         self.turbospec_path: str = None  # path to the /exec/ file
         self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
@@ -337,8 +340,11 @@ class Spectra:
         self.include_molecules: bool = None  # "True" or "False", bool
         self.nlte_flag: bool = None
         self.fit_vmic: str = "No"  # TODO: redo as bool. It expects, "Yes", "No" or "Input". Add extra variable if input?
+        self.input_vmic: bool = None
         self.fit_vmac: bool = False
+        self.input_vmac: bool = None
         self.fit_rotation: bool = False
+        self.input_rotation: bool = None
         self.fit_teff: bool = None
         #self.fit_logg: str = None  # does not work atm
         self.nelement: int = None  # how many elements to fit (1 to whatever)
@@ -349,7 +355,7 @@ class Spectra:
         self.ldelta: float = None
         self.resolution: float = None  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
         # macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
-        self.rotation: float = None  # rotation km/s, constant for all stars
+        self.rotation: float = 0  # rotation km/s, constant for all stars
         self.fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
         self.output_folder: str = None
 
@@ -443,14 +449,20 @@ class Spectra:
             self.input_abund: dict = {}
         else:
             try:
-                self.input_abund: dict = self.input_elem_abundance[self.spec_name]
-            except KeyError:
-                self.input_abund: dict = {}
+                self.input_abund = {**abundances_dict, **self.input_elem_abundance[self.spec_name]}
+            except KeyError: # if no spec_name in self.input_elem_abundance
+                self.input_abund: dict = abundances_dict
+
+        # if Input, then takes it from the fitlist. Otherwise takes it from the constant in the config (vmac + rot)
         if self.fit_vmic == "Input":
             self.vmic: float = float(micro)  # microturbulence. Set if it is given in input
         else:
             self.vmic = None
-        self.vmac: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
+        if self.input_vmac:
+            self.vmac: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
+        if self.input_rotation:
+            self.rotation: float = float(rotation)  # rotation km/s, constant for all stars if not fitted
+
         self.temp_dir: str = os.path.join(self.global_temp_dir, self.spec_name + str(index_temp_dir),
                                           '')  # temp directory, including date and name of the star fitted
         create_dir(self.temp_dir)  # create temp directory
@@ -797,7 +809,7 @@ class Spectra:
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
         :param met: metallicity of star
-        :param elem_abund: dictionary with iron and elemental abundances
+        :param elem_abund: dictionary with iron and elemental abundances as [X/H]
         :param vmicro: microturbulence parameter
         :param lmin: minimum wavelength where spectra are computed
         :param lmax: maximum wavelength where spectra are computed
@@ -814,6 +826,7 @@ class Spectra:
         else:
             teff = teff
         if self.nlte_flag:
+            logging.debug(f"NLTE model atoms: {self.model_atom_file_dict}")
             ts.configure(t_eff=teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
                          lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                          free_abundances=elem_abund, temp_directory=temp_dir, nlte_flag=True,
@@ -1594,6 +1607,12 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     elem_abund_dict = {"Fe": met}
 
     #abundances = [met]
+    # first it takes the input abundances and then adds the fit abundances to it, so priority is given to fitted abundances
+    for element in spectra_to_fit.input_abund:
+        if element != "Fe":
+            elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
+        else:
+            raise ValueError("Fe is not allowed as input abundance")
 
     for i in range(spectra_to_fit.nelement):
         # spectra_to_fit.elem_to_fit[i] = element name
@@ -1603,8 +1622,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
             elem_abund_dict[elem_name] = param[i] + met     # convert [X/Fe] to [X/H]
             #abundances.append(param[i])
 
-    for element in spectra_to_fit.input_abund:
-        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
 
     if spectra_to_fit.vmic is not None:  # Input given
         microturb = spectra_to_fit.vmic
@@ -2032,7 +2049,8 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 
 def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
-                           macroturb: float, line_list_path_trimmed: str, input_abundance: float, index: float,
+                           macroturb: float, rotation1: float, abundances_dict1: dict, line_list_path_trimmed: str,
+                           input_abundance: float, index: float,
                            tsfitpy_pickled_configuration_path: str) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
@@ -2043,6 +2061,8 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     :param met: metallicity (doesn't matter what if fitting for Fe)
     :param microturb: Microturbulence if given (None is not known or fitted)
     :param macroturb: Macroturbulence if given (None is not known or fitted)
+    :param rotation1: Rotation if given (None is not known or fitted)
+    :param abundances_dict1: Abundances if given (None is not known or fitted)
     :param line_list_path_trimmed: Path to the root of the trimmed line list
     :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
     :return: result of the fit with the best fit parameters and chi squared
@@ -2051,8 +2071,8 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     with open(tsfitpy_pickled_configuration_path, 'rb') as f:
         tsfitpy_configuration = pickle.load(f)
 
-    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, line_list_path_trimmed, index, tsfitpy_configuration,
-                      elem_abund=input_abundance)
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
+                      line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance)
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
@@ -2155,7 +2175,7 @@ class TSFitPyConfig:
 
         self.debug_mode: int = None
         self.number_of_cpus: int = None
-        self.experimental_parallelisation: bool = None
+        self.experimental_parallelisation: bool = False
         self.cluster_name: str = None
 
         self.input_fitlist_filename: str = None
@@ -2173,7 +2193,9 @@ class TSFitPyConfig:
         self.wavelength_max: float = None
 
         self.fit_vmic: str = None
+        self.vmic_input: bool = None
         self.fit_rotation: bool = None
+        self.rotation_input: bool = None
         self.bounds_vmic: list[float] = None
         self.guess_range_vmic: list[float] = None
 
@@ -2490,20 +2512,12 @@ class TSFitPyConfig:
         self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
         self.include_molecules = self._convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
         self.nlte_flag = self._convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
-        self.fit_vmic = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
+        vmic_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
+        self.fit_vmic, self.vmic_input = self._get_fitting_mode(vmic_fitting_mode)
         vmac_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmac"], ["yes", "no", "input"])
-        if vmac_fitting_mode == "Yes":
-            self.fit_vmac = True
-            self.vmac_input = False
-        elif vmac_fitting_mode == "No":
-            self.fit_vmac = False
-            self.vmac_input = False
-        elif vmac_fitting_mode == "Input":
-            self.fit_vmac = False
-            self.vmac_input = True
-        else:
-            raise ValueError(f"Vmac fitting mode {vmac_fitting_mode} not recognized")
-        self.fit_rotation = self._convert_string_to_bool(self.config_parser["FittingParameters"]["fit_rotation"])
+        self.fit_vmac, self.vmac_input = self._get_fitting_mode(vmac_fitting_mode)
+        rotation_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_rotation"], ["yes", "no", "input"])
+        self.fit_rotation, self.rotation_input = self._get_fitting_mode(rotation_fitting_mode)
         self.elements_to_fit = self._split_string_to_string_list(self.config_parser["FittingParameters"]["element_to_fit"])
         if 'Fe' in self.elements_to_fit:
             self.fit_feh = True
@@ -2564,6 +2578,22 @@ class TSFitPyConfig:
         self.guess_range_rotation = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
         self.guess_range_abundance = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
         self.guess_range_doppler = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
+
+    @staticmethod
+    def _get_fitting_mode(fitting_mode: str):
+        fit_variable, input_variable = None, None  # both booleans
+        if fitting_mode == "Yes":
+            fit_variable = True
+            input_variable = False
+        elif fitting_mode == "No":
+            fit_variable = False
+            input_variable = False
+        elif fitting_mode == "Input":
+            fit_variable = False
+            input_variable = True
+        else:
+            raise ValueError(f"Fitting mode {fitting_mode} not recognized")
+        return fit_variable, input_variable
 
     def convert_old_config(self):
         self.config_parser.add_section("turbospectrum_compiler")
@@ -2717,7 +2747,11 @@ class TSFitPyConfig:
         self.atmosphere_type = self.atmosphere_type.upper()
         self.fitting_mode = self.fitting_mode.lower()
         self.include_molecules = self.include_molecules
-        self.nlte_flag = self.nlte_flag
+        if len(self.nlte_elements) == 0 and self.nlte_flag:
+            print("\nNo NLTE elements were provided, setting NLTE flag to False!!\n")
+            self.nlte_flag = False
+        else:
+            self.nlte_flag = self.nlte_flag
         self.fit_vmic = self.fit_vmic
         self.fit_vmac = self.fit_vmac
         self.fit_rotation = self.fit_rotation
@@ -2734,6 +2768,10 @@ class TSFitPyConfig:
         self.segment_file = os.path.join(self.temporary_directory_path, "segment_file.txt")
 
         self.debug_mode = self.debug_mode
+        if self.debug_mode >= 1:
+            logging.basicConfig(level=logging.DEBUG)
+        else:
+            logging.basicConfig(level=logging.WARNING)
         self.experimental_parallelisation = self.experimental_parallelisation
 
         self.nelement = len(self.elements_to_fit)
@@ -2794,9 +2832,20 @@ class TSFitPyConfig:
         spectra_object.fitting_mode = self.fitting_mode
         spectra_object.include_molecules = self.include_molecules
         spectra_object.nlte_flag = self.nlte_flag
-        spectra_object.fit_vmic = self.fit_vmic
+
+        # TODO: redo as booleans instead of strings
+        if self.fit_vmic:
+            spectra_object.fit_vmic = "Yes"
+        elif self.vmic_input:
+            spectra_object.fit_vmic = "Input"
+        else:
+            spectra_object.fit_vmic = "No"
+
         spectra_object.fit_vmac = self.fit_vmac
         spectra_object.fit_rotation = self.fit_rotation
+        spectra_object.input_vmic = self.vmic_input
+        spectra_object.input_vmac = self.vmac_input
+        spectra_object.input_rotation = self.rotation_input
         spectra_object.elem_to_fit = self.elements_to_fit
         spectra_object.fit_feh = self.fit_feh
         spectra_object.lmin = self.wavelength_min
@@ -2804,6 +2853,7 @@ class TSFitPyConfig:
         spectra_object.ldelta = self.wavelength_delta
         spectra_object.resolution = self.resolution
         spectra_object.rotation = self.rotation
+        spectra_object.vmac = self.vmac
         spectra_object.global_temp_dir = self.temporary_directory_path
         spectra_object.dask_workers = self.number_of_cpus
         spectra_object.bound_min_vmac = self.bounds_rotation[0]
@@ -3025,7 +3075,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.validate_input()
 
+    logging.debug(f"Configuration: {tsfitpy_configuration.__dict__}")
+
     if not config_location[-4:] == ".cfg":
+        logging.debug("Configuration: Config file does not end with .cfg. Converting to new format.")
         tsfitpy_configuration.convert_old_config()
 
     print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
@@ -3036,6 +3089,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     # load NLTE data dicts
     if tsfitpy_configuration.nlte_flag:
+        logging.debug("Configuration: NLTE flag is set to True. Loading NLTE data.")
         nlte_elements_add_to_og_config = []
         if tsfitpy_configuration.oldconfig_nlte_config_outdated is not False:
             print("\n\nDEPRECATION WARNING PLEASE CHECK IT\n\n")
@@ -3212,7 +3266,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             tsfitpy_configuration.nlte_elements = nlte_elements_add_to_og_config
 
         nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(tsfitpy_configuration.departure_file_config_path))
+        # check if nlte_filenames.cfg exists
+        if not os.path.isfile(tsfitpy_configuration.departure_file_config_path):
+            raise FileNotFoundError(f"NLTE config file not found in {tsfitpy_configuration.departure_file_config_path}. Please download it from the GitHub")
+        nlte_config.read(tsfitpy_configuration.departure_file_config_path)
 
         depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
 
@@ -3273,41 +3330,23 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     else:
         print("Fitting Teff based on the linelist provided. Ignoring element fitting.")
 
-    fitlist_data = np.loadtxt(fitlist, dtype='str')
+    logging.debug("Reading fitlist")
 
-    if fitlist_data.ndim == 1:
-        fitlist_data = np.array([fitlist_data])
+    fitlist_data = SpectraParameters(fitlist, True)
 
-    specname_fitlist, rv_fitlist, teff_fitlist, logg_fitlist = fitlist_data[:, 0], fitlist_data[:, 1], \
-                                                               fitlist_data[:, 2], fitlist_data[:, 3]
+    logging.debug(f"{fitlist_data}")
 
-    fitlist_next_column = 4     # next loaded column #TODO not perfect solution? what if user gives metal but fits it too?
-
-    input_abundances = np.zeros(fitlist_data.shape[0])  # if lbl_quick they will be used as center guess, otherwise means nothing
-    if not tsfitpy_configuration.fitting_mode == "lbl_quick":
-        if tsfitpy_configuration.fit_feh:
-            met_fitlist = np.zeros(fitlist_data.shape[0])  # fitting metallicity: just give it 0
-        else:
-            met_fitlist = fitlist_data[:, fitlist_next_column]  # metallicity [Fe/H], scaled to solar; not fitting metallicity: load it
-            fitlist_next_column += 1
+    if tsfitpy_configuration.vmic_input:
+        output_vmic: bool = True
     else:
-        met_fitlist = fitlist_data[:, fitlist_next_column]
-        fitlist_next_column += 1
-        if not tsfitpy_configuration.fit_feh:
-            input_abundances = fitlist_data[:, fitlist_next_column]  # guess for abundance for lbl quick, [X/Fe]
-            fitlist_next_column += 1
+        output_vmic: bool = False
 
-    if tsfitpy_configuration.fit_vmic == "Input":
-        vmic_input = fitlist_data[:, fitlist_next_column]
-        fitlist_next_column += 1
+    if tsfitpy_configuration.rotation_input:
+        output_rotation: bool = True
     else:
-        vmic_input = np.zeros(fitlist_data.shape[0])
-
-    if tsfitpy_configuration.vmac_input:
-        vmac_input = fitlist_data[:, fitlist_next_column]  # input macroturbulence in km/s
-        fitlist_next_column += 1
-    else:
-        vmac_input = np.ones(fitlist_data.shape[0]) * tsfitpy_configuration.vmac
+        output_rotation: bool = False
+    logging.debug(f"Input vmic: {output_vmic}, input rotation: {output_rotation}, input vmac: {tsfitpy_configuration.vmac_input}")
+    fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(output_vmic, tsfitpy_configuration.vmac_input, output_rotation)
 
     if np.size(tsfitpy_configuration.init_guess_elements) > 0:
         init_guess_spectra_dict = collections.defaultdict(dict)
@@ -3318,7 +3357,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                 init_guess_data = np.array([init_guess_data])
             init_guess_spectra_names, init_guess_values = init_guess_data[:, 0], init_guess_data[:, 1].astype(float)
 
-            for spectra in specname_fitlist:
+            for spectra in fitlist_data.spectra_parameters_df['specname'].values:
                 spectra_loc_index = np.where(init_guess_spectra_names == spectra)[0][0]
                 init_guess_spectra_dict[spectra][init_guess_elem] = init_guess_values[spectra_loc_index]
 
@@ -3333,7 +3372,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                 input_abund_data = np.array([input_abund_data])
             input_abund_data_spectra_names, input_abund_data_values = input_abund_data[:, 0], input_abund_data[:, 1].astype(float)
 
-            for spectra in specname_fitlist:
+            for spectra in fitlist_data.spectra_parameters_df['specname'].values:
                 spectra_loc_index = np.where(input_abund_data_spectra_names == spectra)[0]
                 if np.size(spectra_loc_index) == 1:
                     input_elem_abundance_dict[spectra][input_elem] = input_abund_data_values[spectra_loc_index]
@@ -3342,6 +3381,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                     input_elem_abundance_dict[spectra][input_elem] = 0
 
         tsfitpy_configuration.input_elem_abundance_dict = dict(input_elem_abundance_dict)
+
+    logging.debug("Reading linemask")
 
     line_centers, line_begins, line_ends = np.loadtxt(tsfitpy_configuration.linemask_file, comments=";", usecols=(0, 1, 2),
                                                       unpack=True)
@@ -3471,6 +3512,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         pickle.dump(tsfitpy_configuration, f)
     tsfitpy_pickled_configuration_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl")
 
+    logging.debug("Finished preparing the configuration file")
+
     if tsfitpy_configuration.number_of_cpus != 1:
         print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
         if dask_mpi_installed:
@@ -3495,13 +3538,14 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         print("Worker preparation complete")
 
         futures = []
-        for i in range(specname_fitlist.size):
-            specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
-                                                             rv_fitlist[i], met_fitlist[i], vmic_input[i]
-            macroturb1 = vmac_input[i]
-            input_abundance = input_abundances[i]
+        for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
+            # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
+            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+            logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}")
+            input_abundance = None  # TODO: fix for lbl_quick eventually
             future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   line_list_path_trimmed, input_abundance, i, tsfitpy_pickled_configuration_path)
+                                   rotation1, abundances_dict1,
+                                   line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -3510,13 +3554,14 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         print("Worker calculation done")  # when done, save values
     else:
         results = []
-        for i in range(specname_fitlist.size):
-            specname1, teff1, logg1, rv1, met1, microturb1 = specname_fitlist[i], teff_fitlist[i], logg_fitlist[i], \
-                                                             rv_fitlist[i], met_fitlist[i], vmic_input[i]
-            input_abundance = input_abundances[i]
-            macroturb1 = vmac_input[i]
+        for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
+            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+            input_abundance = None  # TODO: fix for lbl_quick eventually
             results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                                  line_list_path_trimmed, input_abundance, i, tsfitpy_pickled_configuration_path))
+                                                  rotation1, abundances_dict1,
+                                                  line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path))
+
+    logging.debug("Finished fitting, now saving results")
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
 
@@ -3568,6 +3613,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                 print(results[i][j], file=f)
 
     f.close()
+
+    logging.debug("Finished saving results, now removing temporary files")
 
     shutil.rmtree(tsfitpy_configuration.temporary_directory_path)  # clean up temp directory
     try:

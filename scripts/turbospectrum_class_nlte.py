@@ -9,7 +9,7 @@ import re
 from operator import itemgetter
 import numpy as np
 import math
-
+import logging
 from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
 from scripts.solar_isotopes import solar_isotopes
 
@@ -86,7 +86,7 @@ class TurboSpectrum:
         self.log_g: float = None
         self.t_eff: float = None
         self.turbulent_velocity: float = None  # micro turbulence, km/s
-        self.free_abundances: dict = None
+        self.free_abundances: dict = None  # [X/H] for each element
         self.free_isotopes: dict = None
         self.sphere: bool = None
         self.alpha = None  # not used?
@@ -283,7 +283,7 @@ class TurboSpectrum:
         if turbulent_velocity is not None:
             self.turbulent_velocity = turbulent_velocity
         if free_abundances is not None:
-            self.free_abundances = free_abundances
+            self.free_abundances = free_abundances  # [X/H]
         if free_isotopes is not None:
             self.free_isotopes = free_isotopes
         if sphere is not None:
@@ -504,28 +504,12 @@ class TurboSpectrum:
                     #                    options[parameter_descriptor[3]], failure_count))
                     parameter_descriptor[1] = options[parameter_descriptor[3]]
 
-            # print(marcs_model_list)
+        logging.debug(marcs_model_list)
 
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
         if self.nlte_flag:
             for element in self.model_atom_file:
-                if element in self.free_abundances:
-                    # if element abundance was given, then pass it to the NLTE
-                    # self.free_abundances[element] = [X/Fe] + [Fe/H] = [X/H] (already scaled from before)
-                    # solar_abundances[element] = abundance as A(X)
-                    element_abundance = self.free_abundances[element] + float(solar_abundances[element])
-                else:
-                    # else, take solar abundance and scale with metallicity
-                    # solar_abundances[element] = abundance as A(X)
-                    # self.metallicity = [Fe/H]
-                    if element in molecules_atomic_number:
-                        # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
-                        if element == "CN":
-                            element_abundance = float(solar_abundances["N"]) + self.metallicity
-                        elif element == "CH":
-                            element_abundance = float(solar_abundances["C"]) + self.metallicity
-                    else:
-                        element_abundance = float(solar_abundances[element]) + self.metallicity
+                element_abundance = self._get_element_abundance(element)
 
                 if self.verbose:
                     stdout = None
@@ -632,7 +616,30 @@ class TurboSpectrum:
             "errors": None
         }
 
+    def _get_element_abundance(self, element):
+        if element in self.free_abundances:
+            # if element abundance was given, then pass it to the NLTE
+            # self.free_abundances[element] = [X/Fe] + [Fe/H] = [X/H] (already scaled from before)
+            # solar_abundances[element] = abundance as A(X)
+            element_abundance = self.free_abundances[element] + float(solar_abundances[element])
+        else:
+            # else, take solar abundance and scale with metallicity
+            # solar_abundances[element] = abundance as A(X)
+            # self.metallicity = [Fe/H]
+            if element in molecules_atomic_number:
+                # so if a molecule is given, get "atomic number" from the separate dictionary #TODO improve to do automatically not just for select molecules?
+                if element == "CN":
+                    element_abundance = float(solar_abundances["N"]) + self.metallicity
+                elif element == "CH":
+                    element_abundance = float(solar_abundances["C"]) + self.metallicity
+                else:
+                    raise ValueError(f"Molecule {element} not supported.")
+            else:
+                element_abundance = float(solar_abundances[element]) + self.metallicity
+        return element_abundance
+
     def make_atmosphere_properties(self, spherical, element):
+        logging.debug(f"make_atmosphere_properties: spherical={spherical}, element={element}, {self.free_abundances}")
         if self.nlte_flag == True:
             # Write configuration input for interpolator
             output = os_path.join(self.tmp_dir, self.marcs_model_name)
@@ -647,14 +654,12 @@ class TurboSpectrum:
                 os_path.join(self.departure_file_path, self.depart_bin_file[element]))  # needed for nlte interpolator
             interpol_config += "'{}'\n".format(
                 os_path.join(self.departure_file_path, self.depart_aux_file[element]))  # needed for nlte interpolator
-            # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
-            # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
             interpol_config += "{}\n".format(self.aux_file_length_dict[element])
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
             interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-            interpol_config += "{:.6f}\n".format(
-                round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
+            element_abundance = self._get_element_abundance(element)
+            interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
             interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
             interpol_config += "'{}'\n".format(model_test)
@@ -689,6 +694,8 @@ class TurboSpectrum:
 
         if self.log_g < 3:
             flag_dont_interp_microturb = True
+
+        logging.debug(f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
 
         if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
                 self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
@@ -768,43 +775,49 @@ class TurboSpectrum:
 
             # generate models for low and high parts
             if self.nlte_flag:
+                #  {self.model_atom_file}
+                logging.debug(f"self.model_atom_file inside ts_class_nlte.py: {self.model_atom_file}")
                 for element in self.model_atom_file:
-                        atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
-                                                                                element)
-                        low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
-                        f_coef_low = open(low_coef_dat_name, 'r')
-                        lines_coef_low = f_coef_low.read().splitlines()
-                        f_coef_low.close()
+                    logging.debug(f"now low/high parts calling element: {element}")
+                    atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
+                                                                            element)
+                    low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    logging.debug(f"low_coef_dat_name: {low_coef_dat_name}")
+                    f_coef_low = open(low_coef_dat_name, 'r')
+                    lines_coef_low = f_coef_low.read().splitlines()
+                    f_coef_low.close()
 
-                        high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        high_coef_dat_name += '_{}_coef.dat'.format(element)
+                    high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                    high_coef_dat_name += '_{}_coef.dat'.format(element)
 
-                        high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
-                        f_coef_high = open(high_coef_dat_name, 'r')
-                        lines_coef_high = f_coef_high.read().splitlines()
-                        f_coef_high.close()
+                    high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    logging.debug(f"high_coef_dat_name: {high_coef_dat_name}")
+                    f_coef_high = open(high_coef_dat_name, 'r')
+                    lines_coef_high = f_coef_high.read().splitlines()
+                    f_coef_high.close()
 
-                        interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        interp_coef_dat_name += '_{}_coef.dat'.format(element)
+                    interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                    interp_coef_dat_name += '_{}_coef.dat'.format(element)
 
-                        #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
+                    #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
 
-                        g = open(interp_coef_dat_name, 'w')
-                        for i in range(11):
-                            print(lines_coef_low[i], file=g)
-                        for i in range(len(t_interp)):
-                            print(" {:7.4f}".format(t_interp[i]), file=g)
-                        for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
-                            fields_low = lines_coef_low[i].strip().split()
-                            fields_high = lines_coef_high[i].strip().split()
-                            fields_interp = []
-                            for j in range(len(fields_low)):
-                                fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
-                            fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
-                            print(*fields_interp_print, file=g)
-                        for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
-                            print(lines_coef_low[i], file=g)
-                        g.close()
+                    g = open(interp_coef_dat_name, 'w')
+                    logging.debug(f"interp_coef_dat_name: {interp_coef_dat_name}")
+                    for i in range(11):
+                        print(lines_coef_low[i], file=g)
+                    for i in range(len(t_interp)):
+                        print(" {:7.4f}".format(t_interp[i]), file=g)
+                    for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
+                        fields_low = lines_coef_low[i].strip().split()
+                        fields_high = lines_coef_high[i].strip().split()
+                        fields_interp = []
+                        for j in range(len(fields_low)):
+                            fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
+                        fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
+                        print(*fields_interp_print, file=g)
+                    for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
+                        print(lines_coef_low[i], file=g)
+                    g.close()
             else:
                 # atmosphere_properties = atmosphere_properties_low
                 atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], 'Fe')
@@ -1113,6 +1126,9 @@ class TurboSpectrum:
         self.make_species_lte_nlte_file()  # TODO: not create this file every time (same one for each run anyway)
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
 
+        logging.debug("babsma input:\n{}".format(babsma_in))
+        logging.debug("bsyn input:\n{}".format(bsyn_in))
+
         # print(babsma_in)
         # print(bsyn_in)
 
@@ -1244,8 +1260,10 @@ class TurboSpectrum:
 
     def run_turbospectrum_and_atmosphere(self):
         try:
+            logging.debug("Running Turbospectrum and atmosphere")
             self.calculate_atmosphere()
             try:
+                logging.debug("Running Turbospectrum")
                 self.run_turbospectrum()
             except AttributeError:
                 print("No attribute, fail of generation?")
