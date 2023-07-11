@@ -692,7 +692,7 @@ class TurboSpectrum:
         if self.log_g < 3:
             flag_dont_interp_microturb = True
 
-        logging.debug(f"flag_dont_interp_microturb: {flag_dont_interp_microturb}")
+        logging.debug(f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
 
         if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
                 self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
