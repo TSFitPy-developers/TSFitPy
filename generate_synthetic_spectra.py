@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import pickle
 import sys
 from configparser import ConfigParser
@@ -238,15 +239,24 @@ if __name__ == '__main__':
     config_synthetic_spectra.load_config()
     config_synthetic_spectra.check_valid_input()
 
+    # if debug_mode is >= 1, then change logging level to debug
+    if config_synthetic_spectra.debug_mode >= 1:
+        logging.basicConfig(level=logging.DEBUG)
+    if config_synthetic_spectra.debug_mode >= 2:
+        verbose = True
+
     spectra_parameters_class = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False)
     spectra_parameters = spectra_parameters_class.get_spectra_parameters_for_grid_generation()
+
+    logging.debug(f"Input parameters: \n{spectra_parameters_class}")
 
     output_dir = config_synthetic_spectra.output_folder_path
     os.makedirs(output_dir)
 
     print(f"Output directory: {output_dir}")
     print(f"Input parameters file: {config_synthetic_spectra.input_parameter_path}")
-    print(f"Starting grid generation at {datetime.datetime.now().strftime('%H:%M:%S')}")
+    # print when the grid generation started with the current time and date
+    print(f"Grid generation started: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
 
     # load NLTE data
     nlte_config = ConfigParser()
@@ -329,7 +339,7 @@ if __name__ == '__main__':
         spectrum_name = f"{specname}.spec"
         future = client.submit(run_and_save_wrapper, tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
                                config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
-                               spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra)
+                               spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose)
         futures.append(future)  # prepares to get values
 
     print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
