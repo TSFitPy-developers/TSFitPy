@@ -779,6 +779,7 @@ class TurboSpectrum:
                     atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
                                                                             element)
                     low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    logging.debug(f"low_coef_dat_name: {low_coef_dat_name}")
                     f_coef_low = open(low_coef_dat_name, 'r')
                     lines_coef_low = f_coef_low.read().splitlines()
                     f_coef_low.close()
@@ -787,6 +788,7 @@ class TurboSpectrum:
                     high_coef_dat_name += '_{}_coef.dat'.format(element)
 
                     high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    logging.debug(f"high_coef_dat_name: {high_coef_dat_name}")
                     f_coef_high = open(high_coef_dat_name, 'r')
                     lines_coef_high = f_coef_high.read().splitlines()
                     f_coef_high.close()
@@ -797,6 +799,7 @@ class TurboSpectrum:
                     #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
 
                     g = open(interp_coef_dat_name, 'w')
+                    logging.debug(f"interp_coef_dat_name: {interp_coef_dat_name}")
                     for i in range(11):
                         print(lines_coef_low[i], file=g)
                     for i in range(len(t_interp)):
