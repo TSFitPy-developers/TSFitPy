@@ -772,6 +772,8 @@ class TurboSpectrum:
 
             # generate models for low and high parts
             if self.nlte_flag:
+                #  {self.model_atom_file}
+                logging.debug(f"self.model_atom_file inside ts_class_nlte.py: {self.model_atom_file}")
                 for element in self.model_atom_file:
                         atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
                                                                                 element)
