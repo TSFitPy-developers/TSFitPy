@@ -652,11 +652,17 @@ class TurboSpectrum:
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
             interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-            if element == "H":
-                interpol_config += "{:.6f}\n".format(12) #TODO here float(solar_abundances[element])
+            if element == "H" or element == "He":
+                # if H or He, use solar abundances, constant with metallicity
+                interpol_config += "{:.6f}\n".format(round(float(solar_abundances[element]), 6))
             else:
-                interpol_config += "{:.6f}\n".format(
-                    round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
+                # if other element, use input abundance [X/H], converted to A(X) by adding solar abundance
+                if element in self.free_abundances:
+                    interpol_config += "{:.6f}\n".format(
+                        round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))
+                else:
+                    # if element not in free_abundances, use solar abundances, scaled by metallicity
+                    interpol_config += "{:.6f}\n".format(round(float(solar_abundances[element] + self.metallicity), 6))
             interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
             interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
             interpol_config += "'{}'\n".format(model_test)
