@@ -86,7 +86,7 @@ class TurboSpectrum:
         self.log_g: float = None
         self.t_eff: float = None
         self.turbulent_velocity: float = None  # micro turbulence, km/s
-        self.free_abundances: dict = None
+        self.free_abundances: dict = None  # [X/H] for each element
         self.free_isotopes: dict = None
         self.sphere: bool = None
         self.alpha = None  # not used?
@@ -283,7 +283,7 @@ class TurboSpectrum:
         if turbulent_velocity is not None:
             self.turbulent_velocity = turbulent_velocity
         if free_abundances is not None:
-            self.free_abundances = free_abundances
+            self.free_abundances = free_abundances  # [X/H]
         if free_isotopes is not None:
             self.free_isotopes = free_isotopes
         if sphere is not None:
@@ -633,6 +633,7 @@ class TurboSpectrum:
         }
 
     def make_atmosphere_properties(self, spherical, element):
+        logging.debug(f"make_atmosphere_properties: spherical={spherical}, element={element}, {self.free_abundances}")
         if self.nlte_flag == True:
             # Write configuration input for interpolator
             output = os_path.join(self.tmp_dir, self.marcs_model_name)
@@ -647,14 +648,12 @@ class TurboSpectrum:
                 os_path.join(self.departure_file_path, self.depart_bin_file[element]))  # needed for nlte interpolator
             interpol_config += "'{}'\n".format(
                 os_path.join(self.departure_file_path, self.depart_aux_file[element]))  # needed for nlte interpolator
-            # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/1D_NLTE_grid_Fe_mean3D.bin'\n" #needed for nlte interpolator
-            # interpol_config += "'/Users/gerber/gitprojects/TurboSpectrum2020/interpol_modeles_nlte/NLTEdata/auxData_Fe_mean3D_marcs_names.txt'\n" #needed for nlte interpolator
             interpol_config += "{}\n".format(self.aux_file_length_dict[element])
             interpol_config += "{}\n".format(self.t_eff)
             interpol_config += "{}\n".format(self.log_g)
             interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
             if element == "H":
-                interpol_config += "{:.6f}\n".format(12)
+                interpol_config += "{:.6f}\n".format(12) #TODO here float(solar_abundances[element])
             else:
                 interpol_config += "{:.6f}\n".format(
                     round(float(self.free_abundances[element]), 6) + float(solar_abundances[element]))

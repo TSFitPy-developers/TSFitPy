@@ -809,7 +809,7 @@ class Spectra:
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
         :param met: metallicity of star
-        :param elem_abund: dictionary with iron and elemental abundances
+        :param elem_abund: dictionary with iron and elemental abundances as [X/H]
         :param vmicro: microturbulence parameter
         :param lmin: minimum wavelength where spectra are computed
         :param lmax: maximum wavelength where spectra are computed
@@ -826,6 +826,7 @@ class Spectra:
         else:
             teff = teff
         if self.nlte_flag:
+            logging.debug(f"NLTE model atoms: {self.model_atom_file_dict}")
             ts.configure(t_eff=teff, log_g=self.logg, metallicity=met, turbulent_velocity=vmicro,
                          lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                          free_abundances=elem_abund, temp_directory=temp_dir, nlte_flag=True,
