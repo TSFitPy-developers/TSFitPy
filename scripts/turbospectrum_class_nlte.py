@@ -775,42 +775,43 @@ class TurboSpectrum:
                 #  {self.model_atom_file}
                 logging.debug(f"self.model_atom_file inside ts_class_nlte.py: {self.model_atom_file}")
                 for element in self.model_atom_file:
-                        atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
-                                                                                element)
-                        low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
-                        f_coef_low = open(low_coef_dat_name, 'r')
-                        lines_coef_low = f_coef_low.read().splitlines()
-                        f_coef_low.close()
+                    logging.debug(f"now low/high parts calling element: {element}")
+                    atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
+                                                                            element)
+                    low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    f_coef_low = open(low_coef_dat_name, 'r')
+                    lines_coef_low = f_coef_low.read().splitlines()
+                    f_coef_low.close()
 
-                        high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        high_coef_dat_name += '_{}_coef.dat'.format(element)
+                    high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                    high_coef_dat_name += '_{}_coef.dat'.format(element)
 
-                        high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
-                        f_coef_high = open(high_coef_dat_name, 'r')
-                        lines_coef_high = f_coef_high.read().splitlines()
-                        f_coef_high.close()
+                    high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    f_coef_high = open(high_coef_dat_name, 'r')
+                    lines_coef_high = f_coef_high.read().splitlines()
+                    f_coef_high.close()
 
-                        interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                        interp_coef_dat_name += '_{}_coef.dat'.format(element)
+                    interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                    interp_coef_dat_name += '_{}_coef.dat'.format(element)
 
-                        #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
+                    #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
 
-                        g = open(interp_coef_dat_name, 'w')
-                        for i in range(11):
-                            print(lines_coef_low[i], file=g)
-                        for i in range(len(t_interp)):
-                            print(" {:7.4f}".format(t_interp[i]), file=g)
-                        for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
-                            fields_low = lines_coef_low[i].strip().split()
-                            fields_high = lines_coef_high[i].strip().split()
-                            fields_interp = []
-                            for j in range(len(fields_low)):
-                                fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
-                            fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
-                            print(*fields_interp_print, file=g)
-                        for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
-                            print(lines_coef_low[i], file=g)
-                        g.close()
+                    g = open(interp_coef_dat_name, 'w')
+                    for i in range(11):
+                        print(lines_coef_low[i], file=g)
+                    for i in range(len(t_interp)):
+                        print(" {:7.4f}".format(t_interp[i]), file=g)
+                    for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
+                        fields_low = lines_coef_low[i].strip().split()
+                        fields_high = lines_coef_high[i].strip().split()
+                        fields_interp = []
+                        for j in range(len(fields_low)):
+                            fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
+                        fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
+                        print(*fields_interp_print, file=g)
+                    for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
+                        print(lines_coef_low[i], file=g)
+                    g.close()
             else:
                 # atmosphere_properties = atmosphere_properties_low
                 atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], 'Fe')
