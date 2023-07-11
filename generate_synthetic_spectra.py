@@ -244,6 +244,8 @@ if __name__ == '__main__':
         logging.basicConfig(level=logging.DEBUG)
     if config_synthetic_spectra.debug_mode >= 2:
         verbose = True
+    else:
+        verbose = False
 
     spectra_parameters_class = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False)
     spectra_parameters = spectra_parameters_class.get_spectra_parameters_for_grid_generation()
@@ -256,7 +258,7 @@ if __name__ == '__main__':
     print(f"Output directory: {output_dir}")
     print(f"Input parameters file: {config_synthetic_spectra.input_parameter_path}")
     # print when the grid generation started with the current time and date
-    print(f"Grid generation started: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    print(f"Grid generation started: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
     # load NLTE data
     nlte_config = ConfigParser()
@@ -356,5 +358,8 @@ if __name__ == '__main__':
     time_end = perf_counter()
     # with 4 decimals, the time is converted to hours, minutes and seconds
     print(f"Time elapsed: {datetime.timedelta(seconds=time_end - time_start)}")
+
+    # print ending date and time
+    print("Ending date and time: ", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
