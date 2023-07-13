@@ -1267,7 +1267,8 @@ class Spectra:
 
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
-        print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
+        print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number],
+              self.line_ends_sorted[line_number], self.seg_begins[start], self.seg_ends[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
