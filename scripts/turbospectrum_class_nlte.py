@@ -410,6 +410,7 @@ class TurboSpectrum:
                 failed_on_parameter = ("None", "None", "None")
                 value = "None"
                 parameter = "None"
+                logg_chosen = None
 
                 # Start looking for a model that sits at this particular vertex of the cube
                 dict_iter = self.marcs_models  # Navigate through dictionary tree of MARCS models we have
@@ -423,9 +424,27 @@ class TurboSpectrum:
                             option_number = int(bool(vertex & (2 ** interpolate_parameters.index(parameter))))  # 0 or 1
                             value = value[option_number]
 
+                        if parameter == "log_g":
+                            logg_chosen = value
+
                         # Step to next level of dictionary tree
                         model_description.append("{}={}".format(parameter, str(value)))
-                        dict_iter = dict_iter[value]
+                        if parameter == "mass" and self.atmosphere_dimension == "3D":
+                            # take all values no matter the mass
+                            if logg_chosen < 3:
+                                dict_iter = dict_iter[1.0]
+                            else:
+                                dict_iter = dict_iter[0.0]
+                        elif parameter == "spherical" and self.atmosphere_dimension == "3D":
+                            try:
+                                dict_iter = dict_iter[value]
+                            except KeyError:
+                                if value == "p":
+                                    dict_iter = dict_iter["s"]
+                                else:
+                                    dict_iter = dict_iter["p"]
+                        else:
+                            dict_iter = dict_iter[value]
 
                     # Success -- we've found a model which matches all requested parameter.
                     # Extract filename of model we've found.
