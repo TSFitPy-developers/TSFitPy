@@ -429,6 +429,10 @@ class TurboSpectrum:
 
                         # Step to next level of dictionary tree
                         model_description.append("{}={}".format(parameter, str(value)))
+
+                        # NS: this ugly if statement is to deal with the fact that the 3D models do not have p/s in reality,
+                        # but the names of the files are p/s. So we need to change the name of the parameter to match the file name
+                        # since for 1D models, we dont interpolate between p/s, but rather between p/p or s/s
                         if parameter == "mass" and self.atmosphere_dimension == "3D":
                             # take all values no matter the mass
                             if logg_chosen < 3:

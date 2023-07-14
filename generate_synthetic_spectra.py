@@ -234,7 +234,10 @@ if __name__ == '__main__':
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     today = f"{today}_{np.random.random(1)[0]}"
 
-    config_file = sys.argv[1]
+    if len(sys.argv) == 0:
+        config_file = "input_files/synthetic_spectra_generation_configuration.cfg"
+    else:
+        config_file = "input_files/synthetic_spectra_generation_configuration.cfg"
     config_synthetic_spectra = SyntheticSpectraConfig(config_file, today)
     config_synthetic_spectra.load_config()
     config_synthetic_spectra.check_valid_input()
@@ -287,7 +290,7 @@ if __name__ == '__main__':
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
-    include_molecules = True
+    include_molecules = config_synthetic_spectra.include_molecules
     create_window_linelist([config_synthetic_spectra.wavelength_min - 5], [config_synthetic_spectra.wavelength_max + 5], config_synthetic_spectra.line_list_path, line_list_path_trimmed, include_molecules, False)
     print("trimming done")
 
