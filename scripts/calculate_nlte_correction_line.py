@@ -139,7 +139,10 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
 
     teff = teff
     logg = logg
-    met = met
+    if element == "Fe":
+        met = abundance
+    else:
+        met = met
     lmin = lmin
     lmax = lmax
     ldelta = ldelta
@@ -225,7 +228,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
         abusingclasses = pickle.load(f)
     wavelength_lte, norm_flux_lte = generate_atmosphere(abusingclasses, teff, logg, microturb, met, lmin - 5, lmax + 5, ldelta,
                                                         line_list_path, element, abundance, abundances_dict1, False, verbose)
-    if element in abundances_dict1:
+    if element in abundances_dict1 and element != 'Fe':
         abundance = abundances_dict1[element]
     if wavelength_lte is not None:
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
@@ -420,6 +423,9 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
         # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
         specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+        # if element is Fe, then take abundance from metallicity
+        if abusingclasses.elem_to_fit[0] == "Fe":
+            abundance = met1
         for j in range(len(abusingclasses.line_begins_sorted)):
             future = client.submit(generate_and_fit_atmosphere, os.path.join(tsfitpy_configuration.temporary_directory_path, 'abusingclasses.pkl'), specname1, teff1, logg1, microturb1, met1,
                                    abusingclasses.line_begins_sorted[j] - 2, abusingclasses.line_ends_sorted[j] + 2,

@@ -438,7 +438,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         plt.ylim(0, 1.05)
         plt.xlabel("Wavelength")
         plt.ylabel("Normalised flux")
-    except FileNotFoundError:
+    except (FileNotFoundError, ValueError, IndexError) as e:
         print("TS failed")
         wave_mod, flux_norm_mod = np.array([]), np.array([])
     shutil.rmtree(temp_directory)
