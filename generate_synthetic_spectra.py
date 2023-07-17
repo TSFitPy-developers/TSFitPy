@@ -237,7 +237,7 @@ if __name__ == '__main__':
     if len(sys.argv) == 0:
         config_file = "input_files/synthetic_spectra_generation_configuration.cfg"
     else:
-        config_file = "input_files/synthetic_spectra_generation_configuration.cfg"
+        config_file = sys.argv[1]
     config_synthetic_spectra = SyntheticSpectraConfig(config_file, today)
     config_synthetic_spectra.load_config()
     config_synthetic_spectra.check_valid_input()
