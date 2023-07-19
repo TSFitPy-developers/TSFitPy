@@ -181,6 +181,17 @@ Also, Windows is not supported (?).
   - It will also save the .csv file with the grid parameters (including the name of spectrum)
   - Each spectra also has comments on top with the parameters used to generate it
 
+## Usage for calculate_nlte_correction_line.py
+
+- This script calculates the NLTE correction for a given line, for a given element, for a given model atmosphere
+- It uses the same config file as the fitting, it just skips some of the parameters
+- Specify element (`elements_to_fit`), line (`linemask`) and model atmosphere (`fitlist`) in the config file
+- It calculates the NLTE correction for the given line and saves it in the output folder by matching EW of NLTE line to LTE line
+- This can be useful to calculate pure NLTE correction withouth fitting the spectrum
+  - The precision is much higher than in the fitting, because it doesn't have to fit the spectrum
+  - Remember that the NLTE correction is different for different A(X) abundances
+    - You can specify abundance beforehand in the fitlist (using [X/Fe], [X/H] or A(X) notation); then it will calculate the NLTE correction for that abundance
+
 ## Extra notes
 
 Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-todo
