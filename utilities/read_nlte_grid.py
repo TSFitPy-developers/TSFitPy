@@ -1,7 +1,10 @@
-import numpy as np
-
 # script to read the binary NLTE grid at a pointer (specified in the auxiliary file)
 
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
+
+#matplotlib.use('MacOSX')
 
 def read_binary_grid(grid_file, pointer=1):
     """
@@ -43,12 +46,35 @@ def read_binary_grid(grid_file, pointer=1):
     return ndep, nk, depart, tau, atmosStr
 
 
+def plot_departure_coefficients(depart, tau, atmosStr, levels_to_plot):
+    # plot departure coefficients
+
+    # if levels_to_plot is int, convert to list
+    if isinstance(levels_to_plot, int):
+        levels_to_plot = [levels_to_plot]
+
+    fig, ax = plt.subplots()
+    for level in levels_to_plot:
+        ax.plot(tau, depart[level - 1], label=f"level {level}")
+    ax.set_xlabel(r"$\log_{10}(\tau)$")
+    ax.set_ylabel(r"$b_{\rm NLTE}$")
+    ax.set_title(f"Departure coefficients for {atmosStr}")
+    ax.legend()
+    plt.show()
+
+
+
 if __name__ == '__main__':
-    pointer: int = 1001
-    grid_file: str = 'binary_grid.bin'
+    pointer = 1001
+    grid_file = 'binary_grid.bin'
     ndep, nk, depart, tau, atmosStr = read_binary_grid(grid_file, pointer=pointer)
 
     print(f"atmosStr={atmosStr}")  # atmosStr is the model atmosphere used to solve for NLTE, can compare to the model atmosphere in the auxiliary file
     print(f"ndep={ndep} nk={nk}")  # ndep are number of depth points, nk are number of energy levels
-    print(f"tau={np.log10(tau)}")  # convert to log10(tau)
-    print(f"depart={depart}")      # departure coefficients as a function of depth and energy level, 2D array
+    print(f"tau={(tau)}")          # converted to log10(tau)
+    print(f"depart={depart}")      # departure coefficients as a function of depth and energy level, 2D array.
+    # depart[level] is the departure coefficients for a given energy level, at all depths
+
+    # levels_to_plot can be a list of levels to plot, or a single level
+    # levels are indexed from 1
+    plot_departure_coefficients(depart, tau, atmosStr, levels_to_plot=[0, 1])
