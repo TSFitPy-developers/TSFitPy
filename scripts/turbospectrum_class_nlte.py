@@ -528,6 +528,10 @@ class TurboSpectrum:
                     parameter_descriptor[1] = options[parameter_descriptor[3]]
 
         logging.debug(marcs_model_list)
+        # save marcs model list in a file as one line at a time
+        #with open(os_path.join("test12312123.txt"), 'a') as f:
+        #    for item in marcs_model_list:
+        #        f.write("%s\n" % item)
 
         # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
         if self.nlte_flag:
