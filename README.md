@@ -192,6 +192,26 @@ Also, Windows is not supported (?).
   - Remember that the NLTE correction is different for different A(X) abundances
     - You can specify abundance beforehand in the fitlist (using [X/Fe], [X/H] or A(X) notation); then it will calculate the NLTE correction for that abundance
 
+## NLTE usage: important notes
+
+- NLTE is **NOT** just the departure coefficients grid. It also **REQUIRES** linelist with the correct labels, where each transition is referenced to the correct levels in the model atom
+  - E.g. `  3947.295  9.146 -2.095   -7.957    7.0  4.57E+06  's' 'p'   0.0    1.0 'O I LS:2s2.2p3.(4S*).3s 5S* LS:2s2.2p3.(4S*).4p 5P'  6 26  '3s5S2*' '4p5P3'  'c' 'a'`
+  - At the end you can see `6 26  '3s5S2*' '4p5P3'  'c' 'a'`, where 6 and 26 are energy levels in the model atom that correspond to this transition
+  - `'3s5S2*' '4p5P3'` are the labels of the levels in the model atom
+  - `'c' 'a'` are not actually used
+  - Without this information, NLTE will not work for that line!!! (it will just use LTE)
+  - Each model atom will have different levels, so you need to make sure that the linelist is correct for that model atom
+    - E.g. if you download a different grid for the same element, linelist might need to be changed
+- So if you run into a problem, where NLTE is not working, check the linelist first for that transition, if it has the correct labels (0 means that it is not referenced to any level in the model atom)
+  - TurboSpectrum itself actually gives warning of all lines that are computed in LTE (use `debug = 2` and search for `W A R N I N G     B S Y N`)
+- If you add a new departure coefficient grid, you need to do several steps:
+  - Add it to the `nlte_grids` folder and also add it to the `/nlte_data/nlte_filanames.cfg` file
+    - That is where you can specify new element names for the grids with their corresponding grid names (just copy the format from other elements)
+  - Make sure that the linelist is correct for that model atom
+    - Open the linelist, find that element (e.g. search for `O I`), and check that the levels are correct (at least NLTE should be written there next to the element name)
+    - OR if you add a new linelist, you will need to add the 
+
+
 ## Extra notes
 
 Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-todo
