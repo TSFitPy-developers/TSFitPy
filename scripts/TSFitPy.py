@@ -1644,9 +1644,13 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     spectra_to_fit.vmac_dict[line_number] = macroturb
     spectra_to_fit.rotation_dict[line_number] = rotation
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
-
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+
+    # delete the temporary directory if it exists
+    if os_path.exists(temp_spectra_location):
+        os.remove(temp_spectra_location)
+
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
@@ -1678,10 +1682,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     else:
         chi_square = 9999.9999
         print("didn't generate spectra or atmosphere")
-
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
 
     output_print = f""
     for key in elem_abund_dict:
