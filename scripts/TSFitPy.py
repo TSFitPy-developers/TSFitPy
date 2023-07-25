@@ -26,7 +26,7 @@ from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.loading_configs import SpectraParameters
 import logging
-from dask_client import get_client
+from scripts.dask_client import get_client
 
 
 def create_dir(directory: str):
