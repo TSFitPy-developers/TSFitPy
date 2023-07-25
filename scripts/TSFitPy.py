@@ -3552,7 +3552,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     logging.debug("Finished preparing the configuration file")
 
     if tsfitpy_configuration.number_of_cpus != 1:
-        client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name, tsfitpy_configuration.number_of_cpus, tsfitpy_configuration.number_of_nodes)
+        client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name,
+                                 tsfitpy_configuration.number_of_cpus, nodes=tsfitpy_configuration.number_of_nodes,
+                                 slurm_script_commands=tsfitpy_configuration.script_commands,
+                                 slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
