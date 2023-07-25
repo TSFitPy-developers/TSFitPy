@@ -2264,6 +2264,16 @@ class TSFitPyConfig:
         self.find_teff_errors: bool = False
         self.teff_error_sigma: float = 3
 
+        # new options for the slurm cluster
+        self.cluster_type = "local"
+        self.number_of_nodes = 1
+        self.memory_per_cpu_gb = 3.6
+        self.script_commands = [            # Additional commands to run before starting dask worker
+            'module purge',
+            'module load basic-path',
+            'module load intel',
+            'module load anaconda3-py3.10']
+
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -2584,6 +2594,21 @@ class TSFitPyConfig:
         self.guess_range_rotation = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
         self.guess_range_abundance = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
         self.guess_range_doppler = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
+
+        try:
+            self.cluster_type = self.config_parser["SlurmClusterParameters"]["cluster_type"].lower()
+            self.number_of_nodes = int(self.config_parser["SlurmClusterParameters"]["number_of_nodes"])
+            self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
+            self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
+        except KeyError:
+            self.cluster_type = "local"
+            self.number_of_nodes = 1
+            self.memory_per_cpu_gb = 3.6
+            self.script_commands = [            # Additional commands to run before starting dask worker
+                'module purge',
+                'module load basic-path',
+                'module load intel',
+                'module load anaconda3-py3.10']
 
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
@@ -3045,6 +3070,12 @@ class TSFitPyConfig:
             string_to_return = f"{string_to_return} {element}"
         return string_to_return
 
+    @staticmethod
+    def _split_string_to_string_list_with_semicolons(string_to_split: str) -> list[str]:
+        # separate based on semicolons and remove them from the list
+        string_to_split = string_to_split.split(';')
+        return string_to_split
+
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
@@ -3066,7 +3097,7 @@ def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -
 
     return np.asarray(segments_left), np.asarray(segments_right)
 
-def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed):
+def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed=False):
     print("IMPORTANT UPDATE:")
     print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma"
           "i.e. the error in the observed spectra (sqrt(variance)). If this is not the case, please change the spectra."
@@ -3521,13 +3552,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     logging.debug("Finished preparing the configuration file")
 
     if tsfitpy_configuration.number_of_cpus != 1:
-        print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
-        if dask_mpi_installed:
-            print("Ignoring requested number of CPUs in the config file and launching based on CPUs requested in the slurm script")
-            dask_mpi_initialize()
-            client = Client(threads_per_worker=1)  # if # of threads are not equal to 1, then may break the program
-        else:
-            client = get_dask_client("slurm", tsfitpy_configuration.cluster_name, tsfitpy_configuration.number_of_cpus, nodes=8)
+        client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name, tsfitpy_configuration.number_of_cpus, tsfitpy_configuration.number_of_nodes)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
