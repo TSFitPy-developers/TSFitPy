@@ -50,6 +50,7 @@ def get_slurm_cluster(cores_per_job: int, jobs: int, memory_per_job_gb: int, scr
         cores=cores_per_job,                     # Number of cores per job (so like cores/workers per node)
         memory=f"{memory_per_job_gb * cores_per_job}GB",         # Amount of memory per job (also per node)
         job_script_prologue=script_commands,     # Additional commands to run before starting dask worker
+        walltime='336:00:00',                      # Time limit for each job
     )
     cluster.scale(jobs=jobs)      # How many nodes
     client = Client(cluster)
