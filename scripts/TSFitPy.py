@@ -2273,6 +2273,7 @@ class TSFitPyConfig:
             'module load basic-path',
             'module load intel',
             'module load anaconda3-py3.10']
+        self.time_limit_hours = 71
 
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -2600,6 +2601,7 @@ class TSFitPyConfig:
             self.number_of_nodes = int(self.config_parser["SlurmClusterParameters"]["number_of_nodes"])
             self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
             self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
+            self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
         except KeyError:
             self.cluster_type = "local"
             self.number_of_nodes = 1
@@ -2609,6 +2611,7 @@ class TSFitPyConfig:
                 'module load basic-path',
                 'module load intel',
                 'module load anaconda3-py3.10']
+            self.time_limit_hours = 71
 
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
@@ -3555,7 +3558,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name,
                                  tsfitpy_configuration.number_of_cpus, nodes=tsfitpy_configuration.number_of_nodes,
                                  slurm_script_commands=tsfitpy_configuration.script_commands,
-                                 slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb)
+                                 slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb,
+                                 time_limit_hours=tsfitpy_configuration.time_limit_hours)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):

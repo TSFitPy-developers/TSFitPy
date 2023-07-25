@@ -5,14 +5,16 @@ import numpy as np
 import socket
 
 
-def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: int, nodes=1, slurm_script_commands=None, slurm_memory_per_core=3.6, **kwargs):
+def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: int, nodes=1, slurm_script_commands=None,
+                    slurm_memory_per_core=3.6, time_limit_hours=None, **kwargs):
     if cluster_name is None:
         cluster_name = "unknown"
     print("Preparing workers")
     if client_type == "local":
         client = get_local_client(workers_amount_cpus)
     elif client_type == "slurm":
-        client = get_slurm_cluster(workers_amount_cpus, nodes, slurm_memory_per_core, script_commands=slurm_script_commands, **kwargs)
+        client = get_slurm_cluster(workers_amount_cpus, nodes, slurm_memory_per_core,
+                                   script_commands=slurm_script_commands, time_limit_hours=time_limit_hours, **kwargs)
     else:
         raise ValueError("client_type must be either local or slurm")
 
@@ -38,7 +40,8 @@ def get_local_client(workers_amount, **kwargs):
     return client
 
 
-def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: int, script_commands=None, **kwargs):
+def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: int, script_commands=None,
+                      time_limit_hours=72, **kwargs):
     if script_commands is None:
         script_commands = [            # Additional commands to run before starting dask worker
             'module purge',
@@ -50,7 +53,7 @@ def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: i
         cores=cores_per_job,                     # Number of cores per job (so like cores/workers per node)
         memory=f"{memory_per_core_gb * cores_per_job}GB",         # Amount of memory per job (also per node)
         job_script_prologue=script_commands,     # Additional commands to run before starting dask worker
-        walltime='336:00:00'                      # Time limit for each job
+        walltime=f'{time_limit_hours}:00:00'                      # Time limit for each job
     )
     cluster.scale(jobs=jobs_nodes)      # How many nodes
     client = Client(cluster)
