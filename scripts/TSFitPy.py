@@ -26,6 +26,7 @@ from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.loading_configs import SpectraParameters
 import logging
+from dask_client import get_client
 
 
 def create_dir(directory: str):
@@ -3526,21 +3527,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             dask_mpi_initialize()
             client = Client(threads_per_worker=1)  # if # of threads are not equal to 1, then may break the program
         else:
-            if tsfitpy_configuration.number_of_cpus > 1:
-                client = Client(threads_per_worker=1, n_workers=tsfitpy_configuration.number_of_cpus)
-            else:
-                client = Client(threads_per_worker=1)
-        print(client)
-
-        host = client.run_on_scheduler(socket.gethostname)
-        port = client.scheduler_info()['services']['dashboard']
-        print(f"Assuming that the cluster is ran at {tsfitpy_configuration.cluster_name} (change in config if not the case)")
-
-        # print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
-        print(f"ssh -N -L {port}:{host}:{port} {tsfitpy_configuration.cluster_name}")
-        print(f"Then go to http://localhost:{port}/status to check the status of the workers")
-
-        print("Worker preparation complete")
+            client = get_client("slurm", tsfitpy_configuration.cluster_name, tsfitpy_configuration.number_of_cpus, nodes=8)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
