@@ -5,7 +5,7 @@ import numpy as np
 import socket
 
 
-def get_client(client_type: str, cluster_name: str, workers_amount: int, **kwargs):
+def get_dask_client(client_type: str, cluster_name: str, workers_amount: int, **kwargs):
     if cluster_name is None:
         cluster_name = "unknown"
     print("Preparing workers")

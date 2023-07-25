@@ -26,7 +26,7 @@ from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.loading_configs import SpectraParameters
 import logging
-from scripts.dask_client import get_client
+from scripts.dask_client import get_dask_client
 
 
 def create_dir(directory: str):
@@ -1027,7 +1027,7 @@ class Spectra:
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
             # Maybe Dask will break this in the future? Then remove whatever within this if statement
-            client = get_client()
+            client = get_dask_client()
             for line_number in range(len(self.line_begins_sorted)):
 
                 res1 = client.submit(self.fit_one_line, line_number)
@@ -1453,7 +1453,7 @@ class Spectra:
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
             # Maybe Dask will break this in the future? Then remove whatever within this if statement
-            client = get_client()
+            client = get_dask_client()
             for line_number in range(len(self.line_begins_sorted)):
 
                 res1 = client.submit(self.fit_one_line_vmic, line_number)
@@ -3527,7 +3527,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             dask_mpi_initialize()
             client = Client(threads_per_worker=1)  # if # of threads are not equal to 1, then may break the program
         else:
-            client = get_client("slurm", tsfitpy_configuration.cluster_name, tsfitpy_configuration.number_of_cpus, nodes=8)
+            client = get_dask_client("slurm", tsfitpy_configuration.cluster_name, tsfitpy_configuration.number_of_cpus, nodes=8)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
