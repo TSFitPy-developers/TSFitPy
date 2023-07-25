@@ -1453,7 +1453,7 @@ class Spectra:
         if self.dask_workers > 1 and self.experimental_parallelisation:
             #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
             # Maybe Dask will break this in the future? Then remove whatever within this if statement
-            client = get_dask_client()
+            client = get_client()
             for line_number in range(len(self.line_begins_sorted)):
 
                 res1 = client.submit(self.fit_one_line_vmic, line_number)
