@@ -12,7 +12,7 @@ def get_client(client_type: str, cluster_name: str, workers_amount: int, **kwarg
     if client_type == "local":
         client = get_local_client(workers_amount)
     elif client_type == "slurm":
-        client = get_slurm_cluster(kwargs['nodes'], **kwargs)
+        client = get_slurm_cluster(workers_amount, kwargs['nodes'], 3.6, **kwargs)
     else:
         raise ValueError("client_type must be either local or slurm")
 
