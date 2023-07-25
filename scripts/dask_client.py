@@ -49,12 +49,14 @@ def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: i
             'module load intel',
             'module load anaconda3-py3.10']
     # Create a SLURM cluster object
-    time_limit_string = ""
     # split into days, hours in format: days-hh:mm:ss
-    if time_limit_hours is not None:
-        days = time_limit_hours // 24
-        hours = time_limit_hours % 24
-        time_limit_string = f"{days}-{hours}:00:00"
+    days = time_limit_hours // 24
+    hours = time_limit_hours % 24
+    if days == 0:
+        time_limit_string = f"{hours:02d}:00:00"
+    else:
+        time_limit_string = f"{days}-{hours:02d}:00:00"
+    print(time_limit_string)
     cluster = SLURMCluster(
         cores=cores_per_job,                     # Number of cores per job (so like cores/workers per node)
         memory=f"{memory_per_core_gb * cores_per_job}GB",         # Amount of memory per job (also per node)
