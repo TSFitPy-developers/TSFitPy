@@ -49,11 +49,17 @@ def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: i
             'module load intel',
             'module load anaconda3-py3.10']
     # Create a SLURM cluster object
+    time_limit_string = ""
+    # split into days, hours in format: days-hh:mm:ss
+    if time_limit_hours is not None:
+        days = time_limit_hours // 24
+        hours = time_limit_hours % 24
+        time_limit_string = f"{days}-{hours:02d}:00:00"
     cluster = SLURMCluster(
         cores=cores_per_job,                     # Number of cores per job (so like cores/workers per node)
         memory=f"{memory_per_core_gb * cores_per_job}GB",         # Amount of memory per job (also per node)
         job_script_prologue=script_commands,     # Additional commands to run before starting dask worker
-        walltime=f'{time_limit_hours}:00:00'                      # Time limit for each job
+        walltime=time_limit_string                      # Time limit for each job
     )
     cluster.scale(jobs=jobs_nodes)      # How many nodes
     client = Client(cluster)
