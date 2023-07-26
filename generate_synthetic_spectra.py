@@ -259,6 +259,12 @@ class SyntheticSpectraConfig:
             string_to_return = f"{string_to_return} {element_}"
         return string_to_return
 
+    @staticmethod
+    def _split_string_to_string_list_with_semicolons(string_to_split: str) -> list[str]:
+        # separate based on semicolons and remove them from the list
+        string_to_split = string_to_split.split(';')
+        return string_to_split
+
 if __name__ == '__main__':
     # load config file from command line
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
