@@ -55,7 +55,7 @@ def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: i
     if days == 0:
         time_limit_string = f"{int(hours):02d}:00:00"
     else:
-        time_limit_string = f"{days}-{int(hours):02d}:00:00"
+        time_limit_string = f"{int(days)}-{int(hours):02d}:00:00"
     print(time_limit_string)
     cluster = SLURMCluster(
         cores=cores_per_job,                     # Number of cores per job (so like cores/workers per node)
