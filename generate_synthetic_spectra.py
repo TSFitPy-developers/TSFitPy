@@ -4,6 +4,8 @@ import logging
 import pickle
 import sys
 from configparser import ConfigParser
+
+from scripts.dask_client import get_dask_client
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 from scripts.convolve import *
 import datetime
@@ -71,6 +73,17 @@ class SyntheticSpectraConfig:
         self.marcs_models = None
         self.marcs_values = None
 
+        # new options for the slurm cluster
+        self.cluster_type = "local"
+        self.number_of_nodes = 1
+        self.memory_per_cpu_gb = 3.6
+        self.script_commands = [            # Additional commands to run before starting dask worker
+            'module purge',
+            'module load basic-path',
+            'module load intel',
+            'module load anaconda3-py3.10']
+        self.time_limit_hours = 71
+
     def load_config(self):
         # read the configuration file
         self.config_parser.read(self.config_location)
@@ -103,6 +116,23 @@ class SyntheticSpectraConfig:
         self.save_unnormalised_spectra = self.convert_string_to_bool(self.config_parser["ExtraParameters"]["save_unnormalised_spectra"])
 
         self.input_parameters_filename = self.config_parser["InputFile"]["input_filename"]
+
+        try:
+            self.cluster_type = self.config_parser["SlurmClusterParameters"]["cluster_type"].lower()
+            self.number_of_nodes = int(self.config_parser["SlurmClusterParameters"]["number_of_nodes"])
+            self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
+            self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
+            self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
+        except KeyError:
+            self.cluster_type = "local"
+            self.number_of_nodes = 1
+            self.memory_per_cpu_gb = 3.6
+            self.script_commands = [            # Additional commands to run before starting dask worker
+                'module purge',
+                'module load basic-path',
+                'module load intel',
+                'module load anaconda3-py3.10']
+            self.time_limit_hours = 71
 
 
 
@@ -296,18 +326,11 @@ if __name__ == '__main__':
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
-    print("Preparing workers")
-    client = Client(threads_per_worker=1, n_workers=config_synthetic_spectra.number_of_cpus)  # if # of threads are not equal to 1, then may break the program
-    print(client)
-
-    host = client.run_on_scheduler(socket.gethostname)
-    port = client.scheduler_info()['services']['dashboard']
-    print(f"Assuming that the cluster is ran at {config_synthetic_spectra.cluster_name} (change in config if not the case)")
-
-    # print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
-    print(f"ssh -N -L {port}:{host}:{port} {config_synthetic_spectra.cluster_name}")
-
-    print("Worker preparation complete")
+    client = get_dask_client(config_synthetic_spectra.cluster_type, config_synthetic_spectra.cluster_name,
+                             config_synthetic_spectra.number_of_cpus, nodes=config_synthetic_spectra.number_of_nodes,
+                             slurm_script_commands=config_synthetic_spectra.script_commands,
+                             slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
+                             time_limit_hours=config_synthetic_spectra.time_limit_hours)
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
