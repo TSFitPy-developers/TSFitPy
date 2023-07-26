@@ -6,7 +6,7 @@ import socket
 
 
 def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: int, nodes=1, slurm_script_commands=None,
-                    slurm_memory_per_core=3.6, time_limit_hours=None, **kwargs):
+                    slurm_memory_per_core=3.6, time_limit_hours=72, **kwargs):
     if cluster_name is None:
         cluster_name = "unknown"
     print("Preparing workers")
