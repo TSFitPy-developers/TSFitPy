@@ -124,7 +124,7 @@ class SyntheticSpectraConfig:
             self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
             self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
             self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
-            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["slurm_partition"]
+            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["partition"]
         except KeyError:
             self.cluster_type = "local"
             self.number_of_nodes = 1
@@ -339,7 +339,8 @@ if __name__ == '__main__':
                              config_synthetic_spectra.number_of_cpus, nodes=config_synthetic_spectra.number_of_nodes,
                              slurm_script_commands=config_synthetic_spectra.script_commands,
                              slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
-                             time_limit_hours=config_synthetic_spectra.time_limit_hours)
+                             time_limit_hours=config_synthetic_spectra.time_limit_hours,
+                             slurm_partition=config_synthetic_spectra.partition)
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
