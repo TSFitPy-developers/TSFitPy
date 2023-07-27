@@ -2274,6 +2274,7 @@ class TSFitPyConfig:
             'module load intel',
             'module load anaconda3-py3.10']
         self.time_limit_hours = 71
+        self.slurm_partition = "debug"
 
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -2602,6 +2603,7 @@ class TSFitPyConfig:
             self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
             self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
             self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
+            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["slurm_partition"]
         except KeyError:
             self.cluster_type = "local"
             self.number_of_nodes = 1
@@ -2612,6 +2614,7 @@ class TSFitPyConfig:
                 'module load intel',
                 'module load anaconda3-py3.10']
             self.time_limit_hours = 71
+            self.slurm_partition = "debug"
 
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
@@ -3559,7 +3562,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
                                  tsfitpy_configuration.number_of_cpus, nodes=tsfitpy_configuration.number_of_nodes,
                                  slurm_script_commands=tsfitpy_configuration.script_commands,
                                  slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb,
-                                 time_limit_hours=tsfitpy_configuration.time_limit_hours)
+                                 time_limit_hours=tsfitpy_configuration.time_limit_hours,
+                                 slurm_partition=tsfitpy_configuration.slurm_partition)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
@@ -3686,8 +3690,3 @@ if __name__ == '__main__':
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
-
-# TODO:
-# - fix pathing in run_wrapper
-# - fix pathing in run_wrapper_v2
-# - fix chisqr for method all

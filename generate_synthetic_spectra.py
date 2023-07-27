@@ -83,6 +83,7 @@ class SyntheticSpectraConfig:
             'module load intel',
             'module load anaconda3-py3.10']
         self.time_limit_hours = 71
+        self.slurm_partition = "debug"
 
     def load_config(self):
         # read the configuration file
@@ -123,6 +124,7 @@ class SyntheticSpectraConfig:
             self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
             self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
             self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
+            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["slurm_partition"]
         except KeyError:
             self.cluster_type = "local"
             self.number_of_nodes = 1
@@ -133,6 +135,7 @@ class SyntheticSpectraConfig:
                 'module load intel',
                 'module load anaconda3-py3.10']
             self.time_limit_hours = 71
+            self.slurm_partition = "debug"
 
 
 
