@@ -340,7 +340,7 @@ if __name__ == '__main__':
                              slurm_script_commands=config_synthetic_spectra.script_commands,
                              slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
                              time_limit_hours=config_synthetic_spectra.time_limit_hours,
-                             slurm_partition=config_synthetic_spectra.partition)
+                             slurm_partition=config_synthetic_spectra.slurm_partition)
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
