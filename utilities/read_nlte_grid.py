@@ -55,7 +55,7 @@ def plot_departure_coefficients(depart, tau, atmosStr, levels_to_plot):
 
     fig, ax = plt.subplots()
     for level in levels_to_plot:
-        ax.plot(tau, depart[level - 1], label=f"level {level - 1}")
+        ax.plot(tau, depart[level - 1], label=f"level {level}")
     ax.set_xlabel(r"$\log_{10}(\tau)$")
     ax.set_ylabel(r"$b_{\rm NLTE}$")
     ax.set_title(f"Departure coefficients for {atmosStr}")
