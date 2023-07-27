@@ -26,6 +26,7 @@ from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.loading_configs import SpectraParameters
 import logging
+from scripts.dask_client import get_dask_client
 
 
 def create_dir(directory: str):
@@ -2263,6 +2264,18 @@ class TSFitPyConfig:
         self.find_teff_errors: bool = False
         self.teff_error_sigma: float = 3
 
+        # new options for the slurm cluster
+        self.cluster_type = "local"
+        self.number_of_nodes = 1
+        self.memory_per_cpu_gb = 3.6
+        self.script_commands = [            # Additional commands to run before starting dask worker
+            'module purge',
+            'module load basic-path',
+            'module load intel',
+            'module load anaconda3-py3.10']
+        self.time_limit_hours = 71
+        self.slurm_partition = "debug"
+
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -2583,6 +2596,25 @@ class TSFitPyConfig:
         self.guess_range_rotation = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
         self.guess_range_abundance = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
         self.guess_range_doppler = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
+
+        try:
+            self.cluster_type = self.config_parser["SlurmClusterParameters"]["cluster_type"].lower()
+            self.number_of_nodes = int(self.config_parser["SlurmClusterParameters"]["number_of_nodes"])
+            self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
+            self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
+            self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
+            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["slurm_partition"]
+        except KeyError:
+            self.cluster_type = "local"
+            self.number_of_nodes = 1
+            self.memory_per_cpu_gb = 3.6
+            self.script_commands = [            # Additional commands to run before starting dask worker
+                'module purge',
+                'module load basic-path',
+                'module load intel',
+                'module load anaconda3-py3.10']
+            self.time_limit_hours = 71
+            self.slurm_partition = "debug"
 
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
@@ -3044,6 +3076,12 @@ class TSFitPyConfig:
             string_to_return = f"{string_to_return} {element}"
         return string_to_return
 
+    @staticmethod
+    def _split_string_to_string_list_with_semicolons(string_to_split: str) -> list[str]:
+        # separate based on semicolons and remove them from the list
+        string_to_split = string_to_split.split(';')
+        return string_to_split
+
 
 def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
     segments_left = []
@@ -3065,7 +3103,7 @@ def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -
 
     return np.asarray(segments_left), np.asarray(segments_right)
 
-def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed):
+def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed=False):
     print("IMPORTANT UPDATE:")
     print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma"
           "i.e. the error in the observed spectra (sqrt(variance)). If this is not the case, please change the spectra."
@@ -3520,27 +3558,12 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     logging.debug("Finished preparing the configuration file")
 
     if tsfitpy_configuration.number_of_cpus != 1:
-        print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
-        if dask_mpi_installed:
-            print("Ignoring requested number of CPUs in the config file and launching based on CPUs requested in the slurm script")
-            dask_mpi_initialize()
-            client = Client(threads_per_worker=1)  # if # of threads are not equal to 1, then may break the program
-        else:
-            if tsfitpy_configuration.number_of_cpus > 1:
-                client = Client(threads_per_worker=1, n_workers=tsfitpy_configuration.number_of_cpus)
-            else:
-                client = Client(threads_per_worker=1)
-        print(client)
-
-        host = client.run_on_scheduler(socket.gethostname)
-        port = client.scheduler_info()['services']['dashboard']
-        print(f"Assuming that the cluster is ran at {tsfitpy_configuration.cluster_name} (change in config if not the case)")
-
-        # print(logger.info(f"ssh -N -L {port}:{host}:{port} {login_node_address}"))
-        print(f"ssh -N -L {port}:{host}:{port} {tsfitpy_configuration.cluster_name}")
-        print(f"Then go to http://localhost:{port}/status to check the status of the workers")
-
-        print("Worker preparation complete")
+        client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name,
+                                 tsfitpy_configuration.number_of_cpus, nodes=tsfitpy_configuration.number_of_nodes,
+                                 slurm_script_commands=tsfitpy_configuration.script_commands,
+                                 slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb,
+                                 time_limit_hours=tsfitpy_configuration.time_limit_hours,
+                                 slurm_partition=tsfitpy_configuration.slurm_partition)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
@@ -3667,8 +3690,3 @@ if __name__ == '__main__':
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
     finally:
         print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
-
-# TODO:
-# - fix pathing in run_wrapper
-# - fix pathing in run_wrapper_v2
-# - fix chisqr for method all

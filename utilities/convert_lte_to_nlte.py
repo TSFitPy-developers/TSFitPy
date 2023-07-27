@@ -13,8 +13,8 @@ def read_atoms():
             while line:
                 fields = line.strip().split()
                 if fields[0] == "*" and len(fields) > 1:
-                    if fields[1] == "EC":
-                        while line[0:4] != "* UP":
+                    if fields[1] == "EC" or fields[1] == "E[cm⁻¹]":
+                        while line[0:4] != "* UP" and line[0:11] != "* RADIATIVE":
                             line = fp.readline()
                             fields = line.strip().split()
                             if fields[0] != "*":
@@ -32,15 +32,15 @@ def read_atoms():
                     line = fp.readline()
         fp.close()
         #begin crossmatching the lines in the model linelist and filling the nlte line array
+        count_found_both = 0  # keep a count of how many we successfully crossmatch for a report at the end
+        count_found_one = 0
+        count_total = 0
         for k in range(len(transition_names[i])):
             with open(lte_linelist) as fp:
                 line = fp.readline()
                 while line:
                     if (line[1:6].replace(" ", "") == transition_names[i][k].replace(" ","")): #find the transition we want to crossmatch
                         line = fp.readline()
-                        count_found_both = 0 #keep a count of how many we successfully crossmatch for a report at the end
-                        count_found_one = 0
-                        count_total = 0
                         energy_factor = 1.0005 #this parameter can be adjusted to whatever margin of error is wanted (currently at 0.05%)
                         while line[0] != "'": #pull info from lte linelist and set to units in model atom
                             fields = line.strip().split()
@@ -230,8 +230,10 @@ def read_atoms():
                         else:
                             line = fp.readline()
             fp.close()
-
-            print("{}: Found {} of {} lines ({} %). Partial matches are {} of {} lines ({} %)".format(transition_names[i][k], count_found_both, count_total, 100.*(count_found_both/count_total), count_found_one, count_total, 100.*(count_found_one/count_total)))
+            if count_total == 0:
+                print(f"{transition_names[i][k]}: No lines found in the linelist to crossmatch")
+            else:
+                print("{}: Found {} of {} lines ({} %). Partial matches are {} of {} lines ({} %)".format(transition_names[i][k], count_found_both, count_total, 100.*(count_found_both/count_total), count_found_one, count_total, 100.*(count_found_one/count_total)))
 
 def print_atoms():
     #now print linelist with nlte values

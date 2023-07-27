@@ -1,3 +1,4 @@
+from __future__ import annotations
 import pandas as pd
 import numpy as np
 from scripts.solar_abundances import periodic_table, solar_abundances
@@ -76,7 +77,7 @@ class SpectraParameters:
                         standard_name = f"{testing_col[:-1].lower()}"
                         abundances_xh_given.append(standard_name)
                         self.abundance_elements_given.append(standard_name.capitalize())
-                    elif np.size(testing_col) <= 2 and testing_col in periodic_table:
+                    elif np.size(testing_col) <= 2 and testing_col.capitalize() in periodic_table:
                         # means just elemental abundance perhaps
                         standard_name = f"{testing_col.lower()}"
                         abundances_x_given.append(standard_name)
@@ -206,7 +207,11 @@ class SpectraParameters:
         for i in range(self.number_of_rows):
             abundance_dict = {}
             for element in self.abundance_elements_given:
-                abundance_dict[element] = self.spectra_parameters_df[element][i]
+                elemental_abundance = self.spectra_parameters_df[element][i]
+                # replace nan with 0
+                if np.isnan(elemental_abundance):
+                    elemental_abundance = 0
+                abundance_dict[element] = elemental_abundance
             abundance_list.append(abundance_dict)
 
         # stack all parameters
@@ -227,6 +232,6 @@ class SpectraParameters:
         return self.spectra_parameters_df.to_string()
 
 if __name__ == '__main__':
-    fitlist = SpectraParameters('../input_files/fitlist_test', True)
+    fitlist = SpectraParameters('../input_files/fitlist_test2', False)
     print(fitlist)
-    print(fitlist.get_spectra_parameters_for_fit(False, False, False))
+    print(fitlist.get_spectra_parameters_for_grid_generation())
