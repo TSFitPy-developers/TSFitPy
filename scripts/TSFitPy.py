@@ -2603,7 +2603,7 @@ class TSFitPyConfig:
             self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
             self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
             self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
-            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["slurm_partition"]
+            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["partition"]
         except KeyError:
             self.cluster_type = "local"
             self.number_of_nodes = 1
