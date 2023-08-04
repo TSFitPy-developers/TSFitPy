@@ -213,6 +213,10 @@ Also, Windows is not supported (?).
       - You need to specify the element name, the model atom and the linelist
       - It will add the labels to the linelist and save it in
       - You can then use that linelist for the NLTE fitting
+      - Note on the usage of the script. The model atom should not have too many weird comments, because Python expects really specific formatting. 
+        - Importantly, after the levels, the comment should start with `* UP` or `* RADIATIVE` to stop reading the levels
+        - Each level should have approximately this format: `      0.0000    2.0 ' Level     1  =    2p6.3s2S           ' 1`, so space locations are important. 6th or 7th column is the electron configuration, which should not have any spaces:
+          - I.e. 4th is level energy and 6th is electron configuration OR 5th is level energy and 7th is electron configuration
 
 
 ## ifort compiler installation
@@ -238,6 +242,11 @@ Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-
     - This will print out the Fortran output and extra Python output
   - Look at the bottom of the output: usually you will see what goes wrong
     - You can also search for `forr`, because Fortran errors usually start with `forrtl`
+
+- TurboSpectrum has a limit of 100 linelists. So if you have too many linelists, it will crash.
+  - In that case combine some of the linelists into one
+
+
 
 - If you get a Fortran error `forrtl: severe (24): end-of-file during read, unit -5, file Internal List-Directed Read` in the `bsyn_lu            000000000041DB92  getlele_                   38  getlele.f` just after it trying to `  starting scan of linelist` with some molecular name, then the issue is probably the following one:
   - Your abundance of the element is too low (e.g. I had that issue with [X/Fe] = -30) and it skips that element in the molecular line identification. In that case remove the molecular linelist containing that element, or increase your element abundance (e.g. to [X/Fe] = -3)
