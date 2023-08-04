@@ -209,8 +209,22 @@ Also, Windows is not supported (?).
     - That is where you can specify new element names for the grids with their corresponding grid names (just copy the format from other elements)
   - Make sure that the linelist is correct for that model atom
     - Open the linelist, find that element (e.g. search for `O I`), and check that the levels are correct (at least NLTE should be written there next to the element name)
-    - OR if you add a new linelist, you will need to add the 
+    - OR if you add a new linelist, you will need to add the labels using the `utities/convert_lte_to_nlte.py` script
+      - You need to specify the element name, the model atom and the linelist
+      - It will add the labels to the linelist and save it in
+      - You can then use that linelist for the NLTE fitting
 
+
+## ifort compiler installation
+
+- You can install the ifort compiler from [this link](https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html)
+  - I believe stand-alone version works great, just try that one
+  - You will probably require Intel CPU, though someone had success with older versions of ifort on M1 Mac?
+  - Or you can use a docker image (slower fitting though)
+- Before you are able to run `ifort` command, you might need to source the `setvars.sh` file (see [this intel link](https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/2023-0/use-the-setvars-script-with-linux-or-macos.html) and [especially this intel link](https://www.intel.com/content/www/us/en/docs/fortran-compiler/developer-guide-reference/2023-0/specifying-the-location-of-compiler-components.html))
+  - You can find it in the installation folder, e.g. `source <install-dir>/setvars.sh`
+    - `<install_dir>` is probably `/opt/intel/oneapi/`? 
+  - You can also add it to your `.bashrc` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
 
 ## Extra notes
 
