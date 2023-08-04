@@ -13,7 +13,7 @@ def read_atoms():
             while line:
                 fields = line.strip().split()
                 if fields[0] == "*" and len(fields) > 1:
-                    if fields[1] == "EC" or fields[1] == "E[cm⁻¹]":
+                    if fields[1] == "EC" or fields[1] == "E[cm⁻¹]" or fields[1] == "Energy":
                         while line[0:4] != "* UP" and line[0:11] != "* RADIATIVE":
                             line = fp.readline()
                             fields = line.strip().split()
