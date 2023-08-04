@@ -138,15 +138,7 @@ def read_atoms():
                                 try:
                                     if accessory_match:
                                         acc_level, acc_energy, acc_label, acc_energy_nist, acc_term, acc_config, acc_percent, acc_ion = np.loadtxt(accessory_matching_files[i], dtype='str', unpack=True)
-                                    lte_config = fields[len(fields)-2]
-                                    place = 0
-                                    while lte_config:
-                                        if lte_config[len(lte_config)-1-place] == "." or lte_config[len(lte_config)-1-place] == "-" or lte_config[len(lte_config)-1-place] == ":":
-                                            break
-                                        place+=1
-                                    lte_config = lte_config[-place:len(lte_config)]
-                                    lte_config = lte_config.replace("(","")
-                                    lte_config = lte_config.replace(")","")
+
                                     if accessory_match == False:
                                         lte_label_up = lte_label_up.replace("*","")
                                     nlte_level_low = 0
@@ -162,6 +154,17 @@ def read_atoms():
                                             nlte_EC_low = atom_EC[j]
                                             convid_low = 'c'
                                     if accessory_match:
+                                        lte_config = fields[len(fields) - 2]
+                                        place = 0
+                                        while lte_config:
+                                            if lte_config[len(lte_config) - 1 - place] == "." or lte_config[
+                                                len(lte_config) - 1 - place] == "-" or lte_config[
+                                                len(lte_config) - 1 - place] == ":":
+                                                break
+                                            place += 1
+                                        lte_config = lte_config[-place:len(lte_config)]
+                                        lte_config = lte_config.replace("(", "")
+                                        lte_config = lte_config.replace(")", "")
                                         for j in range(len(acc_level)):
                                             if lte_label_up == acc_term[j] and lte_config == acc_config[j] and lte_EC_up <= float(acc_energy[j])*energy_factor and lte_EC_up >= float(acc_energy[j])/energy_factor:
                                                 nlte_level_up = int(acc_level[j])
