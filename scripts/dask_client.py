@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dask.distributed import Client
 from dask_jobqueue import SLURMCluster
 import time

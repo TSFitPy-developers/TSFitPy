@@ -8,6 +8,7 @@ The code requires at least version Python 3.7. It also makes use of fortran prog
 - Numpy
 - Scipy (at least 1.7.1)
 - Dask (installed using pip install dask[complete])
+- dask_jobqueue (does NOT come by default with the Dask)
 - Pandas
 - Astropy
 - Matplotlib (only for plotting)
@@ -229,6 +230,36 @@ Also, Windows is not supported (?).
   - You can find it in the installation folder, e.g. `source <install-dir>/setvars.sh`
     - `<install_dir>` is probably `/opt/intel/oneapi/`? 
   - You can also add it to your `.bashrc` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
+
+## Multiprocessing usage
+
+Regarding the multiprocessing usage with Dask
+- Dask is the library used for multiprocessing.
+- By default, it runs the same whether on a cluster or locally
+- From the new update, now you can run on several nodes using slurm
+  - There are several new options at the bottom of the config under [SlurmClusterParameters]
+    - `cluster_type` is the type of cluster. Can be `slurm` or `local`. `local` ignores the other parameters
+    - `number_of_nodes` is the number of nodes to use, cpus are taken from the `number_of_cpus` parameter
+    - `memory_per_cpu_gb` is the memory per CPU in GB (recommended to be at least 3 GB)
+    - `script_commands` are the commands to run before the script. Each command is separated by a semicolon. Example below purges the modules and loads the ones needed
+      - `module purge;module load basic-path;module load intel;module load anaconda3-py3.10`
+    - `time_limit_hours` is the time limit for the job in hours 
+    - `partition` is the partition to use in the cluster passed to the `--partition` flag
+  - 'slurm' will launch each individual work with `number_of_cpus` cpus, so if you have 4 cpus and 2 nodes, it will use 8 CPUs in total
+    - Each worker will start as a separate slurm job
+    - The best way to use this is to launch a slurm job of the actual script using 1 CPU, standard memory and long time limit
+    - That job will act as the dashboard to launch and distribute other workers
+    - Each other worker will start up in the slurm queue and start as soon as slurm allows them
+      - However, not all workers need to launch at the same time, so the calculations will start as soon as the first worker starts
+      - BUT, it seems like if any worker dies, the Dask dashboard will crash in the end, so make sure workers have enough time limit as well
+- You can also monitor the progress (and other statistics) in the Dask dashboard
+  - Locally, you can simply run `http://localhost:8787/` in your browser (port might be different, but probably not)
+  - If ran on a cluster, you can use SSH command to direct this dashboard to your own PC
+    - For that you write the name of your cluster (whichever server name you connect to) in the `cluster_name` in the [ExtraParameters]
+    - This will print something similar to: `ssh -N -L {port}:{host}:{port} {cluster_name}`, where `cluster_name` is taken from your config
+    - It should automatically figure out your `host` and `port` where the dask dashboard is ran
+    - By running this command in your terminal, it will redirect the dashboard to your browser with port `port`
+    - So you can once again check the dashboard in your browser by running `http://localhost:{port}/`, replacing `{port}` with the port above
 
 ## Extra notes
 

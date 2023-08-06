@@ -6,6 +6,7 @@ from scripts.convolve import *
 import datetime
 import shutil
 import os
+from scripts.solar_abundances import solar_abundances
 
 def calculate_vturb(teff, logg, met):
     t0 = 5500.
@@ -33,7 +34,8 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
     lmin = lmin
     lmax = lmax
     ldelta = ldelta
-    temp_directory = os.path.join(os.getcwd(), f"temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
+    temp_directory = os.path.join(ts_config["global_temporary_directory"],
+                                  f"temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
@@ -118,8 +120,8 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
             wave_mod = wave_mod_macro
             flux_norm_mod = flux_norm_mod_macro
             flux_mod = flux_mod_macro
-    except FileNotFoundError:
-        print(f"FileNotFoundError: {spectrum_name}. Failed to generate spectrum.")
+    except (FileNotFoundError, OSError) as err:
+        print(f"FileNotFoundError: {spectrum_name}. Failed to generate spectrum. Error: {err}")
         wave_mod, flux_norm_mod, flux_mod = [], [], []
 
     shutil.rmtree(temp_directory)
@@ -133,31 +135,37 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
 
     wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb, verbose=verbose)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
-    f = open(file_location_output, 'w')
+    if len(wave_mod) > 0:
+        f = open(file_location_output, 'w')
 
-    # save the parameters used to generate the spectrum
-    # print when spectra was generated
-    print("#Generated using TurboSpectrum and TSFitPy wrapper", file=f)
-    print("#date: {}".format(datetime.datetime.now()), file=f)
-    print("#spectrum_name: {}".format(spectrum_name), file=f)
-    print("#teff: {}".format(teff), file=f)
-    print("#logg: {}".format(logg), file=f)
-    print("#[Fe/H]: {}".format(met), file=f)
-    print("#vmic: {}".format(vturb), file=f)
-    print("#vmac: {}".format(macro), file=f)
-    print("#resolution: {}".format(resolution), file=f)
-    print("#rotation: {}".format(rotation), file=f)
-    print("#nlte_flag: {}".format(nlte_flag), file=f)
-    for key, value in abundances_dict.items():
-        print("#[{}/Fe]={}".format(key, value), file=f)
-    print("#", file=f)
+        # save the parameters used to generate the spectrum
+        # print when spectra was generated
+        print("#Generated using TurboSpectrum and TSFitPy wrapper", file=f)
+        print("#date: {}".format(datetime.datetime.now()), file=f)
+        print("#spectrum_name: {}".format(spectrum_name), file=f)
+        print("#teff: {}".format(teff), file=f)
+        print("#logg: {}".format(logg), file=f)
+        print("#[Fe/H]: {}".format(met), file=f)
+        print("#vmic: {}".format(vturb), file=f)
+        print("#vmac: {}".format(macro), file=f)
+        print("#resolution: {}".format(resolution), file=f)
+        print("#rotation: {}".format(rotation), file=f)
+        print("#nlte_flag: {}".format(nlte_flag), file=f)
+        for key, value in abundances_dict.items():
+            if key != "Fe":
+                print(f"#[{key}/Fe]={value}", file=f)
+            else:
+                # if Fe, it is given as weird Fe/Fe way, which can be fixed back by:
+                # xfe + feh + A(X)_sun = A(X)_star
+                print(f"#[{key}/Fe]={value + met + solar_abundances['Fe']}", file=f)
+        print("#", file=f)
 
-    if save_unnormalised_spectra:
-        print("#Wavelength Normalised_flux Unnormalised_flux", file=f)
-        for i in range(len(wave_mod)):
-            print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
-    else:
-        print("#Wavelength Normalised_flux", file=f)
-        for i in range(len(wave_mod)):
-            print("{}  {}".format(wave_mod[i], flux_norm_mod[i]), file=f)
-    f.close()
+        if save_unnormalised_spectra:
+            print("#Wavelength Normalised_flux Unnormalised_flux", file=f)
+            for i in range(len(wave_mod)):
+                print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
+        else:
+            print("#Wavelength Normalised_flux", file=f)
+            for i in range(len(wave_mod)):
+                print("{}  {}".format(wave_mod[i], flux_norm_mod[i]), file=f)
+        f.close()
