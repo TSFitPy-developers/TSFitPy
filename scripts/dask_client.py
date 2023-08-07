@@ -35,7 +35,7 @@ def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: in
 
 
 def get_local_client(workers_amount, **kwargs):
-    if workers_amount > 1:
+    if workers_amount >= 1:
         client = Client(threads_per_worker=1, n_workers=workers_amount, **kwargs)
     else:
         client = Client(threads_per_worker=1, **kwargs)
