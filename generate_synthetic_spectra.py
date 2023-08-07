@@ -370,6 +370,8 @@ if __name__ == '__main__':
         pickle.dump(ts_config, f)
     tsfitpy_pickled_configuration_path = os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl")
 
+    logging.debug(config_synthetic_spectra)
+
     # time to run the code
     time_start = perf_counter()
 
