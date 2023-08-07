@@ -336,7 +336,7 @@ if __name__ == '__main__':
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
-    logging.debug(config_synthetic_spectra)
+    logging.debug(config_synthetic_spectra.__dict__)
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
