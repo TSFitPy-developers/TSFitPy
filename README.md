@@ -84,6 +84,7 @@ Also, Windows is not supported (?).
   - Error is used in chi2 calculation
 - It is recommended to create a separate config file for each run/set of stars. This allows to quickly refit the same sample of stars without recreating config file each time
 - Copy and paste the existing `TSFitPy/input_files/tsfitpy_input_configuration.cfg` and call it something like `TSFitPy/input_files/tsfitpy_input_configuration_sun_test.cfg`
+  - The reason to copy and paste is so that `git pull` cannot interfer with the default configuration
 - The config file should already be ready for a test run, but here is the reference breakdown if needed
   - [turbospectrum_compiler]:
     - `compiler` specifies the compiler (intel or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
@@ -166,7 +167,7 @@ Also, Windows is not supported (?).
 
 - 16.06.2023 - finally added grid generation (hooray? please be sure to test before using it maybe? seems to work on my side though)
 - To generate the grid, you need to create a `synthetic_spectra_generation_configuration.cfg` file based on the one provided in `./input_files/`
-- It is very similar to the config for fitting (just less options) and it only has one extra parameter:
+- It is very similar to the config for fitting (just fewer options) and it only has one extra parameter:
   - `save_unnormalised_spectra` is a boolean, if True, then it will save the unnormalised synthetic spectra (each file would be 30% larger)
 - It uses similar `fitlist`, but that one is much more flexible (see example in `./input_files/synthetic_spectra_parameters`)
   - First column specifies columns (order not important). Most importantly to have `teff  logg  [Fe/H]`
@@ -180,12 +181,12 @@ Also, Windows is not supported (?).
   - It will generate the grid and save it in the folder specified in the config file
     - Each spectrum is `index.spec` where `index` is the index of the spectrum (same order as in `fitlist`)
   - It will also save the .csv file with the grid parameters (including the name of spectrum)
-  - Each spectra also has comments on top with the parameters used to generate it
+  - Each spectrum also has comments on top with the parameters used to generate it
 
 ## Usage for calculate_nlte_correction_line.py
 
 - This script calculates the NLTE correction for a given line, for a given element, for a given model atmosphere
-- It uses the same config file as the fitting, it just skips some of the parameters
+- It uses the same config file as the fitting, it just skips some parameters
 - Specify element (`elements_to_fit`), line (`linemask`) and model atmosphere (`fitlist`) in the config file
 - It calculates the NLTE correction for the given line and saves it in the output folder by matching EW of NLTE line to LTE line
 - This can be useful to calculate pure NLTE correction withouth fitting the spectrum
@@ -251,7 +252,7 @@ Regarding the multiprocessing usage with Dask
     - That job will act as the dashboard to launch and distribute other workers
     - Each other worker will start up in the slurm queue and start as soon as slurm allows them
       - However, not all workers need to launch at the same time, so the calculations will start as soon as the first worker starts
-      - BUT, it seems like if any worker dies, the Dask dashboard will crash in the end, so make sure workers have enough time limit as well
+      - BUT it seems like if any worker dies, the Dask dashboard will crash in the end, so make sure workers have enough time limit as well
 - You can also monitor the progress (and other statistics) in the Dask dashboard
   - Locally, you can simply run `http://localhost:8787/` in your browser (port might be different, but probably not)
   - If ran on a cluster, you can use SSH command to direct this dashboard to your own PC
