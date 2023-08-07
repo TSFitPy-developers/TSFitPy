@@ -261,6 +261,26 @@ Regarding the multiprocessing usage with Dask
     - By running this command in your terminal, it will redirect the dashboard to your browser with port `port`
     - So you can once again check the dashboard in your browser by running `http://localhost:{port}/`, replacing `{port}` with the port above
 
+## Utilities
+
+There are some utilities in the `utilities` folder. They are not used in the fitting, but can be useful for other things.
+- `print_interesting_loggf.py`
+  - This script prints out the log(gf) values of the lines in the linelist within a certain range of wavelength above the given loggf threshold
+  - It is useful to find the lines that are interesting for the fitting
+- `read_nlte_grid.py`
+  - This script reads the NLTE grid and prints or plots departure coefficients for given level populations
+  - It is useful to check the NLTE grid
+  - As an input it takes the pointer to the NLTE grid for a specific atmosphere and the abundance, which you can find in the auxiliary files
+- `convert_lte_to_nlte.py`
+  - This script converts the LTE linelist to linelist containing NLTE labels, such that TurboSpectrum can do NLTE
+  - You usually only need to change 5 variables at the bottom:
+    - `lte_linelist` is the LTE linelist
+    - `output_file` is the NLTE linelist
+    - `nlte_models` are the NLTE model atoms for each element (list of models)
+    - `transition_names` are the names of the transitions in the linelist (2D list, where each list is for each element and ionisation stage)
+    - `ion_energy` is the ionisation energy of each element and ionisation stage (appropriately to `transition_names`)
+  - Then you can run the script and it will create the linelist with NLTE labels, so that you can run NLTE fitting
+
 ## Extra notes
 
 Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-todo
