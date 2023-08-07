@@ -336,12 +336,7 @@ if __name__ == '__main__':
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
-    client = get_dask_client(config_synthetic_spectra.cluster_type, config_synthetic_spectra.cluster_name,
-                             config_synthetic_spectra.number_of_cpus, nodes=config_synthetic_spectra.number_of_nodes,
-                             slurm_script_commands=config_synthetic_spectra.script_commands,
-                             slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
-                             time_limit_hours=config_synthetic_spectra.time_limit_hours,
-                             slurm_partition=config_synthetic_spectra.slurm_partition)
+    logging.debug(config_synthetic_spectra)
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
@@ -370,10 +365,16 @@ if __name__ == '__main__':
         pickle.dump(ts_config, f)
     tsfitpy_pickled_configuration_path = os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl")
 
-    logging.debug(config_synthetic_spectra)
-
     # time to run the code
     time_start = perf_counter()
+
+
+    client = get_dask_client(config_synthetic_spectra.cluster_type, config_synthetic_spectra.cluster_name,
+                             config_synthetic_spectra.number_of_cpus, nodes=config_synthetic_spectra.number_of_nodes,
+                             slurm_script_commands=config_synthetic_spectra.script_commands,
+                             slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
+                             time_limit_hours=config_synthetic_spectra.time_limit_hours,
+                             slurm_partition=config_synthetic_spectra.slurm_partition)
 
     futures = []
     for one_spectra_parameter in spectra_parameters:
