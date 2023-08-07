@@ -8,7 +8,7 @@ The code requires at least version Python 3.7. It also makes use of fortran prog
 - Numpy
 - Scipy (at least 1.7.1)
 - Dask (installed using pip install dask[complete])
-- dask_jobqueue (does NOT come by default with the Dask)
+- dask-jobqueue (does NOT come by default with the Dask)
 - Pandas
 - Astropy
 - Matplotlib (only for plotting)
