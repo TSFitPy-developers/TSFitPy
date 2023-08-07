@@ -7,7 +7,7 @@ To use TSFitPy, you will need a working Turbospectrum (TS) installation of the l
 The code requires at least version Python 3.7. It also makes use of fortran programs, which will need to be compiled on the user's machine (intel fortran ifort compiler highly recommended). The Python packages needed are as follows (they should all be installable via "pip install"):
 - Numpy
 - Scipy (at least 1.7.1)
-- Dask (installed using pip install dask[complete])
+- Dask (installed using `pip install dask[complete]`)
 - dask-jobqueue (does NOT come by default with the Dask)
 - Pandas
 - Astropy
