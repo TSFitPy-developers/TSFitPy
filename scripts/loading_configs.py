@@ -77,14 +77,16 @@ class SpectraParameters:
                         standard_name = f"{testing_col[:-1].lower()}"
                         abundances_xh_given.append(standard_name)
                         self.abundance_elements_given.append(standard_name.capitalize())
+                    elif (np.size(testing_col) <= 3 and testing_col[1:].capitalize() in periodic_table and
+                          testing_col[0].lower() == 'a' and col[1] == "(" and col[-1] == ")"):
+                        # 01.08.2023: added check for brackets, because A(C) would be parsed as Ac, not A(C)
+                        # means just elemental abundance perhaps because A(X) is given
+                        standard_name = f"{testing_col[1:].lower()}"
+                        abundances_x_given.append(standard_name)
+                        self.abundance_elements_given.append(standard_name.capitalize())
                     elif np.size(testing_col) <= 2 and testing_col.capitalize() in periodic_table:
                         # means just elemental abundance perhaps
                         standard_name = f"{testing_col.lower()}"
-                        abundances_x_given.append(standard_name)
-                        self.abundance_elements_given.append(standard_name.capitalize())
-                    elif np.size(testing_col) <= 3 and testing_col[1:].capitalize() in periodic_table and testing_col[0].lower() == 'a':
-                        # means just elemental abundance perhaps because A(X) is given
-                        standard_name = f"{testing_col[1:].lower()}"
                         abundances_x_given.append(standard_name)
                         self.abundance_elements_given.append(standard_name.capitalize())
                     else:

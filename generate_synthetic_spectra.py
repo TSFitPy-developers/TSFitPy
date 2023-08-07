@@ -17,6 +17,7 @@ import os
 from scripts.run_wrapper import run_and_save_wrapper
 from time import perf_counter
 from scripts.loading_configs import SpectraParameters
+from scripts.solar_abundances import periodic_table
 
 class SyntheticSpectraConfig:
     def __init__(self, config_location: str, output_folder_title: str):
@@ -335,12 +336,7 @@ if __name__ == '__main__':
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
-    client = get_dask_client(config_synthetic_spectra.cluster_type, config_synthetic_spectra.cluster_name,
-                             config_synthetic_spectra.number_of_cpus, nodes=config_synthetic_spectra.number_of_nodes,
-                             slurm_script_commands=config_synthetic_spectra.script_commands,
-                             slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
-                             time_limit_hours=config_synthetic_spectra.time_limit_hours,
-                             slurm_partition=config_synthetic_spectra.slurm_partition)
+    logging.debug(config_synthetic_spectra.__dict__)
 
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
@@ -362,7 +358,8 @@ if __name__ == '__main__':
                  "line_mask_file": None,
                  "depart_bin_file": depart_bin_file,
                  "depart_aux_file": depart_aux_file,
-                 "model_atom_file": model_atom_file}
+                 "model_atom_file": model_atom_file,
+                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path}
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
@@ -370,6 +367,14 @@ if __name__ == '__main__':
 
     # time to run the code
     time_start = perf_counter()
+
+
+    client = get_dask_client(config_synthetic_spectra.cluster_type, config_synthetic_spectra.cluster_name,
+                             config_synthetic_spectra.number_of_cpus, nodes=config_synthetic_spectra.number_of_nodes,
+                             slurm_script_commands=config_synthetic_spectra.script_commands,
+                             slurm_memory_per_core=config_synthetic_spectra.memory_per_cpu_gb,
+                             time_limit_hours=config_synthetic_spectra.time_limit_hours,
+                             slurm_partition=config_synthetic_spectra.slurm_partition)
 
     futures = []
     for one_spectra_parameter in spectra_parameters:
@@ -387,6 +392,14 @@ if __name__ == '__main__':
 
     # in spectra_parameters_class.spectra_parameters_df change the column names and add .spec to the specname
     spectra_parameters_class.spectra_parameters_df["specname"] = spectra_parameters_class.spectra_parameters_df["specname"].apply(lambda x: f"{x}.spec")
+
+    # change the columns names for elements in df from X to X_Fe
+    # go through columns in the df
+    for column in spectra_parameters_class.spectra_parameters_df.columns:
+        # if the column name is in the list of elements
+        if column in periodic_table:
+            # add _Fe to the column name
+            spectra_parameters_class.spectra_parameters_df.rename(columns={column: f"{column}_Fe"}, inplace=True)
 
     # save the spectra parameters 
     spectra_parameters_class.spectra_parameters_df.to_csv(os.path.join(output_dir, "spectra_parameters.csv"), index=False)

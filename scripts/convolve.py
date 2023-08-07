@@ -1,3 +1,4 @@
+from __future__ import annotations
 import numpy as np
 from astropy import constants as const
 from numpy.fft import fft, ifft

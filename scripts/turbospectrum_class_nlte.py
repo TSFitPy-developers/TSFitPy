@@ -959,7 +959,7 @@ class TurboSpectrum:
 
         # Allow for user input isotopes as a dictionary (similar to abundances)
 
-        individual_isotopes = "'ISOTOPES : ' '149'\n"
+        individual_isotopes = f"'ISOTOPES : ' '{len(solar_isotopes)}'\n"
         if self.free_isotopes is None:
             for isotope, ratio in solar_isotopes.items():
                 individual_isotopes += "{}  {:6f}\n".format(isotope, ratio)

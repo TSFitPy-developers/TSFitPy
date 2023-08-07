@@ -7,7 +7,8 @@ To use TSFitPy, you will need a working Turbospectrum (TS) installation of the l
 The code requires at least version Python 3.7. It also makes use of fortran programs, which will need to be compiled on the user's machine (intel fortran ifort compiler highly recommended). The Python packages needed are as follows (they should all be installable via "pip install"):
 - Numpy
 - Scipy (at least 1.7.1)
-- Dask (installed using pip install dask[complete])
+- Dask (installed using `pip install dask[complete]`)
+- dask-jobqueue (does NOT come by default with the Dask)
 - Pandas
 - Astropy
 - Matplotlib (only for plotting)
@@ -83,6 +84,7 @@ Also, Windows is not supported (?).
   - Error is used in chi2 calculation
 - It is recommended to create a separate config file for each run/set of stars. This allows to quickly refit the same sample of stars without recreating config file each time
 - Copy and paste the existing `TSFitPy/input_files/tsfitpy_input_configuration.cfg` and call it something like `TSFitPy/input_files/tsfitpy_input_configuration_sun_test.cfg`
+  - The reason to copy and paste is so that `git pull` cannot interfer with the default configuration
 - The config file should already be ready for a test run, but here is the reference breakdown if needed
   - [turbospectrum_compiler]:
     - `compiler` specifies the compiler (intel or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
@@ -165,7 +167,7 @@ Also, Windows is not supported (?).
 
 - 16.06.2023 - finally added grid generation (hooray? please be sure to test before using it maybe? seems to work on my side though)
 - To generate the grid, you need to create a `synthetic_spectra_generation_configuration.cfg` file based on the one provided in `./input_files/`
-- It is very similar to the config for fitting (just less options) and it only has one extra parameter:
+- It is very similar to the config for fitting (just fewer options) and it only has one extra parameter:
   - `save_unnormalised_spectra` is a boolean, if True, then it will save the unnormalised synthetic spectra (each file would be 30% larger)
 - It uses similar `fitlist`, but that one is much more flexible (see example in `./input_files/synthetic_spectra_parameters`)
   - First column specifies columns (order not important). Most importantly to have `teff  logg  [Fe/H]`
@@ -179,12 +181,12 @@ Also, Windows is not supported (?).
   - It will generate the grid and save it in the folder specified in the config file
     - Each spectrum is `index.spec` where `index` is the index of the spectrum (same order as in `fitlist`)
   - It will also save the .csv file with the grid parameters (including the name of spectrum)
-  - Each spectra also has comments on top with the parameters used to generate it
+  - Each spectrum also has comments on top with the parameters used to generate it
 
 ## Usage for calculate_nlte_correction_line.py
 
 - This script calculates the NLTE correction for a given line, for a given element, for a given model atmosphere
-- It uses the same config file as the fitting, it just skips some of the parameters
+- It uses the same config file as the fitting, it just skips some parameters
 - Specify element (`elements_to_fit`), line (`linemask`) and model atmosphere (`fitlist`) in the config file
 - It calculates the NLTE correction for the given line and saves it in the output folder by matching EW of NLTE line to LTE line
 - This can be useful to calculate pure NLTE correction withouth fitting the spectrum
@@ -209,8 +211,76 @@ Also, Windows is not supported (?).
     - That is where you can specify new element names for the grids with their corresponding grid names (just copy the format from other elements)
   - Make sure that the linelist is correct for that model atom
     - Open the linelist, find that element (e.g. search for `O I`), and check that the levels are correct (at least NLTE should be written there next to the element name)
-    - OR if you add a new linelist, you will need to add the 
+    - OR if you add a new linelist, you will need to add the labels using the `utities/convert_lte_to_nlte.py` script
+      - You need to specify the element name, the model atom and the linelist
+      - It will add the labels to the linelist and save it in
+      - You can then use that linelist for the NLTE fitting
+      - Note on the usage of the script. The model atom should not have too many weird comments, because Python expects really specific formatting. 
+        - Importantly, after the levels, the comment should start with `* UP` or `* RADIATIVE` to stop reading the levels
+        - Each level should have approximately this format: `      0.0000    2.0 ' Level     1  =    2p6.3s2S           ' 1`, so space locations are important. 6th or 7th column is the electron configuration, which should not have any spaces:
+          - I.e. 4th is level energy and 6th is electron configuration OR 5th is level energy and 7th is electron configuration
 
+
+## ifort compiler installation
+
+- You can install the ifort compiler from [this link](https://www.intel.com/content/www/us/en/developer/tools/oneapi/fortran-compiler.html)
+  - I believe stand-alone version works great, just try that one
+  - You will probably require Intel CPU, though someone had success with older versions of ifort on M1 Mac?
+  - Or you can use a docker image (slower fitting though)
+- Before you are able to run `ifort` command, you might need to source the `setvars.sh` file (see [this intel link](https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/2023-0/use-the-setvars-script-with-linux-or-macos.html) and [especially this intel link](https://www.intel.com/content/www/us/en/docs/fortran-compiler/developer-guide-reference/2023-0/specifying-the-location-of-compiler-components.html))
+  - You can find it in the installation folder, e.g. `source <install-dir>/setvars.sh`
+    - `<install_dir>` is probably `/opt/intel/oneapi/`? 
+  - You can also add it to your `.bashrc` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
+
+## Multiprocessing usage
+
+Regarding the multiprocessing usage with Dask
+- Dask is the library used for multiprocessing.
+- By default, it runs the same whether on a cluster or locally
+- From the new update, now you can run on several nodes using slurm
+  - There are several new options at the bottom of the config under [SlurmClusterParameters]
+    - `cluster_type` is the type of cluster. Can be `slurm` or `local`. `local` ignores the other parameters
+    - `number_of_nodes` is the number of nodes to use, cpus are taken from the `number_of_cpus` parameter
+    - `memory_per_cpu_gb` is the memory per CPU in GB (recommended to be at least 3 GB)
+    - `script_commands` are the commands to run before the script. Each command is separated by a semicolon. Example below purges the modules and loads the ones needed
+      - `module purge;module load basic-path;module load intel;module load anaconda3-py3.10`
+    - `time_limit_hours` is the time limit for the job in hours 
+    - `partition` is the partition to use in the cluster passed to the `--partition` flag
+  - 'slurm' will launch each individual work with `number_of_cpus` cpus, so if you have 4 cpus and 2 nodes, it will use 8 CPUs in total
+    - Each worker will start as a separate slurm job
+    - The best way to use this is to launch a slurm job of the actual script using 1 CPU, standard memory and long time limit
+    - That job will act as the dashboard to launch and distribute other workers
+    - Each other worker will start up in the slurm queue and start as soon as slurm allows them
+      - However, not all workers need to launch at the same time, so the calculations will start as soon as the first worker starts
+      - BUT it seems like if any worker dies, the Dask dashboard will crash in the end, so make sure workers have enough time limit as well
+- You can also monitor the progress (and other statistics) in the Dask dashboard
+  - Locally, you can simply run `http://localhost:8787/` in your browser (port might be different, but probably not)
+  - If ran on a cluster, you can use SSH command to direct this dashboard to your own PC
+    - For that you write the name of your cluster (whichever server name you connect to) in the `cluster_name` in the [ExtraParameters]
+    - This will print something similar to: `ssh -N -L {port}:{host}:{port} {cluster_name}`, where `cluster_name` is taken from your config
+    - It should automatically figure out your `host` and `port` where the dask dashboard is ran
+    - By running this command in your terminal, it will redirect the dashboard to your browser with port `port`
+    - So you can once again check the dashboard in your browser by running `http://localhost:{port}/`, replacing `{port}` with the port above
+
+## Utilities
+
+There are some utilities in the `utilities` folder. They are not used in the fitting, but can be useful for other things.
+- `print_interesting_loggf.py`
+  - This script prints out the log(gf) values of the lines in the linelist within a certain range of wavelength above the given loggf threshold
+  - It is useful to find the lines that are interesting for the fitting
+- `read_nlte_grid.py`
+  - This script reads the NLTE grid and prints or plots departure coefficients for given level populations
+  - It is useful to check the NLTE grid
+  - As an input it takes the pointer to the NLTE grid for a specific atmosphere and the abundance, which you can find in the auxiliary files
+- `convert_lte_to_nlte.py`
+  - This script converts the LTE linelist to linelist containing NLTE labels, such that TurboSpectrum can do NLTE
+  - You usually only need to change 5 variables at the bottom:
+    - `lte_linelist` is the LTE linelist
+    - `output_file` is the NLTE linelist
+    - `nlte_models` are the NLTE model atoms for each element (list of models)
+    - `transition_names` are the names of the transitions in the linelist (2D list, where each list is for each element and ionisation stage)
+    - `ion_energy` is the ionisation energy of each element and ionisation stage (appropriately to `transition_names`)
+  - Then you can run the script and it will create the linelist with NLTE labels, so that you can run NLTE fitting
 
 ## Extra notes
 
@@ -224,6 +294,11 @@ Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-
     - This will print out the Fortran output and extra Python output
   - Look at the bottom of the output: usually you will see what goes wrong
     - You can also search for `forr`, because Fortran errors usually start with `forrtl`
+
+- TurboSpectrum has a limit of 100 linelists. So if you have too many linelists, it will crash.
+  - In that case combine some of the linelists into one
+
+
 
 - If you get a Fortran error `forrtl: severe (24): end-of-file during read, unit -5, file Internal List-Directed Read` in the `bsyn_lu            000000000041DB92  getlele_                   38  getlele.f` just after it trying to `  starting scan of linelist` with some molecular name, then the issue is probably the following one:
   - Your abundance of the element is too low (e.g. I had that issue with [X/Fe] = -30) and it skips that element in the molecular line identification. In that case remove the molecular linelist containing that element, or increase your element abundance (e.g. to [X/Fe] = -3)
