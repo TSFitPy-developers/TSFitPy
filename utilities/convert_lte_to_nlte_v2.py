@@ -1,36 +1,18 @@
 import numpy as np
 import re
 
+def strip_element_name(element_name):
+    # strips the element name by removing commas, spaces, apostrophes, and dashes
+    element_name = element_name.replace(",", "")
+    element_name = element_name.replace(" ", "")
+    element_name = element_name.replace("'", "")
+    element_name = element_name.replace("-", "")
+    return element_name
+
 def read_atoms():
     for i in range(len(nlte_models)):
-        #extract the info on the energy levels from the model atom/s
-        atom_EC = []
-        atom_upper2j1 = []
-        atom_level = []
-        atom_label = []
-        with open(nlte_models[i]) as fp:
-            line = fp.readline()
-            while line:
-                fields = line.strip().split()
-                if fields[0] == "*" and len(fields) > 1:
-                    if fields[1] == "EC" or fields[1] == "E[cm⁻¹]" or fields[1] == "Energy":
-                        while line[0:4] != "* UP" and line[0:11] != "* RADIATIVE":
-                            line = fp.readline()
-                            fields = line.strip().split()
-                            if fields[0] != "*":
-                                atom_EC.append(float(fields[0]))
-                                atom_upper2j1.append(float(fields[1]))
-                                try:
-                                    atom_level.append(int(fields[3]))
-                                    atom_label.append(fields[5].replace("'", ""))
-                                except ValueError:
-                                    atom_level.append(int(fields[4]))
-                                    atom_label.append(fields[6].replace("'", ""))
-                    else:
-                        line = fp.readline()
-                else:
-                    line = fp.readline()
-        fp.close()
+        nlte_model = nlte_models[i]
+        atom_EC, atom_label, atom_level, atom_upper2j1 = read_model_atom(nlte_model)
         #begin crossmatching the lines in the model linelist and filling the nlte line array
         count_found_both = 0  # keep a count of how many we successfully crossmatch for a report at the end
         count_found_one = 0
@@ -39,7 +21,7 @@ def read_atoms():
             with open(lte_linelist) as fp:
                 line = fp.readline()
                 while line:
-                    if (line[1:6].replace(" ", "") == transition_names[i][k].replace(" ","")): #find the transition we want to crossmatch
+                    if strip_element_name(line[1:6]) == strip_element_name(transition_names[i][k]): #find the transition we want to crossmatch
                         line = fp.readline()
                         energy_factor = 1.0005 #this parameter can be adjusted to whatever margin of error is wanted (currently at 0.05%)
                         while line[0] != "'": #pull info from lte linelist and set to units in model atom
@@ -52,8 +34,10 @@ def read_atoms():
                             fact = 1.0 + 8.336624212083e-5 + 2.408926869968e-2/(1.301065924522e2 - sigma2) + 1.599740894897e-4/(3.892568793293e1 - sigma2)
                             lte_wave_vac = lte_wave_air * fact
                             lte_EC_up = lte_EC_low + ((1.0/lte_wave_vac)*1e8)
-                            if (len(fields) > 15):
+                            if len(fields) > 15:
                                 lte_label_up = fields[len(fields)-1].replace("'","")
+                                if lte_label_up == "":
+                                    lte_label_up = fields[len(fields) - 2].replace("'", "")
                             else:
                                 lte_label_up = "spud"
                             if lte_label_up[0].isalpha() and fields[len(fields)-1][0] != '_': #determine if matching can be done based on the labels in the lte linelist
@@ -68,7 +52,7 @@ def read_atoms():
                                 convid_low = 'x'
                                 convid_high = 'x'
                                 for j in range(len(atom_EC)):
-                                    if lte_EC_low <= atom_EC[j]*energy_factor and lte_EC_low >= atom_EC[j]/energy_factor:
+                                    if atom_EC[j]*energy_factor >= lte_EC_low >= atom_EC[j]/energy_factor:
                                         nlte_level_low = atom_level[j]
                                         nlte_label_low = atom_label[j]
                                         nlte_EC_low = atom_EC[j]
@@ -88,12 +72,12 @@ def read_atoms():
                                 try:
                                     lte_EC_up = float(lte_EC_up[0])
                                     for j in range(len(atom_EC)):
-                                        if lte_EC_low <= atom_EC[j] * energy_factor and lte_EC_low >= atom_EC[j] / energy_factor:
+                                        if atom_EC[j] * energy_factor >= lte_EC_low >= atom_EC[j] / energy_factor:
                                             nlte_level_low = atom_level[j]
                                             nlte_label_low = atom_label[j]
                                             nlte_EC_low = atom_EC[j]
                                             convid_low = 'c'
-                                        if lte_EC_up <= atom_EC[j] * energy_factor and lte_EC_up >= atom_EC[j] / energy_factor:
+                                        if atom_EC[j] * energy_factor >= lte_EC_up >= atom_EC[j] / energy_factor:
                                             nlte_level_up = atom_level[j]
                                             nlte_label_up = atom_label[j]
                                             convid_high = 'c'
@@ -111,26 +95,26 @@ def read_atoms():
                                 convid_low = 'x'
                                 convid_high = 'x'
                                 for j in range(len(atom_EC)):
-                                    if lte_EC_low <= atom_EC[j]*energy_factor and lte_EC_low >= atom_EC[j]/energy_factor:
+                                    if atom_EC[j] * energy_factor >= lte_EC_low >= atom_EC[j] / energy_factor:
                                         nlte_level_low = atom_level[j]
                                         nlte_label_low = atom_label[j]
                                         nlte_EC_low = atom_EC[j]
                                         convid_low = 'c'
                                 if accessory_match:
                                     for j in range(len(acc_level)):
-                                        if lte_label_up == acc_term[j] and lte_config == acc_config[j] and lte_EC_up <= float(acc_energy[j])*energy_factor and lte_EC_up >= float(acc_energy[j])/energy_factor:
+                                        if lte_label_up == acc_term[j] and lte_config == acc_config[j] and float(acc_energy[j]) * energy_factor >= lte_EC_up >= float(acc_energy[j]) / energy_factor:
                                             nlte_level_up = int(acc_level[j])
                                             nlte_label_up = acc_label[j]
                                             convid_high = 'a'
                                 elif match_multiplicity:
                                     for j in range(len(atom_EC)):
-                                        if lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor and lte_up2j1 == atom_upper2j1[j]:
+                                        if atom_EC[j]*energy_factor >= lte_EC_up >= atom_EC[j]/energy_factor and lte_up2j1 == atom_upper2j1[j]:
                                             nlte_level_up = atom_level[j]
                                             nlte_label_up = atom_label[j]
                                             convid_high = 'a'
                                 else:
                                     for j in range(len(atom_EC)):
-                                        if lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor:
+                                        if atom_EC[j] * energy_factor >= lte_EC_up >=atom_EC[j] / energy_factor:
                                             nlte_level_up = atom_level[j]
                                             nlte_label_up = atom_label[j]
                                             convid_high = 'a'
@@ -139,24 +123,26 @@ def read_atoms():
                                     if accessory_match:
                                         acc_level, acc_energy, acc_label, acc_energy_nist, acc_term, acc_config, acc_percent, acc_ion = np.loadtxt(accessory_matching_files[i], dtype='str', unpack=True)
 
-                                    if accessory_match == False:
-                                        lte_label_up = lte_label_up.replace("*","")
+                                    place = 0
                                     nlte_level_low = 0
                                     nlte_label_low = 'none'
                                     nlte_level_up = 0
                                     nlte_label_up = 'none'
                                     convid_low = 'x'
                                     convid_high = 'x'
+
+                                    if not accessory_match:
+                                        lte_label_up = lte_label_up.replace("*","")
                                     for j in range(len(atom_EC)):
-                                        if lte_EC_low <= atom_EC[j]*energy_factor and lte_EC_low >= atom_EC[j]/energy_factor:
+                                        if atom_EC[j] * energy_factor >= lte_EC_low >= atom_EC[j] / energy_factor:
                                             nlte_level_low = atom_level[j]
                                             nlte_label_low = atom_label[j]
                                             nlte_EC_low = atom_EC[j]
                                             convid_low = 'c'
                                     if accessory_match:
                                         lte_config = fields[len(fields) - 2]
-                                        place = 0
                                         while lte_config:
+                                            # print(lte_config[len(lte_config)-1-place])
                                             if lte_config[len(lte_config) - 1 - place] == "." or lte_config[
                                                 len(lte_config) - 1 - place] == "-" or lte_config[
                                                 len(lte_config) - 1 - place] == ":":
@@ -165,8 +151,11 @@ def read_atoms():
                                         lte_config = lte_config[-place:len(lte_config)]
                                         lte_config = lte_config.replace("(", "")
                                         lte_config = lte_config.replace(")", "")
+
                                         for j in range(len(acc_level)):
-                                            if lte_label_up == acc_term[j] and lte_config == acc_config[j] and lte_EC_up <= float(acc_energy[j])*energy_factor and lte_EC_up >= float(acc_energy[j])/energy_factor:
+                                            if lte_label_up == acc_term[j] and lte_config == acc_config[j] and float(
+                                                    acc_energy[j]) * energy_factor >= lte_EC_up >= float(
+                                                    acc_energy[j]) / energy_factor:
                                                 nlte_level_up = int(acc_level[j])
                                                 nlte_label_up = acc_label[j]
                                                 convid_high = 'a'
@@ -178,7 +167,7 @@ def read_atoms():
                                                 convid_high = 'a'
                                     else:
                                         for j in range(len(atom_EC)):
-                                            if (lte_label_up in atom_label[j] or lte_label_up.lower() in atom_label[j]) and lte_EC_up <= float(atom_EC[j])*energy_factor and lte_EC_up >= float(atom_EC[j])/energy_factor:
+                                            if (lte_label_up in atom_label[j] or lte_label_up.lower() in atom_label[j]) and atom_EC[j] * energy_factor >= lte_EC_up >= atom_EC[j] / energy_factor:
                                                 nlte_level_up = atom_level[j]
                                                 nlte_label_up = atom_label[j]
                                                 convid_high = 'a'
@@ -205,7 +194,7 @@ def read_atoms():
                                                 if int(level_low_model) == nlte_level_low and int(level_up_model) == nlte_level_up:
                                                     wave_vald, loggf_vald, gamma_stark_vald = np.loadtxt(vald_output[i], delimiter = ',', skiprows=2, usecols=(1,3,5), unpack=True)
                                                     for z in range(len(wave_vald)):
-                                                        if lte_wave_air <= wave_vald[z]*1.0005 and lte_wave_air >= wave_vald[z]/1.0005 and float(fields[2]) <= loggf_vald[z]*1.0005 and float(fields[2]) >= loggf_vald[z]/1.0005:
+                                                        if wave_vald[z]*1.0005 >= lte_wave_air >= wave_vald[z]/1.0005 and float(fields[2]) <= loggf_vald[z]*1.0005 and float(fields[2]) >= loggf_vald[z]/1.0005:
                                                             gamma_stark = str(gamma_stark_vald[z])
                                                     if i == 1:
                                                         convid_high = 'c'
@@ -214,8 +203,6 @@ def read_atoms():
                                                 model_fields = model_line.strip().split()
                                                 wave_model = model_fields[4]
                                                 loggf_model = model_fields[7]
-                                                label_low_model = model_fields[8]
-                                                label_up_model = model_fields[9]
                                             model_line = file.readline()
                                             line_count+=1
                                     file.close()
@@ -228,21 +215,48 @@ def read_atoms():
                             if not line: #added to prevent error if element and transition is last one in lte file
                                 break
                     else:
-                        if (line[0] != "'"):
-                            line = fp.readline()
-                        else:
-                            line = fp.readline()
-            fp.close()
+                        line = fp.readline()
             if count_total == 0:
                 print(f"{transition_names[i][k]}: No lines found in the linelist to crossmatch")
             else:
                 print("{}: Found {} of {} lines ({} %). Partial matches are {} of {} lines ({} %)".format(transition_names[i][k], count_found_both, count_total, 100.*(count_found_both/count_total), count_found_one, count_total, 100.*(count_found_one/count_total)))
 
+
+def read_model_atom(nlte_model):
+    # extract the info on the energy levels from the model atom/s
+    atom_EC = []
+    atom_upper2j1 = []
+    atom_level = []
+    atom_label = []
+    with open(nlte_model) as model_atom_file:
+        line = model_atom_file.readline()
+        while line:
+            fields = line.strip().split()
+            if fields[0] == "*" and len(fields) > 1:
+                if fields[1] == "EC" or fields[1] == "E[cm⁻¹]" or fields[1] == "Energy":
+                    while line[0:4] != "* UP" and line[0:11] != "* RADIATIVE":
+                        line = model_atom_file.readline()
+                        fields = line.strip().split()
+                        if fields[0] != "*":
+                            atom_EC.append(float(fields[0]))
+                            atom_upper2j1.append(float(fields[1]))
+                            try:
+                                atom_level.append(int(fields[3]))
+                                atom_label.append(fields[5].replace("'", ""))
+                            except ValueError:
+                                atom_level.append(int(fields[4]))
+                                atom_label.append(fields[6].replace("'", ""))
+                    break
+                else:
+                    line = model_atom_file.readline()
+            else:
+                line = model_atom_file.readline()
+    return atom_EC, atom_label, atom_level, atom_upper2j1
+
+
 def print_atoms():
     #now print linelist with nlte values
     g = open(output_file, "w")
-
-    add_lte_flag = "  0 0  'none' 'none'"
 
     with open(lte_linelist) as fp:
         line = fp.readline()
@@ -250,7 +264,7 @@ def print_atoms():
         while line:
             for i in range(len(transition_names)):
                 for k in range(len(transition_names[i])):
-                    if (line[1:6].replace(" ", "") == transition_names[i][k].replace(" ","") and line[-5:-1] == "LTE'"): #works with newer format
+                    if strip_element_name(line[1:6]) == strip_element_name(transition_names[i][k]) and line[-5:-1] == "LTE'": #works with newer format
                         g.write("{}".format(line.strip().replace("LTE'","")+" NLTE'\n"))
                         line = fp.readline()
                         while line[0] != "'":
@@ -259,7 +273,8 @@ def print_atoms():
                                 break
                         for j in range(len(nlte_lines[i][k])):
                             g.write("{}\n".format(nlte_lines[i][k][j]))
-                    elif (line[1:6].replace(" ", "") == transition_names[i][k].replace(" ","") and line[-3:-1] == " '"): #works with older format when NLTE/LTE wasn't specified
+                    elif strip_element_name(line[1:6]) == strip_element_name(transition_names[i][k]) and line[-2:-1] == "'": #works with older format when NLTE/LTE wasn't specified
+                        # TODO: replace the last ' with NLTE
                         g.write("{}".format(line.strip().replace(" '","")+" NLTE'\n"))
                         line = fp.readline()
                         while line[0] != "'":
@@ -270,31 +285,28 @@ def print_atoms():
                             g.write("{}\n".format(nlte_lines[i][k][j]))
             if not line:
                 break
-            if (line[0] != "'"):
+            if line[0] != "'":
                 g.write("  {}\n".format(line.strip()))
-            elif (len(line) > 10):
+            elif len(line) > 10:
                 g.write("{}\n".format(line.strip()))
             else:
                 g.write("{}\n".format("'"+line.strip().replace("'","")+" LTE'"))
             cnt += 1
             line = fp.readline()
 
-    fp.close()
-
     g.close()
 
 if __name__ == '__main__':
-    # input parameters for the cross matching
+    # input parameters for the cross-matching
 
-    lte_linelist = "sample_lte_linelist"
-    output_file = "sample_nlte_converted_linelist"
+    lte_linelist_dir = "nlte_ges_linelist_jmg18jul2023_I_II_ba_test"
+    lte_linelist = lte_linelist_dir
+    output_file = f"{lte_linelist_dir}_test"
 
-    nlte_models = ["../input_files/nlte_data/model_atoms/atom.o41f", "../input_files/nlte_data/model_atoms/atom.mg86b",
-                   "../input_files/nlte_data/model_atoms/atom.caNew"]
+    nlte_models = ["atom.ba111"]
 
-    transition_names = [["O I", "O II"], ["Mg I", "Mg II"], ["Ca I",
-                                                             "Ca II"]]  # needs to match the length of nlte_models and needs to match the transition names in the lte linelist
-    ion_energy = [[0.0, 13.61805], [0.0, 7.646235], [0.0, 6.11316]]  # ionization energy in eV from NIST
+    transition_names = [["Ba I", "Ba II"]]
+    ion_energy = [[0.0, 5.2116646]]
 
     accessory_match = False  # whether or not to use accessory matching files set as True or False, in almost all cases, this will be false (it is outdated)
     accessory_matching_files = []  # can leave empty if not using accessory matching files
