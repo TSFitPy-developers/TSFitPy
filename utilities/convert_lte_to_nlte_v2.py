@@ -7,27 +7,34 @@ def strip_element_name(element_name):
     element_name = element_name.replace(" ", "")
     element_name = element_name.replace("'", "")
     element_name = element_name.replace("-", "")
-    return element_name
+    return element_name.strip()
 
-def read_atoms(nlte_linelist, transition_names):
+def read_atoms(nlte_linelist, transition_names, ion_energies, nlte_model_atoms):
     transition_names = np.asarray(transition_names)
+    # go through the 2D array of transition names and strip the element names
+    for index, element in enumerate(transition_names):
+        for index2, element2 in enumerate(element):
+            transition_names[index][index2] = strip_element_name(element2).lower()
     # flatten the transition names
     transition_names_all = transition_names.flatten()
     transition_names_all = list(transition_names_all)
-    for index, element in enumerate(transition_names):
-        transition_names_all[index] = strip_element_name(element)
+
+    ion_energies = np.asarray(ion_energies)
+    # flatten the ion energies
+    ion_energies_all = ion_energies.flatten()
+    ion_energies_all = list(ion_energies_all)
+    for index, element in enumerate(transition_names_all):
+        transition_names_all[index] = strip_element_name(element).lower()
+
+    # write the NLTE linelist
     with open(nlte_linelist, 'w') as new_nlte_file:
+        # read the LTE linelist
         with open(lte_linelist, 'r') as fp:
             lines_file: list[str] = fp.readlines()
-            line_number_read_for_element: int = 0
+            # go through all lines
             line_number_read_file: int = 0
             total_lines_in_file: int = len(lines_file)
-            while line_number_read_file < total_lines_in_file:  # go through all line
-                """
-                '  56.134            '    2         4
-                'Ba II   LTE'
-                  4934.076  0.000 -0.157  303.222    2.0  1.00E+05  's' 'p'   0.0    1.0 'Ba II LS:6s 2S LS:6p 2P*'
-                """
+            while line_number_read_file < total_lines_in_file:  # go through all lines
                 # first line is the element name and number of lines
                 elem_line_1_to_save = lines_file[line_number_read_file]
                 line_number_read_file += 1
@@ -37,15 +44,36 @@ def read_atoms(nlte_linelist, transition_names):
                 # second line is the element name and ionization stage
                 elem_line_2_to_save: str = lines_file[line_number_read_file]
                 line_number_read_file += 1
+                line = elem_line_2_to_save
 
-                if strip_element_name(line[1:6]) in transition_names_all:  # find the transition we want to crossmatch
-                    line = fp.readline()
+                if strip_element_name(line[1:6]).lower() in transition_names_all:  # find the transition we want to crossmatch
+                    # write the element name and number of lines
+                    new_nlte_file.write(elem_line_1_to_save)
+                    # write the element and NLTE label
+                    elem_line_2_to_save_nlte = elem_line_2_to_save.replace("LTE", "NLTE")
+                    if "NLTE" not in elem_line_2_to_save_nlte:
+                        # replace only the last ' with NLTE'
+                        elem_line_2_to_save_nlte = elem_line_2_to_save_nlte[::-1].replace("'", "ETLN", 1)[::-1]
+                    new_nlte_file.write(elem_line_2_to_save_nlte)
+
+                    # get the index of the element
+                    transition_index: int = transition_names_all.index(strip_element_name(line[1:6]).lower())
+                    ionisation_energy = ion_energies_all[transition_index]
+                    # find index in which the element is in the transition_names 2D array
+                    index_element_in_transition_names = np.where(transition_names == strip_element_name(line[1:6]).lower())[0][0]
+                    atom_EC, atom_label, atom_level, atom_upper2j1 = read_model_atom(nlte_model_atoms[index_element_in_transition_names])
+                    line = lines_file[line_number_read_file]
+                    line_number_read_file += 1
+                    # get count of crossmatched lines
+                    count_total = 0
+                    count_found_both = 0
+                    count_found_one = 0
                     for line_number in range(number_of_lines_element):  # pull info from lte linelist and set to units in model atom
                         fields = line.strip().split()
                         lte_wave_air = float(fields[0])
                         lte_EC_ev = float(fields[1])
                         lte_up2j1 = float(fields[4])
-                        lte_EC_low = 8065.54429 * (lte_EC_ev + ion_energy[i][k])
+                        lte_EC_low = 8065.54429 * (lte_EC_ev + ionisation_energy)
                         sigma2 = (10000. / lte_wave_air) ** 2
                         fact = 1.0 + 8.336624212083e-5 + 2.408926869968e-2 / (
                                     1.301065924522e2 - sigma2) + 1.599740894897e-4 / (3.892568793293e1 - sigma2)
@@ -105,7 +133,7 @@ def read_atoms(nlte_linelist, transition_names):
                         elif "/" in lte_label_up:  # what to do if upper label in lte linelist is something like "2[11/2]", means either using accessory file or matching based on energy
                             if accessory_match:
                                 acc_level, acc_energy, acc_label, acc_energy_nist, acc_term, acc_config, acc_percent, acc_ion = np.loadtxt(
-                                    accessory_matching_files[i], dtype='str', unpack=True)
+                                    accessory_matching_files[index_element_in_transition_names], dtype='str', unpack=True)
                             lte_config = fields[len(fields) - 2]
                             lte_config = lte_config[-2:len(lte_config)]
                             nlte_level_low = 0
@@ -145,7 +173,7 @@ def read_atoms(nlte_linelist, transition_names):
                             try:
                                 if accessory_match:
                                     acc_level, acc_energy, acc_label, acc_energy_nist, acc_term, acc_config, acc_percent, acc_ion = np.loadtxt(
-                                        accessory_matching_files[i], dtype='str', unpack=True)
+                                        accessory_matching_files[index_element_in_transition_names], dtype='str', unpack=True)
 
                                 place = 0
                                 nlte_level_low = 0
@@ -212,7 +240,7 @@ def read_atoms(nlte_linelist, transition_names):
                                 gamma_stark = '0.000'
                                 nlte_EC_low_EV = "{:.3f}".format(nlte_EC_low / 8065.54429)
                                 line_count = 0
-                                with open(model_line_list[i]) as file:
+                                with open(model_line_list[index_element_in_transition_names]) as file:
                                     model_line = file.readline()
                                     line_count += 1
                                     while model_line:
@@ -223,7 +251,7 @@ def read_atoms(nlte_linelist, transition_names):
                                             GA_model = model_fields[7]
                                             if int(level_low_model) == nlte_level_low and int(
                                                     level_up_model) == nlte_level_up:
-                                                wave_vald, loggf_vald, gamma_stark_vald = np.loadtxt(vald_output[i],
+                                                wave_vald, loggf_vald, gamma_stark_vald = np.loadtxt(vald_output[index_element_in_transition_names],
                                                                                                      delimiter=',',
                                                                                                      skiprows=2,
                                                                                                      usecols=(1, 3, 5),
@@ -233,7 +261,7 @@ def read_atoms(nlte_linelist, transition_names):
                                                         z] / 1.0005 and float(fields[2]) <= loggf_vald[
                                                         z] * 1.0005 and float(fields[2]) >= loggf_vald[z] / 1.0005:
                                                         gamma_stark = str(gamma_stark_vald[z])
-                                                if i == 1:
+                                                if index_element_in_transition_names == 1:
                                                     convid_high = 'c'
                                                 nlte_line = "  " + wave_model + "  " + nlte_EC_low_EV + " " + loggf_model + "  " + \
                                                             fields[3] + "    " + fields[
@@ -256,34 +284,29 @@ def read_atoms(nlte_linelist, transition_names):
                                 nlte_line = "  " + line.strip() + "  " + str(nlte_level_low) + " " + str(
                                     nlte_level_up) + "  '" + str(nlte_label_low) + "' '" + str(
                                     nlte_label_up) + "'  '" + str(convid_low) + "' '" + str(convid_high) + "'"
-                        nlte_lines[i][k].append(nlte_line)
-                        line = fp.readline()
+                        # write line to new nlte file
+                        new_nlte_file.write(f"{nlte_line}\n")
+                        # get next line from lte file
+                        line = lines_file[line_number_read_file]
+                        line_number_read_file += 1
                         if not line:  # added to prevent error if element and transition is last one in lte file
                             break
+                    # actually needed to read len(lines_file) - 1 lines, so we need to go back one line
+                    line_number_read_file -= 1
+                    if count_total == 0:
+                        print(f"{strip_element_name(elem_line_2_to_save.replace('LTE', ''))}: No lines found in the linelist to crossmatch")
+                    else:
+                        print("{}: Found {} of {} lines ({} %). Partial matches are {} of {} lines ({} %)".format(
+                            strip_element_name(elem_line_2_to_save.replace('LTE', '')), count_found_both, count_total,
+                            100. * (count_found_both / count_total), count_found_one, count_total,
+                            100. * (count_found_one / count_total)))
                 else:
-                    # so if the element is not in the model atoms to match, we just copy the lte line over
+                    # so if the element is not in the model atoms to match, we just copy the lte linelist over
                     new_nlte_file.write(elem_line_1_to_save)
                     new_nlte_file.write(elem_line_2_to_save)
                     for line_number_lte in range(number_of_lines_element):
-                        new_nlte_file.write(line[line_number_read_file])
+                        new_nlte_file.write(lines_file[line_number_read_file])
                         line_number_read_file += 1
-
-
-
-    for i in range(len(nlte_models)):
-        nlte_model = nlte_models[i]
-        atom_EC, atom_label, atom_level, atom_upper2j1 = read_model_atom(nlte_model)
-        #begin crossmatching the lines in the model linelist and filling the nlte line array
-        count_found_both = 0  # keep a count of how many we successfully crossmatch for a report at the end
-        count_found_one = 0
-        count_total = 0
-        for k in range(len(transition_names[i])):
-
-            if count_total == 0:
-                print(f"{transition_names[i][k]}: No lines found in the linelist to crossmatch")
-            else:
-                print("{}: Found {} of {} lines ({} %). Partial matches are {} of {} lines ({} %)".format(transition_names[i][k], count_found_both, count_total, 100.*(count_found_both/count_total), count_found_one, count_total, 100.*(count_found_one/count_total)))
-
 
 def read_model_atom(nlte_model):
     # extract the info on the energy levels from the model atom/s
@@ -315,49 +338,6 @@ def read_model_atom(nlte_model):
             else:
                 line = model_atom_file.readline()
     return atom_EC, atom_label, atom_level, atom_upper2j1
-
-
-def print_atoms():
-    #now print linelist with nlte values
-    g = open(output_file, "w")
-
-    with open(lte_linelist) as fp:
-        line = fp.readline()
-        cnt = 1
-        while line:
-            for i in range(len(transition_names)):
-                for k in range(len(transition_names[i])):
-                    if strip_element_name(line[1:6]) == strip_element_name(transition_names[i][k]) and line[-5:-1] == "LTE'": #works with newer format
-                        g.write("{}".format(line.strip().replace("LTE'","")+" NLTE'\n"))
-                        line = fp.readline()
-                        while line[0] != "'":
-                            line = fp.readline()
-                            if not line:
-                                break
-                        for j in range(len(nlte_lines[i][k])):
-                            g.write("{}\n".format(nlte_lines[i][k][j]))
-                    elif strip_element_name(line[1:6]) == strip_element_name(transition_names[i][k]) and line[-2:-1] == "'": #works with older format when NLTE/LTE wasn't specified
-                        # TODO: replace the last ' with NLTE
-                        g.write("{}".format(line.strip().replace(" '","")+" NLTE'\n"))
-                        line = fp.readline()
-                        while line[0] != "'":
-                            line = fp.readline()
-                            if not line:
-                                break
-                        for j in range(len(nlte_lines[i][k])):
-                            g.write("{}\n".format(nlte_lines[i][k][j]))
-            if not line:
-                break
-            if line[0] != "'":
-                g.write("  {}\n".format(line.strip()))
-            elif len(line) > 10:
-                g.write("{}\n".format(line.strip()))
-            else:
-                g.write("{}\n".format("'"+line.strip().replace("'","")+" LTE'"))
-            cnt += 1
-            line = fp.readline()
-
-    g.close()
 
 if __name__ == '__main__':
     # input parameters for the cross-matching
@@ -393,5 +373,4 @@ if __name__ == '__main__':
     nlte_lines = [[[] for i in range(len(nlte_models) + 1)] for j in
                   range(len(nlte_models) + 1)]  # the +1 allows it to work with an array of one nlte element to identify
 
-    read_atoms(output_file, transition_names)
-    print_atoms()
+    read_atoms(output_file, transition_names, ion_energy, nlte_models)
