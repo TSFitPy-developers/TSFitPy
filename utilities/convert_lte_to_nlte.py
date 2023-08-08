@@ -346,7 +346,7 @@ if __name__ == '__main__':
     output_file = "sample_nlte_converted_linelist"
 
     nlte_models = ["../input_files/nlte_data/model_atoms/atom.o41f", "../input_files/nlte_data/model_atoms/atom.mg86b",
-                   "../input_files/nlte_data/model_atoms/atom.caNew"]
+                   "../input_files/nlte_data/model_atoms/atom.ca105b"]
 
     transition_names = [["O I", "O II"], ["Mg I", "Mg II"], ["Ca I",
                                                              "Ca II"]]  # needs to match the length of nlte_models and needs to match the transition names in the lte linelist
