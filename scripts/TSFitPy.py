@@ -1013,7 +1013,7 @@ class Spectra:
 
         return result
 
-    def fit_lbl(self) -> list:
+    def fit_lbl(self, client) -> list:
         """
         Fits line by line, by going through each line in the linelist and computing best abundance/met with chi sqr.
         Also fits doppler shift and can fit micro and macro turbulence. New method, faster and more accurate TM.
@@ -1025,7 +1025,6 @@ class Spectra:
         result_list = []
         find_upper_limit = self.find_upper_limit
         sigmas_upper_limit = self.sigmas_upper_limit
-        client = self.dask_client
 
         for line_number in range(len(self.line_begins_sorted)):
             if self.dask_workers != 1:
@@ -2105,7 +2104,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
                       line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance)
 
-    spectra.dask_client = dask_client
+    #spectra.dask_client = dask_client
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
@@ -2114,7 +2113,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         if spectra.fitting_mode == "all":
             result = spectra.fit_all()
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl()
+            result = spectra.fit_lbl(None)
         elif spectra.fitting_mode == "lbl_quick":
             result = spectra.fit_lbl_quick()
         elif spectra.fitting_mode == "teff":
@@ -2127,7 +2126,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         if spectra.fitting_mode == "all":
             result = spectra.dask_client.submit(spectra.fit_all)
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl()
+            result = spectra.fit_lbl(dask_client)
         elif spectra.fitting_mode == "lbl_quick":
             result = spectra.dask_client.submit(spectra.fit_lbl_quick)
         elif spectra.fitting_mode == "teff":
