@@ -328,6 +328,7 @@ class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  rotation: float, abundances_dict: dict, line_list_path_trimmed: str, index_temp_dir: float,
                  tsfitpy_config, elem_abund=None):
+        self.dask_client = None  # dask client for parallelisation
         # Default values
         self.turbospec_path: str = None  # path to the /exec/ file
         self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
@@ -1021,100 +1022,123 @@ class Spectra:
         """
         result = {}
         result_upper_limit = {}
+        result_list = []
         find_upper_limit = self.find_upper_limit
         sigmas_upper_limit = self.sigmas_upper_limit
+        client = self.dask_client
 
-        if self.dask_workers > 1 and self.experimental_parallelisation:
-            #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
-            # Maybe Dask will break this in the future? Then remove whatever within this if statement
-            client = get_client()
-            for line_number in range(len(self.line_begins_sorted)):
-
-                res1 = client.submit(self.fit_one_line, line_number)
-                result[line_number] = res1
-
-            secede()
-            result = client.gather(result)
-            rejoin()
-        else:
-            for line_number in range(len(self.line_begins_sorted)):
+        for line_number in range(len(self.line_begins_sorted)):
+            if self.dask_workers != 1:
+                result[line_number] = client.submit(self.fit_one_line, line_number)
+                if find_upper_limit:
+                    _ = client.submit(self.calculate_and_save_upper_limit, result, result_upper_limit, sigmas_upper_limit)
+                final_result = client.submit(self.analyse_lbl_fit, result, line_number)
+                result_list.append(final_result)
+            else:
                 time_start = time.perf_counter()
                 print(f"Fitting line at {self.line_centers_sorted[line_number]} angstroms")
 
                 result[line_number] = self.fit_one_line(line_number)
+                if find_upper_limit:
+                    self.calculate_and_save_upper_limit(result, result_upper_limit, sigmas_upper_limit)
+                result_list.append(self.analyse_lbl_fit(result, line_number))
 
                 time_end = time.perf_counter()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-        if find_upper_limit:
-            for line_number in range(len(self.line_begins_sorted)):
-                time_start = time.perf_counter()
-                print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
-
-                try:
-                    result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number, result[line_number]["rv"],
-                                                                                     result[line_number]["macroturb"], result[line_number]["rotation"],
-                                                                                     result[line_number]["vmic"],
-                                                                                     offset_chisqr=(result[line_number]["chi_sqr"] + np.square(sigmas_upper_limit)),
-                                                                                     bound_min_abund=result[line_number]["fitted_abund"],
-                                                                                     bound_max_abund=result[line_number]["fitted_abund"]+7)
-                except ValueError:
-                    result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
-
-                time_end = time.perf_counter()
-                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-            # save 5 sigma results
-            with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
-                for line_number in range(len(self.line_begins_sorted)):
-                    print(f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}", file=file_upper_limit)
-
-
-        result_list = []
-        #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
-        for line_number in range(len(self.line_begins_sorted)):
-            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
-                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                    # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-                    for k in range(len(result[line_number]["fit_wavelength"])):
-                        print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
-
-                line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
-
-                wavelength_fit_array = result[line_number]['fit_wavelength']
-                norm_flux_fit_array = result[line_number]['fit_flux_norm']
-
-                indices_to_use_cut = np.where((wavelength_fit_array <= line_right + 5) & (wavelength_fit_array >= line_left - 5))
-                wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], norm_flux_fit_array[indices_to_use_cut]
-                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut, norm_flux_fit_array_cut, self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
-
-                equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
-
-                extra_wavelength_to_save = 1  # AA extra wavelength to save left and right of the line
-
-                # this will save extra +/- extra_wavelength_to_save in convolved spectra. But just so that it doesn't
-                # overlap other lines, I save only up to half of the other linemask if they are close enough
-                if line_number > 0:
-                    line_previous_right = self.line_ends_sorted[line_number - 1]
-                    left_bound_to_save = max(line_left - extra_wavelength_to_save, (line_left - line_previous_right) / 2 + line_previous_right)
-                else:
-                    left_bound_to_save = line_left - extra_wavelength_to_save
-                if line_number < len(self.line_begins_sorted) - 1:
-                    line_next_left = self.line_begins_sorted[line_number + 1]
-                    right_bound_to_save = min(line_right + extra_wavelength_to_save, (line_next_left - line_right) / 2 + line_right)
-                else:
-                    right_bound_to_save = line_right + extra_wavelength_to_save
-                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > left_bound_to_save, wavelength_fit_conv < right_bound_to_save))
-
-                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
-                    # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-                    for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
-                        print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
-            else:
-                equivalent_width = 9999
-            result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
 
         return result_list
+
+    def analyse_lbl_fit(self, result, line_number):
+        #result_list = []
+        # {"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
+
+        if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
+            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
+                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
+                for k in range(len(result[line_number]["fit_wavelength"])):
+                    print(
+                        f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}",
+                        file=g)
+
+            line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
+
+            wavelength_fit_array = result[line_number]['fit_wavelength']
+            norm_flux_fit_array = result[line_number]['fit_flux_norm']
+
+            indices_to_use_cut = np.where(
+                (wavelength_fit_array <= line_right + 5) & (wavelength_fit_array >= line_left - 5))
+            wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], \
+            norm_flux_fit_array[indices_to_use_cut]
+            wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut,
+                                                                       norm_flux_fit_array_cut, self.resolution,
+                                                                       result[line_number]["macroturb"],
+                                                                       result[line_number]["rotation"])
+
+            equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
+
+            extra_wavelength_to_save = 1  # AA extra wavelength to save left and right of the line
+
+            # this will save extra +/- extra_wavelength_to_save in convolved spectra. But just so that it doesn't
+            # overlap other lines, I save only up to half of the other linemask if they are close enough
+            if line_number > 0:
+                line_previous_right = self.line_ends_sorted[line_number - 1]
+                left_bound_to_save = max(line_left - extra_wavelength_to_save,
+                                         (line_left - line_previous_right) / 2 + line_previous_right)
+            else:
+                left_bound_to_save = line_left - extra_wavelength_to_save
+            if line_number < len(self.line_begins_sorted) - 1:
+                line_next_left = self.line_begins_sorted[line_number + 1]
+                right_bound_to_save = min(line_right + extra_wavelength_to_save,
+                                          (line_next_left - line_right) / 2 + line_right)
+            else:
+                right_bound_to_save = line_right + extra_wavelength_to_save
+            indices_to_save_conv = np.logical_and.reduce(
+                (wavelength_fit_conv > left_bound_to_save, wavelength_fit_conv < right_bound_to_save))
+
+            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"),
+                      'a') as h:
+                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
+                for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
+                    print(
+                        f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}",
+                        file=h)
+        else:
+            equivalent_width = 9999
+        #result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
+        return f"{result[line_number]['result']} {equivalent_width * 1000}"
+
+    def calculate_and_save_upper_limit(self, result, result_upper_limit, sigmas_upper_limit):
+        for line_number in range(len(self.line_begins_sorted)):
+            time_start = time.perf_counter()
+            print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
+
+            try:
+                result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number,
+                                                                                 result[line_number]["rv"],
+                                                                                 result[line_number]["macroturb"],
+                                                                                 result[line_number]["rotation"],
+                                                                                 result[line_number]["vmic"],
+                                                                                 offset_chisqr=(result[line_number][
+                                                                                                    "chi_sqr"] + np.square(
+                                                                                     sigmas_upper_limit)),
+                                                                                 bound_min_abund=
+                                                                                 result[line_number][
+                                                                                     "fitted_abund"],
+                                                                                 bound_max_abund=
+                                                                                 result[line_number][
+                                                                                     "fitted_abund"] + 7)
+            except ValueError:
+                result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
+
+            time_end = time.perf_counter()
+            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+
+        # save 5 sigma results
+        with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
+            for line_number in range(len(self.line_begins_sorted)):
+                print(
+                    f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}",
+                    file=file_upper_limit)
 
     def fit_teff_function(self) -> list:
         """
@@ -2054,12 +2078,13 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     return chi_square
 
 
-def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
+def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, rotation1: float, abundances_dict1: dict, line_list_path_trimmed: str,
                            input_abundance: float, index: float,
                            tsfitpy_pickled_configuration_path: str) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
+    :param dask_client: Dask client
     :param specname: Name of the textfile
     :param teff: Teff in K
     :param logg: logg in dex
@@ -2080,21 +2105,39 @@ def create_and_fit_spectra(specname: str, teff: float, logg: float, rv: float, m
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
                       line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance)
 
+    spectra.dask_client = dask_client
+
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
 
-    if spectra.fitting_mode == "all":
-        result = spectra.fit_all()
-    elif spectra.fitting_mode == "lbl":
-        result = spectra.fit_lbl()
-    elif spectra.fitting_mode == "lbl_quick":
-        result = spectra.fit_lbl_quick()
-    elif spectra.fitting_mode == "teff":
-        result = spectra.fit_teff_function()
-    elif spectra.fitting_mode == "vmic":
-        result = spectra.fit_vmic_slow()
+    if spectra.dask_workers == 1:
+        if spectra.fitting_mode == "all":
+            result = spectra.fit_all()
+        elif spectra.fitting_mode == "lbl":
+            result = spectra.fit_lbl()
+        elif spectra.fitting_mode == "lbl_quick":
+            result = spectra.fit_lbl_quick()
+        elif spectra.fitting_mode == "teff":
+            result = spectra.fit_teff_function()
+        elif spectra.fitting_mode == "vmic":
+            result = spectra.fit_vmic_slow()
+        else:
+            raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     else:
-        raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
+        if spectra.fitting_mode == "all":
+            result = spectra.dask_client.submit(spectra.fit_all)
+        elif spectra.fitting_mode == "lbl":
+            result = spectra.fit_lbl()
+        elif spectra.fitting_mode == "lbl_quick":
+            result = spectra.dask_client.submit(spectra.fit_lbl_quick)
+        elif spectra.fitting_mode == "teff":
+            result = spectra.dask_client.submit(spectra.fit_teff_function)
+            #result = spectra.fit_teff_function()
+        elif spectra.fitting_mode == "vmic":
+            result = spectra.dask_client.submit(spectra.fit_vmic_slow)
+            #result = spectra.fit_vmic_slow()
+        else:
+            raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     del spectra
     return result
 
@@ -3571,9 +3614,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}")
             input_abundance = None  # TODO: fix for lbl_quick eventually
-            future = client.submit(create_and_fit_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   rotation1, abundances_dict1,
-                                   line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path)
+            future = create_and_fit_spectra(client, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
+                                   rotation1, abundances_dict1, line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -3585,7 +3627,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             input_abundance = None  # TODO: fix for lbl_quick eventually
-            results.append(create_and_fit_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
+            results.append(create_and_fit_spectra(None, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   rotation1, abundances_dict1,
                                                   line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path))
 
