@@ -120,7 +120,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
             wave_mod = wave_mod_macro
             flux_norm_mod = flux_norm_mod_macro
             flux_mod = flux_mod_macro
-    except (FileNotFoundError, OSError) as err:
+    except (FileNotFoundError, OSError, ValueError) as err:
         print(f"FileNotFoundError: {spectrum_name}. Failed to generate spectrum. Error: {err}")
         wave_mod, flux_norm_mod, flux_mod = [], [], []
 
