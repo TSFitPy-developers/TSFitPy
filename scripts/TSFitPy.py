@@ -327,7 +327,7 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  rotation: float, abundances_dict: dict, line_list_path_trimmed: str, index_temp_dir: float,
-                 tsfitpy_config, elem_abund=None):
+                 tsfitpy_config, elem_abund=None, n_workers=1):
         self.dask_client = None  # dask client for parallelisation
         # Default values
         self.turbospec_path: str = None  # path to the /exec/ file
@@ -433,6 +433,8 @@ class Spectra:
         self.experimental_parallelisation = False  # experimental parallelisation of the TS code
 
         # Set values from config
+        if n_workers != 1:
+            tsfitpy_config = tsfitpy_config.result()
         self.load_spectra_config(tsfitpy_config)
 
         self.spec_name: str = str(specname)
@@ -2204,11 +2206,14 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     with open(tsfitpy_pickled_configuration_path, 'rb') as f:
         tsfitpy_configuration = pickle.load(f)
 
+    n_workers = tsfitpy_configuration.number_of_cpus
+
     if tsfitpy_configuration.number_of_cpus != 1:
         tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
 
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
-                      line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance)
+                      line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance,
+                      n_workers=n_workers)
 
     #spectra.dask_client = dask_client
 
