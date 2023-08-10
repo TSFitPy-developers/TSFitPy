@@ -2101,6 +2101,9 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     with open(tsfitpy_pickled_configuration_path, 'rb') as f:
         tsfitpy_configuration = pickle.load(f)
 
+    if tsfitpy_configuration.number_of_cpus != 1:
+        tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
+
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
                       line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance)
 
@@ -2124,16 +2127,16 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
             raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     else:
         if spectra.fitting_mode == "all":
-            result = spectra.dask_client.submit(spectra.fit_all)
+            result = dask_client.submit(spectra.fit_all)
         elif spectra.fitting_mode == "lbl":
             result = spectra.fit_lbl(dask_client)
         elif spectra.fitting_mode == "lbl_quick":
-            result = spectra.dask_client.submit(spectra.fit_lbl_quick)
+            result = dask_client.submit(spectra.fit_lbl_quick)
         elif spectra.fitting_mode == "teff":
-            result = spectra.dask_client.submit(spectra.fit_teff_function)
+            result = dask_client.submit(spectra.fit_teff_function)
             #result = spectra.fit_teff_function()
         elif spectra.fitting_mode == "vmic":
-            result = spectra.dask_client.submit(spectra.fit_vmic_slow)
+            result = dask_client.submit(spectra.fit_vmic_slow)
             #result = spectra.fit_vmic_slow()
         else:
             raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
