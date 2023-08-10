@@ -433,7 +433,7 @@ class Spectra:
         self.experimental_parallelisation = False  # experimental parallelisation of the TS code
 
         # Set values from config
-        tsfitpy_config.load_spectra_config(self)
+        self.load_spectra_config(tsfitpy_config)
 
         self.spec_name: str = str(specname)
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
@@ -517,6 +517,109 @@ class Spectra:
         self.rotation_dict = {}
         self.doppler_shift_dict = {}
         self.elem_abund_dict_fitting = {}
+
+    def load_spectra_config(self, tsfitpy_config):
+        self.atmosphere_type = tsfitpy_config.atmosphere_type
+        self.fitting_mode = tsfitpy_config.fitting_mode
+        self.include_molecules = tsfitpy_config.include_molecules
+        self.nlte_flag = tsfitpy_config.nlte_flag
+
+        # TODO: redo as booleans instead of strings
+        if tsfitpy_config.fit_vmic:
+            self.fit_vmic = "Yes"
+        elif tsfitpy_config.vmic_input:
+            self.fit_vmic = "Input"
+        else:
+            self.fit_vmic = "No"
+
+        self.fit_vmac = tsfitpy_config.fit_vmac
+        self.fit_rotation = tsfitpy_config.fit_rotation
+        self.input_vmic = tsfitpy_config.vmic_input
+        self.input_vmac = tsfitpy_config.vmac_input
+        self.input_rotation = tsfitpy_config.rotation_input
+        self.elem_to_fit = tsfitpy_config.elements_to_fit
+        self.fit_feh = tsfitpy_config.fit_feh
+        self.lmin = tsfitpy_config.wavelength_min
+        self.lmax = tsfitpy_config.wavelength_max
+        self.ldelta = tsfitpy_config.wavelength_delta
+        self.resolution = tsfitpy_config.resolution
+        self.rotation = tsfitpy_config.rotation
+        self.vmac = tsfitpy_config.vmac
+        self.global_temp_dir = tsfitpy_config.temporary_directory_path
+        self.dask_workers = tsfitpy_config.number_of_cpus
+        self.bound_min_vmac = tsfitpy_config.bounds_rotation[0]
+        self.bound_max_vmac = tsfitpy_config.bounds_rotation[1]
+        self.bound_min_rotation = tsfitpy_config.bounds_rotation[0]
+        self.bound_max_rotation = tsfitpy_config.bounds_rotation[1]
+        self.bound_min_vmic = tsfitpy_config.bounds_vmic[0]
+        self.bound_max_vmic = tsfitpy_config.bounds_vmic[1]
+        self.bound_min_abund = tsfitpy_config.bounds_abundance[0]
+        self.bound_max_abund = tsfitpy_config.bounds_abundance[1]
+        self.bound_min_feh = tsfitpy_config.bounds_feh[0]
+        self.bound_max_feh = tsfitpy_config.bounds_feh[1]
+        self.bound_min_teff = tsfitpy_config.bounds_teff[0]
+        self.bound_max_teff = tsfitpy_config.bounds_teff[1]
+        self.bound_min_doppler = tsfitpy_config.bounds_doppler[0]
+        self.bound_max_doppler = tsfitpy_config.bounds_doppler[1]
+        self.guess_min_vmic = tsfitpy_config.guess_range_vmic[0]
+        self.guess_max_vmic = tsfitpy_config.guess_range_vmic[1]
+        self.guess_min_vmac = tsfitpy_config.guess_range_rotation[0]
+        self.guess_max_vmac = tsfitpy_config.guess_range_rotation[1]
+        self.guess_min_rotation = tsfitpy_config.guess_range_rotation[0]
+        self.guess_max_rotation = tsfitpy_config.guess_range_rotation[1]
+        self.guess_min_abund = tsfitpy_config.guess_range_abundance[0]
+        self.guess_max_abund = tsfitpy_config.guess_range_abundance[1]
+        self.guess_min_doppler = tsfitpy_config.guess_range_doppler[0]
+        self.guess_max_doppler = tsfitpy_config.guess_range_doppler[1]
+        self.guess_plus_minus_neg_teff = tsfitpy_config.guess_range_teff[0]
+        self.guess_plus_minus_pos_teff = tsfitpy_config.guess_range_teff[1]
+        self.debug_mode = tsfitpy_config.debug_mode
+        self.experimental_parallelisation = tsfitpy_config.experimental_parallelisation
+
+        self.nelement = tsfitpy_config.nelement
+        self.turbospec_path = tsfitpy_config.turbospectrum_path
+
+        self.interpol_path = tsfitpy_config.interpolators_path
+
+        self.model_atmosphere_grid_path = tsfitpy_config.model_atmosphere_grid_path
+        self.model_atmosphere_list = tsfitpy_config.model_atmosphere_list
+
+        self.model_atom_path = tsfitpy_config.model_atoms_path
+        self.departure_file_path = tsfitpy_config.departure_file_path
+        self.output_folder = tsfitpy_config.output_folder_path
+        self.spec_input_path = tsfitpy_config.spectra_input_path
+
+        self.fit_teff = tsfitpy_config.fit_teff
+
+        self.line_begins_sorted = tsfitpy_config.line_begins_sorted
+        self.line_ends_sorted = tsfitpy_config.line_ends_sorted
+        self.line_centers_sorted = tsfitpy_config.line_centers_sorted
+
+        self.linemask_file = tsfitpy_config.linemask_file
+        self.segment_file = tsfitpy_config.segment_file
+        self.seg_begins = tsfitpy_config.seg_begins
+        self.seg_ends = tsfitpy_config.seg_ends
+
+        self.depart_bin_file_dict = tsfitpy_config.depart_bin_file_dict
+        self.depart_aux_file_dict = tsfitpy_config.depart_aux_file_dict
+        self.model_atom_file_dict = tsfitpy_config.model_atom_file_dict
+        self.aux_file_length_dict = tsfitpy_config.aux_file_length_dict
+        self.ndimen = tsfitpy_config.ndimen
+
+        self.model_temperatures = tsfitpy_config.model_temperatures
+        self.model_logs = tsfitpy_config.model_logs
+        self.model_mets = tsfitpy_config.model_mets
+        self.marcs_value_keys = tsfitpy_config.marcs_value_keys
+        self.marcs_models = tsfitpy_config.marcs_models
+        self.marcs_values = tsfitpy_config.marcs_values
+
+        self.init_guess_dict = tsfitpy_config.init_guess_spectra_dict
+        self.input_elem_abundance = tsfitpy_config.input_elem_abundance_dict
+
+        self.find_upper_limit = tsfitpy_config.find_upper_limit
+        self.sigmas_upper_limit = tsfitpy_config.sigmas_upper_limit
+        self.find_teff_errors = tsfitpy_config.find_teff_errors
+        self.teff_error_sigma = tsfitpy_config.teff_error_sigma
 
     def set_param_guess(self):
         """
