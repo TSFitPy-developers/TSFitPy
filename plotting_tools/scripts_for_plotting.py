@@ -234,7 +234,7 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.close()
 
 def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, color='black', **pltargs):
-    if color in output_results_pd_df.columns.values:
+    if color in df_results.columns.values:
         pltargs['c'] = df_results[color]
         pltargs['cmap'] = 'viridis'
         pltargs['vmin'] = df_results[color].min()
@@ -507,18 +507,3 @@ def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=Non
     for spectra_name in spectra_names:
         plot_synthetic_spectra(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
     plt.show()
-
-if __name__ == '__main__':
-    # CHANGE NEXT TWO LINES
-    configuration_file_location: str = "../input_files/tsfitpy_input_configuration_ba_oliver_y_nlte_fenlte.txt"  # CHANGE
-    output_folder_location: str = "../output_files/Mar-27-2023-14-11-24_0.23697863971919042_y_nlte_fe_nlte_oliverba/"  # CHANGE
-    output_folder_location: str = "../output_files/test"  # CHANGE
-    # loads all data from config file and output
-    config_dict = load_output_data(configuration_file_location, output_folder_location)
-    output_results_pd_df = config_dict["output_file_df"]  # Pandas dataframe for your own use
-    print("Column names are:")
-    print(output_results_pd_df.columns.values)  # Column names if you want to plot them
-    # CHANGE NEXT LINE
-    star_name_to_plot: str = "00"  # CHANGE
-    # plots all fitted lines for the requested star
-    plot_one_star(config_dict, star_name_to_plot)
