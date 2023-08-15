@@ -7,6 +7,7 @@ import numpy as np
 import os
 from matplotlib import pyplot as plt
 import pandas as pd
+from numpy.linalg import LinAlgError
 from scipy.stats import gaussian_kde
 from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
@@ -167,6 +168,15 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
     wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
     wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
 
+    # sort the observed spectra, just like in TSFitPy
+    if wavelength_observed.size > 1:
+        sorted_obs_wavelength_index = np.argsort(wavelength_observed)
+        wavelength_observed, flux_observed = wavelength_observed[sorted_obs_wavelength_index], flux_observed[sorted_obs_wavelength_index]
+
+        sorted_wavelength_index = np.argsort(wavelength)
+        wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
+
+
     # loads the linemask
     linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
 
@@ -266,28 +276,32 @@ def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis
         plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim,
                                 invert_x_axis=invert_x_axis, invert_y_axis=invert_y_axis, **pltargs)
         return
+    try:
+        # creates density map for the plot
+        x_array = df_results[x_axis_column]
+        y_array = df_results[y_axis_column]
+        xy_point_density = np.vstack([x_array, y_array])
+        z_point_density = gaussian_kde(xy_point_density)(xy_point_density)
+        idx_sort = z_point_density.argsort()
+        x_plot, y_plot, z_plot = x_array[idx_sort], y_array[idx_sort], z_point_density[idx_sort]
 
-    # creates density map for the plot
-    x_array = df_results[x_axis_column]
-    y_array = df_results[y_axis_column]
-    xy_point_density = np.vstack([x_array, y_array])
-    z_point_density = gaussian_kde(xy_point_density)(xy_point_density)
-    idx_sort = z_point_density.argsort()
-    x_plot, y_plot, z_plot = x_array[idx_sort], y_array[idx_sort], z_point_density[idx_sort]
+        density = plt.scatter(x_plot, y_plot, c=z_plot, zorder=-1, vmin=0, **pltargs)
 
-    density = plt.scatter(x_plot, y_plot, c=z_plot, zorder=-1, vmin=0, **pltargs)
-
-    plt.xlim(xlim)
-    plt.ylim(ylim)
-    plt.colorbar(density)
-    plt.xlabel(x_axis_column)
-    plt.ylabel(y_axis_column)
-    if invert_x_axis:
-        plt.gca().invert_xaxis()
-    if invert_y_axis:
-        plt.gca().invert_yaxis()
-    plt.show()
-    plt.close()
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.colorbar(density)
+        plt.xlabel(x_axis_column)
+        plt.ylabel(y_axis_column)
+        if invert_x_axis:
+            plt.gca().invert_xaxis()
+        if invert_y_axis:
+            plt.gca().invert_yaxis()
+        plt.show()
+        plt.close()
+    except LinAlgError:
+        print("LinAlgError, so doing normal scatter plot")
+        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim,
+                                invert_x_axis=invert_x_axis, invert_y_axis=invert_y_axis, **pltargs)
 
 
 def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim=None, ylim=None, **pltargs):
@@ -450,31 +464,34 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         wave_mod_filled = wave_mod_orig
         flux_norm_mod_filled = flux_norm_mod_orig
 
-        if resolution != 0.0:
-            wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-        else:
-            wave_mod_conv = wave_mod_filled
-            flux_norm_mod_conv = flux_norm_mod_filled
+        if len(wave_mod_orig) > 0:
+            if resolution != 0.0:
+                wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+            else:
+                wave_mod_conv = wave_mod_filled
+                flux_norm_mod_conv = flux_norm_mod_filled
 
-        if macro != 0.0:
-            wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-        else:
-            wave_mod_macro = wave_mod_conv
-            flux_norm_mod_macro = flux_norm_mod_conv
+            if macro != 0.0:
+                wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+            else:
+                wave_mod_macro = wave_mod_conv
+                flux_norm_mod_macro = flux_norm_mod_conv
 
-        if rotation != 0.0:
-            wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-        else:
-            wave_mod = wave_mod_macro
-            flux_norm_mod = flux_norm_mod_macro
+            if rotation != 0.0:
+                wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+            else:
+                wave_mod = wave_mod_macro
+                flux_norm_mod = flux_norm_mod_macro
 
-        plt.plot(wave_mod, flux_norm_mod)
-        plt.xlim(lmin - 0.2, lmax + 0.2)
-        plt.ylim(0, 1.05)
-        plt.xlabel("Wavelength")
-        plt.ylabel("Normalised flux")
+            plt.plot(wave_mod, flux_norm_mod)
+            plt.xlim(lmin - 0.2, lmax + 0.2)
+            plt.ylim(0, 1.05)
+            plt.xlabel("Wavelength")
+            plt.ylabel("Normalised flux")
+        else:
+            print('TS failed')
     except (FileNotFoundError, ValueError, IndexError) as e:
-        print("TS failed")
+        print(f"TS failed: {e}")
         wave_mod, flux_norm_mod = np.array([]), np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
@@ -506,7 +523,7 @@ def load_output_grid(output_folder):
 
     return output_file_df
 
-def plot_synthetic_spectra(input_folder, spectra_name, xlim=None, ylim=None, plt_show=True, **kwargs):
+def plot_synthetic_spectra_from_grid(input_folder, spectra_name, xlim=None, ylim=None, plt_show=True, **kwargs):
     wavelength, flux = np.loadtxt(os.path.join(input_folder, spectra_name), usecols=(0, 1), unpack=True, dtype=float)
     plt.plot(wavelength, flux, **kwargs)
     plt.title(spectra_name)
@@ -522,6 +539,6 @@ def plot_synthetic_spectra(input_folder, spectra_name, xlim=None, ylim=None, plt
 
 def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=None, **kwargs):
     for spectra_name in spectra_names:
-        plot_synthetic_spectra(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
+        plot_synthetic_spectra_from_grid(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
     plt.show()
     plt.close()
