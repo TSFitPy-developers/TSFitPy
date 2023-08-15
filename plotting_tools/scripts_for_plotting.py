@@ -254,7 +254,8 @@ def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis
     if invert_y_axis:
         plt.gca().invert_yaxis()
     if plot_colorbar:
-        plt.colorbar()
+        # colorbar with label
+        plt.colorbar(label=color)
     plt.show()
     plt.close()
 
