@@ -28,6 +28,9 @@ from scripts.loading_configs import SpectraParameters
 import logging
 from scripts.dask_client import get_dask_client
 
+output_default_configuration_name: str = "configuration.cfg"
+output_default_fitlist_name: str = "fitlist.txt"
+output_default_linemask_name: str = "linemask.txt"
 
 def create_dir(directory: str):
     """
@@ -3502,11 +3505,17 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     # copy config file into output folder (for easier plotting)
     if not config_location[-4:] == ".cfg":
-        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, "configuration.txt"))
+        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, output_default_configuration_name.replace(".cfg", ".txt")))
     else:
-        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, "configuration.cfg"))
+        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, output_default_configuration_name))
 
     fitlist = os.path.join(tsfitpy_configuration.fitlist_input_path, tsfitpy_configuration.input_fitlist_filename)
+
+    # copy fitlist file into output folder (for easier plotting)
+    shutil.copyfile(fitlist, os.path.join(tsfitpy_configuration.output_folder_path, output_default_fitlist_name))
+
+    # copy linemask file into output folder (for easier plotting)
+    shutil.copyfile(tsfitpy_configuration.linemask_file, os.path.join(tsfitpy_configuration.output_folder_path, output_default_linemask_name))
 
     tsfitpy_configuration.ndimen = 1  # first dimension is RV fit
     if not tsfitpy_configuration.fit_teff:

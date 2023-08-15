@@ -3,21 +3,20 @@ from __future__ import annotations
 import datetime
 import shutil
 from configparser import ConfigParser
-
 import numpy as np
 import os
 from matplotlib import pyplot as plt
 import pandas as pd
 from scipy.stats import gaussian_kde
 from warnings import warn
-
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-from scripts.TSFitPy import TSFitPyConfig, calculate_equivalent_width
+from scripts.TSFitPy import (TSFitPyConfig, calculate_equivalent_width, apply_doppler_correction,
+                             output_default_configuration_name, output_default_fitlist_name,
+                             output_default_linemask_name)
+from scripts.loading_configs import SpectraParameters
 
-def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
-    return wave_ob / (1 + (doppler / 299792.))
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
     """
@@ -39,13 +38,13 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
              "from now on. In the future this will give an error", DeprecationWarning, stacklevel=2)
         if os.path.isfile(os.path.join(old_variable, "configuration.txt")):
             # trying new way of loading: first variable is output folder with config in it
-            print(f"Loading config from {os.path.join(old_variable, 'configuration.txt')}")
-            config_file_location = os.path.join(old_variable, "configuration.txt")
+            print(f"Loading config from {os.path.join(old_variable, output_default_configuration_name.replace('.cfg', '.txt'))}")
+            config_file_location = os.path.join(old_variable, output_default_configuration_name.replace(".cfg", ".txt"))
             output_folder_location = old_variable
-        elif os.path.isfile(os.path.join(old_variable, "configuration.cfg")):
+        elif os.path.isfile(os.path.join(old_variable, output_default_configuration_name)):
             # trying new way of loading: first variable is output folder with config in it
-            print(f"Loading config from {os.path.join(old_variable, 'configuration.cfg')}")
-            config_file_location = os.path.join(old_variable, "configuration.cfg")
+            print(f"Loading config from {os.path.join(old_variable, output_default_configuration_name)}")
+            config_file_location = os.path.join(old_variable, output_default_configuration_name)
             output_folder_location = old_variable
         else:
             # this was an old way of loading. first variable: config file, second variable: output folder
@@ -54,10 +53,10 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             output_folder_location = old_variable
     else:
         # new way of loading: first variable is output folder with config in it
-        if os.path.isfile(os.path.join(output_folder_location, "configuration.txt")):
-            config_file_location = os.path.join(output_folder_location, "configuration.txt")
+        if os.path.isfile(os.path.join(output_folder_location, output_default_configuration_name.replace(".cfg", ".txt"))):
+            config_file_location = os.path.join(output_folder_location, output_default_configuration_name.replace(".cfg", ".txt"))
         else:
-            config_file_location = os.path.join(output_folder_location, "configuration.cfg")
+            config_file_location = os.path.join(output_folder_location, output_default_configuration_name)
 
     tsfitpy_config = TSFitPyConfig(config_file_location, "none")
     tsfitpy_config.load_config()
@@ -99,15 +98,28 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     # Convert columns to appropriate data types
     output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
 
-    specname_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=str, unpack=True, usecols=(0))
-    rv_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=float, unpack=True, usecols=(1))
+    # check if fitlist exists and if not load old fitlist
+    output_filist_location = os.path.join(output_folder_location, output_default_fitlist_name)
+    if os.path.isfile(output_filist_location):
+        fitlist_path = output_filist_location
+    else:
+        fitlist_path = os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename)
+
+    fitlist = SpectraParameters(fitlist_path, True)
+    specname_fitlist = fitlist.spectra_parameters_df["specname"].values
+    rv_fitlist = fitlist.spectra_parameters_df["rv"].values
+
     if specname_fitlist.ndim == 0:
         specname_fitlist = np.array([specname_fitlist])
         rv_fitlist = np.array([rv_fitlist])
 
     config_dict = {}
     config_dict["filenames_output_folder"]: list[dir] = filenames_output_folder_convolved
-    config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
+    linemask_output_location = os.path.join(output_folder_location, output_default_linemask_name)
+    if os.path.isfile(linemask_output_location):
+        config_dict["linemask_location"]: str = linemask_output_location
+    else:
+        config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
     config_dict["observed_spectra_location"]: str = tsfitpy_config.spectra_input_path
     config_dict["specname_fitlist"]: np.ndarray = specname_fitlist
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
