@@ -233,26 +233,37 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.show()
         plt.close()
 
-def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, color='black', **pltargs):
+def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None,
+                            color='black', invert_x_axis=False, invert_y_axis=False, **pltargs):
     if color in df_results.columns.values:
         pltargs['c'] = df_results[color]
         pltargs['cmap'] = 'viridis'
         pltargs['vmin'] = df_results[color].min()
         pltargs['vmax'] = df_results[color].max()
+        plot_colorbar = True
     else:
         pltargs['color'] = color
+        plot_colorbar = False
     plt.scatter(df_results[x_axis_column], df_results[y_axis_column], **pltargs)
     plt.xlabel(x_axis_column)
     plt.ylabel(y_axis_column)
     plt.xlim(xlim)
     plt.ylim(ylim)
+    if invert_x_axis:
+        plt.gca().invert_xaxis()
+    if invert_y_axis:
+        plt.gca().invert_yaxis()
+    if plot_colorbar:
+        plt.colorbar()
     plt.show()
     plt.close()
 
-def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
+def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None,
+                            invert_x_axis=False, invert_y_axis=False, **pltargs):
     if np.size(df_results[x_axis_column]) == 1:
         print("Only one point is found, so doing normal scatter plot")
-        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim, **pltargs)
+        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim,
+                                invert_x_axis=invert_x_axis, invert_y_axis=invert_y_axis, **pltargs)
         return
 
     # creates density map for the plot
@@ -270,6 +281,10 @@ def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis
     plt.colorbar(density)
     plt.xlabel(x_axis_column)
     plt.ylabel(y_axis_column)
+    if invert_x_axis:
+        plt.gca().invert_xaxis()
+    if invert_y_axis:
+        plt.gca().invert_yaxis()
     plt.show()
     plt.close()
 
@@ -502,8 +517,10 @@ def plot_synthetic_spectra(input_folder, spectra_name, xlim=None, ylim=None, plt
         plt.ylim(ylim)
     if plt_show:
         plt.show()
+        plt.close()
 
 def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=None, **kwargs):
     for spectra_name in spectra_names:
         plot_synthetic_spectra(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
     plt.show()
+    plt.close()
