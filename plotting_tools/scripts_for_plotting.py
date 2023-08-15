@@ -233,7 +233,14 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.show()
         plt.close()
 
-def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
+def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, color='black', **pltargs):
+    if color in output_results_pd_df.columns.values:
+        pltargs['c'] = df_results[color]
+        pltargs['cmap'] = 'viridis'
+        pltargs['vmin'] = df_results[color].min()
+        pltargs['vmax'] = df_results[color].max()
+    else:
+        pltargs['color'] = color
     plt.scatter(df_results[x_axis_column], df_results[y_axis_column], **pltargs)
     plt.xlabel(x_axis_column)
     plt.ylabel(y_axis_column)
@@ -477,6 +484,29 @@ def remove_bad_lines(output_data):
     output_file_df.to_csv(os.path.join(output_data["output_folder_location"], "output_good_lines"), sep=' ', index=False, header=True)
     return output_file_df
 
+def load_output_grid(output_folder):
+    # load pandas dataframe .csv file
+    output_file_df = pd.read_csv(os.path.join(output_folder, "spectra_parameters.csv"), sep=',', header=0)
+
+    return output_file_df
+
+def plot_synthetic_spectra(input_folder, spectra_name, xlim=None, ylim=None, plt_show=True, **kwargs):
+    wavelength, flux = np.loadtxt(os.path.join(input_folder, spectra_name), usecols=(0, 1), unpack=True, dtype=float)
+    plt.plot(wavelength, flux, **kwargs)
+    plt.title(spectra_name)
+    plt.xlabel("Wavelength")
+    plt.ylabel("Normalised flux")
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
+    if plt_show:
+        plt.show()
+
+def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=None, **kwargs):
+    for spectra_name in spectra_names:
+        plot_synthetic_spectra(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
+    plt.show()
 
 if __name__ == '__main__':
     # CHANGE NEXT TWO LINES
