@@ -14,14 +14,6 @@ if __name__ == '__main__':
                           f"That will lead to bad fits. Please update to scipy 1.7.1 OR higher. Your version: "
                           f"{scipy.__version__}")
 
-    try:
-        raise ModuleNotFoundError
-        from dask_mpi import initialize as dask_mpi_initialize
-        dask_mpi_installed = True
-    except ModuleNotFoundError:
-        #print("Dask MPI not installed. Job launching only on 1 node. Ignore if not using a cluster.")
-        dask_mpi_installed = False
-
     if len(argv) > 1:   # when calling the program, can now add extra argument with location of config file, easier to call
         config_location = argv[1]
     else:
@@ -35,9 +27,8 @@ if __name__ == '__main__':
     output_folder_title_date = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     output_folder_title_date = f"{output_folder_title_date}_{np.random.random(1)[0]}"     # in case if someone calls the function several times per second
     print(f"Start of the fitting: {output_folder_title_date}")
-    login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
     try:
-        run_tsfitpy(output_folder_title_date, config_location, obs_location, dask_mpi_installed)
+        run_tsfitpy(output_folder_title_date, config_location, obs_location)
         print("Fitting completed")
     except KeyboardInterrupt:
         print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?

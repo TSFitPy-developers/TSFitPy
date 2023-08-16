@@ -1972,15 +1972,11 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     return result
 
 
-def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed=False):
+def run_tsfitpy(output_folder_title, config_location, spectra_location):
     print("\nIMPORTANT UPDATE:")
     print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma"
           "i.e. the error in the observed spectra (sqrt(variance)). If this is not the case, please change the spectra."
           "If none is given, the error will be assumed to be 1.0. This error is taken into account in chisqr calculation\n\n\n")
-    #nlte_config_outdated = False
-    #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
-
-    #initial_guess_string = None
 
     # read the configuration file
     tsfitpy_configuration = TSFitPyConfig(config_location, output_folder_title, spectra_location)
@@ -2210,7 +2206,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         raise FileExistsError("Error: output folder already exists. Run was stopped to prevent overwriting")
 
     tsfitpy_configuration.linemask_file = os.path.join(tsfitpy_configuration.linemasks_path, tsfitpy_configuration.linemask_file)
-    #Spectra.segment_file = f"{segment_file_og}{segment_file}"
 
     print(f"Temporary directory name: {tsfitpy_configuration.temporary_directory_path}")
     create_dir(tsfitpy_configuration.temporary_directory_path)
@@ -2314,9 +2309,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
     tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends = create_segment_file(tsfitpy_configuration.segment_size, tsfitpy_configuration.line_begins_sorted, tsfitpy_configuration.line_ends_sorted)
     # save segment in a separate file where each line is an index of the seg_begins and seg_ends
     np.savetxt(tsfitpy_configuration.segment_file, np.column_stack((tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)), fmt="%d")
-    #if tsfitpy_configuration.seg_begins.size == 1:
-    #    tsfitpy_configuration.seg_begins = np.array([tsfitpy_configuration.seg_begins])
-    #    tsfitpy_configuration.seg_ends = np.array([tsfitpy_configuration.seg_ends])
 
     # check inputs
 
@@ -2386,20 +2378,12 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     print("Trimming down the linelist to only lines within segments for faster fitting")
     if tsfitpy_configuration.fitting_mode == "all":
-        # os.system("rm {}/*".format(line_list_path_trimmed))
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", output_folder_title, '')
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig, line_list_path_trimmed,
                                tsfitpy_configuration.include_molecules, lbl=False)
         line_list_path_trimmed =  os.path.join(line_list_path_trimmed, "0", "")
     elif tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "teff" or tsfitpy_configuration.fitting_mode == "vmic":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", output_folder_title, '')
-        """for j in range(len(tsfitpy_configuration.line_begins_sorted)):
-            start = np.where(np.logical_and(tsfitpy_configuration.seg_begins <= tsfitpy_configuration.line_centers_sorted[j],
-                                            tsfitpy_configuration.line_centers_sorted[j] <= tsfitpy_configuration.seg_ends))[0][0]
-            line_list_path_trimmed_new = get_trimmed_lbl_path_name(tsfitpy_configuration.elem_to_fit, line_list_path_trimmed,
-                                                                   tsfitpy_configuration.segment_file, j, start)"""
-        #line_list_path_trimmed_new = get_trimmed_lbl_path_name(tsfitpy_configuration.elem_to_fit, line_list_path_trimmed,
-        #                                                       tsfitpy_configuration.segment_file, j, start)
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig,
                                line_list_path_trimmed,
                                tsfitpy_configuration.include_molecules, lbl=True)
