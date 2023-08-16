@@ -535,12 +535,7 @@ class Spectra:
         self.aux_file_length_dict = tsfitpy_config.aux_file_length_dict
         self.ndimen = tsfitpy_config.ndimen
 
-        self.model_temperatures = tsfitpy_config.model_temperatures
-        self.model_logs = tsfitpy_config.model_logs
-        self.model_mets = tsfitpy_config.model_mets
-        self.marcs_value_keys = tsfitpy_config.marcs_value_keys
-        self.marcs_models = tsfitpy_config.marcs_models
-        self.marcs_values = tsfitpy_config.marcs_values
+        self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models, self.marcs_values = MarcsGridSingleton.get_marcs_grids()
 
         self.init_guess_dict = tsfitpy_config.init_guess_spectra_dict
         self.input_elem_abundance = tsfitpy_config.input_elem_abundance_dict
@@ -1910,7 +1905,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, rotation1: float, abundances_dict1: dict, line_list_path_trimmed: str,
-                           index: float, tsfitpy_pickled_configuration_path: str) -> list:
+                           index: float, tsfitpy_configuration) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param dask_client: Dask client
@@ -1928,8 +1923,8 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     :return: result of the fit with the best fit parameters and chi squared
     """
     # Load TS configuration
-    with open(tsfitpy_pickled_configuration_path, 'rb') as f:
-        tsfitpy_configuration = pickle.load(f)
+    #with open(tsfitpy_pickled_configuration_path, 'rb') as f:
+    #    tsfitpy_configuration = pickle.load(f)
 
     n_workers = tsfitpy_configuration.number_of_cpus
 
@@ -1971,6 +1966,31 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     del spectra
     return result
 
+class MarcsGridSingleton:
+    _model_temperatures = None
+    _model_logs =         None
+    _model_mets =         None
+    _marcs_value_keys =   None
+    _marcs_models =       None
+    _marcs_values =       None
+
+    @classmethod
+    def set_marcs_grids(cls, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values):
+        if cls._model_temperatures is None:
+            cls._model_temperatures = model_temperatures
+            cls._model_logs = model_logs
+            cls._model_mets = model_mets
+            cls._marcs_value_keys = marcs_value_keys
+            cls._marcs_models = marcs_models
+            cls._marcs_values = marcs_values
+        else:
+            raise ValueError("MarcsGridSingleton is already set!")
+
+    @classmethod
+    def get_marcs_grids(cls):
+        if cls._model_temperatures is None:
+            raise ValueError("big_data hasn't been set yet!")
+        return cls._model_temperatures, cls._model_logs, cls._model_mets, cls._marcs_value_keys, cls._marcs_models, cls._marcs_values
 
 def run_tsfitpy(output_folder_title, config_location, spectra_location):
     print("\nIMPORTANT UPDATE:")
@@ -2392,12 +2412,15 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
     print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(tsfitpy_configuration.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
-    tsfitpy_configuration.model_temperatures = model_temperatures
-    tsfitpy_configuration.model_logs = model_logs
-    tsfitpy_configuration.model_mets = model_mets
-    tsfitpy_configuration.marcs_value_keys = marcs_value_keys
-    tsfitpy_configuration.marcs_models = marcs_models
-    tsfitpy_configuration.marcs_values = marcs_values
+    #tsfitpy_configuration.model_temperatures = model_temperatures
+    #tsfitpy_configuration.model_logs = model_logs
+    #tsfitpy_configuration.model_mets = model_mets
+    #tsfitpy_configuration.marcs_value_keys = marcs_value_keys
+    #tsfitpy_configuration.marcs_models = marcs_models
+    #tsfitpy_configuration.marcs_values = marcs_values
+
+    # create the big data object
+    MarcsGridSingleton.set_marcs_grids(model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values)
     if tsfitpy_configuration.nlte_flag:
         tsfitpy_configuration.aux_file_length_dict = {}
 
@@ -2405,9 +2428,9 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
             tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
 
     # pickle the configuration file into the temp folder
-    with open(os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
-        pickle.dump(tsfitpy_configuration, f)
-    tsfitpy_pickled_configuration_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl")
+    #with open(os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
+    #    pickle.dump(tsfitpy_configuration, f)
+    #tsfitpy_pickled_configuration_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl")
 
     logging.debug("Finished preparing the configuration file")
 
@@ -2425,7 +2448,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}")
             future = create_and_fit_spectra(client, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   rotation1, abundances_dict1, line_list_path_trimmed, idx, tsfitpy_pickled_configuration_path)
+                                   rotation1, abundances_dict1, line_list_path_trimmed, idx, tsfitpy_configuration)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -2438,7 +2461,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             results.append(create_and_fit_spectra(None, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   rotation1, abundances_dict1,
-                                                  line_list_path_trimmed, idx, tsfitpy_pickled_configuration_path))
+                                                  line_list_path_trimmed, idx, tsfitpy_configuration))
 
     logging.debug("Finished fitting, now saving results")
 
