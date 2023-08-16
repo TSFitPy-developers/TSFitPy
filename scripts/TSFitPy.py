@@ -535,8 +535,6 @@ class Spectra:
         self.aux_file_length_dict = tsfitpy_config.aux_file_length_dict
         self.ndimen = tsfitpy_config.ndimen
 
-        self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models, self.marcs_values = MarcsGridSingleton.get_marcs_grids()
-
         self.init_guess_dict = tsfitpy_config.init_guess_spectra_dict
         self.input_elem_abundance = tsfitpy_config.input_elem_abundance_dict
 
@@ -544,6 +542,11 @@ class Spectra:
         self.sigmas_upper_limit = tsfitpy_config.sigmas_upper_limit
         self.find_teff_errors = tsfitpy_config.find_teff_errors
         self.teff_error_sigma = tsfitpy_config.teff_error_sigma
+
+    def _load_marcs_grids(self):
+        (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
+         self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
+
 
     def get_all_guess(self):
         """
@@ -900,6 +903,7 @@ class Spectra:
         :return: List with the results. Each element is a string containing file name, center start and end of the line,
         Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
         """
+        self._load_marcs_grids()
         result = {}
         result_upper_limit = {}
         result_list = []
