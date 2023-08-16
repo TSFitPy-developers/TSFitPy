@@ -4,11 +4,8 @@ import logging
 import os
 from _warnings import warn
 from configparser import ConfigParser
-
 import pandas as pd
 import numpy as np
-
-from scripts.TSFitPy import Spectra
 from scripts.solar_abundances import periodic_table, solar_abundances
 
 class SpectraParameters:
@@ -975,7 +972,7 @@ class TSFitPyConfig:
         if self.fit_teff:
             self.fit_feh = False
 
-    def load_spectra_config(self, spectra_object: Spectra):
+    def load_spectra_config(self, spectra_object):
         spectra_object.atmosphere_type = self.atmosphere_type
         spectra_object.fitting_mode = self.fitting_mode
         spectra_object.include_molecules = self.include_molecules
