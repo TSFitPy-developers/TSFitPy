@@ -274,7 +274,6 @@ class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  rotation: float, abundances_dict: dict, line_list_path_trimmed: str, index_temp_dir: float,
                  tsfitpy_config, n_workers=1):
-        self.dask_client = None  # dask client for parallelisation
         # Default values
         self.turbospec_path: str = None  # path to the /exec/ file
         self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
@@ -879,8 +878,6 @@ class Spectra:
 
         time_end = time.perf_counter()
         print(f"Total runtime was {(time_end - time_start) / 60.:2f} minutes.")
-        # remove all temporary files
-        #shutil.rmtree(self.temp_dir)
         return result
 
     def create_ts_object(self):
@@ -941,7 +938,6 @@ class Spectra:
 
         if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(result[line_number]["fit_wavelength"])):
                     print(
                         f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}",
@@ -1045,9 +1041,6 @@ class Spectra:
             time_end = time.perf_counter()
             print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
-        # g.close()
-        # h.close()
-
         return result
 
 
@@ -1090,14 +1083,12 @@ class Spectra:
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
                                                                     unpack=True)
             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
                 for k in range(len(wave_result)):
                     print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
             wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wave_result, flux_norm_result, self.resolution,
                                                                        macroturb, rotation)
 
             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
-                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
                 for k in range(len(wavelength_fit_conv)):
                     print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
 
@@ -1131,7 +1122,7 @@ class Spectra:
         result_output = f"{self.spec_name} {teff} {teff_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
                         f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {res.fun}"
 
-        one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+        one_result = result_output
 
         return one_result
 
@@ -1151,12 +1142,9 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        #param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
-        #minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
-            #res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
             print(res)
             fitted_teff = res.root
         except IndexError as error:
@@ -1164,7 +1152,7 @@ class Spectra:
             fitted_teff = -9999
 
         shutil.rmtree(temp_directory)
-        return fitted_teff #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+        return fitted_teff
 
 
     def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
@@ -1267,12 +1255,9 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        #param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
         function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
-        #minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
-            #res = minimize_function(lbl_abund_upper_limit, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
             print(res)
             fitted_abund = res.root
         except IndexError as error:
@@ -1334,16 +1319,6 @@ class Spectra:
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{temp_directory}spectrum_00000000.spec",
                                                                     unpack=True)
-            #with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
-                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-            #    for k in range(len(wave_result)):
-            #        print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-            #wave_result_conv, flux_norm_result_conv = np.loadtxt(f"{temp_directory}spectrum_00000000_convolved.spec", unpack=True)
-            #with open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a') as h:
-                # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-            #    for k in range(len(wave_result)):
-            #        print("{}  {}".format(wave_result[k], flux_norm_result[k]), file=h)
-            # os.system("rm ../output_files/spectrum_{:08d}_convolved.spec".format(i + 1))
         except (OSError, ValueError) as error:
             print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
             wave_result = np.array([])
@@ -1383,8 +1358,6 @@ class Spectra:
                 time_end = time.perf_counter()
                 print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
-        # g.close()
-        # h.close()
 
         result_list = []
         #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
@@ -1494,7 +1467,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         met = spectra_to_fit.met
     elem_abund_dict = {"Fe": met}
 
-    #abundances = [met]
     # first it takes the input abundances and then adds the fit abundances to it, so priority is given to fitted abundances
     for element in spectra_to_fit.input_abund:
         if element != "Fe":
@@ -1508,7 +1480,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param[i] + met     # convert [X/Fe] to [X/H]
-            #abundances.append(param[i])
 
 
     if spectra_to_fit.vmic is not None:  # Input given
@@ -1622,7 +1593,7 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
     print(f"{output_print} teff={teff} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr} chisqr={(chi_square - offset_chisqr)}")
 
-    return (chi_square - offset_chisqr)
+    return chi_square - offset_chisqr
 
 
 def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
@@ -1656,7 +1627,6 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param + met     # convert [X/Fe] to [X/H]
-            #abundances.append(param[i])
 
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
@@ -1690,7 +1660,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
     print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr / dof} chisqr={(chi_square - offset_chisqr / dof)}")
 
-    return (chi_square - offset_chisqr / dof)
+    return chi_square - offset_chisqr / dof
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
@@ -1720,8 +1690,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
         # param[0:nelement - 1] = abundance of the element
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
-            elem_abund_dict[elem_name] = param[i] + met
-            #abundances.append(param[i])
+            elem_abund_dict[elem_name] = param[i] + met  # convert [X/Fe] to [X/H]
 
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met
@@ -1908,7 +1877,6 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     else:
         macroturb = spectra_to_fit.vmac
 
-    #wave_obs = spectra_to_fit.wave_ob / (1 + (doppler / 299792.))
     wave_obs = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
     if spectra_to_fit.fit_feh:
