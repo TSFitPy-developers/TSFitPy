@@ -13,10 +13,10 @@ from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-from scripts.TSFitPy import (TSFitPyConfig, calculate_equivalent_width, apply_doppler_correction,
-                             output_default_configuration_name, output_default_fitlist_name,
+from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
                              output_default_linemask_name)
-from scripts.loading_configs import SpectraParameters
+from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
+from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:

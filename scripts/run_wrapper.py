@@ -7,19 +7,8 @@ import datetime
 import shutil
 import os
 from scripts.solar_abundances import solar_abundances
+from scripts.auxiliary_functions import calculate_vturb
 
-def calculate_vturb(teff, logg, met):
-    t0 = 5500.
-    g0 = 4.
-
-    if teff >= 5000.:
-        vturb = 1.05 + 2.51e-4*(teff-t0) + 1.5e-7*(teff-t0)*(teff-t0) - 0.14*(logg-g0) - 0.005*(logg-g0)*(logg-g0) + 0.05*met + 0.01*met*met
-    elif teff < 5000. and logg >= 3.5:
-        vturb = 1.05 + 2.51e-4*(teff-t0) + 1.5e-7*(5250.-t0)*(5250.-t0) - 0.14*(logg-g0) - 0.005*(logg-g0)*(logg-g0) + 0.05*met + 0.01*met*met
-    elif teff < 5500. and logg < 3.5:
-        vturb = 1.25 + 4.01e-4*(teff-t0) + 3.1e-7*(teff-t0)*(teff-t0) - 0.14*(logg-g0) - 0.005*(logg-g0)*(logg-g0) + 0.05*met + 0.01*met*met
-
-    return vturb
 
 def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vmic=None, verbose=False, **kwargs):
     #parameters to adjust

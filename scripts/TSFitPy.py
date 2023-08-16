@@ -1,77 +1,32 @@
 from __future__ import annotations
 
 import pickle
-import warnings
 from configparser import ConfigParser
 from warnings import warn
 import numpy as np
-from scipy import integrate
-from scipy.interpolate import interp1d
 from scipy.optimize import minimize, root_scalar
+from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
+    apply_doppler_correction, create_segment_file
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import time
 import os
 from os import path as os_path
-import datetime
+
 try:
     from dask.distributed import Client, get_client, secede, rejoin
 except (ModuleNotFoundError, ImportError):
     raise ModuleNotFoundError("Dask not installed. It is required for multiprocessing. Install using pip install dask[complete]")
 import shutil
-import socket
-from sys import argv
 import collections
-import scipy
 from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
-from scripts.loading_configs import SpectraParameters
+from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 import logging
 from scripts.dask_client import get_dask_client
 
 output_default_configuration_name: str = "configuration.cfg"
 output_default_fitlist_name: str = "fitlist.txt"
 output_default_linemask_name: str = "linemask.txt"
-
-def create_dir(directory: str):
-    """
-    Creates a directory if it does not exist
-    :param directory: Path to the directory that can be created (relative or not)
-    """
-    if not os.path.exists(directory):
-        try:
-            os.mkdir(directory)
-        except FileNotFoundError:  # if one needs to create folders in-between
-            os.makedirs(directory)  # can't recall why I just don't call this function directly
-
-
-def calculate_vturb(teff: float, logg: float, met: float) -> float:
-    """
-    Calculates micro turbulence based on the input parameters
-    :param teff: Temperature in kelvin
-    :param logg: log(g) in dex units
-    :param met: metallicity [Fe/H] scaled by solar
-    :return: micro turbulence in km/s
-    """
-    t0 = 5500.
-    g0 = 4.
-
-    v_mturb: float = 0
-
-    if teff >= 5000.:
-        v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
-                logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
-    elif teff < 5000. and logg >= 3.5:
-        v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (5250. - t0) * (5250. - t0) - 0.14 * (logg - g0) - 0.005 * (
-                logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
-    elif teff < 5500. and logg < 3.5:
-        v_mturb = 1.25 + 4.01e-4 * (teff - t0) + 3.1e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
-                logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
-
-    if v_mturb <= 0.0:
-        print("error in calculating micro turb, setting it to 1.0")
-        return 1.0
-
-    return v_mturb
 
 
 def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, resolution: float, macro: float, rot: float) -> tuple[
@@ -248,18 +203,6 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     return chi_square
 
 
-def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray, left_bound: float, right_bound: float) -> float:
-    line_func = interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
-                                     fill_value=1, bounds_error=False)
-    total_area = (right_bound - left_bound) * 1.0   # continuum
-    try:
-        integration_points = fit_wavelength[np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))]
-        area_under_line = integrate.quad(line_func, left_bound, right_bound, points=integration_points, limit=len(integration_points) * 5)
-    except ValueError:
-        return -9999
-
-    return total_area - area_under_line[0]
-
 class Result:
     # because other fitting algorithms call result differently
     def __init__(self):
@@ -330,7 +273,7 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  rotation: float, abundances_dict: dict, line_list_path_trimmed: str, index_temp_dir: float,
-                 tsfitpy_config, elem_abund=None, n_workers=1):
+                 tsfitpy_config, n_workers=1):
         self.dask_client = None  # dask client for parallelisation
         # Default values
         self.turbospec_path: str = None  # path to the /exec/ file
@@ -361,7 +304,7 @@ class Spectra:
         self.resolution: float = None  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
         # macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
         self.rotation: float = 0  # rotation km/s, constant for all stars
-        self.fitting_mode: str = None  # "lbl" = line by line or "all" or "lbl_quick"
+        self.fitting_mode: str = None  # "lbl" = line by line or "all"
         self.output_folder: str = None
 
         self.dask_workers: int = None  # workers, i.e. CPUs for multiprocessing
@@ -448,10 +391,6 @@ class Spectra:
         self.met: float = float(met)
         self.rv: float = float(rv)  # RV of star (given, but is fitted with extra doppler shift)
         self.doppler_shift: float = 0.0  # doppler shift; added to RV (fitted)
-        if elem_abund is not None:
-            self.elem_abund_input: float = float(elem_abund)  # initial abundance of element as a guess if lbl quick
-        else:
-            self.elem_abund_input = None
         if self.input_elem_abundance is None:  # input abundance - NOT fitted, but just accepted as a constant abund for spectra
             self.input_abund: dict = {}
         else:
@@ -482,15 +421,6 @@ class Spectra:
         self.set_param_guess()
 
         self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
-
-        """self.ts = TurboSpectrum(
-            turbospec_path=self.turbospec_path,
-            interpol_path=self.interpol_path,
-            line_list_paths=self.line_list_path_trimmed,
-            marcs_grid_path=self.model_atmosphere_grid_path,
-            marcs_grid_list=self.model_atmosphere_list,
-            model_atom_path=self.model_atom_path,
-            departure_file_path=self.departure_file_path)"""
 
         self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
                                                 dtype=float)  # observed spectra
@@ -678,10 +608,6 @@ class Spectra:
                                                                                   min_macroturb, max_macroturb,
                                                                                   min_microturb, max_microturb,
                                                                                   min_abundance, max_abundance)
-        elif self.fitting_mode == "lbl_quick":
-            # param[0] = doppler
-            # param[1] = macro turb
-            initial_guess, self.minim_bounds = self.get_rv_macro_rotation_guess()
         else:
             ValueError("Unknown fitting mode, choose all or lbl")
 
@@ -999,127 +925,6 @@ class Spectra:
             marcs_models=self.marcs_models,
             marcs_values=self.marcs_values)
         return ts
-
-    def generate_grid_for_lbl(self, abund_to_gen: np.ndarray) -> list:
-        """
-        Generates grids for lbl quick method. Grids are centered at input metallicity/abundance. Number of grids and
-        bounds depend on self.abund_bound, self.grids_amount
-        :return: List corresponding to self.abund_to_gen with same locations. True: generation success. False: not
-        """
-        success = []
-
-        for abund_to_use in abund_to_gen:
-            if self.met > 0.5 or self.met < -4.0 or abund_to_use < -40 or (
-                    self.fit_feh and (abund_to_use < -4.0 or abund_to_use > 0.5)):
-                success.append(False)  # if metallicity or abundance too weird, then fail
-            else:
-                if self.fit_feh:
-                    item_abund = {"Fe": abund_to_use}
-                    met = abund_to_use
-                else:
-                    item_abund = {"Fe": self.met, self.elem_to_fit[0]: abund_to_use + self.met}
-                    met = self.met
-
-                if self.vmic is not None:  # sets microturbulence here
-                    vmicro = self.vmic
-                else:
-                    vmicro = calculate_vturb(self.teff, self.logg, met)
-
-                ts = self.create_ts_object()
-
-                temp_dir = os.path.join(self.temp_dir, f"{abund_to_use}", '')
-                #create_dir(temp_dir)
-                self.configure_and_run_ts(ts, met, item_abund, vmicro, self.lmin, self.lmax, False, temp_dir=temp_dir)
-
-                if os_path.exists(f"{temp_dir}spectrum_00000000.spec") and \
-                        os.stat(f"{temp_dir}spectrum_00000000.spec").st_size != 0:
-                    success.append(True)
-                else:
-                    success.append(False)
-        return success
-
-    def fit_lbl_quick(self) -> list:
-        """
-        lbl quick called here. It generates grids based on input parameters and then tries to find best chi-squared for
-        each grid (with best fit doppler shift and if requested macroturbulence). Then it gives chi-squared and best
-        fit parameters for each grid point. Also saves spectra for best fit chi squared for corresponding abundances.
-        :return: List full of grid parameters with corresponding best fit values and chi squared
-        """
-        print("Generating grids")
-        if self.fit_feh:  # grids generated centered on input metallicity or abundance
-            input_abund = self.met
-        else:
-            input_abund = self.elem_abund_input
-        self.abund_to_gen = np.linspace(input_abund - self.abund_bound, input_abund + self.abund_bound,
-                                        self.grids_amount)
-        success_grid_gen = self.generate_grid_for_lbl(self.abund_to_gen)  # generate grids
-        print("Generation successful")
-        result = []
-        grid_spectra = {}
-        # read spectra from generated grids and keep in memory to not waste time reading them each time
-        for abund, success in zip(self.abund_to_gen, success_grid_gen):
-            if success:
-                spectra_grid_path = os.path.join(self.temp_dir, f"{abund}", '')
-                wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_grid_path}/spectrum_00000000.spec',
-                                                          usecols=(0, 1), unpack=True)
-                grid_spectra[abund] = [wave_mod_orig, flux_mod_orig]
-
-        for j in range(len(self.line_begins_sorted)):
-            # each line contains spectra name and fitted line. then to the right of it abundance with chi-sqr are added
-            result_one_line = f"{self.spec_name} {self.line_centers_sorted[j]} {self.line_begins_sorted[j]} " \
-                              f"{self.line_ends_sorted[j]}"
-
-            chi_squares = []
-
-            for abund, success in zip(self.abund_to_gen, success_grid_gen):
-                if success:  # for each successful grid find chi squared with best fit parameters
-                    wave_abund, flux_abund = grid_spectra[abund][0], grid_spectra[abund][1]
-                    function_argsuments=(self, self.line_begins_sorted[j] - 5., self.line_ends_sorted[j] + 5.,
-                                         wave_abund, flux_abund)
-                    minimize_options = {'maxiter': self.ndimen * 50, 'disp': False}
-                    res = minimize_function(lbl_rv_vmac_rot, self.init_param_guess,
-                                            function_argsuments, self.minim_bounds, 'L-BFGS-B',
-                                            minimize_options)
-                    #print(res.x)
-                    if self.fit_vmac:  # if fitted macroturbulence
-                        macroturb = res.x[1]
-                    else:
-                        macroturb = self.vmac
-                    if self.vmic is not None:  # if microturbulence was given or finds whatever input was used
-                        vmicro = self.vmic
-                    else:
-                        if self.fit_feh:
-                            met = abund
-                        else:
-                            met = self.met
-                        vmicro = calculate_vturb(self.teff, self.logg, met)
-                    result_one_line += f" {abund} {res.x[0]} {vmicro} {macroturb} {res.fun}"  # saves additionally here
-                    chi_squares.append(res.fun)
-                else:
-                    #print(f"Abundance {abund} did not manage to generate a grid")  # if no grid was generated
-                    result_one_line += f" {abund} {9999} {9999} {9999} {9999}"
-                    chi_squares.append(9999)
-
-            result.append(result_one_line)
-            # finds best fit chi squared for the line and corresponding abundance
-            # 01.12.2022 NS: removed the next few lines, because takes 10 MB/star, which is quite a bit
-            """index_min_chi_square = np.argmin(chi_squares)
-            min_chi_sqr_spectra_path = os.path.join(self.temp_dir, f"{self.abund_to_gen[index_min_chi_square]}",
-                                                    'spectrum_00000000.spec')
-            # appends that best fit spectra to the total output spectra. NOT convolved. separate abundance for each line
-            wave_result, flux_norm_result, flux_result = np.loadtxt(min_chi_sqr_spectra_path,
-                                                                    unpack=True)  # TODO asyncio here? or just print at the very end?
-            with open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a') as g:
-                # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-                for k in range(len(wave_result)):
-                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-            """
-            #time_end = time.perf_counter()
-            #print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-        # g.close()
-
-        return result
 
     def fit_lbl(self, client) -> list:
         """
@@ -1653,27 +1458,6 @@ class Spectra:
         return result_list
 
 
-def get_second_degree_polynomial(x: list, y: list) -> tuple[int, int, int]:
-    """
-    Takes a list of x and y of length 3 each and calculates perfectly fitted second degree polynomial through it.
-    Returns a, b, c that are related to the function ax^2+bx+c = y
-    :param x: x values, length 3
-    :param y: y values, length 3
-    :return a,b,c -> ax^2+bx+c = y 2nd degree polynomial
-    """
-    x1 = x[0]
-    x2 = x[1]
-    x3 = x[2]
-    y1 = y[0]
-    y2 = y[1]
-    y3 = y[2]
-
-    a = (x1 * (y3 - y2) + x2 * (y1 - y3) + x3 * (y2 - y1)) / ((x1 - x2) * (x1 - x3) * (x2 - x3))
-    b = (y2 - y1) / (x2 - x1) - a * (x1 + x2)
-    c = y1 - a * x1 * x1 - b * x2
-
-    return a, b, c
-
 def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
                     wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, offset_chisqr=0) -> float:
     """
@@ -1711,10 +1495,6 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
 
     return np.abs(chi_square - offset_chisqr)
-
-
-def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
-    return wave_ob / (1 + (doppler / 299792.))
 
 
 def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int, offset_chisqr=0) -> float:
@@ -2187,8 +1967,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, rotation1: float, abundances_dict1: dict, line_list_path_trimmed: str,
-                           input_abundance: float, index: float,
-                           tsfitpy_pickled_configuration_path: str) -> list:
+                           index: float, tsfitpy_pickled_configuration_path: str) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param dask_client: Dask client
@@ -2215,8 +1994,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
 
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
-                      line_list_path_trimmed, index, tsfitpy_configuration, elem_abund=input_abundance,
-                      n_workers=n_workers)
+                      line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers)
 
     #spectra.dask_client = dask_client
 
@@ -2228,8 +2006,6 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
             result = spectra.fit_all()
         elif spectra.fitting_mode == "lbl":
             result = spectra.fit_lbl(None)
-        elif spectra.fitting_mode == "lbl_quick":
-            result = spectra.fit_lbl_quick()
         elif spectra.fitting_mode == "teff":
             result = spectra.fit_teff_function()
         elif spectra.fitting_mode == "vmic":
@@ -2241,8 +2017,6 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
             result = dask_client.submit(spectra.fit_all)
         elif spectra.fitting_mode == "lbl":
             result = spectra.fit_lbl(dask_client)
-        elif spectra.fitting_mode == "lbl_quick":
-            result = dask_client.submit(spectra.fit_lbl_quick)
         elif spectra.fitting_mode == "teff":
             result = dask_client.submit(spectra.fit_teff_function)
             #result = spectra.fit_teff_function()
@@ -2255,1012 +2029,8 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     return result
 
 
-def load_nlte_files_in_dict(elements_to_fit: list, depart_bin_file: list, depart_aux_file: list, model_atom_file: list, fit_feh, load_fe=True) -> tuple[dict, dict, dict]:
-    """
-    Loads and sorts NLTE elements to fit into respective dictionaries
-    :param elements_to_fit: Array of elements to fit
-    :param depart_bin_file: Departure binary file location (Fe last if not fitted)
-    :param depart_aux_file: Departure aux file location (Fe last if not fitted)
-    :param model_atom_file: Model atom file location (Fe last if not fitted)
-    :param load_fe: loads Fe in the dict as well with it being the last element even if not fitted
-    :return: 3 dictionaries: NLTE location of elements that exist with keys as element names
-    """
-    depart_bin_file_dict = {}  # assume that element locations are in the same order as the element to fit
-    if load_fe:
-        if fit_feh:
-            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file))
-        else:
-            iterations_for_nlte_elem = min(len(elements_to_fit), len(depart_bin_file) - 1)
-    else:
-        iterations_for_nlte_elem = len(elements_to_fit)
-    for i in range(iterations_for_nlte_elem):
-        depart_bin_file_dict[elements_to_fit[i]] = depart_bin_file[i]
-    depart_aux_file_dict = {}
-    for i in range(iterations_for_nlte_elem):
-        depart_aux_file_dict[elements_to_fit[i]] = depart_aux_file[i]
-    model_atom_file_dict = {}
-    for i in range(iterations_for_nlte_elem):
-        model_atom_file_dict[elements_to_fit[i]] = model_atom_file[i]
-    for i in range(iterations_for_nlte_elem, len(elements_to_fit)):
-        depart_bin_file_dict[elements_to_fit[i]] = ""
-        depart_aux_file_dict[elements_to_fit[i]] = ""
-        model_atom_file_dict[elements_to_fit[i]] = ""
-    if load_fe:
-        if "Fe" not in elements_to_fit:  # if Fe is not fitted, then the last NLTE element should be
-            depart_bin_file_dict["Fe"] = depart_bin_file[-1]
-            depart_aux_file_dict["Fe"] = depart_aux_file[-1]
-            model_atom_file_dict["Fe"] = model_atom_file[-1]
-    return depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict
-
-class TSFitPyConfig:
-    def __init__(self, config_location: str, output_folder_title=None, spectra_location=None):
-        self.config_parser = ConfigParser()
-        self.config_location: str = config_location
-        if output_folder_title is not None:
-            self.output_folder_title: str = output_folder_title
-        else:
-            self.output_folder_title: str = "none"
-
-        self.compiler: str = None
-        self.turbospectrum_path: str = None
-        self.interpolators_path: str = None
-        self.line_list_path: str = None
-        self.model_atmosphere_grid_path_1d: str = None
-        self.model_atmosphere_grid_path_3d: str = None
-        self.model_atoms_path: str = None
-
-        self.temporary_directory_path: str = None
-        self.fitlist_input_path: str = None
-        if spectra_location is not None:
-            self.spectra_input_path: str = spectra_location
-        else:
-            self.spectra_input_path: str = None
-        self.linemasks_path: str = None
-        self.output_folder_path: str = None
-        self.departure_file_config_path: str = None
-        self.departure_file_path: str = None
-
-        self.atmosphere_type: str = None
-        self.fitting_mode: str = None
-        self.include_molecules: bool = None
-        self.nlte_flag: bool = None
-        self.fit_vmac: bool = None
-        self.vmac_input: bool = None
-        self.elements_to_fit: list[str] = None
-        self.fit_feh: bool = None
-        self.nlte_elements: list[str] = []
-        self.linemask_file: str = None
-        self.wavelength_delta: float = None
-        self.segment_size: float = 5  # default value
-
-        self.segment_file: str = None  # path to the temp place where segment is saved
-
-        self.debug_mode: int = None
-        self.number_of_cpus: int = None
-        self.experimental_parallelisation: bool = False
-        self.cluster_name: str = None
-
-        self.input_fitlist_filename: str = None
-        self.output_filename: str = None
-
-        self.resolution: float = None
-        self.vmac: float = None
-        self.rotation: float = None
-        self.init_guess_elements: list[str] = []
-        self.init_guess_elements_path: list[str] = []
-        self.input_elements_abundance: list[str] = []
-        self.input_elements_abundance_path: list[str] = []
-
-        self.wavelength_min: float = None
-        self.wavelength_max: float = None
-
-        self.fit_vmic: str = None
-        self.vmic_input: bool = None
-        self.fit_rotation: bool = None
-        self.rotation_input: bool = None
-        self.bounds_vmic: list[float] = None
-        self.guess_range_vmic: list[float] = None
-
-        self.bounds_teff: list[float] = None
-        self.guess_range_teff: list[float] = None
-
-        self.bounds_vmac: list[float] = None
-        self.bounds_rotation: list[float] = None
-        self.bounds_abundance: list[float] = None
-        self.bounds_feh: list[float] = None
-        self.bounds_doppler: list[float] = None
-
-        self.guess_range_vmac: list[float] = None
-        self.guess_range_rotation: list[float] = None
-        self.guess_range_abundance: list[float] = None
-        self.guess_range_doppler: list[float] = None
-
-        self.oldconfig_nlte_config_outdated: bool = False
-        self.oldconfig_need_to_add_new_nlte_config: bool = True  # only if nlte_config_outdated == True
-        self.oldconfig_model_atom_file: list[str] = []
-        self.oldconfig_model_atom_file_input_elem: list[str] = []
-
-        self.fit_teff: bool = None
-        self.nelement: int = None
-        self.model_atmosphere_list: str = None
-        self.model_atmosphere_grid_path: str = None
-
-        self.depart_bin_file_dict: dict = None
-        self.depart_aux_file_dict: dict = None
-        self.model_atom_file_dict: dict = None
-
-        self.line_begins_sorted: list[float] = None
-        self.line_ends_sorted: list[float] = None
-        self.line_centers_sorted: list[float] = None
-
-        self.seg_begins: list[float] = None
-        self.seg_ends: list[float] = None
-
-        self.aux_file_length_dict: dict = None
-        self.ndimen: int = None
-
-        self.model_temperatures = None
-        self.model_logs = None
-        self.model_mets = None
-        self.marcs_value_keys = None
-        self.marcs_models = None
-        self.marcs_values = None
-
-        # dictionaries with either abundance guess or abundance input
-        self.init_guess_spectra_dict: dict = None
-        self.input_elem_abundance_dict: dict = None
-
-        self.old_global_temporary_directory = None  # used only to convert old config to new config
-        self.old_output_folder_path_global = None  # used only to convert old config to new config
-        self.old_turbospectrum_global_path = None  # used only to convert old config to new config
-
-        self.find_upper_limit: bool = False
-        self.sigmas_upper_limit: float = 5
-
-        self.find_teff_errors: bool = False
-        self.teff_error_sigma: float = 3
-
-        # new options for the slurm cluster
-        self.cluster_type = "local"
-        self.number_of_nodes = 1
-        self.memory_per_cpu_gb = 3.6
-        self.script_commands = [            # Additional commands to run before starting dask worker
-            'module purge',
-            'module load basic-path',
-            'module load intel',
-            'module load anaconda3-py3.10']
-        self.time_limit_hours = 71
-        self.slurm_partition = "debug"
-
-    def load_config(self):
-        # if last 3 characters are .cfg then new config file, otherwise old config file
-        if self.config_location[-4:] == ".cfg":
-            self.load_new_config()
-        else:
-            self.load_old_config()
-
-    def load_old_config(self):
-        model_atom_file = []
-        init_guess_elements = []
-        input_elem_abundance = []
-        model_atom_file_input_elem = []
-        elements_to_do_in_nlte = []
-        self.bounds_rotation = [0, 15] # default value
-        self.bounds_vmic = [0, 5] # default value
-        self.bounds_vmac = [0, 15] # default value
-        self.bounds_abundance = [-40, 40] # default value
-        self.bounds_feh = [-5, 1] # default value
-        self.bounds_doppler = [-2, 2] # default value
-        self.guess_range_rotation = [0, 15] # default value
-        self.guess_range_vmic = [0.8, 2.0] # default value
-        self.guess_range_vmac = [0, 15] # default value
-        self.guess_range_abundance = [-2, 2] # default value
-        self.guess_range_doppler = [2, -2] # default value
-        self.bounds_teff = [2000, 8000] # default value
-        self.guess_range_teff = [-250, 250] # default value
-
-        self.turbospectrum_path = "../turbospectrum/"
-        self.cluster_name = "None"
-        self.debug_mode = 0
-
-        #nlte_config_outdated = False
-        #need_to_add_new_nlte_config = True  # only if nlte_config_outdated == True
-
-        #initial_guess_string = None
-
-        with open(self.config_location) as fp:
-            line = fp.readline()
-            while line:
-                if len(line) > 1:
-                    fields = line.strip().split()
-                    field_name = fields[0].lower()
-                    if field_name == "title":
-                        self.output_folder_title = fields[2]
-                    if field_name == "interpol_path":
-                        self.interpolators_path = fields[2]
-                    if field_name == "line_list_path":
-                        self.line_list_path = fields[2]
-                    if field_name == "model_atmosphere_grid_path_1d":
-                        self.model_atmosphere_grid_path_1d = fields[2]
-                    if field_name == "model_atmosphere_grid_path_3d":
-                        self.model_atmosphere_grid_path_3d = fields[2]
-                    if field_name == "model_atom_path":
-                        self.model_atoms_path = fields[2]
-                    if field_name == "departure_file_path":
-                        self.departure_file_path = fields[2]
-                        self.departure_file_config_path = os.path.join(self.departure_file_path, "nlte_filenames.cfg")
-                    if field_name == "output_folder":
-                        self.output_folder_path = fields[2]
-                    if field_name == "linemask_file_folder_location":
-                        self.linemasks_path = self._check_if_path_exists(fields[2])
-                    #if field_name == "segment_file_folder_location":
-                        #self.segment_file_og = fields[2]
-                    if field_name == "spec_input_path":
-                        if self.spectra_input_path is None:
-                            self.spectra_input_path = fields[2]
-                    if field_name == "fitlist_input_folder":
-                        self.fitlist_input_path = self._check_if_path_exists(fields[2])
-                    if field_name == "turbospectrum_compiler":
-                        self.compiler = fields[2]
-                    if field_name == "atmosphere_type":
-                        self.atmosphere_type = fields[2].lower()
-                    if field_name == "mode":
-                        self.fitting_mode = fields[2].lower()
-                    if field_name == "include_molecules":
-                        # spectra_to_fit.include_molecules = fields[2]
-                        if fields[2].lower() in ["yes", "true"]:
-                            self.include_molecules = True
-                        elif fields[2].lower() in ["no", "false"]:
-                            self.include_molecules = False
-                        else:
-                            raise ValueError(f"Expected True/False for including molecules, got {fields[2]}")
-                    if field_name == "nlte":
-                        nlte_flag = fields[2].lower()
-                        if nlte_flag in ["yes", "true"]:
-                            self.nlte_flag = True
-                        elif nlte_flag in ["no", "false"]:
-                            self.nlte_flag = False
-                        else:
-                            raise ValueError(f"Expected True/False for nlte flag, got {fields[2]}")
-                    if field_name == "fit_microturb":  # Yes No Input
-                        self.fit_vmic = fields[2]
-                        if self.fit_vmic not in ["Yes", "No", "Input"]:
-                            raise ValueError(f"Expected Yes/No/Input for micro fit, got {fields[2]}")
-                    if field_name == "fit_macroturb":  # Yes No Input
-                        if fields[2].lower() in ["yes", "true"]:
-                            self.fit_vmac = True
-                            self.vmac_input = False
-                        elif fields[2].lower() in ["no", "false"]:
-                            self.fit_vmac = False
-                            self.vmac_input = False
-                        elif fields[2].lower() == "input":
-                            self.fit_vmac = False
-                            self.vmac_input = True
-                        else:
-                            raise ValueError(f"Expected Yes/No/Input for macro fit, got {fields[2]}")
-                    if field_name == "fit_rotation":
-                        if fields[2].lower() in ["yes", "true"]:
-                            self.fit_rotation = True
-                        elif fields[2].lower() in ["no", "false"]:
-                            self.fit_rotation = False
-                        else:
-                            raise ValueError(f"Expected Yes/No for rotation fit, got {fields[2]}")
-                    if field_name == "element":
-                        elements_to_fit = []
-                        for i in range(len(fields) - 2):
-                            elements_to_fit.append(fields[2 + i])
-                        self.elements_to_fit = np.asarray(elements_to_fit)
-                        if 'Fe' in self.elements_to_fit:
-                            self.fit_feh = True
-                        else:
-                            self.fit_feh = False
-                        """if "Fe" in elements_to_fit:
-                            spectra_to_fit.fit_feh = True
-                        else:
-                            Spectra.fit_feh = False
-                        Spectra.nelement = len(Spectra.elem_to_fit)"""
-                    if field_name == "linemask_file":
-                        self.linemask_file = fields[2]
-                    #if field_name == "segment_file":
-                        #self.segment_file = fields[2]
-
-                    if field_name == "model_atom_file":
-                        self.oldconfig_nlte_config_outdated = True
-                        for i in range(2, len(fields)):
-                            model_atom_file.append(fields[i])
-                        self.oldconfig_model_atom_file = model_atom_file
-                    if field_name == "input_elem_model_atom_file":
-                        self.oldconfig_nlte_config_outdated = True
-                        for i in range(2, len(fields)):
-                            model_atom_file_input_elem.append(fields[i])
-                        self.oldconfig_model_atom_file_input_elem = model_atom_file_input_elem
-                    if field_name == "nlte_elements":
-                        self.oldconfig_need_to_add_new_nlte_config = False
-                        for i in range(len(fields) - 2):
-                            elements_to_do_in_nlte.append(fields[2 + i])
-                        self.nlte_elements = elements_to_do_in_nlte
-                    if field_name == "wavelength_minimum":
-                        self.wavelength_min = float(fields[2])
-                    if field_name == "wavelength_maximum":
-                        self.wavelength_max = float(fields[2])
-                    if field_name == "wavelength_delta":
-                        self.wavelength_delta = float(fields[2])
-                    if field_name == "resolution":
-                        self.resolution = float(fields[2])
-                    if field_name == "macroturbulence":
-                        self.vmac = float(fields[2])
-                    if field_name == "rotation":
-                        self.rotation = float(fields[2])
-                    if field_name == "temporary_directory":
-                        temp_directory = fields[2]
-                        self.old_global_temporary_directory = os.path.join(".", temp_directory, "")
-                        temp_directory = os.path.join(os.path.join("..", temp_directory, ""), self.output_folder_title, '')
-                        self.temporary_directory_path = os.path.join("..", temp_directory, "")
-                    if field_name == "input_file":
-                        self.input_fitlist_filename = fields[2]
-                    if field_name == "output_file":
-                        self.output_filename = fields[2]
-                    if field_name == "workers":
-                        workers = int(fields[2])  # should be the same as cores; use value of 1 if you do not want to use multithprocessing
-                        self.number_of_cpus = workers
-                    if field_name == "init_guess_elem":
-                        init_guess_elements = []
-                        for i in range(len(fields) - 2):
-                            init_guess_elements.append(fields[2 + i])
-                        self.init_guess_elements = np.asarray(init_guess_elements)
-                    if field_name == "init_guess_elem_location":
-                        init_guess_elements_location = []
-                        for i in range(len(init_guess_elements)):
-                            init_guess_elements_location.append(fields[2 + i])
-                        self.init_guess_elements_path = np.asarray(init_guess_elements_location)
-                    if field_name == "input_elem_abundance":
-                        input_elem_abundance = []
-                        for i in range(len(fields) - 2):
-                            input_elem_abundance.append(fields[2 + i])
-                        self.input_elements_abundance = np.asarray(input_elem_abundance)
-                    if field_name == "input_elem_abundance_location":
-                        input_elem_abundance_location = []
-                        for i in range(len(input_elem_abundance)):
-                            input_elem_abundance_location.append(fields[2 + i])
-                        self.input_elements_abundance_path = np.asarray(input_elem_abundance_location)
-                    if field_name == "bounds_macro":
-                        self.bounds_vmac = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "bounds_rotation":
-                        self.bounds_rotation = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "bounds_micro":
-                        self.bounds_vmic = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "bounds_abund":
-                        self.bounds_abundance = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "bounds_met":
-                        self.bounds_feh = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "bounds_teff":
-                        self.bounds_teff = [min(float(fields[2]), float(fields[3])),  max(float(fields[2]), float(fields[3]))]
-                    if field_name == "bounds_doppler":
-                        self.bounds_doppler = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "guess_range_microturb":
-                        self.guess_range_vmic = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "guess_range_macroturb":
-                        self.guess_range_vmac = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "guess_range_rotation":
-                        self.guess_range_rotation = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "guess_range_abundance":
-                        self.guess_range_abundance = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "guess_range_rv":
-                        self.guess_range_doppler = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "guess_range_teff":
-                        self.guess_range_teff = [min(float(fields[2]), float(fields[3])), max(float(fields[2]), float(fields[3]))]
-                    if field_name == "debug":
-                        self.debug_mode = int(fields[2])
-                    if field_name == "experimental":
-                        if fields[2].lower() == "true" or fields[2].lower() == "yes":
-                            self.experimental_parallelisation = True
-                        else:
-                            self.experimental_parallelisation = False
-                line = fp.readline()
-
-    def load_new_config(self):
-        # check if the config file exists
-        if not os.path.isfile(self.config_location):
-            raise ValueError(f"The configuration file {self.config_location} does not exist.")
-
-        # read the configuration file
-        self.config_parser.read(self.config_location)
-        # intel or gnu compiler
-        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
-        self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
-        self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
-        self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
-        self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
-        self.model_atmosphere_grid_path_3d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_3d"]
-        self.model_atoms_path = self.config_parser["MainPaths"]["model_atoms_path"]
-        self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
-        self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
-        self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
-        if self.spectra_input_path is None:
-            self.spectra_input_path = self.config_parser["MainPaths"]["spectra_input_path"]
-        self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
-        self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
-
-        self.atmosphere_type = self._validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
-        self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
-        self.include_molecules = self._convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
-        self.nlte_flag = self._convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
-        vmic_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
-        self.fit_vmic, self.vmic_input = self._get_fitting_mode(vmic_fitting_mode)
-        vmac_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmac"], ["yes", "no", "input"])
-        self.fit_vmac, self.vmac_input = self._get_fitting_mode(vmac_fitting_mode)
-        rotation_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_rotation"], ["yes", "no", "input"])
-        self.fit_rotation, self.rotation_input = self._get_fitting_mode(rotation_fitting_mode)
-        self.elements_to_fit = self._split_string_to_string_list(self.config_parser["FittingParameters"]["element_to_fit"])
-        if 'Fe' in self.elements_to_fit:
-            self.fit_feh = True
-        else:
-            self.fit_feh = False
-
-        self.nlte_elements = self._split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
-        self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
-        self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
-        self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
-
-        self.debug_mode = int(self.config_parser["ExtraParameters"]["debug_mode"])
-        self.number_of_cpus = int(self.config_parser["ExtraParameters"]["number_of_cpus"])
-        self.experimental_parallelisation = self._convert_string_to_bool(self.config_parser["ExtraParameters"]["experimental_parallelisation"])
-        self.cluster_name = self.config_parser["ExtraParameters"]["cluster_name"]
-
-        self.input_fitlist_filename = self.config_parser["InputAndOutputFiles"]["input_filename"]
-        self.output_filename = self.config_parser["InputAndOutputFiles"]["output_filename"]
-
-        self.resolution = float(self.config_parser["SpectraParameters"]["resolution"])
-        self.vmac = float(self.config_parser["SpectraParameters"]["vmac"])
-        self.rotation = float(self.config_parser["SpectraParameters"]["rotation"])
-        self.init_guess_elements = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["init_guess_elements"])
-        self.init_guess_elements_path = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["init_guess_elements_path"])
-        self.input_elements_abundance = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["input_elements_abundance"])
-        self.input_elements_abundance_path = self._split_string_to_string_list(self.config_parser["SpectraParameters"]["input_elements_abundance_path"])
-
-        self.wavelength_min = float(self.config_parser["ParametersForModeAll"]["wavelength_min"])
-        self.wavelength_max = float(self.config_parser["ParametersForModeAll"]["wavelength_max"])
-
-        self.bounds_vmic = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_vmic"])
-        self.guess_range_vmic = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["guess_range_vmic"])
-        try:
-            self.find_upper_limit = self._convert_string_to_bool(self.config_parser["ParametersForModeLbl"]["find_upper_limit"])
-            self.sigmas_upper_limit = float(self.config_parser["ParametersForModeLbl"]["upper_limit_sigma"])
-        except KeyError:
-            self.find_upper_limit = False
-            self.sigmas_upper_limit = 5.0
-
-        self.bounds_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["bounds_teff"])
-        self.guess_range_teff = self._split_string_to_float_list(self.config_parser["ParametersForModeTeff"]["guess_range_teff"])
-        try:
-            self.find_teff_errors = self._convert_string_to_bool(self.config_parser["ParametersForModeTeff"]["find_teff_errors"])
-            self.teff_error_sigma = float(self.config_parser["ParametersForModeTeff"]["teff_error_sigma"])
-            if self.find_teff_errors:
-                print("Currently, the find_teff_errors option is not working properly. Please, use it with caution. (most likely, it will not work)")
-        except KeyError:
-            self.find_teff_errors = False
-            self.teff_error_sigma = 5.0
-
-        self.bounds_vmac = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
-        self.bounds_rotation = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])
-        self.bounds_abundance = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_abundance"])
-        self.bounds_feh = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_feh"])
-        self.bounds_doppler = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_doppler"])
-
-        self.guess_range_vmac = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_vmac"])
-        self.guess_range_rotation = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_rotation"])
-        self.guess_range_abundance = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_abundance"])
-        self.guess_range_doppler = self._split_string_to_float_list(self.config_parser["GuessRanges"]["guess_range_doppler"])
-
-        try:
-            self.cluster_type = self.config_parser["SlurmClusterParameters"]["cluster_type"].lower()
-            self.number_of_nodes = int(self.config_parser["SlurmClusterParameters"]["number_of_nodes"])
-            self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
-            self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
-            self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
-            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["partition"]
-        except KeyError:
-            self.cluster_type = "local"
-            self.number_of_nodes = 1
-            self.memory_per_cpu_gb = 3.6
-            self.script_commands = [            # Additional commands to run before starting dask worker
-                'module purge',
-                'module load basic-path',
-                'module load intel',
-                'module load anaconda3-py3.10']
-            self.time_limit_hours = 71
-            self.slurm_partition = "debug"
-
-    @staticmethod
-    def _get_fitting_mode(fitting_mode: str):
-        fit_variable, input_variable = None, None  # both booleans
-        if fitting_mode == "Yes":
-            fit_variable = True
-            input_variable = False
-        elif fitting_mode == "No":
-            fit_variable = False
-            input_variable = False
-        elif fitting_mode == "Input":
-            fit_variable = False
-            input_variable = True
-        else:
-            raise ValueError(f"Fitting mode {fitting_mode} not recognized")
-        return fit_variable, input_variable
-
-    def convert_old_config(self):
-        self.config_parser.add_section("turbospectrum_compiler")
-        self.config_parser["turbospectrum_compiler"]["compiler"] = self.compiler
-
-        self.config_parser.add_section("MainPaths")
-        self.config_parser["MainPaths"]["turbospectrum_path"] = self.old_turbospectrum_global_path
-        self.config_parser["MainPaths"]["interpolators_path"] = self.interpolators_path
-        self.config_parser["MainPaths"]["line_list_path"] = self.line_list_path
-        self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"] = self.model_atmosphere_grid_path_1d
-        self.config_parser["MainPaths"]["model_atmosphere_grid_path_3d"] = self.model_atmosphere_grid_path_3d
-        self.config_parser["MainPaths"]["model_atoms_path"] = self.model_atoms_path
-        self.config_parser["MainPaths"]["departure_file_path"] = self.departure_file_path
-        self.config_parser["MainPaths"]["departure_file_config_path"] = self.departure_file_config_path
-        self.config_parser["MainPaths"]["output_path"] = self.old_output_folder_path_global
-        self.config_parser["MainPaths"]["linemasks_path"] = self.linemasks_path
-        self.config_parser["MainPaths"]["spectra_input_path"] = self.spectra_input_path
-        self.config_parser["MainPaths"]["fitlist_input_path"] = self.fitlist_input_path
-        self.config_parser["MainPaths"]["temporary_directory_path"] = self.old_global_temporary_directory
-
-        self.config_parser.add_section("FittingParameters")
-        self.config_parser["FittingParameters"]["atmosphere_type"] = self.atmosphere_type.upper()
-        self.config_parser["FittingParameters"]["fitting_mode"] = self.fitting_mode
-        self.config_parser["FittingParameters"]["include_molecules"] = str(self.include_molecules)
-        self.config_parser["FittingParameters"]["nlte"] = str(self.nlte_flag)
-        self.config_parser["FittingParameters"]["fit_vmic"] = self.fit_vmic
-        if self.vmac_input:
-            vmac_fitting_mode = "Input"
-        elif self.fit_vmac:
-            vmac_fitting_mode = "Yes"
-        else:
-            vmac_fitting_mode = "No"
-        self.config_parser["FittingParameters"]["fit_vmac"] = vmac_fitting_mode
-        if self.fit_rotation:
-            rotation_fitting_mode = "Input"
-        elif self.fit_rotation:
-            rotation_fitting_mode = "Yes"
-        else:
-            rotation_fitting_mode = "No"
-        self.config_parser["FittingParameters"]["fit_rotation"] = rotation_fitting_mode
-        self.config_parser["FittingParameters"]["element_to_fit"] = self._convert_list_to_str(self.elements_to_fit)
-
-        nlte_elements_to_write = []
-        if self.oldconfig_need_to_add_new_nlte_config:
-            for element in self.oldconfig_model_atom_file + self.oldconfig_model_atom_file_input_elem:
-                if ".ba" in element:
-                    nlte_elements_to_write.append("Ba")
-                if ".ca" in element:
-                    nlte_elements_to_write.append("Ca")
-                if ".co" in element:
-                    nlte_elements_to_write.append("Co")
-                if ".fe" in element:
-                    nlte_elements_to_write.append("Fe")
-                if ".h" in element:
-                    nlte_elements_to_write.append("H")
-                if ".mg" in element:
-                    nlte_elements_to_write.append("Mg")
-                if ".mn" in element:
-                    nlte_elements_to_write.append("Mn")
-                if ".na" in element:
-                    nlte_elements_to_write.append("Na")
-                if ".ni" in element:
-                    nlte_elements_to_write.append("Ni")
-                if ".o" in element:
-                    nlte_elements_to_write.append("O")
-                if ".si" in element:
-                    nlte_elements_to_write.append("Si")
-                if ".sr" in element:
-                    nlte_elements_to_write.append("Sr")
-                if ".ti" in element:
-                    nlte_elements_to_write.append("Ti")
-                if ".y" in element:
-                    nlte_elements_to_write.append("Y")
-        else:
-            nlte_elements_to_write = self.nlte_elements
-        self.config_parser["FittingParameters"]["nlte_elements"] = self._convert_list_to_str(nlte_elements_to_write)
-        self.config_parser["FittingParameters"]["linemask_file"] = self.linemask_file
-        self.config_parser["FittingParameters"]["wavelength_delta"] = str(self.wavelength_delta)
-        self.config_parser["FittingParameters"]["segment_size"] = str(self.segment_size)
-
-        self.config_parser.add_section("ExtraParameters")
-        self.config_parser["ExtraParameters"]["debug_mode"] = str(self.debug_mode)
-        self.config_parser["ExtraParameters"]["number_of_cpus"] = str(self.number_of_cpus)
-        self.config_parser["ExtraParameters"]["experimental_parallelisation"] = str(self.experimental_parallelisation)
-        self.config_parser["ExtraParameters"]["cluster_name"] = self.cluster_name
-
-        self.config_parser.add_section("InputAndOutputFiles")
-        self.config_parser["InputAndOutputFiles"]["input_filename"] = self.input_fitlist_filename
-        self.config_parser["InputAndOutputFiles"]["output_filename"] = self.output_filename
-
-        self.config_parser.add_section("SpectraParameters")
-        self.config_parser["SpectraParameters"]["resolution"] = str(self.resolution)
-        self.config_parser["SpectraParameters"]["vmac"] = str(self.vmac)
-        self.config_parser["SpectraParameters"]["rotation"] = str(self.rotation)
-        self.config_parser["SpectraParameters"]["init_guess_elements"] = self._convert_list_to_str(self.init_guess_elements)
-        self.config_parser["SpectraParameters"]["init_guess_elements_path"] = self._convert_list_to_str(self.init_guess_elements_path)
-        self.config_parser["SpectraParameters"]["input_elements_abundance"] = self._convert_list_to_str(self.input_elements_abundance)
-        self.config_parser["SpectraParameters"]["input_elements_abundance_path"] = self._convert_list_to_str(self.input_elements_abundance_path)
-
-        self.config_parser.add_section("ParametersForModeAll")
-        self.config_parser["ParametersForModeAll"]["wavelength_min"] = str(self.wavelength_min)
-        self.config_parser["ParametersForModeAll"]["wavelength_max"] = str(self.wavelength_max)
-
-        self.config_parser.add_section("ParametersForModeLbl")
-        self.config_parser["ParametersForModeLbl"]["bounds_vmic"] = self._convert_list_to_str(self.bounds_vmic)
-        self.config_parser["ParametersForModeLbl"]["guess_range_vmic"] = self._convert_list_to_str(self.guess_range_vmic)
-        self.config_parser["ParametersForModeLbl"]["find_upper_limit"] = 'False'
-        self.config_parser["ParametersForModeLbl"]["upper_limit_sigma"] = '5.0'
-
-        self.config_parser.add_section("ParametersForModeTeff")
-        self.config_parser["ParametersForModeTeff"]["bounds_teff"] = self._convert_list_to_str(self.bounds_teff)
-        self.config_parser["ParametersForModeTeff"]["guess_range_teff"] = self._convert_list_to_str(self.guess_range_teff)
-        self.config_parser["ParametersForModeTeff"]["find_teff_errors"] = 'False'
-        self.config_parser["ParametersForModeTeff"]["teff_error_sigma"] = '1.0'
-
-        self.config_parser.add_section("Bounds")
-        self.config_parser["Bounds"]["bounds_vmac"] = self._convert_list_to_str(self.bounds_vmac)
-        self.config_parser["Bounds"]["bounds_rotation"] = self._convert_list_to_str(self.bounds_rotation)
-        self.config_parser["Bounds"]["bounds_abundance"] = self._convert_list_to_str(self.bounds_abundance)
-        self.config_parser["Bounds"]["bounds_feh"] = self._convert_list_to_str(self.bounds_feh)
-        self.config_parser["Bounds"]["bounds_doppler"] = self._convert_list_to_str(self.bounds_doppler)
-
-        self.config_parser.add_section("GuessRanges")
-        self.config_parser["GuessRanges"]["guess_range_vmac"] = self._convert_list_to_str(self.guess_range_vmac)
-        self.config_parser["GuessRanges"]["guess_range_rotation"] = self._convert_list_to_str(self.guess_range_rotation)
-        self.config_parser["GuessRanges"]["guess_range_abundance"] = self._convert_list_to_str(self.guess_range_abundance)
-        self.config_parser["GuessRanges"]["guess_range_doppler"] = self._convert_list_to_str(self.guess_range_doppler)
-
-        if self.config_location[-4:] == ".txt":
-            converted_config_location = f"{self.config_location[:-4]}"
-        else:
-            converted_config_location = f"{self.config_location}"
-
-        print("\n\nConverting old config into new one")
-
-        while os.path.exists(f"{converted_config_location}.cfg"):
-            print(f"{converted_config_location}.cfg already exists trying {converted_config_location}0.cfg")
-            converted_config_location = f"{converted_config_location}0"
-        converted_config_location = f"{converted_config_location}.cfg"
-
-        with open(converted_config_location, "w") as new_config_file:
-            new_config_file.write(f"# Converted from old file {self.config_location} to a new format\n")
-            self.config_parser.write(new_config_file)
-
-        print(f"Converted old config file into new one and save at {converted_config_location}\n\n")
-        warn(f"Converted old config file into new one and save at {converted_config_location}", DeprecationWarning, stacklevel=2)
-
-    def validate_input(self, check_valid_path=True):
-        self.departure_file_config_path = self._check_if_file_exists(self.departure_file_config_path, check_valid_path=check_valid_path)
-
-        self.atmosphere_type = self.atmosphere_type.upper()
-        self.fitting_mode = self.fitting_mode.lower()
-        self.include_molecules = self.include_molecules
-        if len(self.nlte_elements) == 0 and self.nlte_flag:
-            print("\nNo NLTE elements were provided, setting NLTE flag to False!!\n")
-            self.nlte_flag = False
-        else:
-            self.nlte_flag = self.nlte_flag
-        self.fit_vmic = self.fit_vmic
-        self.fit_vmac = self.fit_vmac
-        self.fit_rotation = self.fit_rotation
-        self.elements_to_fit = np.asarray(self.elements_to_fit)
-        self.fit_feh = self.fit_feh
-        self.wavelength_min = float(self.wavelength_min)
-        self.wavelength_max = float(self.wavelength_max)
-        self.wavelength_delta = float(self.wavelength_delta)
-        self.resolution = float(self.resolution)
-        self.rotation = float(self.rotation)
-        self.temporary_directory_path = self._find_path_temporary_directory(self.temporary_directory_path)
-        self.number_of_cpus = int(self.number_of_cpus)
-
-        self.segment_file = os.path.join(self.temporary_directory_path, "segment_file.txt")
-
-        self.debug_mode = self.debug_mode
-        if self.debug_mode >= 1:
-            logging.basicConfig(level=logging.DEBUG)
-        else:
-            logging.basicConfig(level=logging.WARNING)
-        self.experimental_parallelisation = self.experimental_parallelisation
-
-        self.nelement = len(self.elements_to_fit)
-
-        if self.turbospectrum_path is None:
-            self.turbospectrum_path = "../turbospectrum/"
-        self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path))
-        if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
-                                                   "exec", "")
-        elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
-                                                   "exec-gf", "")
-        else:
-            raise ValueError("Compiler not recognized")
-        self.turbospectrum_path = self.turbospectrum_path
-
-        if os.path.exists(self.interpolators_path):
-            self.interpolators_path = os.path.join(os.getcwd(), self.interpolators_path)
-        else:
-            if self.interpolators_path.startswith("./"):
-                self.interpolators_path = self.interpolators_path[2:]
-                self.interpolators_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
-
-        if self.atmosphere_type.upper() == "1D":
-            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_1d, check_valid_path)
-            self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
-                                                                "model_atmosphere_list.txt")
-        elif self.atmosphere_type.upper() == "3D":
-            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_3d, check_valid_path)
-            self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
-                                                                "model_atmosphere_list.txt")
-        else:
-            raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
-        self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path, check_valid_path)
-        self.departure_file_path = self._check_if_path_exists(self.departure_file_path, check_valid_path)
-        self.old_output_folder_path_global = self._check_if_path_exists(self.output_folder_path, check_valid_path)
-
-        nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
-
-        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self._convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
-
-        self.output_folder_path = os.path.join(self._check_if_path_exists(self.output_folder_path, check_valid_path),
-                                               self.output_folder_title)
-        self.spectra_input_path = self._check_if_path_exists(self.spectra_input_path, check_valid_path)
-        self.line_list_path = self._check_if_path_exists(self.line_list_path, check_valid_path)
-
-        if self.fitting_mode == "teff":
-            self.fit_teff = True
-        else:
-            self.fit_teff = False
-
-        if self.fit_teff:
-            self.fit_feh = False
-
-    def load_spectra_config(self, spectra_object: Spectra):
-        spectra_object.atmosphere_type = self.atmosphere_type
-        spectra_object.fitting_mode = self.fitting_mode
-        spectra_object.include_molecules = self.include_molecules
-        spectra_object.nlte_flag = self.nlte_flag
-
-        # TODO: redo as booleans instead of strings
-        if self.fit_vmic:
-            spectra_object.fit_vmic = "Yes"
-        elif self.vmic_input:
-            spectra_object.fit_vmic = "Input"
-        else:
-            spectra_object.fit_vmic = "No"
-
-        spectra_object.fit_vmac = self.fit_vmac
-        spectra_object.fit_rotation = self.fit_rotation
-        spectra_object.input_vmic = self.vmic_input
-        spectra_object.input_vmac = self.vmac_input
-        spectra_object.input_rotation = self.rotation_input
-        spectra_object.elem_to_fit = self.elements_to_fit
-        spectra_object.fit_feh = self.fit_feh
-        spectra_object.lmin = self.wavelength_min
-        spectra_object.lmax = self.wavelength_max
-        spectra_object.ldelta = self.wavelength_delta
-        spectra_object.resolution = self.resolution
-        spectra_object.rotation = self.rotation
-        spectra_object.vmac = self.vmac
-        spectra_object.global_temp_dir = self.temporary_directory_path
-        spectra_object.dask_workers = self.number_of_cpus
-        spectra_object.bound_min_vmac = self.bounds_rotation[0]
-        spectra_object.bound_max_vmac = self.bounds_rotation[1]
-        spectra_object.bound_min_rotation = self.bounds_rotation[0]
-        spectra_object.bound_max_rotation = self.bounds_rotation[1]
-        spectra_object.bound_min_vmic = self.bounds_vmic[0]
-        spectra_object.bound_max_vmic = self.bounds_vmic[1]
-        spectra_object.bound_min_abund = self.bounds_abundance[0]
-        spectra_object.bound_max_abund = self.bounds_abundance[1]
-        spectra_object.bound_min_feh = self.bounds_feh[0]
-        spectra_object.bound_max_feh = self.bounds_feh[1]
-        spectra_object.bound_min_teff = self.bounds_teff[0]
-        spectra_object.bound_max_teff = self.bounds_teff[1]
-        spectra_object.bound_min_doppler = self.bounds_doppler[0]
-        spectra_object.bound_max_doppler = self.bounds_doppler[1]
-        spectra_object.guess_min_vmic = self.guess_range_vmic[0]
-        spectra_object.guess_max_vmic = self.guess_range_vmic[1]
-        spectra_object.guess_min_vmac = self.guess_range_rotation[0]
-        spectra_object.guess_max_vmac = self.guess_range_rotation[1]
-        spectra_object.guess_min_rotation = self.guess_range_rotation[0]
-        spectra_object.guess_max_rotation = self.guess_range_rotation[1]
-        spectra_object.guess_min_abund = self.guess_range_abundance[0]
-        spectra_object.guess_max_abund = self.guess_range_abundance[1]
-        spectra_object.guess_min_doppler = self.guess_range_doppler[0]
-        spectra_object.guess_max_doppler = self.guess_range_doppler[1]
-        spectra_object.guess_plus_minus_neg_teff = self.guess_range_teff[0]
-        spectra_object.guess_plus_minus_pos_teff = self.guess_range_teff[1]
-        spectra_object.debug_mode = self.debug_mode
-        spectra_object.experimental_parallelisation = self.experimental_parallelisation
-
-        spectra_object.nelement = self.nelement
-        spectra_object.turbospec_path = self.turbospectrum_path
-
-        spectra_object.interpol_path = self.interpolators_path
-
-        spectra_object.model_atmosphere_grid_path = self.model_atmosphere_grid_path
-        spectra_object.model_atmosphere_list = self.model_atmosphere_list
-
-        spectra_object.model_atom_path = self.model_atoms_path
-        spectra_object.departure_file_path = self.departure_file_path
-        spectra_object.output_folder = self.output_folder_path
-        spectra_object.spec_input_path = self.spectra_input_path
-
-        spectra_object.fit_teff = self.fit_teff
-
-        spectra_object.line_begins_sorted = self.line_begins_sorted
-        spectra_object.line_ends_sorted = self.line_ends_sorted
-        spectra_object.line_centers_sorted = self.line_centers_sorted
-
-        spectra_object.linemask_file = self.linemask_file
-        spectra_object.segment_file = self.segment_file
-        spectra_object.seg_begins = self.seg_begins
-        spectra_object.seg_ends = self.seg_ends
-
-        spectra_object.depart_bin_file_dict = self.depart_bin_file_dict
-        spectra_object.depart_aux_file_dict = self.depart_aux_file_dict
-        spectra_object.model_atom_file_dict = self.model_atom_file_dict
-        spectra_object.aux_file_length_dict = self.aux_file_length_dict
-        spectra_object.ndimen = self.ndimen
-
-        spectra_object.model_temperatures = self.model_temperatures
-        spectra_object.model_logs = self.model_logs
-        spectra_object.model_mets = self.model_mets
-        spectra_object.marcs_value_keys = self.marcs_value_keys
-        spectra_object.marcs_models = self.marcs_models
-        spectra_object.marcs_values = self.marcs_values
-
-        spectra_object.init_guess_dict = self.init_guess_spectra_dict
-        spectra_object.input_elem_abundance = self.input_elem_abundance_dict
-
-        spectra_object.find_upper_limit = self.find_upper_limit
-        spectra_object.sigmas_upper_limit = self.sigmas_upper_limit
-        spectra_object.find_teff_errors = self.find_teff_errors
-        spectra_object.teff_error_sigma = self.teff_error_sigma
-
-    @staticmethod
-    def _split_string_to_float_list(string_to_split: str) -> list[float]:
-        # remove commas from the string if they exist and split the string into a list
-        string_to_split = string_to_split.replace(",", " ").split()
-        # convert the list of strings to a list of floats
-        string_to_split = [float(i) for i in string_to_split]
-        return string_to_split
-
-    @staticmethod
-    def _split_string_to_string_list(string_to_split: str) -> list[str]:
-        # remove commas from the string if they exist and split the string into a list
-        string_to_split = string_to_split.replace(",", " ").split()
-        return string_to_split
-
-    @staticmethod
-    def _convert_string_to_bool(string_to_convert: str) -> bool:
-        if string_to_convert.lower() in ["true", "yes", "y", "1"]:
-            return True
-        elif string_to_convert.lower() in ["false", "no", "n", "0"]:
-            return False
-        else:
-            raise ValueError(f"Configuration: could not convert {string_to_convert} to a boolean")
-
-    @staticmethod
-    def _validate_string_input(input_to_check: str, allowed_values: list[str]) -> str:
-        # check if input is in the list of allowed values
-        if input_to_check.lower() in allowed_values:
-            # return string in lower case with first letter capitalised
-            return input_to_check.lower().capitalize()
-        else:
-            raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
-
-    @staticmethod
-    def _check_if_file_exists(path_to_check: str, check_valid_path=True) -> str:
-        # check if path is absolute
-        if os.path.isabs(path_to_check):
-            # check if path exists or file exists
-            if os.path.isfile(path_to_check):
-                return path_to_check
-        else:
-            # if path is relative, check if it exists in the current directory
-            if os.path.isfile(path_to_check):
-                # returns absolute path
-                return os.path.join(os.getcwd(), path_to_check)
-            else:
-                # if it starts with ../ convert to ./ and check again
-                if path_to_check.startswith("../"):
-                    path_to_check = path_to_check[3:]
-                    if os.path.isfile(path_to_check):
-                        return os.path.join(os.getcwd(), path_to_check)
-        # try to add ../ to the path and check if it exists
-        if os.path.isfile(os.path.join("..", path_to_check)):
-            return os.path.join(os.getcwd(), "..", path_to_check)
-        if check_valid_path:
-            raise FileNotFoundError(f"Configuration: {path_to_check} file does not exist")
-        else:
-            return ""
-
-    @staticmethod
-    def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
-        # check if path is absolute
-        if os.path.isabs(path_to_check):
-            # check if path exists or file exists
-            if os.path.exists(os.path.join(path_to_check, "")):
-                return path_to_check
-        else:
-            # if path is relative, check if it exists in the current directory
-            if os.path.exists(os.path.join(path_to_check, "")):
-                # returns absolute path
-                return os.path.join(os.getcwd(), path_to_check, "")
-            else:
-                # if it starts with ../ convert to ./ and check again
-                if path_to_check.startswith("../"):
-                    path_to_check = path_to_check[3:]
-                    if os.path.exists(os.path.join(path_to_check, "")):
-                        return os.path.join(os.getcwd(), path_to_check, "")
-        # try to add ../ to the path and check if it exists
-        if os.path.exists(os.path.join("..", path_to_check, "")):
-            return os.path.join(os.getcwd(), "..", path_to_check, "")
-        if check_valid_path:
-            raise FileNotFoundError(f"Configuration: {path_to_check} folder does not exist")
-        else:
-            return ""
-
-    @staticmethod
-    def _find_path_temporary_directory(temp_directory):
-        # find the path to the temporary directory by finding if /scripts/ is located adjacent to the input directory
-        # if it is, change temp_directory path to that one
-        # check if path is absolute then return it
-        if os.path.isabs(temp_directory):
-            return temp_directory
-
-        # first check if path above path directory contains /scripts/
-        if os.path.exists(os.path.join(temp_directory, "..", "scripts", "")):
-            return os.path.join(os.getcwd(), temp_directory)
-        elif temp_directory.startswith("../"):
-            # if it doesnt, and temp_directory contains ../ remove the ../ and return that
-            return os.path.join(os.getcwd(), temp_directory[3:])
-        else:
-            # otherwise just return the temp_directory
-            return os.path.join(os.getcwd(), temp_directory)
-
-    @staticmethod
-    def _convert_list_to_str(list_to_convert: list) -> str:
-        string_to_return = ""
-        for element in list_to_convert:
-            string_to_return = f"{string_to_return} {element}"
-        return string_to_return
-
-    @staticmethod
-    def _split_string_to_string_list_with_semicolons(string_to_split: str) -> list[str]:
-        # separate based on semicolons and remove them from the list
-        string_to_split = string_to_split.split(';')
-        return string_to_split
-
-
-def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
-    segments_left = []
-    segments_right = []
-    start = line_begins_list[0] - segment_size
-    end = line_ends_list[0] + segment_size
-
-    for (line_left, line_right) in zip(line_begins_list, line_ends_list):
-        if line_left > end + segment_size:
-            segments_left.append(start)
-            segments_right.append(end)
-            start = line_left - segment_size
-            end = line_right + segment_size
-        else:
-            end = line_right + segment_size
-
-    segments_left.append(start)
-    segments_right.append(end)
-
-    return np.asarray(segments_left), np.asarray(segments_right)
-
 def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi_installed=False):
-    print("IMPORTANT UPDATE:")
+    print("\nIMPORTANT UPDATE:")
     print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma"
           "i.e. the error in the observed spectra (sqrt(variance)). If this is not the case, please change the spectra."
           "If none is given, the error will be assumed to be 1.0. This error is taken into account in chisqr calculation\n\n\n")
@@ -3519,14 +2289,11 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
     tsfitpy_configuration.ndimen = 1  # first dimension is RV fit
     if not tsfitpy_configuration.fit_teff:
-        if tsfitpy_configuration.fit_vmic == "Yes" and (
-                tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "lbl_quick") and not tsfitpy_configuration.atmosphere_type == "3D":
+        if tsfitpy_configuration.fit_vmic == "Yes" and tsfitpy_configuration.fitting_mode == "lbl" and not tsfitpy_configuration.atmosphere_type == "3D":
             tsfitpy_configuration.ndimen += 1  # if fitting micro for lbl, not 3D
         if tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "vmic":  # TODO: if several elements fitted for other modes, change here
             tsfitpy_configuration.ndimen += tsfitpy_configuration.nelement
             print(f"Fitting {tsfitpy_configuration.nelement} element(s): {tsfitpy_configuration.elements_to_fit}")
-        elif tsfitpy_configuration.fitting_mode == "lbl_quick":
-            pass    # element is not fitted using minimization, no need for ndimen
         else:
             tsfitpy_configuration.ndimen += 1
             print(f"Fitting {1} element: {tsfitpy_configuration.elements_to_fit[0]}")
@@ -3653,8 +2420,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         print(f"Requested macroturbulence input of {tsfitpy_configuration.vmac}, which is less than 0. Consider changing it if "
               f"you fit it.")
     # check done in tsfitpyconfiguration
-    #if tsfitpy_configuration.fitting_mode not in ["all", "lbl", "lbl_quick", "teff"]:
-    #    print(f"Expected fitting mode 'all', 'lbl', 'lbl_quick', 'teff', but got {tsfitpy_configuration.fitting_mode} instead")
     if tsfitpy_configuration.nlte_flag:
         for file in tsfitpy_configuration.depart_bin_file_dict:
             if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_bin_file_dict[file])):
@@ -3677,7 +2442,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
           "crashes.\n\n")
 
     print("Trimming down the linelist to only lines within segments for faster fitting")
-    if tsfitpy_configuration.fitting_mode == "all" or tsfitpy_configuration.fitting_mode == "lbl_quick":
+    if tsfitpy_configuration.fitting_mode == "all":
         # os.system("rm {}/*".format(line_list_path_trimmed))
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", output_folder_title, '')
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig, line_list_path_trimmed,
@@ -3732,9 +2497,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
             # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
             logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}")
-            input_abundance = None  # TODO: fix for lbl_quick eventually
             future = create_and_fit_spectra(client, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   rotation1, abundances_dict1, line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path)
+                                   rotation1, abundances_dict1, line_list_path_trimmed, idx, tsfitpy_pickled_configuration_path)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -3745,10 +2509,9 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         results = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
-            input_abundance = None  # TODO: fix for lbl_quick eventually
             results.append(create_and_fit_spectra(None, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   rotation1, abundances_dict1,
-                                                  line_list_path_trimmed, input_abundance, idx, tsfitpy_pickled_configuration_path))
+                                                  line_list_path_trimmed, idx, tsfitpy_pickled_configuration_path))
 
     logging.debug("Finished fitting, now saving results")
 
@@ -3781,12 +2544,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
         print(
             f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew",
             file=f)
-    elif tsfitpy_configuration.fitting_mode == "lbl_quick":  # f" {res.x[0]} {vmicro} {macroturb} {res.fun}"
-        output_columns = "#specname\twave_center\twave_start\twave_end"
-        for i in range(tsfitpy_configuration.grids_amount):     # TODO fix lbl_quick
-            output_columns += f"\tabund_{i}\tdoppler_shift_{i}\tmicroturb_{i}\tmacroturb_{i}\tchi_square_{i}"
-        # f"#specname        wave_center  wave_start  wave_end  {element[0]}_Fe   Doppler_Shift_add_to_RV Microturb   Macroturb    chi_squared"
-        print(output_columns, file=f)
     elif tsfitpy_configuration.fitting_mode == "teff":
         output_columns = "#specname\tTeff\tTeff_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared"
         print(output_columns, file=f)
@@ -3815,39 +2572,3 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location, dask_mpi
 
 if __name__ == '__main__':
     raise RuntimeError("This file is not meant to be run as main. Please run TSFitPy/main.py instead.")  # this is a module
-    """major_version_scipy, minor_version_scipy, patch_version_scipy = scipy.__version__.split(".")
-    if int(major_version_scipy) < 1 or (int(major_version_scipy) == 1 and int(minor_version_scipy) < 7) or (
-            int(major_version_scipy) == 1 and int(minor_version_scipy) == 7 and int(patch_version_scipy) == 0):
-        raise ImportError(f"Scipy has to be at least version 1.7.1, otherwise bounds are not considered in mimisation. "
-                          f"That will lead to bad fits. Please update to scipy 1.7.1 OR higher. Your version: "
-                          f"{scipy.__version__}")
-
-    try:
-        raise ModuleNotFoundError
-        from dask_mpi import initialize as dask_mpi_initialize
-        dask_mpi_installed = True
-    except ModuleNotFoundError:
-        #print("Dask MPI not installed. Job launching only on 1 node. Ignore if not using a cluster.")
-        dask_mpi_installed = False
-
-    if len(argv) > 1:   # when calling the program, can now add extra argument with location of config file, easier to call
-        config_location = argv[1]
-    else:
-        config_location = "../input_files/tsfitpy_input_configuration.txt"  # location of config file
-    if len(argv) > 2:  # when calling the program, can now add extra argument with location of observed spectra, easier to call
-        obs_location = argv[2]
-    else:
-        obs_location = None  # otherwise defaults to the input one
-    print(config_location)
-    # TODO explain lbl quick
-    output_folder_title_date = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
-    output_folder_title_date = f"{output_folder_title_date}_{np.random.random(1)[0]}"     # in case if someone calls the function several times per second
-    print(f"Start of the fitting: {output_folder_title_date}")
-    login_node_address = "gemini-login.mpia.de"  # Change this to the address/domain of your login node
-    try:
-        run_TSFitPy(output_folder_title_date, config_location, obs_location)
-        print("Fitting completed")
-    except KeyboardInterrupt:
-        print(f"KeyboardInterrupt detected. Terminating job.")  #TODO: cleanup temp folders here?
-    finally:
-        print(f"End of the fitting: {datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}")"""
