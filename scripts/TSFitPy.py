@@ -415,11 +415,6 @@ class Spectra:
 
         self.abund_to_gen = None  # array with generated abundances for lbl quick
 
-        self.init_param_guess: list = None  # guess for minimzation
-        self.initial_simplex_guess: list = None
-        self.minim_bounds: list = []
-        self.set_param_guess()
-
         self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
 
         self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
@@ -556,63 +551,41 @@ class Spectra:
         self.find_teff_errors = tsfitpy_config.find_teff_errors
         self.teff_error_sigma = tsfitpy_config.teff_error_sigma
 
-    def set_param_guess(self):
+    def get_all_guess(self):
         """
         Converts init param guess list to the 2D list for the simplex calculation
         """
+        minim_bounds: list = []
         # make an array for initial guess equal to n x ndimen+1
         initial_guess = np.empty((self.ndimen + 1, self.ndimen))
         # 17.11.2022: Tried random guesses. But they DO affect the result if the random guesses are way off.
         # Trying with linspace. Should be better I hope
-        min_microturb = self.guess_min_vmic  # set bounds for all elements here, change later if needed
-        max_microturb = self.guess_max_vmic  # km/s ? cannot be less than 0
         min_macroturb = self.guess_min_vmac  # km/s; cannot be less than 0
         max_macroturb = self.guess_max_vmac
         min_abundance = self.guess_min_abund  # either [Fe/H] or [X/Fe] here
         max_abundance = self.guess_max_abund  # for [Fe/H]: hard bounds -4 to 0.5; other elements: bounds are above -40
         min_rv = self.guess_min_doppler  # km/s i think as well
         max_rv = self.guess_max_doppler
-        #microturb_guesses = np.linspace(min_microturb, max_microturb, self.ndimen + 1)
         macroturb_guesses = np.linspace(min_macroturb + np.random.random(1)[0] / 2, max_macroturb + np.random.random(1)[0] / 2, self.ndimen + 1)
         abundance_guesses = np.linspace(min_abundance + np.random.random(1)[0] / 10, max_abundance + np.random.random(1)[0] / 10, self.ndimen + 1)
         rv_guesses = np.linspace(min_rv + np.random.random(1)[0] / 10, max_rv + np.random.random(1)[0] / 10, self.ndimen + 1)
 
-        """# fill the array with input from config file # OLD
-        for j in range(self.ndimen):
-            for i in range(j, len(init_param_guess), self.ndimen):
-                initial_guess[int(i / self.ndimen)][j] = float(init_param_guess[i])"""
-
-        # TODO: order depends on the fitting mode. Make more universal?
-
-        if self.fitting_mode == "all":
-            # abund = param[0]
-            # dopple = param[1]
-            # macroturb = param [2] (if needed)
-            initial_guess[:, 0] = abundance_guesses
-            if self.fit_feh:
-                self.minim_bounds.append((self.bound_min_feh, self.bound_max_feh))
-            else:
-                self.minim_bounds.append((self.bound_min_abund, self.bound_max_abund))
-            initial_guess[:, 1] = rv_guesses
-            self.minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
-            if self.fit_vmac:
-                initial_guess[:, 2] = macroturb_guesses
-                self.minim_bounds.append((self.bound_min_vmac, self.bound_max_vmac))
-        elif self.fitting_mode == "lbl":
-            # param[0] = added doppler to rv
-            # param[1:nelements] = met or abund
-            # param[-1] = macro turb IF MACRO FIT
-            # param[-2] = micro turb IF MACRO FIT
-            # param[-1] = micro turb IF NOT MACRO FIT
-            initial_guess, self.minim_bounds = self.get_rv_elem_micro_macro_guess(min_rv, max_rv,
-                                                                                  min_macroturb, max_macroturb,
-                                                                                  min_microturb, max_microturb,
-                                                                                  min_abundance, max_abundance)
+        # abund = param[0]
+        # dopple = param[1]
+        # macroturb = param [2] (if needed)
+        initial_guess[:, 0] = abundance_guesses
+        if self.fit_feh:
+            minim_bounds.append((self.bound_min_feh, self.bound_max_feh))
         else:
-            ValueError("Unknown fitting mode, choose all or lbl")
+            minim_bounds.append((self.bound_min_abund, self.bound_max_abund))
+        initial_guess[:, 1] = rv_guesses
+        minim_bounds.append((self.bound_min_doppler, self.bound_max_doppler))
+        if self.fit_vmac:
+            initial_guess[:, 2] = macroturb_guesses
+            minim_bounds.append((self.bound_min_vmac, self.bound_max_vmac))
 
-        self.init_param_guess = initial_guess[0]
-        self.initial_simplex_guess = initial_guess
+
+        return initial_guess[0], initial_guess, minim_bounds
 
 
     def get_elem_micro_guess(self, min_guess_microturb: float, max_guess_microturb: float, min_guess_abundance: float,
@@ -890,10 +863,12 @@ class Spectra:
 
         ts = self.create_ts_object()
 
+        initial_simplex_guess, init_param_guess, minim_bounds = self.get_all_guess()
+
         function_arguments = (ts, self)
         minimize_options = {'maxiter': self.ndimen * 50, 'disp': self.python_verbose,
-                            'initial_simplex': self.initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05}
-        res = minimize_function(all_abund_rv, self.init_param_guess, function_arguments, self.minim_bounds, 'Nelder-Mead', minimize_options)
+                            'initial_simplex': initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05}
+        res = minimize_function(all_abund_rv, init_param_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
         # print final result from minimazation
         print(res.x)
 
