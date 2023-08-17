@@ -430,7 +430,7 @@ class Spectra:
         sorted_obs_wavelength_index = np.argsort(self.wave_ob)
         self.wave_ob, self.flux_ob = self.wave_ob[sorted_obs_wavelength_index], self.flux_ob[sorted_obs_wavelength_index]
 
-        margin = 40
+        margin = 5
         result_indices = []
 
         for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
