@@ -124,6 +124,8 @@ class SpectraParameters:
         # if rv is not present, add it
         if 'rv' not in df.columns:
             df.insert(1, 'rv', 0.0)
+        if 'feh' not in df.columns:
+            df.insert(2, 'feh', 0.0)
 
         self.spectra_parameters_df = df
 
