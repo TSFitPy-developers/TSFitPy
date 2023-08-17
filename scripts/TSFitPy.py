@@ -2020,7 +2020,7 @@ class MarcsGridSingleton:
 
     @classmethod
     def set_marcs_grids(cls, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, _marcs_models_location, marcs_values):
-        if cls._model_temperatures is None:
+        if cls._marcs_models_location is None:
             cls._model_temperatures = model_temperatures
             cls._model_logs = model_logs
             cls._model_mets = model_mets
@@ -2036,7 +2036,7 @@ class MarcsGridSingleton:
 
     @classmethod
     def get_marcs_grids(cls):
-        if cls._model_temperatures is None:
+        if cls._marcs_models_location is None:
             raise ValueError("big_data hasn't been set yet!")
         return cls._model_temperatures, cls._model_logs, cls._model_mets, cls._marcs_value_keys, cls._marcs_models, cls._marcs_models_location, cls._marcs_values
 
