@@ -490,6 +490,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
             plt.ylabel("Normalised flux")
         else:
             print('TS failed')
+            wave_mod, flux_norm_mod = np.array([]), np.array([])
     except (FileNotFoundError, ValueError, IndexError) as e:
         print(f"TS failed: {e}")
         wave_mod, flux_norm_mod = np.array([]), np.array([])
