@@ -554,6 +554,8 @@ class Spectra:
         self.find_teff_errors = tsfitpy_config.find_teff_errors
         self.teff_error_sigma = tsfitpy_config.teff_error_sigma
 
+        self._load_marcs_grids()
+
     def _load_marcs_grids(self):
         (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
          self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
@@ -914,7 +916,7 @@ class Spectra:
         :return: List with the results. Each element is a string containing file name, center start and end of the line,
         Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
         """
-        self._load_marcs_grids()
+        #self._load_marcs_grids()
         result = {}
         result_upper_limit = {}
         result_list = []
