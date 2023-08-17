@@ -1393,5 +1393,7 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list):
     for parameter in marcs_value_keys:
         marcs_values[parameter].sort()
 
+    model_temperatures, model_logs, model_mets = None, None, None  # i think not used, but eats memory
+
     return model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
 

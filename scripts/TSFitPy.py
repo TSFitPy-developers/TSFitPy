@@ -4,6 +4,7 @@ import pickle
 from configparser import ConfigParser
 from warnings import warn
 import numpy as np
+from distributed import get_worker
 from scipy.optimize import minimize, root_scalar
 from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
     apply_doppler_correction, create_segment_file
@@ -372,6 +373,7 @@ class Spectra:
         self.model_mets: np.ndarray = None
         self.marcs_value_keys: list = None
         self.marcs_models: dict = None
+        self.marcs_models_location: str = None  # location of the MARCS models pickled file
         self.marcs_values: dict = None
 
         self.debug_mode = 0  # 0: no debug, 1: show Python warnings, 2: turn Fortran TS verbose setting on
@@ -558,7 +560,7 @@ class Spectra:
 
     def _load_marcs_grids(self):
         (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
-         self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
+         self.marcs_models_location, self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
 
 
     def get_all_guess(self):
@@ -891,7 +893,9 @@ class Spectra:
         print(f"Total runtime was {(time_end - time_start) / 60.:2f} minutes.")
         return result
 
-    def create_ts_object(self):
+    def create_ts_object(self, marcs_models=None):
+        if marcs_models is None:
+            marcs_models = self.marcs_models
         ts = TurboSpectrum(
             turbospec_path=self.turbospec_path,
             interpol_path=self.interpol_path,
@@ -905,7 +909,7 @@ class Spectra:
             model_logs=self.model_logs,
             model_mets=self.model_mets,
             marcs_value_keys=self.marcs_value_keys,
-            marcs_models=self.marcs_models,
+            marcs_models=marcs_models,
             marcs_values=self.marcs_values)
         return ts
 
@@ -1166,6 +1170,28 @@ class Spectra:
         shutil.rmtree(temp_directory)
         return fitted_teff
 
+    def _get_marcs_models(self) -> dict:
+        """
+        I hate this function, but it's the only way to get the marcs models to the workers with the least memory usage
+        I wasted probably too long to count trying to get this to work with dask distributed
+        But it returns the marcs models inside this class
+        Please don't judge me
+        Also please rewrite this if you know how to do it better
+        :return: marcs models as a dictionary
+        """
+        # usually size of standard marcs models is 8 MB
+        if self.dask_workers != 1:
+            worker = get_worker()
+            try:
+                marcs_models = worker.marcs_models
+            except AttributeError:
+                with open(os.path.join(self.marcs_models_location), 'rb') as pickled_marcs_models:
+                    worker.marcs_models = pickle.load(pickled_marcs_models)
+                    marcs_models = worker.marcs_models
+        else:
+            with open(os.path.join(self.marcs_models_location), 'rb') as pickled_marcs_models:
+                marcs_models = pickle.load(pickled_marcs_models)
+        return marcs_models
 
     def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
         """
@@ -1175,7 +1201,7 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        ts = self.create_ts_object()
+        ts = self.create_ts_object(self._get_marcs_models())
 
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
@@ -1989,16 +2015,21 @@ class MarcsGridSingleton:
     _model_mets =         None
     _marcs_value_keys =   None
     _marcs_models =       None
+    _marcs_models_location =       None
     _marcs_values =       None
 
     @classmethod
-    def set_marcs_grids(cls, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values):
+    def set_marcs_grids(cls, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, _marcs_models_location, marcs_values):
         if cls._model_temperatures is None:
             cls._model_temperatures = model_temperatures
             cls._model_logs = model_logs
             cls._model_mets = model_mets
             cls._marcs_value_keys = marcs_value_keys
-            cls._marcs_models = marcs_models
+            #cls._marcs_models = marcs_models
+            # pickle marcs models to marcs_models_location
+            with open(_marcs_models_location, 'wb') as f:
+                pickle.dump(marcs_models, f)
+            cls._marcs_models_location = _marcs_models_location
             cls._marcs_values = marcs_values
         else:
             raise ValueError("MarcsGridSingleton is already set!")
@@ -2007,7 +2038,7 @@ class MarcsGridSingleton:
     def get_marcs_grids(cls):
         if cls._model_temperatures is None:
             raise ValueError("big_data hasn't been set yet!")
-        return cls._model_temperatures, cls._model_logs, cls._model_mets, cls._marcs_value_keys, cls._marcs_models, cls._marcs_values
+        return cls._model_temperatures, cls._model_logs, cls._model_mets, cls._marcs_value_keys, cls._marcs_models, cls._marcs_models_location, cls._marcs_values
 
 def run_tsfitpy(output_folder_title, config_location, spectra_location):
     print("\nIMPORTANT UPDATE:")
@@ -2436,8 +2467,11 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
     #tsfitpy_configuration.marcs_models = marcs_models
     #tsfitpy_configuration.marcs_values = marcs_values
 
+    marcs_models_location = os.path.join(tsfitpy_configuration.temporary_directory_path, "marcs_models.pkl")
+
     # create the big data object
-    MarcsGridSingleton.set_marcs_grids(model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values)
+    MarcsGridSingleton.set_marcs_grids(model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models,
+                                       marcs_models_location, marcs_values)
     if tsfitpy_configuration.nlte_flag:
         tsfitpy_configuration.aux_file_length_dict = {}
 
