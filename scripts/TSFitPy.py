@@ -432,15 +432,17 @@ class Spectra:
         sorted_obs_wavelength_index = np.argsort(self.wave_ob)
         self.wave_ob, self.flux_ob = self.wave_ob[sorted_obs_wavelength_index], self.flux_ob[sorted_obs_wavelength_index]
 
-        #margin = 5
-        #result_indices = []
-        
-        #for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
-        #    result_indices.extend(np.where((self.wave_ob >= l - margin) & (self.wave_ob <= r + margin))[0])
+        margin = 3
+        result_indices = []
 
-        #self.wave_ob = self.wave_ob[result_indices]
-        #self.flux_ob = self.flux_ob[result_indices]
-        #self.error_obs_variance = self.error_obs_variance[result_indices]
+        wave_ob_doppler_shifted = apply_doppler_correction(self.wave_ob, self.doppler_shift)
+        
+        for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
+            result_indices.extend(np.where((wave_ob_doppler_shifted >= l - margin) & (wave_ob_doppler_shifted <= r + margin))[0])
+
+        self.wave_ob = self.wave_ob[result_indices]
+        self.flux_ob = self.flux_ob[result_indices]
+        self.error_obs_variance = self.error_obs_variance[result_indices]
 
 
         if self.debug_mode >= 1:
