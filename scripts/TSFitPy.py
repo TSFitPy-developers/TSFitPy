@@ -391,7 +391,7 @@ class Spectra:
         self.rv: float = float(rv)  # RV of star (given, but is fitted with extra doppler shift)
         self.doppler_shift: float = 0.0  # doppler shift; added to RV (fitted)
         if self.input_elem_abundance is None:  # input abundance - NOT fitted, but just accepted as a constant abund for spectra
-            self.input_abund: dict = {}
+            self.input_abund: dict = abundances_dict
         else:
             try:
                 self.input_abund = {**abundances_dict, **self.input_elem_abundance[self.spec_name]}
