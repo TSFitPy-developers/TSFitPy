@@ -435,7 +435,7 @@ class Spectra:
         self.doppler_shift_dict = {}
         self.elem_abund_dict_fitting = {}
 
-    def load_spectra(self, left_bound: float, right_bound: float):
+    def load_observed_spectra(self, left_bound: float, right_bound: float):
         wave_ob, flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)  # observed spectra
         try:
             # if error sigma is given, load it
@@ -923,8 +923,8 @@ class Spectra:
         find_upper_limit = self.find_upper_limit
         sigmas_upper_limit = self.sigmas_upper_limit
 
-        for line_number, (line_start, line_end) in enumerate(zip(self.line_starts_sorted, self.line_ends_sorted)):
-            wave_obs_line, flux_obs_line, flux_err_line = self.get_line_data(line_start, line_end)
+        for line_number, (line_start, line_end) in enumerate(zip(self.line_begins_sorted, self.line_ends_sorted)):
+            wave_obs_line, flux_obs_line, flux_err_line = self.load_observed_spectra(line_start, line_end)
             if self.dask_workers != 1:
                 result[line_number] = client.submit(self.fit_one_line, line_number, wave_obs_line, flux_obs_line, flux_err_line)
                 if find_upper_limit:
