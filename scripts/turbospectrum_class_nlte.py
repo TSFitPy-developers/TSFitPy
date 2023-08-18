@@ -662,7 +662,13 @@ class TurboSpectrum:
                 else:
                     raise ValueError(f"Molecule {element} not supported.")
             else:
-                element_abundance = float(solar_abundances[element]) + self.metallicity
+                if element.lower() not in ["h", "he"]:
+                    # if not H or He, then scale with metallicity
+                    # self.metallicity = [Fe/H]
+                    element_abundance = float(solar_abundances[element]) + self.metallicity
+                else:
+                    # if H or He, then just take solar abundance
+                    element_abundance = float(solar_abundances[element])
         return element_abundance
 
     def make_atmosphere_properties(self, spherical, element):
