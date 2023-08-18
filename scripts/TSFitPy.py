@@ -184,6 +184,10 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
     wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
     flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+
+    if np.size(flux_line_obs) == 0:
+        return 999999
+
     flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
     # TODO: proper calculation of DOF
@@ -191,13 +195,11 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     if dof <= 0:
         dof = 1
     chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance) / dof
-    # os.system(f"mv {temp_directory}spectrum_00000000.spec ../output_files/spectrum_fit_{obs_name.replace('../input_files/observed_spectra/', '')}")
 
     if save_convolved:
-        out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
-
+        out = open(os.path.join(temp_directory, "spectrum_00000000_convolved.spec"), 'w')
         for i in range(len(wave_line)):
-            print("{}  {}".format(wave_line[i], flux_line_mod[i]), file=out)
+            print(f"{wave_line[i]}  {flux_line_mod[i]}", file=out)
         out.close()
     return chi_square
 
