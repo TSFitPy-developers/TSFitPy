@@ -837,8 +837,8 @@ class Spectra:
 
         function_arguments = (ts, self)
         minimize_options = {'maxiter': self.ndimen * 50, 'disp': self.python_verbose,
-                            'initial_simplex': initial_simplex_guess, 'xatol': 0.05, 'fatol': 0.05}
-        res = minimize_function(all_abund_rv, init_param_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
+                            'initial_simplex': init_param_guess, 'xatol': 0.05, 'fatol': 0.05}
+        res = minimize_function(all_abund_rv, initial_simplex_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
         # print final result from minimazation
         print(res.x)
 
