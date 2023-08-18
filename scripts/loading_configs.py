@@ -175,17 +175,25 @@ class SpectraParameters:
         else:
             rotation_list = np.zeros(len(specname_list))
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
-        abundance_list = []
-        for i in range(self.number_of_rows):
-            abundance_dict = {}
-            for element in self.abundance_elements_given:
-                abundance_dict[element] = self.spectra_parameters_df[element][i]
-            abundance_list.append(abundance_dict)
+        abundance_list = self._get_abundance_list()
 
         # stack all parameters
         stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
 
         return stacked_parameters
+
+    def _get_abundance_list(self):
+        abundance_list = []
+        for i in range(self.number_of_rows):
+            abundance_dict = {}
+            for element in self.abundance_elements_given:
+                elemental_abundance = self.spectra_parameters_df[element][i]
+                # replace nan with 0
+                if np.isnan(elemental_abundance):
+                    elemental_abundance = 0
+                abundance_dict[element] = elemental_abundance
+            abundance_list.append(abundance_dict)
+        return abundance_list
 
     def get_spectra_parameters_for_grid_generation(self) -> np.ndarray:
         """
@@ -212,16 +220,7 @@ class SpectraParameters:
         else:
             rotation_list = np.zeros(len(specname_list))
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
-        abundance_list = []
-        for i in range(self.number_of_rows):
-            abundance_dict = {}
-            for element in self.abundance_elements_given:
-                elemental_abundance = self.spectra_parameters_df[element][i]
-                # replace nan with 0
-                if np.isnan(elemental_abundance):
-                    elemental_abundance = 0
-                abundance_dict[element] = elemental_abundance
-            abundance_list.append(abundance_dict)
+        abundance_list = self._get_abundance_list()
 
         # stack all parameters
         stacked_parameters = np.stack((specname_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
