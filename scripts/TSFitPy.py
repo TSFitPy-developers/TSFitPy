@@ -418,6 +418,33 @@ class Spectra:
 
         self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
 
+        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
+                                                dtype=float)  # observed spectra
+        try:
+            # if error sigma is given, load it
+            self.error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
+        except (IndexError, ValueError) as e:
+            # if no error variance is given, set it to 1
+            self.error_obs_variance = np.ones(len(self.wave_ob))
+            print("No error sigma given in 3rd column, setting to 1")
+
+        # sort the observed spectra according to wavelength using numpy argsort
+        sorted_obs_wavelength_index = np.argsort(self.wave_ob)
+        self.wave_ob, self.flux_ob = self.wave_ob[sorted_obs_wavelength_index], self.flux_ob[sorted_obs_wavelength_index]
+
+        margin = 3
+        result_indices = []
+
+        wave_ob_doppler_shifted = apply_doppler_correction(self.wave_ob, self.doppler_shift)
+        
+        for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
+            result_indices.extend(np.where((wave_ob_doppler_shifted >= l - margin) & (wave_ob_doppler_shifted <= r + margin))[0])
+
+        self.wave_ob = self.wave_ob[result_indices]
+        self.flux_ob = self.flux_ob[result_indices]
+        self.error_obs_variance = self.error_obs_variance[result_indices]
+
+
         if self.debug_mode >= 1:
             self.python_verbose = True
         else:
@@ -434,27 +461,6 @@ class Spectra:
         self.rotation_dict = {}
         self.doppler_shift_dict = {}
         self.elem_abund_dict_fitting = {}
-
-    def load_spectra(self, left_bound: float, right_bound: float):
-        wave_ob, flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)  # observed spectra
-        try:
-            # if error sigma is given, load it
-            error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
-        except (IndexError, ValueError) as e:
-            # if no error variance is given, set it to 1
-            error_obs_variance = np.ones(len(wave_ob))
-            print("No error sigma given in 3rd column, setting to 1")
-        # sort the observed spectra according to wavelength using numpy argsort
-        sorted_obs_wavelength_index = np.argsort(wave_ob)
-        wave_ob, flux_ob = wave_ob[sorted_obs_wavelength_index], flux_ob[sorted_obs_wavelength_index]
-        margin = 3  # AA
-        wave_ob_doppler_shifted = apply_doppler_correction(wave_ob, self.doppler_shift)
-        result_indices = np.where((wave_ob_doppler_shifted >= left_bound - margin) & (wave_ob_doppler_shifted <= right_bound + margin))[0]
-        wave_ob = wave_ob[result_indices]
-        flux_ob = flux_ob[result_indices]
-        error_obs_variance = error_obs_variance[result_indices]
-
-        return wave_ob, flux_ob, error_obs_variance
 
     def load_spectra_config(self, tsfitpy_config):
         self.atmosphere_type = tsfitpy_config.atmosphere_type
@@ -923,10 +929,9 @@ class Spectra:
         find_upper_limit = self.find_upper_limit
         sigmas_upper_limit = self.sigmas_upper_limit
 
-        for line_number, (line_start, line_end) in enumerate(zip(self.line_starts_sorted, self.line_ends_sorted)):
-            wave_obs_line, flux_obs_line, flux_err_line = self.get_line_data(line_start, line_end)
+        for line_number in range(len(self.line_begins_sorted)):
             if self.dask_workers != 1:
-                result[line_number] = client.submit(self.fit_one_line, line_number, wave_obs_line, flux_obs_line, flux_err_line)
+                result[line_number] = client.submit(self.fit_one_line, line_number)
                 if find_upper_limit:
                     _ = client.submit(self.calculate_and_save_upper_limit, result, result_upper_limit, sigmas_upper_limit)
                 final_result = client.submit(self.analyse_lbl_fit, result, line_number)
@@ -935,7 +940,7 @@ class Spectra:
                 time_start = time.perf_counter()
                 print(f"Fitting line at {self.line_centers_sorted[line_number]} angstroms")
 
-                result[line_number] = self.fit_one_line(line_number, wave_obs_line, flux_obs_line, flux_err_line)
+                result[line_number] = self.fit_one_line(line_number)
                 if find_upper_limit:
                     self.calculate_and_save_upper_limit(result, result_upper_limit, sigmas_upper_limit)
                 result_list.append(self.analyse_lbl_fit(result, line_number))
@@ -1190,7 +1195,7 @@ class Spectra:
                 marcs_models = pickle.load(pickled_marcs_models)
         return marcs_models
 
-    def fit_one_line(self, line_number: int, wave_obs_line, flux_obs_line, flux_err_line, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
+    def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         :param line_number: Which line number/index in line_center_sorted is being fitted
@@ -1208,7 +1213,7 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number, offset_chisqr, wave_obs_line, flux_obs_line, flux_err_line)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number, offset_chisqr)
         minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
@@ -1442,7 +1447,7 @@ class Spectra:
 
 
 def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
-                    wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, offset_chisqr, wave_obs_line, flux_obs_line, flux_err_line) -> float:
+                    wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, offset_chisqr=0) -> float:
     """
     Line by line quick. Takes precalculated synthetic spectra (i.e. 1 grid) and finds chi-sqr for observed spectra.
     Also fits doppler shift and can fit macroturbulence if needed.
@@ -1470,9 +1475,9 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     else:
         rotation = spectra_to_fit.rotation
 
-    wave_ob = apply_doppler_correction(wave_obs_line, doppler)
+    wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
-    chi_square = calculate_lbl_chi_squared(None, wave_ob, flux_obs_line, flux_err_line, wave_mod_orig, flux_mod_orig,
+    chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
                                            spectra_to_fit.resolution, lmin, lmax, macroturb, rotation,
                                            save_convolved=False)
     #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
@@ -1480,7 +1485,7 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     return np.abs(chi_square - offset_chisqr)
 
 
-def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int, offset_chisqr, wave_obs_line, flux_obs_line, flux_err_line) -> float:
+def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int, offset_chisqr=0) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1551,7 +1556,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
-        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig, offset_chisqr, wave_obs_line, flux_obs_line, flux_err_line)
+        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig, offset_chisqr)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
@@ -1959,6 +1964,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     :param rotation1: Rotation if given (None is not known or fitted)
     :param abundances_dict1: Abundances if given (None is not known or fitted)
     :param line_list_path_trimmed: Path to the root of the trimmed line list
+    :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
     :return: result of the fit with the best fit parameters and chi squared
     """
     # Load TS configuration
