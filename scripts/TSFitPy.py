@@ -12,7 +12,6 @@ from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import time
 import os
 from os import path as os_path
-
 try:
     from dask.distributed import Client, get_client, secede, rejoin
 except (ModuleNotFoundError, ImportError):
@@ -30,8 +29,7 @@ output_default_fitlist_name: str = "fitlist.txt"
 output_default_linemask_name: str = "linemask.txt"
 
 
-def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, resolution: float, macro: float, rot: float) -> tuple[
-    np.ndarray, np.ndarray]:
+def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, resolution: float, macro: float, rot: float) -> tuple[np.ndarray, np.ndarray]:
     """
     Convolves spectra with resolution, macroturbulence or rotation if values are non-zero
     :param wave: wavelength array, in ascending order
@@ -704,52 +702,8 @@ class Spectra:
 
         return guesses, bounds
 
-    def get_rv_elem_micro_macro_guess(self, min_rv: float, max_rv: float, min_macroturb: float,
-                           max_macroturb: float, min_microturb: float, max_microturb: float, min_abundance: float,
-                           max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
-        # param[0] = added doppler to rv
-        # param[1:nelements] = met or abund
-        # param[-1] = macro turb IF MACRO FIT
-        # param[-2] = micro turb IF MACRO FIT
-        # param[-1] = micro turb IF NOT MACRO FIT
-
-        guess_length = self.ndimen
-        bounds = []
-
-        rv_guess, rv_bounds = self.get_simplex_guess(guess_length, min_rv, max_rv, self.bound_min_doppler, self.bound_max_doppler)
-        guesses = np.array([rv_guess])
-        bounds.append(rv_bounds)
-        for i in range(1, self.nelement + 1):
-            if self.elem_to_fit[i - 1] == "Fe":
-                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
-                                                                self.bound_min_feh, self.bound_max_feh)
-            else:
-                guess_elem, bound_elem = self.get_simplex_guess(guess_length, min_abundance, max_abundance,
-                                                                self.bound_min_abund, self.bound_max_abund)
-            if self.init_guess_dict is not None and self.elem_to_fit[i - 1] in self.init_guess_dict[self.spec_name]:
-                abund_guess = self.init_guess_dict[self.spec_name][self.elem_to_fit[i - 1]]
-                abundance_guesses = np.linspace(abund_guess - 0.1, abund_guess + 0.1, guess_length + 1)
-                guesses = np.append(guesses, [abundance_guesses], axis=0)
-                # if initial abundance is given, then linearly give guess +/- 0.1 dex
-            else:
-                guesses = np.append(guesses, [guess_elem], axis=0)
-            bounds.append(bound_elem)
-        if self.fit_vmic == "Yes" and not self.atmosphere_type == "3D":  # first adding micro
-            micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_microturb, max_microturb, self.bound_min_vmic, self.bound_max_vmic)
-            guesses = np.flip(np.append(guesses, [micro_guess], axis=0))
-            bounds.append(micro_bounds)
-        if self.fit_vmac:  # last is macro
-            macro_guess, macro_bounds = self.get_simplex_guess(guess_length, min_macroturb, max_macroturb, self.bound_min_vmac, self.bound_max_vmac)
-            guesses = np.append(guesses, [macro_guess], axis=0)
-            bounds.append(macro_bounds)
-
-        guesses = np.transpose(guesses)
-
-        return guesses, bounds
-
     @staticmethod
-    def get_simplex_guess(length: int, min_guess: float, max_guess: float, min_bound: float, max_bound: float) -> tuple[
-        np.ndarray, tuple]:
+    def get_simplex_guess(length: int, min_guess: float, max_guess: float, min_bound: float, max_bound: float) -> tuple[np.ndarray, tuple]:
         """
         Gets guess if it is fitted for simplex guess
         :param length: number of dimensions (output length+1 array)
@@ -875,7 +829,7 @@ class Spectra:
         # timing how long it took
         time_start = time.perf_counter()
 
-        ts = self.create_ts_object()
+        ts = self.create_ts_object(self._get_marcs_models())
 
         initial_simplex_guess, init_param_guess, minim_bounds = self.get_all_guess()
 
@@ -915,7 +869,7 @@ class Spectra:
             marcs_values=self.marcs_values)
         return ts
 
-    def fit_lbl(self, client) -> list:
+    def fit_lbl(self, client, fitting_function, find_upper_limit) -> list:
         """
         Fits line by line, by going through each line in the linelist and computing best abundance/met with chi sqr.
         Also fits doppler shift and can fit micro and macro turbulence. New method, faster and more accurate TM.
@@ -926,12 +880,11 @@ class Spectra:
         result = {}
         result_upper_limit = {}
         result_list = []
-        find_upper_limit = self.find_upper_limit
         sigmas_upper_limit = self.sigmas_upper_limit
 
         for line_number in range(len(self.line_begins_sorted)):
             if self.dask_workers != 1:
-                result[line_number] = client.submit(self.fit_one_line, line_number)
+                result[line_number] = client.submit(fitting_function, line_number)
                 if find_upper_limit:
                     _ = client.submit(self.calculate_and_save_upper_limit, result, result_upper_limit, sigmas_upper_limit)
                 final_result = client.submit(self.analyse_lbl_fit, result, line_number)
@@ -940,7 +893,7 @@ class Spectra:
                 time_start = time.perf_counter()
                 print(f"Fitting line at {self.line_centers_sorted[line_number]} angstroms")
 
-                result[line_number] = self.fit_one_line(line_number)
+                result[line_number] = fitting_function(line_number)
                 if find_upper_limit:
                     self.calculate_and_save_upper_limit(result, result_upper_limit, sigmas_upper_limit)
                 result_list.append(self.analyse_lbl_fit(result, line_number))
@@ -1041,27 +994,6 @@ class Spectra:
                     f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}",
                     file=file_upper_limit)
 
-    def fit_teff_function(self) -> list:
-        """
-        Fits line by line, by going through each line in the linelist and computing best abundance/met with chi sqr.
-        Also fits doppler shift and can fit micro and macro turbulence. New method, faster and more accurate TM.
-        :return: List with the results. Each element is a string containing file name, center start and end of the line,
-        Best fit abundance/met, doppler shift, microturbulence, macroturbulence and chi-squared.
-        """
-        result = []
-
-        for line_number in range(len(self.line_begins_sorted)):
-            time_start = time.perf_counter()
-            print(f"Fitting line at {self.line_centers_sorted[line_number]} angstroms")
-
-            result.append(self.fit_teff_one_line(line_number))
-
-            time_end = time.perf_counter()
-            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-        return result
-
-
     def fit_teff_one_line(self, line_number: int) -> str:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
@@ -1075,7 +1007,7 @@ class Spectra:
         param_guess = np.array([[self.teff + self.guess_plus_minus_neg_teff], [self.teff + self.guess_plus_minus_pos_teff]])
         min_bounds = [(self.bound_min_teff, self.bound_max_teff)]
 
-        ts = self.create_ts_object()
+        ts = self.create_ts_object(self._get_marcs_models())
 
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
@@ -1144,7 +1076,6 @@ class Spectra:
 
         return one_result
 
-
     def find_teff_error_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_teff, bound_max_teff) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
@@ -1153,7 +1084,7 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        ts = self.create_ts_object()
+        ts = self.create_ts_object(self._get_marcs_models())
 
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
@@ -1288,7 +1219,7 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        ts = self.create_ts_object()
+        ts = self.create_ts_object(self._get_marcs_models())
 
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
@@ -1315,7 +1246,7 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        ts = self.create_ts_object()
+        ts = self.create_ts_object(self._get_marcs_models())
 
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
@@ -1367,83 +1298,6 @@ class Spectra:
         shutil.rmtree(temp_directory)
         return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": res.fun} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
-
-
-    def fit_vmic_slow(self):
-        # this is a slow version of the fit_vmic = True function, but it is more accurate
-        if self.fit_vmac and self.vmac == 0:
-            self.vmac = 10
-
-        result = {}
-
-        if self.dask_workers > 1 and self.experimental_parallelisation:
-            #TODO EXPERIMENTAL attempt: will make it way faster for single/few star fitting with many lines
-            # Maybe Dask will break this in the future? Then remove whatever within this if statement
-            client = get_client()
-            for line_number in range(len(self.line_begins_sorted)):
-
-                res1 = client.submit(self.fit_one_line_vmic, line_number)
-                result[line_number] = res1
-
-            secede()
-            result = client.gather(result)
-            rejoin()
-        else:
-            for line_number in range(len(self.line_begins_sorted)):
-                time_start = time.perf_counter()
-                print(f"Fitting line at {self.line_centers_sorted[line_number]} angstroms")
-
-                result[line_number] = self.fit_one_line_vmic(line_number)
-
-                time_end = time.perf_counter()
-                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
-
-
-        result_list = []
-        #{"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
-        for line_number in range(len(self.line_begins_sorted)):
-            if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 999:
-                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                    # g = open(f"{self.output_folder}result_spectrum_{self.spec_name}.spec", 'a')
-                    for k in range(len(result[line_number]["fit_wavelength"])):
-                        print(f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}", file=g)
-
-                line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
-
-                wavelength_fit_array = result[line_number]['fit_wavelength']
-                norm_flux_fit_array = result[line_number]['fit_flux_norm']
-
-                indices_to_use_cut = np.where((wavelength_fit_array <= line_right + 5) & (wavelength_fit_array >= line_left - 5))
-                wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], norm_flux_fit_array[indices_to_use_cut]
-                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut, norm_flux_fit_array_cut, self.resolution, result[line_number]["macroturb"], result[line_number]["rotation"])
-
-                equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
-
-                extra_wavelength_to_save = 1  # AA extra wavelength to save left and right of the line
-
-                # this will save extra +/- extra_wavelength_to_save in convolved spectra. But just so that it doesn't
-                # overlap other lines, I save only up to half of the other linemask if they are close enough
-                if line_number > 0:
-                    line_previous_right = self.line_ends_sorted[line_number - 1]
-                    left_bound_to_save = max(line_left - extra_wavelength_to_save, (line_left - line_previous_right) / 2 + line_previous_right)
-                else:
-                    left_bound_to_save = line_left - extra_wavelength_to_save
-                if line_number < len(self.line_begins_sorted) - 1:
-                    line_next_left = self.line_begins_sorted[line_number + 1]
-                    right_bound_to_save = min(line_right + extra_wavelength_to_save, (line_next_left - line_right) / 2 + line_right)
-                else:
-                    right_bound_to_save = line_right + extra_wavelength_to_save
-                indices_to_save_conv = np.logical_and.reduce((wavelength_fit_conv > left_bound_to_save, wavelength_fit_conv < right_bound_to_save))
-
-                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
-                    # h = open(f"{self.output_folder}result_spectrum_{self.spec_name}_convolved.spec", 'a')
-                    for k in range(len(wavelength_fit_conv[indices_to_save_conv])):
-                        print(f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}", file=h)
-            else:
-                equivalent_width = 9999
-            result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
-
-        return result_list
 
 
 def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
@@ -1988,24 +1842,22 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         if spectra.fitting_mode == "all":
             result = spectra.fit_all()
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl(None)
+            result = spectra.fit_lbl(None, spectra.fit_one_line, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
-            result = spectra.fit_teff_function()
+            result = spectra.fit_lbl(None, spectra.fit_teff_one_line, False)
         elif spectra.fitting_mode == "vmic":
-            result = spectra.fit_vmic_slow()
+            result = spectra.fit_lbl(None, spectra.fit_one_line_vmic, False)
         else:
             raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     else:
         if spectra.fitting_mode == "all":
             result = dask_client.submit(spectra.fit_all)
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl(dask_client)
+            result = spectra.fit_lbl(dask_client, spectra.fit_one_line, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
-            result = dask_client.submit(spectra.fit_teff_function)
-            #result = spectra.fit_teff_function()
+            result = spectra.fit_lbl(dask_client, spectra.fit_teff_one_line, False)
         elif spectra.fitting_mode == "vmic":
-            result = dask_client.submit(spectra.fit_vmic_slow)
-            #result = spectra.fit_vmic_slow()
+            result = spectra.fit_lbl(dask_client, spectra.fit_one_line_vmic, False)
         else:
             raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     del spectra
