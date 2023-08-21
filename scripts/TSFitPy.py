@@ -1035,8 +1035,14 @@ class Spectra:
             else:
                 microturb = calculate_vturb(self.teff, self.logg, met)
 
-            macroturb = self.vmac_dict[line_number]
-            rotation = self.rotation_dict[line_number]
+            if self.fit_vmac:
+                macroturb = self.vmac_dict[line_number]
+            else:
+                macroturb = self.vmac
+            if self.fit_rotation:
+                rotation = self.rotation_dict[line_number]
+            else:
+                rotation = self.rotation
 
             try:
                 wave_result, flux_norm_result, flux_result = np.loadtxt(os.path.join(self.temp_dir, "spectrum_00000000.spec"), unpack=True)
