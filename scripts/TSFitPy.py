@@ -1005,6 +1005,8 @@ class Spectra:
         :param line_number: Which line number/index in line_center_sorted is being fitted
         :return: best fit result string for that line
         """
+        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
+
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
         print(self.line_centers_sorted[line_number], self.seg_begins[start], self.seg_ends[start])
@@ -1016,7 +1018,7 @@ class Spectra:
 
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5.)
+        function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
         try:
             res = minimize_function(lbl_teff, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
@@ -1027,18 +1029,17 @@ class Spectra:
             chi_squared = res.fun
 
             met = self.met
-            doppler_fit = self.doppler_shift
+            doppler_fit = self.doppler_shift_dict[line_number]
             if self.vmic is not None:  # Input given
                 microturb = self.vmic
             else:
                 microturb = calculate_vturb(self.teff, self.logg, met)
 
-            macroturb = self.vmac
-            rotation = self.rotation
+            macroturb = self.vmac_dict[line_number]
+            rotation = self.rotation_dict[line_number]
 
             try:
-                wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
-                                                                        unpack=True)
+                wave_result, flux_norm_result, flux_result = np.loadtxt(os.path.join(self.temp_dir, "spectrum_00000000.spec"), unpack=True)
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                     for k in range(len(wave_result)):
                         print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
@@ -1449,10 +1450,10 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999.99
+        chi_square = 999999.99
         print("empty spectrum file.")
     else:
-        chi_square = 9999.9999
+        chi_square = 999999.9999
         print("didn't generate spectra or atmosphere")
 
     output_print = f""
@@ -1612,7 +1613,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
     spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
 
     param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
-    function_arguments = (ts, spectra_to_fit, spectra_to_fit.line_begins_sorted[line_number] - 5., spectra_to_fit.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+    function_arguments = (ts, spectra_to_fit, lmin, lmax, temp_directory, line_number)
     minimization_options = {'maxfev': 50, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.05, 'fatol': 0.00001, 'adaptive': False}
     res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
 
@@ -1702,7 +1703,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
 
     return chi_square
 
-def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float) -> float:
+def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: teff.
     Calls macro + doppler inside
@@ -1721,44 +1722,43 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float)
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     rotation = 9999
-    if os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
-            '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{spectra_to_fit.temp_dir}/spectrum_00000000.spec',
-                                                  usecols=(0, 1), unpack=True)
+    chi_square = 9999
+    rv = 9999
+    temp_file_to_check = os.path.join(temp_directory, 'spectrum_00000000.spec')
+    if os_path.exists(temp_file_to_check) and os.stat(temp_file_to_check).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_file_to_check, usecols=(0, 1), unpack=True)
         ndimen = 1
         if spectra_to_fit.fit_vmac:
             ndimen += 1
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
-        # now for the generated abundance it tries to fit best fit macro + doppler shift.
-        # Thus macro should not be dependent on the abundance directly, hopefully
-        # Seems to work way better
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, param_guess[0],
-                                function_args, min_bounds, 'L-BFGS-B', minimize_options)
+        res = minimize_function(lbl_rv_vmac_rot, param_guess[0], function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.doppler_shift = res.x[0]
+        rv = spectra_to_fit.doppler_shift_dict[line_number]
         if spectra_to_fit.fit_vmac:
-            spectra_to_fit.vmac = res.x[1]
-        macroturb = spectra_to_fit.vmac
+            spectra_to_fit.vmac_dict[line_number] = res.x[1]
+            macroturb = spectra_to_fit.vmac_dict[line_number]
+        else:
+            macroturb = spectra_to_fit.vmac
         if spectra_to_fit.fit_rotation:
-            spectra_to_fit.rotation = res.x[-1]
-        rotation = spectra_to_fit.rotation
+            spectra_to_fit.rotation_dict[line_number] = res.x[-1]
+            rotation = spectra_to_fit.rotation_dict[line_number]
+        else:
+            rotation = spectra_to_fit.rotation
 
         chi_square = res.fun
-    elif os_path.exists('{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)) and os.stat(
-            '{}/spectrum_00000000.spec'.format(spectra_to_fit.temp_dir)).st_size == 0:
-        chi_square = 999.99
+    elif os_path.exists(temp_file_to_check) and os.stat(temp_file_to_check).st_size == 0:
         print("empty spectrum file.")
     else:
-        chi_square = 9999.9999
         print("didn't generate spectra or atmosphere")
 
-    print(f"Teff={teff}, RV={spectra_to_fit.doppler_shift}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
+    print(f"Teff={teff}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
     return chi_square
 
