@@ -1739,7 +1739,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(lbl_rv_vmac_rot, param_guess[0], function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
-        spectra_to_fit.doppler_shift = res.x[0]
+        spectra_to_fit.doppler_shift_dict[line_number] = res.x[0]
         rv = spectra_to_fit.doppler_shift_dict[line_number]
         if spectra_to_fit.fit_vmac:
             spectra_to_fit.vmac_dict[line_number] = res.x[1]
