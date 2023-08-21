@@ -179,7 +179,10 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
     error_obs_variance = error_obs_variance[indices_to_use_obs]
 
-    wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
+    try:
+        wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
+    except ValueError:
+        return 999999
 
     flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
     wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
@@ -996,7 +999,7 @@ class Spectra:
                     f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}",
                     file=file_upper_limit)
 
-    def fit_teff_one_line(self, line_number: int) -> str:
+    def fit_teff_one_line(self, line_number: int) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         :param line_number: Which line number/index in line_center_sorted is being fitted
@@ -1015,66 +1018,81 @@ class Spectra:
 
         function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5.)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
-        res = minimize_function(lbl_teff, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
-
-        print(res.x)
-
-        teff = res.x[0]
-
-        met = self.met
-        doppler_fit = self.doppler_shift
-        if self.vmic is not None:  # Input given
-            microturb = self.vmic
-        else:
-            microturb = calculate_vturb(self.teff, self.logg, met)
-
-        macroturb = self.vmac
-        rotation = self.rotation
-
         try:
-            wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
-                                                                    unpack=True)
-            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                for k in range(len(wave_result)):
-                    print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-            wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wave_result, flux_norm_result, self.resolution,
-                                                                       macroturb, rotation)
+            res = minimize_function(lbl_teff, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
 
-            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
-                for k in range(len(wavelength_fit_conv)):
-                    print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
+            print(res.x)
 
-            if self.find_teff_errors:
-                print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
-                try:
-                    teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
-                                                                                     macroturb, rotation,
-                                                                                     microturb,
-                                                                                     offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
-                                                                                     bound_min_teff=teff,
-                                                                                     bound_max_teff=teff + 1000)
-                except ValueError as err:
-                    print(err)
+            teff = res.x[0]
+            chi_squared = res.fun
+
+            met = self.met
+            doppler_fit = self.doppler_shift
+            if self.vmic is not None:  # Input given
+                microturb = self.vmic
+            else:
+                microturb = calculate_vturb(self.teff, self.logg, met)
+
+            macroturb = self.vmac
+            rotation = self.rotation
+
+            try:
+                wave_result, flux_norm_result, flux_result = np.loadtxt(f"{self.temp_dir}spectrum_00000000.spec",
+                                                                        unpack=True)
+                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
+                    for k in range(len(wave_result)):
+                        print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
+                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wave_result, flux_norm_result, self.resolution,
+                                                                           macroturb, rotation)
+
+                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
+                    for k in range(len(wavelength_fit_conv)):
+                        print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
+
+                if self.find_teff_errors:
+                    print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
                     try:
                         teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
-                                                                    macroturb, rotation,
-                                                                    microturb,
-                                                                    offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
-                                                                    bound_min_teff=teff - 1000,
-                                                                    bound_max_teff=teff)
+                                                                                         macroturb, rotation,
+                                                                                         microturb,
+                                                                                         offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                                                         bound_min_teff=teff,
+                                                                                         bound_max_teff=teff + 1000)
                     except ValueError as err:
                         print(err)
-                        teff_error = 1000
-            else:
-                teff_error = -9999
-        except (OSError, ValueError) as error:
-            print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-            teff_error = -9999
+                        try:
+                            teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                                                                        macroturb, rotation,
+                                                                        microturb,
+                                                                        offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                                        bound_min_teff=teff - 1000,
+                                                                        bound_max_teff=teff)
+                        except ValueError as err:
+                            print(err)
+                            teff_error = 1000
+                else:
+                    teff_error = 9999
+            except (OSError, ValueError) as error:
+                print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+                teff_error = 9999
+                wave_result, flux_norm_result, flux_result = np.array([]), np.array([]), np.array([])
+        except IndexError:
+            print(f"Line {line_number} not fitted, is your line in the spectrum?")
+            teff = 9999
+            teff_error = 9999
+            doppler_fit = 9999
+            microturb = 9999
+            macroturb = 9999
+            rotation = 9999
+            wave_result, flux_norm_result, flux_result = np.array([]), np.array([]), np.array([])
+            chi_squared = 999999
 
         result_output = f"{self.spec_name} {teff} {teff_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {res.fun}"
+                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {chi_squared}"
 
-        one_result = result_output
+        one_result = {"result": result_output, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
+                      "fit_flux_norm": flux_norm_result, "fit_flux": flux_result, "macroturb": macroturb,
+                      "rotation": rotation, "chi_sqr": chi_squared}
 
         return one_result
 
