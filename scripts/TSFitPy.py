@@ -1044,55 +1044,55 @@ class Spectra:
             else:
                 rotation = self.rotation
 
-            try:
-                wave_result, flux_norm_result, flux_result = np.loadtxt(os.path.join(self.temp_dir, "spectrum_00000000.spec"), unpack=True)
-                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                    for k in range(len(wave_result)):
-                        print("{}  {}  {}".format(wave_result[k], flux_norm_result[k], flux_result[k]), file=g)
-                wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wave_result, flux_norm_result, self.resolution,
-                                                                           macroturb, rotation)
-
-                with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"), 'a') as h:
-                    for k in range(len(wavelength_fit_conv)):
-                        print(f"{wavelength_fit_conv[k]} {flux_fit_conv[k]}", file=h)
-
-                if self.find_teff_errors:
-                    print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
-                    try:
-                        teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
-                                                                                         macroturb, rotation,
-                                                                                         microturb,
-                                                                                         offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
-                                                                                         bound_min_teff=teff,
-                                                                                         bound_max_teff=teff + 1000)
-                    except ValueError as err:
-                        print(err)
-                        try:
-                            teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
-                                                                        macroturb, rotation,
-                                                                        microturb,
-                                                                        offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
-                                                                        bound_min_teff=teff - 1000,
-                                                                        bound_max_teff=teff)
-                        except ValueError as err:
-                            print(err)
-                            teff_error = 1000
-                else:
-                    teff_error = 9999
-            except (OSError, ValueError) as error:
-                print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-                teff_error = 9999
-                wave_result, flux_norm_result, flux_result = np.array([]), np.array([]), np.array([])
         except IndexError:
             print(f"Line {line_number} not fitted, is your line in the spectrum?")
-            teff = 9999
-            teff_error = 9999
+            teff = 999999
             doppler_fit = 9999
             microturb = 9999
             macroturb = 9999
             rotation = 9999
-            wave_result, flux_norm_result, flux_result = np.array([]), np.array([]), np.array([])
             chi_squared = 999999
+
+        if teff != 999999:
+            try:
+                wave_result, flux_norm_result, flux_result = np.loadtxt(
+                    os.path.join(temp_directory, "spectrum_00000000.spec"),
+                    unpack=True)
+            except (OSError, ValueError) as error:
+                print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+                wave_result = np.array([])
+                flux_norm_result = np.array([])
+                flux_result = np.array([])
+        else:
+            print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+            wave_result = np.array([])
+            flux_norm_result = np.array([])
+            flux_result = np.array([])
+
+        if self.find_teff_errors and teff != 999999:
+            print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
+            try:
+                teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                                                           macroturb, rotation,
+                                                           microturb,
+                                                           offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                           bound_min_teff=teff,
+                                                           bound_max_teff=teff + 1000)
+            except ValueError as err:
+                print(err)
+                try:
+                    teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                                                               macroturb, rotation,
+                                                               microturb,
+                                                               offset_chisqr=(
+                                                                           res.fun + np.square(self.teff_error_sigma)),
+                                                               bound_min_teff=teff - 1000,
+                                                               bound_max_teff=teff)
+                except ValueError as err:
+                    print(err)
+                    teff_error = 1000
+        else:
+            teff_error = 9999
 
         result_output = f"{self.spec_name} {teff} {teff_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
                         f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {chi_squared}"
@@ -1497,6 +1497,10 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
 
+    # delete the temporary directory if it exists
+    if os_path.exists(temp_spectra_location):
+        os.remove(temp_spectra_location)
+
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
@@ -1534,7 +1538,6 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     # param[0:nelements - 1] = met or abund
 
     if spectra_to_fit.fit_feh:
-        met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
         met = param
     else:
         met = spectra_to_fit.met
@@ -1555,6 +1558,10 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+
+    # delete the temporary directory if it exists
+    if os_path.exists(temp_spectra_location):
+        os.remove(temp_spectra_location)
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
@@ -1728,15 +1735,21 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
+    temp_spectra_location = os.path.join(temp_directory, 'spectrum_00000000.spec')
+
+    # delete the temporary directory if it exists
+    if os_path.exists(temp_spectra_location):
+        os.remove(temp_spectra_location)
+
     spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     rotation = 9999
     chi_square = 9999
     rv = 9999
-    temp_file_to_check = os.path.join(temp_directory, 'spectrum_00000000.spec')
-    if os_path.exists(temp_file_to_check) and os.stat(temp_file_to_check).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_file_to_check, usecols=(0, 1), unpack=True)
+
+    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
         ndimen = 1
         if spectra_to_fit.fit_vmac:
             ndimen += 1
@@ -1759,7 +1772,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
             rotation = spectra_to_fit.rotation
 
         chi_square = res.fun
-    elif os_path.exists(temp_file_to_check) and os.stat(temp_file_to_check).st_size == 0:
+    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         print("empty spectrum file.")
     else:
         print("didn't generate spectra or atmosphere")
