@@ -1493,13 +1493,13 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory, teff=teff)     # generates spectra
-
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
 
     # delete the temporary directory if it exists
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
+
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory, teff=teff)     # generates spectra
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
@@ -1555,9 +1555,12 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
-
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+
+    if os_path.exists(temp_spectra_location):
+        os.remove(temp_spectra_location)
+
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
     # delete the temporary directory if it exists
     if os_path.exists(temp_spectra_location):
