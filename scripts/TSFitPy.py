@@ -1072,22 +1072,22 @@ class Spectra:
         if self.find_teff_errors and teff != 999999:
             print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
-                teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                teff_error = np.abs(self.find_teff_error_one_line(line_number, doppler_fit,
                                                            macroturb, rotation,
                                                            microturb,
                                                            offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
                                                            bound_min_teff=teff,
-                                                           bound_max_teff=teff + 1000)
+                                                           bound_max_teff=teff + 1000) - teff)
             except ValueError as err:
                 print(err)
                 try:
-                    teff_error = self.find_teff_error_one_line(line_number, doppler_fit,
+                    teff_error = np.abs(self.find_teff_error_one_line(line_number, doppler_fit,
                                                                macroturb, rotation,
                                                                microturb,
                                                                offset_chisqr=(
                                                                            res.fun + np.square(self.teff_error_sigma)),
                                                                bound_min_teff=teff - 1000,
-                                                               bound_max_teff=teff)
+                                                               bound_max_teff=teff) - teff)
                 except ValueError as err:
                     print(err)
                     teff_error = 1000
@@ -1103,7 +1103,7 @@ class Spectra:
 
         return one_result
 
-    def find_teff_error_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_teff, bound_max_teff) -> dict:
+    def find_teff_error_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_teff, bound_max_teff) -> float:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         :param line_number: Which line number/index in line_center_sorted is being fitted
