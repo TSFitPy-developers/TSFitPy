@@ -726,10 +726,10 @@ class TSFitPyConfig:
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
         fit_variable, input_variable = None, None  # both booleans
-        if fitting_mode == "Yes":
+        if fitting_mode == "Yes" or fitting_mode == "True":
             fit_variable = True
             input_variable = False
-        elif fitting_mode == "No":
+        elif fitting_mode == "No" or fitting_mode == "False":
             fit_variable = False
             input_variable = False
         elif fitting_mode == "Input":
