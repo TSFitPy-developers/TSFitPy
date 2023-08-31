@@ -662,7 +662,13 @@ class TurboSpectrum:
                 else:
                     raise ValueError(f"Molecule {element} not supported.")
             else:
-                element_abundance = float(solar_abundances[element]) + self.metallicity
+                if element.lower() not in ["h", "he"]:
+                    # if not H or He, then scale with metallicity
+                    # self.metallicity = [Fe/H]
+                    element_abundance = float(solar_abundances[element]) + self.metallicity
+                else:
+                    # if H or He, then just take solar abundance
+                    element_abundance = float(solar_abundances[element])
         return element_abundance
 
     def make_atmosphere_properties(self, spherical, element):
@@ -1392,6 +1398,8 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list):
     # Sort model parameter values into order
     for parameter in marcs_value_keys:
         marcs_values[parameter].sort()
+
+    model_temperatures, model_logs, model_mets = None, None, None  # i think not used, but eats memory
 
     return model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
 

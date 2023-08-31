@@ -1,6 +1,9 @@
 import os
 import shutil
 import unittest
+
+import scripts.auxiliary_functions
+import scripts.curve_of_growth
 from scripts import TSFitPy
 import numpy as np
 from scripts import turbospectrum_class_nlte
@@ -14,7 +17,7 @@ class MyTestCase(unittest.TestCase):
         segment_size = 5
         wavelength_start = [4200.0, 4201.0, 4202.0, 4220.0, 4240.0]
         wavelength_end = [4201.0, 4202.0, 4203.0, 4221.0, 4241.0]
-        segment_left, segment_right = TSFitPy.create_segment_file(segment_size, wavelength_start, wavelength_end)
+        segment_left, segment_right = scripts.auxiliary_functions.create_segment_file(segment_size, wavelength_start, wavelength_end)
         segment_left = list(segment_left)
         segment_right = list(segment_right)
 
@@ -23,7 +26,7 @@ class MyTestCase(unittest.TestCase):
 
         wavelength_start = [4200.0]
         wavelength_end = [4201.0]
-        segment_left, segment_right = TSFitPy.create_segment_file(segment_size, wavelength_start, wavelength_end)
+        segment_left, segment_right = scripts.auxiliary_functions.create_segment_file(segment_size, wavelength_start, wavelength_end)
         segment_left = list(segment_left)
         segment_right = list(segment_right)
 
@@ -84,7 +87,7 @@ class MyTestCase(unittest.TestCase):
             self.assertGreater(initial_guess[0], -3)
 
     def test_calculate_vturb(self):
-        self.assertAlmostEqual(TSFitPy.calculate_vturb(5777, 4.44, 0.0), 1.0, delta=0.1)
+        self.assertAlmostEqual(scripts.auxiliary_funciton.calculate_vturb(5777, 4.44, 0.0), 1.0, delta=0.1)
 
     def test_chi_square_lbl(self):
         wave_obs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
@@ -157,7 +160,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Eu": "Eu2", "Fe": "Fe2"}
         expec_dict3 = {"Eu": "Eu3", "Fe": "Fe3"}
 
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, True)
+        dict1, dict2, dict3 = scripts.curve_of_growth.load_nlte_files_in_dict(elems, files1, files2, files3, True)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -171,7 +174,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe": "Fe2", "Eu": "Eu2"}
         expec_dict3 = {"Fe": "Fe3", "Eu": "Eu3"}
 
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, True)
+        dict1, dict2, dict3 = scripts.curve_of_growth.load_nlte_files_in_dict(elems, files1, files2, files3, True)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -185,7 +188,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Eu": "Eu2", "Fe5": "Fe2", "Fe": "Fe02"}
         expec_dict3 = {"Eu": "Eu3", "Fe5": "Fe3", "Fe": "Fe03"}
 
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, False)
+        dict1, dict2, dict3 = scripts.curve_of_growth.load_nlte_files_in_dict(elems, files1, files2, files3, False)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -199,7 +202,7 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe5": "Fe2", "Eu": "Eu2", "Fe": "Fe02"}
         expec_dict3 = {"Fe5": "Fe3", "Eu": "Eu3", "Fe": "Fe03"}
 
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, False)
+        dict1, dict2, dict3 = scripts.curve_of_growth.load_nlte_files_in_dict(elems, files1, files2, files3, False)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
@@ -213,18 +216,18 @@ class MyTestCase(unittest.TestCase):
         expec_dict2 = {"Fe5": "Fe2", "Eu": "", "Fe": "Fe02"}
         expec_dict3 = {"Fe5": "Fe3", "Eu": "", "Fe": "Fe03"}
 
-        dict1, dict2, dict3 = TSFitPy.load_nlte_files_in_dict(elems, files1, files2, files3, False)
+        dict1, dict2, dict3 = scripts.curve_of_growth.load_nlte_files_in_dict(elems, files1, files2, files3, False)
         self.assertDictEqual(expec_dict1, dict1)
         self.assertDictEqual(expec_dict2, dict2)
         self.assertDictEqual(expec_dict3, dict3)
 
     def test_second_degree(self):
-        a, b, c = TSFitPy.get_second_degree_polynomial([1, 2, 3], [1, 4, 9])
+        a, b, c = scripts.auxiliary_functions.get_second_degree_polynomial([1, 2, 3], [1, 4, 9])
         func = lambda t: a * t * t + b * t + c
         self.assertEqual(25, func(5))
         self.assertEqual(25, func(-5))
 
-        a, b, c = TSFitPy.get_second_degree_polynomial([1, 2, 3], [2, 5, 10])
+        a, b, c = scripts.auxiliary_functions.get_second_degree_polynomial([1, 2, 3], [2, 5, 10])
         func = lambda t: a * t * t + b * t + c
         self.assertEqual(26, func(5))
         self.assertEqual(26, func(-5))

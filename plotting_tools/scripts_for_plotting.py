@@ -3,21 +3,21 @@ from __future__ import annotations
 import datetime
 import shutil
 from configparser import ConfigParser
-
 import numpy as np
 import os
 from matplotlib import pyplot as plt
 import pandas as pd
+from numpy.linalg import LinAlgError
 from scipy.stats import gaussian_kde
 from warnings import warn
-
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
-from scripts.TSFitPy import TSFitPyConfig, calculate_equivalent_width
+from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
+                             output_default_linemask_name)
+from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
+from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 
-def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
-    return wave_ob / (1 + (doppler / 299792.))
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
     """
@@ -39,13 +39,13 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
              "from now on. In the future this will give an error", DeprecationWarning, stacklevel=2)
         if os.path.isfile(os.path.join(old_variable, "configuration.txt")):
             # trying new way of loading: first variable is output folder with config in it
-            print(f"Loading config from {os.path.join(old_variable, 'configuration.txt')}")
-            config_file_location = os.path.join(old_variable, "configuration.txt")
+            print(f"Loading config from {os.path.join(old_variable, output_default_configuration_name.replace('.cfg', '.txt'))}")
+            config_file_location = os.path.join(old_variable, output_default_configuration_name.replace(".cfg", ".txt"))
             output_folder_location = old_variable
-        elif os.path.isfile(os.path.join(old_variable, "configuration.cfg")):
+        elif os.path.isfile(os.path.join(old_variable, output_default_configuration_name)):
             # trying new way of loading: first variable is output folder with config in it
-            print(f"Loading config from {os.path.join(old_variable, 'configuration.cfg')}")
-            config_file_location = os.path.join(old_variable, "configuration.cfg")
+            print(f"Loading config from {os.path.join(old_variable, output_default_configuration_name)}")
+            config_file_location = os.path.join(old_variable, output_default_configuration_name)
             output_folder_location = old_variable
         else:
             # this was an old way of loading. first variable: config file, second variable: output folder
@@ -54,10 +54,10 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             output_folder_location = old_variable
     else:
         # new way of loading: first variable is output folder with config in it
-        if os.path.isfile(os.path.join(output_folder_location, "configuration.txt")):
-            config_file_location = os.path.join(output_folder_location, "configuration.txt")
+        if os.path.isfile(os.path.join(output_folder_location, output_default_configuration_name.replace(".cfg", ".txt"))):
+            config_file_location = os.path.join(output_folder_location, output_default_configuration_name.replace(".cfg", ".txt"))
         else:
-            config_file_location = os.path.join(output_folder_location, "configuration.cfg")
+            config_file_location = os.path.join(output_folder_location, output_default_configuration_name)
 
     tsfitpy_config = TSFitPyConfig(config_file_location, "none")
     tsfitpy_config.load_config()
@@ -99,15 +99,28 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     # Convert columns to appropriate data types
     output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
 
-    specname_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=str, unpack=True, usecols=(0))
-    rv_fitlist = np.loadtxt(os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename), dtype=float, unpack=True, usecols=(1))
+    # check if fitlist exists and if not load old fitlist
+    output_filist_location = os.path.join(output_folder_location, output_default_fitlist_name)
+    if os.path.isfile(output_filist_location):
+        fitlist_path = output_filist_location
+    else:
+        fitlist_path = os.path.join(tsfitpy_config.fitlist_input_path, tsfitpy_config.input_fitlist_filename)
+
+    fitlist = SpectraParameters(fitlist_path, True)
+    specname_fitlist = fitlist.spectra_parameters_df["specname"].values
+    rv_fitlist = fitlist.spectra_parameters_df["rv"].values
+
     if specname_fitlist.ndim == 0:
         specname_fitlist = np.array([specname_fitlist])
         rv_fitlist = np.array([rv_fitlist])
 
     config_dict = {}
     config_dict["filenames_output_folder"]: list[dir] = filenames_output_folder_convolved
-    config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
+    linemask_output_location = os.path.join(output_folder_location, output_default_linemask_name)
+    if os.path.isfile(linemask_output_location):
+        config_dict["linemask_location"]: str = linemask_output_location
+    else:
+        config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
     config_dict["observed_spectra_location"]: str = tsfitpy_config.spectra_input_path
     config_dict["specname_fitlist"]: np.ndarray = specname_fitlist
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
@@ -154,6 +167,15 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
     # loads fitted and observed wavelength and flux
     wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
     wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
+
+    # sort the observed spectra, just like in TSFitPy
+    if wavelength_observed.size > 1:
+        sorted_obs_wavelength_index = np.argsort(wavelength_observed)
+        wavelength_observed, flux_observed = wavelength_observed[sorted_obs_wavelength_index], flux_observed[sorted_obs_wavelength_index]
+
+        sorted_wavelength_index = np.argsort(wavelength)
+        wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
+
 
     # loads the linemask
     linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
@@ -221,38 +243,65 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         plt.show()
         plt.close()
 
-def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
+def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None,
+                            color='black', invert_x_axis=False, invert_y_axis=False, **pltargs):
+    if color in df_results.columns.values:
+        pltargs['c'] = df_results[color]
+        pltargs['cmap'] = 'viridis'
+        pltargs['vmin'] = df_results[color].min()
+        pltargs['vmax'] = df_results[color].max()
+        plot_colorbar = True
+    else:
+        pltargs['color'] = color
+        plot_colorbar = False
     plt.scatter(df_results[x_axis_column], df_results[y_axis_column], **pltargs)
     plt.xlabel(x_axis_column)
     plt.ylabel(y_axis_column)
     plt.xlim(xlim)
     plt.ylim(ylim)
+    if invert_x_axis:
+        plt.gca().invert_xaxis()
+    if invert_y_axis:
+        plt.gca().invert_yaxis()
+    if plot_colorbar:
+        # colorbar with label
+        plt.colorbar(label=color)
     plt.show()
     plt.close()
 
-def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None, **pltargs):
+def plot_density_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None,
+                            invert_x_axis=False, invert_y_axis=False, **pltargs):
     if np.size(df_results[x_axis_column]) == 1:
         print("Only one point is found, so doing normal scatter plot")
-        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim, **pltargs)
+        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim,
+                                invert_x_axis=invert_x_axis, invert_y_axis=invert_y_axis, **pltargs)
         return
+    try:
+        # creates density map for the plot
+        x_array = df_results[x_axis_column]
+        y_array = df_results[y_axis_column]
+        xy_point_density = np.vstack([x_array, y_array])
+        z_point_density = gaussian_kde(xy_point_density)(xy_point_density)
+        idx_sort = z_point_density.argsort()
+        x_plot, y_plot, z_plot = x_array[idx_sort], y_array[idx_sort], z_point_density[idx_sort]
 
-    # creates density map for the plot
-    x_array = df_results[x_axis_column]
-    y_array = df_results[y_axis_column]
-    xy_point_density = np.vstack([x_array, y_array])
-    z_point_density = gaussian_kde(xy_point_density)(xy_point_density)
-    idx_sort = z_point_density.argsort()
-    x_plot, y_plot, z_plot = x_array[idx_sort], y_array[idx_sort], z_point_density[idx_sort]
+        density = plt.scatter(x_plot, y_plot, c=z_plot, zorder=-1, vmin=0, **pltargs)
 
-    density = plt.scatter(x_plot, y_plot, c=z_plot, zorder=-1, vmin=0, **pltargs)
-
-    plt.xlim(xlim)
-    plt.ylim(ylim)
-    plt.colorbar(density)
-    plt.xlabel(x_axis_column)
-    plt.ylabel(y_axis_column)
-    plt.show()
-    plt.close()
+        plt.xlim(xlim)
+        plt.ylim(ylim)
+        plt.colorbar(density)
+        plt.xlabel(x_axis_column)
+        plt.ylabel(y_axis_column)
+        if invert_x_axis:
+            plt.gca().invert_xaxis()
+        if invert_y_axis:
+            plt.gca().invert_yaxis()
+        plt.show()
+        plt.close()
+    except LinAlgError:
+        print("LinAlgError, so doing normal scatter plot")
+        plot_scatter_df_results(df_results, x_axis_column, y_axis_column, xlim=xlim, ylim=ylim,
+                                invert_x_axis=invert_x_axis, invert_y_axis=invert_y_axis, **pltargs)
 
 
 def plot_histogram_df_results(df_results: pd.DataFrame, x_axis_column: str, xlim=None, ylim=None, **pltargs):
@@ -415,31 +464,35 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         wave_mod_filled = wave_mod_orig
         flux_norm_mod_filled = flux_norm_mod_orig
 
-        if resolution != 0.0:
-            wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-        else:
-            wave_mod_conv = wave_mod_filled
-            flux_norm_mod_conv = flux_norm_mod_filled
+        if len(wave_mod_orig) > 0:
+            if resolution != 0.0:
+                wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+            else:
+                wave_mod_conv = wave_mod_filled
+                flux_norm_mod_conv = flux_norm_mod_filled
 
-        if macro != 0.0:
-            wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-        else:
-            wave_mod_macro = wave_mod_conv
-            flux_norm_mod_macro = flux_norm_mod_conv
+            if macro != 0.0:
+                wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+            else:
+                wave_mod_macro = wave_mod_conv
+                flux_norm_mod_macro = flux_norm_mod_conv
 
-        if rotation != 0.0:
-            wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-        else:
-            wave_mod = wave_mod_macro
-            flux_norm_mod = flux_norm_mod_macro
+            if rotation != 0.0:
+                wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+            else:
+                wave_mod = wave_mod_macro
+                flux_norm_mod = flux_norm_mod_macro
 
-        plt.plot(wave_mod, flux_norm_mod)
-        plt.xlim(lmin - 0.2, lmax + 0.2)
-        plt.ylim(0, 1.05)
-        plt.xlabel("Wavelength")
-        plt.ylabel("Normalised flux")
+            plt.plot(wave_mod, flux_norm_mod)
+            plt.xlim(lmin - 0.2, lmax + 0.2)
+            plt.ylim(0, 1.05)
+            plt.xlabel("Wavelength")
+            plt.ylabel("Normalised flux")
+        else:
+            print('TS failed')
+            wave_mod, flux_norm_mod = np.array([]), np.array([])
     except (FileNotFoundError, ValueError, IndexError) as e:
-        print("TS failed")
+        print(f"TS failed: {e}")
         wave_mod, flux_norm_mod = np.array([]), np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
@@ -465,18 +518,28 @@ def remove_bad_lines(output_data):
     output_file_df.to_csv(os.path.join(output_data["output_folder_location"], "output_good_lines"), sep=' ', index=False, header=True)
     return output_file_df
 
+def load_output_grid(output_folder):
+    # load pandas dataframe .csv file
+    output_file_df = pd.read_csv(os.path.join(output_folder, "spectra_parameters.csv"), sep=',', header=0)
 
-if __name__ == '__main__':
-    # CHANGE NEXT TWO LINES
-    configuration_file_location: str = "../input_files/tsfitpy_input_configuration_ba_oliver_y_nlte_fenlte.txt"  # CHANGE
-    output_folder_location: str = "../output_files/Mar-27-2023-14-11-24_0.23697863971919042_y_nlte_fe_nlte_oliverba/"  # CHANGE
-    output_folder_location: str = "../output_files/test"  # CHANGE
-    # loads all data from config file and output
-    config_dict = load_output_data(configuration_file_location, output_folder_location)
-    output_results_pd_df = config_dict["output_file_df"]  # Pandas dataframe for your own use
-    print("Column names are:")
-    print(output_results_pd_df.columns.values)  # Column names if you want to plot them
-    # CHANGE NEXT LINE
-    star_name_to_plot: str = "00"  # CHANGE
-    # plots all fitted lines for the requested star
-    plot_one_star(config_dict, star_name_to_plot)
+    return output_file_df
+
+def plot_synthetic_spectra_from_grid(input_folder, spectra_name, xlim=None, ylim=None, plt_show=True, **kwargs):
+    wavelength, flux = np.loadtxt(os.path.join(input_folder, spectra_name), usecols=(0, 1), unpack=True, dtype=float)
+    plt.plot(wavelength, flux, **kwargs)
+    plt.title(spectra_name)
+    plt.xlabel("Wavelength")
+    plt.ylabel("Normalised flux")
+    if xlim is not None:
+        plt.xlim(xlim)
+    if ylim is not None:
+        plt.ylim(ylim)
+    if plt_show:
+        plt.show()
+        plt.close()
+
+def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=None, **kwargs):
+    for spectra_name in spectra_names:
+        plot_synthetic_spectra_from_grid(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
+    plt.show()
+    plt.close()

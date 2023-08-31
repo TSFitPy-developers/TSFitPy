@@ -12,8 +12,8 @@ from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize, root_scalar
 from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
-from scripts.TSFitPy import load_nlte_files_in_dict, create_dir, calculate_equivalent_width, TSFitPyConfig, create_segment_file
-from scripts.loading_configs import SpectraParameters
+from scripts.auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file
+from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 
 

@@ -274,7 +274,7 @@ if __name__ == '__main__':
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     today = f"{today}_{np.random.random(1)[0]}"
 
-    if len(sys.argv) == 0:
+    if len(sys.argv) == 1:
         config_file = "input_files/synthetic_spectra_generation_configuration.cfg"
     else:
         config_file = sys.argv[1]
