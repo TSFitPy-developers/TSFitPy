@@ -26,10 +26,12 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
     temp_directory = os.path.join(ts_config["global_temporary_directory"],
                                   f"temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}", "")
 
+    abundances_dict_xh = abundances_dict.copy()
+
     # need to convert abundances_dict from X/Fe to X/H
-    for key, value in abundances_dict.items():
+    for key, value in abundances_dict_xh.items():
         if key != "Fe":
-            abundances_dict[key] = value + met
+            abundances_dict_xh[key] = value + met
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
@@ -52,7 +54,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
 
     ts.configure(t_eff = teff, log_g = logg, metallicity = met,
                  turbulent_velocity = vmic, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax,
-                 free_abundances=abundances_dict, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=verbose,
+                 free_abundances=abundances_dict_xh, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=ts_config["atmosphere_type"],
                  windows_flag=ts_config["windows_flag"],
                  segment_file=ts_config["segment_file"],
