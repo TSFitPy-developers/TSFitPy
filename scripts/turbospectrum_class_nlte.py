@@ -1300,8 +1300,9 @@ class TurboSpectrum:
                 self.run_turbospectrum()
             except AttributeError:
                 print("No attribute, fail of generation?")
-        except FileNotFoundError as error:
+        except (FileNotFoundError, ValueError) as error:
             print(f"Interpolation failed? {error}")
+            print("ValueError can sometimes imply problem with the departure coefficients grid")
 
 
 def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list):
