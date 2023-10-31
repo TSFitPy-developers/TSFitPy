@@ -142,6 +142,8 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
         print("#teff: {}".format(teff), file=f)
         print("#logg: {}".format(logg), file=f)
         print("#[Fe/H]: {}".format(met), file=f)
+        if vturb is None:
+            vturb = calculate_vturb(teff, logg, met)
         print("#vmic: {}".format(vturb), file=f)
         print("#vmac: {}".format(macro), file=f)
         print("#resolution: {}".format(resolution), file=f)
