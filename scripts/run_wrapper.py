@@ -30,8 +30,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
 
     # need to convert abundances_dict from X/Fe to X/H
     for key, value in abundances_dict_xh.items():
-        if key != "Fe":
-            abundances_dict_xh[key] = value + met
+        abundances_dict_xh[key] = value + met
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
