@@ -30,8 +30,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
 
     # need to convert abundances_dict from X/Fe to X/H
     for key, value in abundances_dict_xh.items():
-        if key != "Fe":
-            abundances_dict_xh[key] = value + met
+        abundances_dict_xh[key] = value + met
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
@@ -142,18 +141,31 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
         print("#teff: {}".format(teff), file=f)
         print("#logg: {}".format(logg), file=f)
         print("#[Fe/H]: {}".format(met), file=f)
+        if vturb is None:
+            vturb = calculate_vturb(teff, logg, met)
         print("#vmic: {}".format(vturb), file=f)
         print("#vmac: {}".format(macro), file=f)
         print("#resolution: {}".format(resolution), file=f)
         print("#rotation: {}".format(rotation), file=f)
         print("#nlte_flag: {}".format(nlte_flag), file=f)
-        for key, value in abundances_dict.items():
-            if key != "Fe":
-                print(f"#[{key}/Fe]={value}", file=f)
+
+        # get which elements are in NLTE using ts_config["model_atom_file"]
+        nlte_elements = ts_config["model_atom_file"].keys()
+
+        for element, value in abundances_dict.items():
+            if nlte_flag:
+                if element in nlte_elements:
+                    nlte_flag = "NLTE"
+                else:
+                    nlte_flag = "LTE"
+            else:
+                nlte_flag = "LTE"
+            if element != "Fe":
+                print(f"#[{element}/Fe]={value} {nlte_flag}", file=f)
             else:
                 # if Fe, it is given as weird Fe/Fe way, which can be fixed back by:
                 # xfe + feh + A(X)_sun = A(X)_star
-                print(f"#A({key})={value + met + solar_abundances['Fe']}", file=f)
+                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag}", file=f)
         print("#", file=f)
 
         if save_unnormalised_spectra:
@@ -165,3 +177,6 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
             for i in range(len(wave_mod)):
                 print("{}  {}".format(wave_mod[i], flux_norm_mod[i]), file=f)
         f.close()
+        return spectrum_name
+    else:
+        return ""
