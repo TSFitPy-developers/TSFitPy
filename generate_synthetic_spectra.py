@@ -18,6 +18,7 @@ from scripts.run_wrapper import run_and_save_wrapper
 from time import perf_counter
 from scripts.loading_configs import SpectraParameters
 from scripts.solar_abundances import periodic_table
+from scripts.auxiliary_functions import calculate_vturb
 
 class SyntheticSpectraConfig:
     def __init__(self, config_location: str, output_folder_title: str):
@@ -376,6 +377,32 @@ if __name__ == '__main__':
                              time_limit_hours=config_synthetic_spectra.time_limit_hours,
                              slurm_partition=config_synthetic_spectra.slurm_partition)
 
+    temp_df = spectra_parameters_class.spectra_parameters_df.copy()
+
+    # in spectra_parameters_class.spectra_parameters_df change the column names and add .spec to the specname
+    temp_df["specname"] = temp_df["specname"].apply(lambda x: f"{x}.spec")
+
+    # if vmic is not in the columns, add it by calculating using the function calculate_vturb
+    if "vmic" not in temp_df.columns:
+        temp_df["vmic"] = temp_df.apply(lambda x: calculate_vturb(x["teff"], x["logg"], x["feh"]), axis=1)
+
+    # change the columns names for elements in df from X to X_Fe
+    # go through columns in the df
+    for column in temp_df.columns:
+        # if the column name is in the list of elements
+        if column in periodic_table:
+            # add _Fe to the column name
+            temp_df.rename(columns={column: f"{column}_Fe"}, inplace=True)
+
+    # if column Fe_Fe is present, then rename it to A(Fe)
+    if "Fe_Fe" in temp_df.columns:
+        temp_df.rename(columns={"Fe_Fe": "A(Fe)"}, inplace=True)
+    # and change its value by adding FeH and solar abundance of Fe
+    temp_df["A(Fe)"] = temp_df["A(Fe)"] + temp_df["feh"] + periodic_table["Fe"]
+
+    # save the spectra parameters
+    temp_df.to_csv(os.path.join(output_dir, "spectra_parameters_temp.csv"), index=False)
+
     futures = []
     for one_spectra_parameter in spectra_parameters:
         specname, teff, logg, feh, vmic, vmac, rotation, abundances_dict = one_spectra_parameter
@@ -393,6 +420,13 @@ if __name__ == '__main__':
     # in spectra_parameters_class.spectra_parameters_df change the column names and add .spec to the specname
     spectra_parameters_class.spectra_parameters_df["specname"] = spectra_parameters_class.spectra_parameters_df["specname"].apply(lambda x: f"{x}.spec")
 
+    # delete any specname columns that are not in the results
+    spectra_parameters_class.spectra_parameters_df = spectra_parameters_class.spectra_parameters_df[spectra_parameters_class.spectra_parameters_df["specname"].isin(results[:, 0])]
+
+    # if vmic is not in the columns, add it by calculating using the function calculate_vturb
+    if "vmic" not in spectra_parameters_class.spectra_parameters_df.columns:
+        spectra_parameters_class.spectra_parameters_df["vmic"] = spectra_parameters_class.spectra_parameters_df.apply(lambda x: calculate_vturb(x["teff"], x["logg"], x["feh"]), axis=1)
+
     # change the columns names for elements in df from X to X_Fe
     # go through columns in the df
     for column in spectra_parameters_class.spectra_parameters_df.columns:
@@ -401,8 +435,20 @@ if __name__ == '__main__':
             # add _Fe to the column name
             spectra_parameters_class.spectra_parameters_df.rename(columns={column: f"{column}_Fe"}, inplace=True)
 
+    # if column Fe_Fe is present, then rename it to A(Fe)
+    if "Fe_Fe" in spectra_parameters_class.spectra_parameters_df.columns:
+        spectra_parameters_class.spectra_parameters_df.rename(columns={"Fe_Fe": "A(Fe)"}, inplace=True)
+    # and change its value by adding FeH and solar abundance of Fe
+    spectra_parameters_class.spectra_parameters_df["A(Fe)"] = spectra_parameters_class.spectra_parameters_df["A(Fe)"] + spectra_parameters_class.spectra_parameters_df["feh"] + periodic_table["Fe"]
+
     # save the spectra parameters 
     spectra_parameters_class.spectra_parameters_df.to_csv(os.path.join(output_dir, "spectra_parameters.csv"), index=False)
+
+    # delete temporary os.path.join(output_dir, "spectra_parameters_temp.csv")
+    try:
+        os.remove(os.path.join(output_dir, "spectra_parameters_temp.csv"))
+    except FileNotFoundError:
+        pass
 
     time_end = perf_counter()
     # with 4 decimals, the time is converted to hours, minutes and seconds

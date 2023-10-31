@@ -147,13 +147,21 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
         print("#resolution: {}".format(resolution), file=f)
         print("#rotation: {}".format(rotation), file=f)
         print("#nlte_flag: {}".format(nlte_flag), file=f)
-        for key, value in abundances_dict.items():
-            if key != "Fe":
-                print(f"#[{key}/Fe]={value}", file=f)
+
+        # get which elements are in NLTE using ts_config["model_atom_file"]
+        nlte_elements = ts_config["model_atom_file"].keys()
+
+        for element, value in abundances_dict.items():
+            if element in nlte_elements:
+                nlte_flag = "NLTE"
+            else:
+                nlte_flag = "LTE"
+            if element != "Fe":
+                print(f"#[{element}/Fe]={value} {nlte_flag}", file=f)
             else:
                 # if Fe, it is given as weird Fe/Fe way, which can be fixed back by:
                 # xfe + feh + A(X)_sun = A(X)_star
-                print(f"#A({key})={value + met + solar_abundances['Fe']}", file=f)
+                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag}", file=f)
         print("#", file=f)
 
         if save_unnormalised_spectra:
@@ -165,3 +173,6 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
             for i in range(len(wave_mod)):
                 print("{}  {}".format(wave_mod[i], flux_norm_mod[i]), file=f)
         f.close()
+        return spectrum_name
+    else:
+        return ""
