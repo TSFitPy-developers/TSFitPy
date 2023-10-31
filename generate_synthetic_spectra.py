@@ -421,7 +421,7 @@ if __name__ == '__main__':
     spectra_parameters_class.spectra_parameters_df["specname"] = spectra_parameters_class.spectra_parameters_df["specname"].apply(lambda x: f"{x}.spec")
 
     # delete any specname columns that are not in the results
-    spectra_parameters_class.spectra_parameters_df = spectra_parameters_class.spectra_parameters_df[spectra_parameters_class.spectra_parameters_df["specname"].isin(results[:, 0])]
+    spectra_parameters_class.spectra_parameters_df = spectra_parameters_class.spectra_parameters_df[spectra_parameters_class.spectra_parameters_df["specname"].isin(results)]
 
     # if vmic is not in the columns, add it by calculating using the function calculate_vturb
     if "vmic" not in spectra_parameters_class.spectra_parameters_df.columns:
