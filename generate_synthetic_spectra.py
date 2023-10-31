@@ -17,7 +17,7 @@ import os
 from scripts.run_wrapper import run_and_save_wrapper
 from time import perf_counter
 from scripts.loading_configs import SpectraParameters
-from scripts.solar_abundances import periodic_table
+from scripts.solar_abundances import periodic_table, solar_abundances
 from scripts.auxiliary_functions import calculate_vturb
 
 class SyntheticSpectraConfig:
@@ -398,7 +398,7 @@ if __name__ == '__main__':
     if "Fe_Fe" in temp_df.columns:
         temp_df.rename(columns={"Fe_Fe": "A(Fe)"}, inplace=True)
         # and change its value by adding FeH and solar abundance of Fe
-        temp_df["A(Fe)"] = temp_df["A(Fe)"] + temp_df["feh"] + periodic_table["Fe"]
+        temp_df["A(Fe)"] = temp_df["A(Fe)"] + temp_df["feh"] + solar_abundances["Fe"]
 
     # save the spectra parameters
     temp_df.to_csv(os.path.join(output_dir, "spectra_parameters_temp.csv"), index=False)
@@ -439,7 +439,7 @@ if __name__ == '__main__':
     if "Fe_Fe" in spectra_parameters_class.spectra_parameters_df.columns:
         spectra_parameters_class.spectra_parameters_df.rename(columns={"Fe_Fe": "A(Fe)"}, inplace=True)
         # and change its value by adding FeH and solar abundance of Fe
-        spectra_parameters_class.spectra_parameters_df["A(Fe)"] = spectra_parameters_class.spectra_parameters_df["A(Fe)"] + spectra_parameters_class.spectra_parameters_df["feh"] + periodic_table["Fe"]
+        spectra_parameters_class.spectra_parameters_df["A(Fe)"] = spectra_parameters_class.spectra_parameters_df["A(Fe)"] + spectra_parameters_class.spectra_parameters_df["feh"] + solar_abundances["Fe"]
 
     # save the spectra parameters 
     spectra_parameters_class.spectra_parameters_df.to_csv(os.path.join(output_dir, "spectra_parameters.csv"), index=False)
