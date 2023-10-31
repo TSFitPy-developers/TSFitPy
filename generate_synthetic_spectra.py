@@ -397,8 +397,8 @@ if __name__ == '__main__':
     # if column Fe_Fe is present, then rename it to A(Fe)
     if "Fe_Fe" in temp_df.columns:
         temp_df.rename(columns={"Fe_Fe": "A(Fe)"}, inplace=True)
-    # and change its value by adding FeH and solar abundance of Fe
-    temp_df["A(Fe)"] = temp_df["A(Fe)"] + temp_df["feh"] + periodic_table["Fe"]
+        # and change its value by adding FeH and solar abundance of Fe
+        temp_df["A(Fe)"] = temp_df["A(Fe)"] + temp_df["feh"] + periodic_table["Fe"]
 
     # save the spectra parameters
     temp_df.to_csv(os.path.join(output_dir, "spectra_parameters_temp.csv"), index=False)
@@ -438,8 +438,8 @@ if __name__ == '__main__':
     # if column Fe_Fe is present, then rename it to A(Fe)
     if "Fe_Fe" in spectra_parameters_class.spectra_parameters_df.columns:
         spectra_parameters_class.spectra_parameters_df.rename(columns={"Fe_Fe": "A(Fe)"}, inplace=True)
-    # and change its value by adding FeH and solar abundance of Fe
-    spectra_parameters_class.spectra_parameters_df["A(Fe)"] = spectra_parameters_class.spectra_parameters_df["A(Fe)"] + spectra_parameters_class.spectra_parameters_df["feh"] + periodic_table["Fe"]
+        # and change its value by adding FeH and solar abundance of Fe
+        spectra_parameters_class.spectra_parameters_df["A(Fe)"] = spectra_parameters_class.spectra_parameters_df["A(Fe)"] + spectra_parameters_class.spectra_parameters_df["feh"] + periodic_table["Fe"]
 
     # save the spectra parameters 
     spectra_parameters_class.spectra_parameters_df.to_csv(os.path.join(output_dir, "spectra_parameters.csv"), index=False)
