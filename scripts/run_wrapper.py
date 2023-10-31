@@ -153,8 +153,11 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
         nlte_elements = ts_config["model_atom_file"].keys()
 
         for element, value in abundances_dict.items():
-            if element in nlte_elements:
-                nlte_flag = "NLTE"
+            if nlte_flag:
+                if element in nlte_elements:
+                    nlte_flag = "NLTE"
+                else:
+                    nlte_flag = "LTE"
             else:
                 nlte_flag = "LTE"
             if element != "Fe":
