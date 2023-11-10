@@ -642,7 +642,7 @@ class TSFitPyConfig:
         self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
         self.atmosphere_type = self._validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
-        self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
+        self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic", "logg"])
         self.include_molecules = self._convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
         self.nlte_flag = self._convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
         vmic_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
