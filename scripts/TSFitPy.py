@@ -2442,7 +2442,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
             f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew",
             file=f)
     elif tsfitpy_configuration.fitting_mode == "teff":
-        output_columns = "#specname\tTeff\tTeff_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared"
+        output_columns = "#specname\tTeff\tTeff_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared\tew"
         print(output_columns, file=f)
 
     results = np.array(results)
