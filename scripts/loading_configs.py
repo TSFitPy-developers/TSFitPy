@@ -317,6 +317,9 @@ class TSFitPyConfig:
         self.bounds_teff: list[float] = None
         self.guess_range_teff: list[float] = None
 
+        self.bounds_logg: list[float] = None
+        self.guess_range_logg: list[float] = None
+
         self.bounds_vmac: list[float] = None
         self.bounds_rotation: list[float] = None
         self.bounds_abundance: list[float] = None
@@ -372,6 +375,9 @@ class TSFitPyConfig:
 
         self.find_teff_errors: bool = False
         self.teff_error_sigma: float = 3
+
+        self.find_logg_errors: bool = False
+        self.logg_error_sigma: float = 3
 
         # new options for the slurm cluster
         self.cluster_type = "local"
@@ -692,6 +698,17 @@ class TSFitPyConfig:
         except KeyError:
             self.find_teff_errors = False
             self.teff_error_sigma = 5.0
+
+        try:
+            self.bounds_logg = self._split_string_to_float_list(self.config_parser["ParametersForModeLogg"]["bounds_logg"])
+            self.guess_range_logg = self._split_string_to_float_list(self.config_parser["ParametersForModeLogg"]["guess_range_logg"])
+            self.find_logg_errors = self._convert_string_to_bool(self.config_parser["ParametersForModeLogg"]["find_logg_errors"])
+            self.logg_error_sigma = float(self.config_parser["ParametersForModeLogg"]["logg_error_sigma"])
+        except KeyError:
+            self.bounds_logg = [-0.5, 5]
+            self.guess_range_logg = [-0.5, 0.5]
+            self.find_logg_errors = False
+            self.logg_error_sigma = 5.0
 
         self.bounds_vmac = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
         self.bounds_rotation = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])
