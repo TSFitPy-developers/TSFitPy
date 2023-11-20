@@ -394,7 +394,7 @@ class TSFitPyConfig:
     def load_config(self):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
-            self.load_new_config()
+            self.load_new_config(check_valid_path=False)
         else:
             self.load_old_config()
 
@@ -617,7 +617,7 @@ class TSFitPyConfig:
                             self.experimental_parallelisation = False
                 line = fp.readline()
 
-    def load_new_config(self):
+    def load_new_config(self, check_valid_path=True):
         # check if the config file exists
         if not os.path.isfile(self.config_location):
             raise ValueError(f"The configuration file {self.config_location} does not exist.")
@@ -635,12 +635,13 @@ class TSFitPyConfig:
         self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
         self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
         self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
+        if check_valid_path:
+            self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
+            self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
         if self.spectra_input_path is None:
             self.spectra_input_path = self.config_parser["MainPaths"]["spectra_input_path"]
-        self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
-        self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
+        self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
         self.atmosphere_type = self._validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
         self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic", "logg"])
         self.include_molecules = self._convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])

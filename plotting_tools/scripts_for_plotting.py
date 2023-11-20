@@ -741,8 +741,8 @@ class Star:
         stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
         ionisation_stages = np.array(ionisation_stages)
+        ep_data = np.array(ep_data)
         if abund_limits is not None:
-            ep_data = np.array(ep_data)
             stellar_param_data = np.array(stellar_param_data)
             mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
             ep_data = ep_data[mask]
@@ -774,8 +774,8 @@ class Star:
         stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
         ionisation_stages = np.array(ionisation_stages)
+        loggf_data = np.array(loggf_data)
         if abund_limits is not None:
-            loggf_data = np.array(loggf_data)
             stellar_param_data = np.array(stellar_param_data)
             mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
             loggf_data = loggf_data[mask]
@@ -862,8 +862,8 @@ class Star:
         plt.show()
 
 if __name__ == '__main__':
-    test_star = Star("KPNO_FTS_flux_2960_13000_Kurucz1984.txt", ["../output_files/watlas_y_lte_grev_loggf_vmac3"], "../input_files/linelists/linelist_for_fitting/")
-    test_star.plot_fit_parameters_vs_abundance("ew", "Y", abund_limits=(-3, 3))
-    test_star.plot_ep_vs_abundance("Y", abund_limits=(-3, 3))
-    test_star.plot_loggf_vs_abundance("Y", abund_limits=(-3, 3))
+    test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
+    test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
+    test_star.plot_ep_vs_abundance("Fe")
+    test_star.plot_loggf_vs_abundance("Fe", abund_limits=(-3, 3))
     test_star.plot_abundance_plot(abund_limits=(-3, 3))
