@@ -17,19 +17,7 @@ from scripts.TSFitPy import (output_default_configuration_name, output_default_f
                              output_default_linemask_name)
 from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
-
-periodic_table = ["H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na",
-                  "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc",
-                  "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga",
-                  "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb",
-                  "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb",
-                  "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm",
-                  "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
-                  "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
-                  "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa",
-                  "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md",
-                  "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg",
-                  "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"]
+from scripts.solar_abundances import periodic_table
 
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
@@ -144,118 +132,121 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     return config_dict
 
 def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None, xlim=None, ylim=None, font_size=None):
-    # unpack the config dict into separate variables
-    filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
-    observed_spectra_location: str = config_dict["observed_spectra_location"]
-    linemask_location: str = config_dict["linemask_location"]
-    specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
-    rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
-    output_file_df: pd.DataFrame = config_dict["output_file_df"]
+    try:
+        # unpack the config dict into separate variables
+        filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
+        observed_spectra_location: str = config_dict["observed_spectra_location"]
+        linemask_location: str = config_dict["linemask_location"]
+        specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
+        rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
+        output_file_df: pd.DataFrame = config_dict["output_file_df"]
 
-    # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
-    # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
-    indices_to_plot = np.where(np.char.find(filenames_output_folder, name_of_spectra_to_plot) != -1)[0]
-    if len(indices_to_plot) > 1:
-        # Warning if part of several specnames, just in case
-        print(f"Warning, several specnames were found with that name {name_of_spectra_to_plot}, using first one")
-    if len(indices_to_plot) == 0:
-        raise ValueError(f"Could not find {name_of_spectra_to_plot} in the spectra to plot")
+        # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
+        # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
+        indices_to_plot = np.where(np.char.find(filenames_output_folder, name_of_spectra_to_plot) != -1)[0]
+        if len(indices_to_plot) > 1:
+            # Warning if part of several specnames, just in case
+            print(f"Warning, several specnames were found with that name {name_of_spectra_to_plot}, using first one")
+        if len(indices_to_plot) == 0:
+            raise ValueError(f"Could not find {name_of_spectra_to_plot} in the spectra to plot")
 
-    # Take first occurrence of the name, hopefully the only one
-    index_to_plot = indices_to_plot[0]
+        # Take first occurrence of the name, hopefully the only one
+        index_to_plot = indices_to_plot[0]
 
-    # get the name of the fitted and observed spectra
-    filename_fitted_spectra = filenames_output_folder[index_to_plot]
-    filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
+        # get the name of the fitted and observed spectra
+        filename_fitted_spectra = filenames_output_folder[index_to_plot]
+        filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
 
-    # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
-    #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
-    df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
+        # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
+        #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
+        df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
 
-    # find RV in the fitlist that was input into the star
-    if filename_observed_spectra not in specname_fitlist:
-        raise ValueError(f"{filename_observed_spectra} not found in the fitlist names, which are {specname_fitlist}")
-    rv_index = np.where(specname_fitlist == filename_observed_spectra)[0][0]
-    rv = rv_fitlist[rv_index]
+        # find RV in the fitlist that was input into the star
+        if filename_observed_spectra not in specname_fitlist:
+            raise ValueError(f"{filename_observed_spectra} not found in the fitlist names, which are {specname_fitlist}")
+        rv_index = np.where(specname_fitlist == filename_observed_spectra)[0][0]
+        rv = rv_fitlist[rv_index]
 
-    # loads fitted and observed wavelength and flux
-    wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
-    wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
+        # loads fitted and observed wavelength and flux
+        wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
+        wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
 
-    # sort the observed spectra, just like in TSFitPy
-    if wavelength_observed.size > 1:
-        sorted_obs_wavelength_index = np.argsort(wavelength_observed)
-        wavelength_observed, flux_observed = wavelength_observed[sorted_obs_wavelength_index], flux_observed[sorted_obs_wavelength_index]
+        # sort the observed spectra, just like in TSFitPy
+        if wavelength_observed.size > 1:
+            sorted_obs_wavelength_index = np.argsort(wavelength_observed)
+            wavelength_observed, flux_observed = wavelength_observed[sorted_obs_wavelength_index], flux_observed[sorted_obs_wavelength_index]
 
-        sorted_wavelength_index = np.argsort(wavelength)
-        wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
+            sorted_wavelength_index = np.argsort(wavelength)
+            wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
 
 
-    # loads the linemask
-    linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
+        # loads the linemask
+        linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
 
-    # sorts linemask, just like in TSFitPy
-    if linemask_center_wavelengths.size > 1:
-        linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
-        linemask_left_wavelengths = np.array(sorted(linemask_left_wavelengths))
-        linemask_right_wavelengths = np.array(sorted(linemask_right_wavelengths))
-    elif linemask_center_wavelengths.size == 1:
-        linemask_center_wavelengths = np.array([linemask_center_wavelengths])
-        linemask_left_wavelengths = np.array([linemask_left_wavelengths])
-        linemask_right_wavelengths = np.array([linemask_right_wavelengths])
+        # sorts linemask, just like in TSFitPy
+        if linemask_center_wavelengths.size > 1:
+            linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
+            linemask_left_wavelengths = np.array(sorted(linemask_left_wavelengths))
+            linemask_right_wavelengths = np.array(sorted(linemask_right_wavelengths))
+        elif linemask_center_wavelengths.size == 1:
+            linemask_center_wavelengths = np.array([linemask_center_wavelengths])
+            linemask_left_wavelengths = np.array([linemask_left_wavelengths])
+            linemask_right_wavelengths = np.array([linemask_right_wavelengths])
 
-    # makes a separate plot for each line
-    for linemask_center_wavelength, linemask_left_wavelength, linemask_right_wavelength in zip(linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths):
-        # finds in the output results, which of the wavelengths are equal to the linemask. Comparison is done using argmin to minimise risk of comparing floats. As downside, there is no check if line is actually the same
-        output_result_index_to_plot = (np.abs(output_file_df[df_correct_specname_indices]["wave_center"] - linemask_center_wavelength)).argmin()
+        # makes a separate plot for each line
+        for linemask_center_wavelength, linemask_left_wavelength, linemask_right_wavelength in zip(linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths):
+            # finds in the output results, which of the wavelengths are equal to the linemask. Comparison is done using argmin to minimise risk of comparing floats. As downside, there is no check if line is actually the same
+            output_result_index_to_plot = (np.abs(output_file_df[df_correct_specname_indices]["wave_center"] - linemask_center_wavelength)).argmin()
 
-        # this is the fitted rv in this case then
-        fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
+            # this is the fitted rv in this case then
+            fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
 
-        # other fitted values
-        fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
-        column_names = output_file_df.columns.values
-        if "_Fe" in column_names[6]:
-            abund_column_name = column_names[6]
-        else:
-            abund_column_name = column_names[5]
-        fitted_abund = output_file_df[df_correct_specname_indices][abund_column_name].values[output_result_index_to_plot]
-        fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
+            # other fitted values
+            fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
+            column_names = output_file_df.columns.values
+            if "_Fe" in column_names[6]:
+                abund_column_name = column_names[6]
+            else:
+                abund_column_name = column_names[5]
+            fitted_abund = output_file_df[df_correct_specname_indices][abund_column_name].values[output_result_index_to_plot]
+            fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
 
-        # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
-        doppler = fitted_rv + rv
-        wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
+            # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
+            doppler = fitted_rv + rv
+            wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
 
-        abund_column_name = f"[{abund_column_name.replace('_', '/')}]"
+            abund_column_name = f"[{abund_column_name.replace('_', '/')}]"
 
-        if plot_title:
-            plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
-        plt.plot(wavelength, flux, color='red')
-        plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
-        # xlimit is wavelength left/right +/- 0.3 AA
-        if xlim is not None:
-            plt.xlim(xlim)
-        else:
-            plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
-        if ylim is not None:
-            plt.ylim(ylim)
-        else:
-            plt.ylim(0, 1.05)
-        # plot x-ticks without scientific notation
-        plt.ticklabel_format(useOffset=False)
-        # change font size
-        if font_size is not None:
-            plt.rcParams.update({'font.size': font_size})
-        plt.plot([linemask_left_wavelength, linemask_left_wavelength], [0, 2], color='green', alpha=0.2)
-        plt.plot([linemask_right_wavelength, linemask_right_wavelength], [0, 2], color='green', alpha=0.2)
-        plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
-        plt.xlabel("Wavelength [Å]")
-        plt.ylabel("Normalised flux")
-        if save_figure is not None:
-            # save figure without cutting off labels
-            plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}", bbox_inches='tight')
-        plt.show()
-        plt.close()
+            if plot_title:
+                plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
+            plt.plot(wavelength, flux, color='red')
+            plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
+            # xlimit is wavelength left/right +/- 0.3 AA
+            if xlim is not None:
+                plt.xlim(xlim)
+            else:
+                plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
+            if ylim is not None:
+                plt.ylim(ylim)
+            else:
+                plt.ylim(0, 1.05)
+            # plot x-ticks without scientific notation
+            plt.ticklabel_format(useOffset=False)
+            # change font size
+            if font_size is not None:
+                plt.rcParams.update({'font.size': font_size})
+            plt.plot([linemask_left_wavelength, linemask_left_wavelength], [0, 2], color='green', alpha=0.2)
+            plt.plot([linemask_right_wavelength, linemask_right_wavelength], [0, 2], color='green', alpha=0.2)
+            plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
+            plt.xlabel("Wavelength [Å]")
+            plt.ylabel("Normalised flux")
+            if save_figure is not None:
+                # save figure without cutting off labels
+                plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}", bbox_inches='tight')
+            plt.show()
+            plt.close()
+    except (ValueError, IndexError, FileNotFoundError) as e:
+        print(f"Error: {e}")
 
 def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None,
                             color='black', invert_x_axis=False, invert_y_axis=False, **pltargs):
