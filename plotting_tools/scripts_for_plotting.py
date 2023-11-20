@@ -658,8 +658,6 @@ class Star:
 
         # Usage
         self.parsed_linelist = read_linelist(self.linelist_filenames)
-        line_data = self.get_line_data('Li', 6707.921, 'wavelength')
-        print(line_data)
 
         # load each element using dataframe:
         self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}}
@@ -686,6 +684,7 @@ class Star:
     def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
         element_data = self.parsed_linelist[element]
         result = []
+        ionisation_stages = []
 
         # Ensure wavelengths is a list
         if not isinstance(wavelengths, list) and not isinstance(wavelengths, np.ndarray):
@@ -706,12 +705,13 @@ class Star:
                         # choose the ionisation stage
                         line = line[line['ionisation_stage'] == ionisation_stage]
                     result.append(line[column])
+                    ionisation_stages.append(line['ionisation_stage'])
                 else:
                     result.append(None)
             except ValueError:
                 result.append(None)
 
-        return result
+        return result, ionisation_stages
 
     def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None):
         allowed_params = ["wavelength", "ew"]
@@ -733,10 +733,11 @@ class Star:
             plt.ylabel("[Fe/H]")
         else:
             plt.ylabel(f"[{element}/Fe]")
+        plt.title(f"{self.name}")
         plt.show()
 
     def plot_ep_vs_abundance(self, element, abund_limits=None):
-        ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
+        ep_data, ionisation_stages = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
         stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
         if abund_limits is not None:
@@ -745,30 +746,53 @@ class Star:
             mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
             ep_data = ep_data[mask]
             stellar_param_data = stellar_param_data[mask]
-        plt.scatter(ep_data, stellar_param_data)
+        # find those with ionisation stage 1
+        ionisation_stages = np.array(ionisation_stages)
+        mask = ionisation_stages == "I"
+        ep_data_neutral = ep_data[mask]
+        stellar_param_data_neutral = stellar_param_data[mask]
+        # find those with any other ionisation stage
+        mask = ionisation_stages != "I"
+        ep_data_other = ep_data[mask]
+        stellar_param_data_other = stellar_param_data[mask]
+        plt.scatter(ep_data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
+        plt.scatter(ep_data_other, stellar_param_data_other, label="Other", color='red')
         plt.xlabel("EP")
         if element == "Fe":
             plt.ylabel("[Fe/H]")
         else:
             plt.ylabel(f"[{element}/Fe]")
+        plt.title(f"{self.name}")
+        plt.legend()
         plt.show()
 
     def plot_loggf_vs_abundance(self, element, abund_limits=None):
-        ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "loggf")
+        loggf_data, ionisation_stages = self.get_line_data(element, self.elemental_data["wavelength"][element], "loggf")
         stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
         if abund_limits is not None:
-            ep_data = np.array(ep_data)
+            loggf_data = np.array(loggf_data)
             stellar_param_data = np.array(stellar_param_data)
             mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
-            ep_data = ep_data[mask]
+            loggf_data = loggf_data[mask]
             stellar_param_data = stellar_param_data[mask]
-        plt.scatter(ep_data, stellar_param_data)
+        # find those with ionisation stage 1
+        ionisation_stages = np.array(ionisation_stages)
+        mask = ionisation_stages == "I"
+        ep_data_neutral = loggf_data[mask]
+        stellar_param_data_neutral = stellar_param_data[mask]
+        # find those with any other ionisation stage
+        mask = ionisation_stages != "I"
+        ep_data_other = loggf_data[mask]
+        stellar_param_data_other = stellar_param_data[mask]
+        plt.scatter(ep_data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
+        plt.scatter(ep_data_other, stellar_param_data_other, label="Other", color='red')
         plt.xlabel("log(gf)")
         if element == "Fe":
             plt.ylabel("[Fe/H]")
         else:
             plt.ylabel(f"[{element}/Fe]")
+        plt.title(f"{self.name}")
         plt.show()
 
     def plot_abundance_plot(self, abund_limits, fontsize=16):
