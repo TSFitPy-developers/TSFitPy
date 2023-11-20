@@ -639,8 +639,7 @@ class Star:
                     data_new[element] = df
                 else:
                     # append to the existing DataFrame using concat
-                    data_new[element] = pd.concat([data_new[element], df])
-
+                    data_new[element] = pd.concat([data_new[element], df], ignore_index=True)
 
             return data_new
 
@@ -673,31 +672,72 @@ class Star:
 
         print(self.elemental_data)
 
-
-    def get_line_data(self, element, wavelength, column, ionisation_stage=None, tolerance=0.1):
+    def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
         element_data = self.parsed_linelist[element]
+        result = []
 
-        # Calculate the absolute difference between each wavelength and the provided wavelength
-        differences = np.abs(element_data['wavelength'] - wavelength)
+        # Ensure wavelengths is a list
+        if not isinstance(wavelengths, list) and not isinstance(wavelengths, np.ndarray):
+            wavelengths = [wavelengths]
 
-        # Find the index of the smallest difference that is within the tolerance
-        idx_min_difference = differences[differences <= tolerance].idxmin()
+        for wavelength in wavelengths:
+            # Calculate the absolute difference between each wavelength and the provided wavelength
+            differences = np.abs(element_data['wavelength'] - wavelength)
 
-        # If a matching row was found
-        if not np.isnan(idx_min_difference):
-            line = element_data.loc[idx_min_difference]
-            if ionisation_stage is not None:
-                # choose the ionisation stage
-                line = line[line['ionisation_stage'] == ionisation_stage]
-            return line[column]
-        else:
-            return None
+            # Find the index of the smallest difference that is within the tolerance
+            try:
+                idx_min_difference = differences[differences <= tolerance].idxmin()
 
-    def plot_stellar_abundance_vs_ep(self, element):
+                # If a matching row was found
+                if not np.isnan(idx_min_difference):
+                    line = element_data.loc[idx_min_difference]
+                    if ionisation_stage is not None:
+                        # choose the ionisation stage
+                        line = line[line['ionisation_stage'] == ionisation_stage]
+                    result.append(line[column])
+                else:
+                    result.append(None)
+            except ValueError:
+                result.append(None)
+
+        return result
+
+    def plot_stellar_parameters_vs_abundance(self, stellar_parameter, element, abund_limits=None):
+        if stellar_parameter not in ["wavelength", "ew", "loggf"]:
+            raise ValueError(f"stellar_parameter must be either 'wavelength', 'ep' or 'loggf', not {stellar_parameter}")
+        corresponding_labels = {"wavelength": "Wavelength [Å]", "ew": "Equivalent width", "loggf": "log(gf)"}
         ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
-        abund_data = self.elemental_data["abund"][element]
-        plt.scatter(ep_data, abund_data)
-        plt.xlabel("EP")
+        stellar_param_data = self.elemental_data[stellar_parameter][element]
+        # if abund_limits is not None, then remove the lines that are outside the limits
+        if abund_limits is not None:
+            ep_data = np.array(ep_data)
+            stellar_param_data = np.array(stellar_param_data)
+            mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
+            ep_data = ep_data[mask]
+            stellar_param_data = stellar_param_data[mask]
+        plt.scatter(ep_data, stellar_param_data)
+        plt.xlabel(corresponding_labels[stellar_parameter])
+        if element == "Fe":
+            plt.ylabel("[Fe/H]")
+        else:
+            plt.ylabel(f"[{element}/Fe]")
+        plt.show()
+
+    def plot_stellar_parameters_vs_abundance(self, stellar_parameter, element, abund_limits=None):
+        if stellar_parameter not in ["wavelength", "ew", "loggf"]:
+            raise ValueError(f"stellar_parameter must be either 'wavelength', 'ep' or 'loggf', not {stellar_parameter}")
+        corresponding_labels = {"wavelength": "Wavelength [Å]", "ew": "Equivalent width", "loggf": "log(gf)"}
+        ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
+        stellar_param_data = self.elemental_data[stellar_parameter][element]
+        # if abund_limits is not None, then remove the lines that are outside the limits
+        if abund_limits is not None:
+            ep_data = np.array(ep_data)
+            stellar_param_data = np.array(stellar_param_data)
+            mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
+            ep_data = ep_data[mask]
+            stellar_param_data = stellar_param_data[mask]
+        plt.scatter(ep_data, stellar_param_data)
+        plt.xlabel(corresponding_labels[stellar_parameter])
         if element == "Fe":
             plt.ylabel("[Fe/H]")
         else:
@@ -707,5 +747,5 @@ class Star:
 
 
 if __name__ == '__main__':
-    test_star = Star("KPNO_FTS_flux_2960_13000_Kurucz1984.txt", ["../output_files/watlas_y_lte_grev_loggf_vmac3"], "../input_files/linelists/")
-    test_star.plot_stellar_abundance_vs_ep("Y")
+    test_star = Star("KPNO_FTS_flux_2960_13000_Kurucz1984.txt", ["../output_files/watlas_y_lte_grev_loggf_vmac3"], "../input_files/linelists/linelist_for_fitting/")
+    test_star.plot_stellar_parameters_vs_abundance("ew", "Y", abund_limits=(-3, 3))
