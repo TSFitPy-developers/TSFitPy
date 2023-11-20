@@ -391,10 +391,10 @@ class TSFitPyConfig:
         self.time_limit_hours = 71
         self.slurm_partition = "debug"
 
-    def load_config(self):
+    def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
-            self.load_new_config(check_valid_path=False)
+            self.load_new_config(check_valid_path=check_valid_path)
         else:
             self.load_old_config()
 
