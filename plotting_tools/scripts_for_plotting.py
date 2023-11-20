@@ -18,6 +18,19 @@ from scripts.TSFitPy import (output_default_configuration_name, output_default_f
 from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 
+periodic_table = ["H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne", "Na",
+                  "Mg", "Al", "Si", "P", "S", "Cl", "Ar", "K", "Ca", "Sc",
+                  "Ti", "V", "Cr", "Mn", "Fe", "Co", "Ni", "Cu", "Zn", "Ga",
+                  "Ge", "As", "Se", "Br", "Kr", "Rb", "Sr", "Y", "Zr", "Nb",
+                  "Mo", "Tc", "Ru", "Rh", "Pd", "Ag", "Cd", "In", "Sn", "Sb",
+                  "Te", "I", "Xe", "Cs", "Ba", "La", "Ce", "Pr", "Nd", "Pm",
+                  "Sm", "Eu", "Gd", "Tb", "Dy", "Ho", "Er", "Tm", "Yb", "Lu",
+                  "Hf", "Ta", "W", "Re", "Os", "Ir", "Pt", "Au", "Hg", "Tl",
+                  "Pb", "Bi", "Po", "At", "Rn", "Fr", "Ra", "Ac", "Th", "Pa",
+                  "U", "Np", "Pu", "Am", "Cm", "Bk", "Cf", "Es", "Fm", "Md",
+                  "No", "Lr", "Rf", "Db", "Sg", "Bh", "Hs", "Mt", "Ds", "Rg",
+                  "Cn", "Nh", "Fl", "Mc", "Lv", "Ts", "Og"]
+
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
     """
@@ -670,8 +683,6 @@ class Star:
                 line_abund = df[f"{fitted_element}_Fe"].values
             self.elemental_data["abund"][fitted_element] = line_abund
 
-        print(self.elemental_data)
-
     def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
         element_data = self.parsed_linelist[element]
         result = []
@@ -702,12 +713,31 @@ class Star:
 
         return result
 
-    def plot_stellar_parameters_vs_abundance(self, stellar_parameter, element, abund_limits=None):
-        if stellar_parameter not in ["wavelength", "ew", "loggf"]:
-            raise ValueError(f"stellar_parameter must be either 'wavelength', 'ep' or 'loggf', not {stellar_parameter}")
-        corresponding_labels = {"wavelength": "Wavelength [Å]", "ew": "Equivalent width", "loggf": "log(gf)"}
+    def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None):
+        allowed_params = ["wavelength", "ew"]
+        if fit_parameter not in allowed_params:
+            raise ValueError(f"Fit parameter must be {allowed_params}, not {fit_parameter}")
+        corresponding_labels = {"wavelength": "Wavelength [Å]", "ew": "Equivalent width"}
+        x_data = self.elemental_data[fit_parameter][element]
+        y_data = self.elemental_data["abund"][element]
+        # if abund_limits is not None, then remove the lines that are outside the limits
+        if abund_limits is not None:
+            x_data = np.array(x_data)
+            y_data = np.array(y_data)
+            mask = (y_data >= abund_limits[0]) & (y_data <= abund_limits[1])
+            x_data = x_data[mask]
+            y_data = y_data[mask]
+        plt.scatter(x_data, y_data)
+        plt.xlabel(corresponding_labels[fit_parameter])
+        if element == "Fe":
+            plt.ylabel("[Fe/H]")
+        else:
+            plt.ylabel(f"[{element}/Fe]")
+        plt.show()
+
+    def plot_ep_vs_abundance(self, element, abund_limits=None):
         ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
-        stellar_param_data = self.elemental_data[stellar_parameter][element]
+        stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
         if abund_limits is not None:
             ep_data = np.array(ep_data)
@@ -716,19 +746,16 @@ class Star:
             ep_data = ep_data[mask]
             stellar_param_data = stellar_param_data[mask]
         plt.scatter(ep_data, stellar_param_data)
-        plt.xlabel(corresponding_labels[stellar_parameter])
+        plt.xlabel("EP")
         if element == "Fe":
             plt.ylabel("[Fe/H]")
         else:
             plt.ylabel(f"[{element}/Fe]")
         plt.show()
 
-    def plot_stellar_parameters_vs_abundance(self, stellar_parameter, element, abund_limits=None):
-        if stellar_parameter not in ["wavelength", "ew", "loggf"]:
-            raise ValueError(f"stellar_parameter must be either 'wavelength', 'ep' or 'loggf', not {stellar_parameter}")
-        corresponding_labels = {"wavelength": "Wavelength [Å]", "ew": "Equivalent width", "loggf": "log(gf)"}
-        ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
-        stellar_param_data = self.elemental_data[stellar_parameter][element]
+    def plot_loggf_vs_abundance(self, element, abund_limits=None):
+        ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "loggf")
+        stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
         if abund_limits is not None:
             ep_data = np.array(ep_data)
@@ -737,15 +764,76 @@ class Star:
             ep_data = ep_data[mask]
             stellar_param_data = stellar_param_data[mask]
         plt.scatter(ep_data, stellar_param_data)
-        plt.xlabel(corresponding_labels[stellar_parameter])
+        plt.xlabel("log(gf)")
         if element == "Fe":
             plt.ylabel("[Fe/H]")
         else:
             plt.ylabel(f"[{element}/Fe]")
         plt.show()
 
+    def plot_abundance_plot(self, abund_limits, fontsize=16):
+        # plots all abundances as a function of atomic number
+        # get all elements
+        elements = self.elemental_data["abund"].keys()
+        # get atomic numbers
+        atomic_numbers = []
+        # use periodic table to get atomic numbers
+        for element in elements:
+            atomic_numbers.append(periodic_table.index(element) + 1)
 
+        # get abundances
+        abundances = []
+        for element in elements:
+            abundance_element = self.elemental_data["abund"][element]
+            if len(abundance_element) > 1:
+                # if abund_limits is not None, then remove the lines that are outside the limits
+                if abund_limits is not None:
+                    abundance_element = np.array(abundance_element)
+                    mask = (abundance_element >= abund_limits[0]) & (abundance_element <= abund_limits[1])
+                    abundance_element = abundance_element[mask]
+                abundance_element = np.mean(abundance_element)
+            else:
+                abundance_element = abundance_element[0]
+            # check that abundance_element is not nan
+            if np.isnan(abundance_element):
+                abundance_element = None
+            abundances.append(abundance_element)
+        # plot
+        plt.scatter(atomic_numbers, abundances, color='black', zorder=3)
+        for i, element in enumerate(elements):
+            # every second element has y offset of 0.1
+            label_y_def = max(abundances) + 0.4
+            if i % 2 == 0:
+                label_y = label_y_def + 0.1
+            else:
+                label_y = label_y_def - 0.1
+            plt.text(atomic_numbers[i], label_y, element, horizontalalignment='center',
+                     verticalalignment='center', color='black', fontsize=fontsize)
+        plt.ylabel('[X/Fe]', fontsize=fontsize)
+        plt.xlabel('Atomic Number (Z)', fontsize=fontsize)
+        plt.title(f'Chemical Abundance {self.name}', fontsize=fontsize)
+        atomic_numbers = [0, 63]
+        # grid should repeat every 2 x-values, but x-ticks themselves should be every 10 x-values
+        plt.xticks(ticks=np.arange(min(atomic_numbers), max(atomic_numbers) + 1, 10))  # Set x-ticks every 10
+        plt.grid(which='major', linestyle='-', linewidth=0.5)  # Major grid lines
+        plt.grid(which='minor', axis='x', linestyle=':', linewidth=0.5)  # Minor grid lines
+        plt.minorticks_on()  # Turn on the minor ticks
+        ax = plt.gca()  # Get the current Axes instance
+        ax.set_xticks(np.arange(min(atomic_numbers), max(atomic_numbers) + 1, 2),
+                      minor=True)  # Set minor x-ticks every 2
+        plt.axhline(0, color='black', linewidth=0.5, zorder=1)
+        # change font size of ticks
+        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+        plt.tight_layout()
+        # plot y=0 line
+        plt.axhline(0, color='black', linewidth=2.0, zorder=1)
+        plt.ylim(min(abundances) - 0.4, max(abundances) + 0.6)
+
+        plt.show()
 
 if __name__ == '__main__':
     test_star = Star("KPNO_FTS_flux_2960_13000_Kurucz1984.txt", ["../output_files/watlas_y_lte_grev_loggf_vmac3"], "../input_files/linelists/linelist_for_fitting/")
-    test_star.plot_stellar_parameters_vs_abundance("ew", "Y", abund_limits=(-3, 3))
+    test_star.plot_fit_parameters_vs_abundance("ew", "Y", abund_limits=(-3, 3))
+    test_star.plot_ep_vs_abundance("Y", abund_limits=(-3, 3))
+    test_star.plot_loggf_vs_abundance("Y", abund_limits=(-3, 3))
+    test_star.plot_abundance_plot(abund_limits=(-3, 3))
