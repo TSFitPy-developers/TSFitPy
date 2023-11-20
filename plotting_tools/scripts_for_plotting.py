@@ -740,23 +740,26 @@ class Star:
         ep_data, ionisation_stages = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
         stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
+        ionisation_stages = np.array(ionisation_stages)
         if abund_limits is not None:
             ep_data = np.array(ep_data)
             stellar_param_data = np.array(stellar_param_data)
             mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
             ep_data = ep_data[mask]
             stellar_param_data = stellar_param_data[mask]
+            ionisation_stages = ionisation_stages[mask]
         # find those with ionisation stage 1
-        ionisation_stages = np.array(ionisation_stages)
         mask = ionisation_stages == "I"
-        ep_data_neutral = ep_data[mask]
-        stellar_param_data_neutral = stellar_param_data[mask]
+        if np.sum(mask) != 0:
+            ep_data_neutral = ep_data[mask]
+            stellar_param_data_neutral = stellar_param_data[mask]
+            plt.scatter(ep_data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
         # find those with any other ionisation stage
         mask = ionisation_stages != "I"
-        ep_data_other = ep_data[mask]
-        stellar_param_data_other = stellar_param_data[mask]
-        plt.scatter(ep_data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
-        plt.scatter(ep_data_other, stellar_param_data_other, label="Other", color='red')
+        if np.sum(mask) != 0:
+            ep_data_other = ep_data[mask]
+            stellar_param_data_other = stellar_param_data[mask]
+            plt.scatter(ep_data_other, stellar_param_data_other, label="Other", color='red')
         plt.xlabel("EP")
         if element == "Fe":
             plt.ylabel("[Fe/H]")
@@ -770,23 +773,26 @@ class Star:
         loggf_data, ionisation_stages = self.get_line_data(element, self.elemental_data["wavelength"][element], "loggf")
         stellar_param_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
+        ionisation_stages = np.array(ionisation_stages)
         if abund_limits is not None:
             loggf_data = np.array(loggf_data)
             stellar_param_data = np.array(stellar_param_data)
             mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
             loggf_data = loggf_data[mask]
             stellar_param_data = stellar_param_data[mask]
+            ionisation_stages = ionisation_stages[mask]
         # find those with ionisation stage 1
-        ionisation_stages = np.array(ionisation_stages)
         mask = ionisation_stages == "I"
-        ep_data_neutral = loggf_data[mask]
-        stellar_param_data_neutral = stellar_param_data[mask]
+        if np.sum(mask) != 0:
+            ep_data_neutral = loggf_data[mask]
+            stellar_param_data_neutral = stellar_param_data[mask]
+            plt.scatter(ep_data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
         # find those with any other ionisation stage
         mask = ionisation_stages != "I"
-        ep_data_other = loggf_data[mask]
-        stellar_param_data_other = stellar_param_data[mask]
-        plt.scatter(ep_data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
-        plt.scatter(ep_data_other, stellar_param_data_other, label="Other", color='red')
+        if np.sum(mask) != 0:
+            loggf_data_other = loggf_data[mask]
+            stellar_param_data_other = stellar_param_data[mask]
+            plt.scatter(loggf_data_other, stellar_param_data_other, label="Other", color='red')
         plt.xlabel("log(gf)")
         if element == "Fe":
             plt.ylabel("[Fe/H]")
