@@ -549,10 +549,14 @@ def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=Non
 class Star:
     # this class will load abundances from several different files and load them into a class for later use
     # it will also load linelist such that we get atomic information about different lines
-    def __init__(self, name, input_folders: list, linelist_folder, linelist_filename):
+    def __init__(self, name, input_folders: list, linelist_folder):
         self.name = name
         self.linelist_folder = linelist_folder
-        self.linelist_filename = linelist_filename
+        # get names of all files in the linelist folder
+        self.linelist_filenames = get_all_file_names_in_a_folder(linelist_folder)
+        # add the path to the filenames
+        for i in range(len(self.linelist_filenames)):
+            self.linelist_filenames[i] = os.path.join(linelist_folder, self.linelist_filenames[i])
 
         molecules_flag = False
 
@@ -640,34 +644,47 @@ class Star:
 
             return data_new
 
-        def get_line_data(linelist, element, wavelength, column, ionisation_stage=None):
-            element_data = linelist[element]
-            if element_data is not None:
-                line = element_data[element_data['wavelength'] == wavelength]
-                if not line.empty:
-                    return_values = line[column]
-                    if ionisation_stage is not None:
-                        return_values = return_values[line['ionisation_stage'] == ionisation_stage]
-                    return return_values.values
-            return None
-
         # Usage
-        linelist = read_linelist(['../input_files/linelists/nlte_ges_linelist_jmg17feb2022_I_II_eu'])
-        line_data = get_line_data(linelist, 'Li', 6707.921, 'wavelength')
+        self.parsed_linelist = read_linelist(self.linelist_filenames)
+        line_data = self.get_line_data('Li', 6707.921, 'wavelength')
         print(line_data)
 
         # load each element using dataframe:
-        #self.elements = {}
-        #for input_folder in input_folders:
-        #    config_dict = load_output_data(input_folder)
-        #    fitted_element = config_dict["fitted_element"]
-        #    # find the name of the star in df and only use that one
-        #    df = config_dict["output_file_df"]
-        #    mask = df["specname"] == name
-        #    df = df[mask]
-        #    # get the line wavelength
-        #    line_wavelengths = df["wave_center"].values
+        self.elemental_data_wavelengths = {}
+        for input_folder in input_folders:
+            config_dict = load_output_data(input_folder)
+            fitted_element = config_dict["fitted_element"]
+            # find the name of the star in df and only use that one
+            df = config_dict["output_file_df"]
+            mask = df["specname"] == name
+            df = df[mask]
+            # get the line wavelength
+            line_wavelengths = df["wave_center"].values
+            self.elemental_data_wavelengths[fitted_element] = line_wavelengths
+
+
+    def get_line_data(self, element, wavelength, column, ionisation_stage=None, tolerance=0.1):
+        element_data = self.parsed_linelist[element]
+
+        # Calculate the absolute difference between each wavelength and the provided wavelength
+        differences = np.abs(element_data['wavelength'] - wavelength)
+
+        # Find the index of the smallest difference that is within the tolerance
+        idx_min_difference = differences[differences <= tolerance].idxmin()
+
+        # If a matching row was found
+        if not np.isnan(idx_min_difference):
+            line = element_data.loc[idx_min_difference]
+            if ionisation_stage is not None and line['ionisation_stage'] != ionisation_stage:
+                return None
+            return line[column]
+        else:
+            return None
+
+    def plot_stellar_abundance_vs_ep(self, element):
+        self.get_line_data(element, self.elemental_data_wavelengths[element], "ep")
+
 
 
 if __name__ == '__main__':
-    Star("test", ["../output_files/"], "../input_files/linelists/", "nlte_ges_linelist_jmg17feb2022_I_II_eu")
+    Star("test", ["../output_files/"], "../input_files/linelists/")
