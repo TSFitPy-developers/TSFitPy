@@ -650,7 +650,7 @@ class Star:
         print(line_data)
 
         # load each element using dataframe:
-        self.elemental_data_wavelengths = {}
+        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}}
         for input_folder in input_folders:
             config_dict = load_output_data(input_folder)
             fitted_element = config_dict["fitted_element"]
@@ -660,7 +660,18 @@ class Star:
             df = df[mask]
             # get the line wavelength
             line_wavelengths = df["wave_center"].values
-            self.elemental_data_wavelengths[fitted_element] = line_wavelengths
+            self.elemental_data["wavelength"][fitted_element] = line_wavelengths
+            # get the line equivalent width
+            line_ew = df["ew"].values
+            self.elemental_data["ew"][fitted_element] = line_ew
+            # get the line abundance
+            if fitted_element == "Fe":
+                line_abund = df["Fe_H"].values
+            else:
+                line_abund = df[f"{fitted_element}_Fe"].values
+            self.elemental_data["abund"][fitted_element] = line_abund
+
+        print(self.elemental_data)
 
 
     def get_line_data(self, element, wavelength, column, ionisation_stage=None, tolerance=0.1):
@@ -675,16 +686,26 @@ class Star:
         # If a matching row was found
         if not np.isnan(idx_min_difference):
             line = element_data.loc[idx_min_difference]
-            if ionisation_stage is not None and line['ionisation_stage'] != ionisation_stage:
-                return None
+            if ionisation_stage is not None:
+                # choose the ionisation stage
+                line = line[line['ionisation_stage'] == ionisation_stage]
             return line[column]
         else:
             return None
 
     def plot_stellar_abundance_vs_ep(self, element):
-        self.get_line_data(element, self.elemental_data_wavelengths[element], "ep")
+        ep_data = self.get_line_data(element, self.elemental_data["wavelength"][element], "ep")
+        abund_data = self.elemental_data["abund"][element]
+        plt.scatter(ep_data, abund_data)
+        plt.xlabel("EP")
+        if element == "Fe":
+            plt.ylabel("[Fe/H]")
+        else:
+            plt.ylabel(f"[{element}/Fe]")
+        plt.show()
 
 
 
 if __name__ == '__main__':
-    Star("test", ["../output_files/"], "../input_files/linelists/")
+    test_star = Star("KPNO_FTS_flux_2960_13000_Kurucz1984.txt", ["../output_files/watlas_y_lte_grev_loggf_vmac3"], "../input_files/linelists/")
+    test_star.plot_stellar_abundance_vs_ep("Y")
