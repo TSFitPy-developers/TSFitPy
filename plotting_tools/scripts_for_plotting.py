@@ -63,7 +63,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     tsfitpy_config.load_config()
     tsfitpy_config.validate_input(check_valid_path=False)
 
-    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic']:
+    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic', 'logg']:
         raise ValueError("Non-lbl fitting methods are not supported yet")
 
     output_elem_column = f"Fe_H"
@@ -126,6 +126,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
     config_dict["output_folder_location"] = output_folder_location
     config_dict["output_file_df"] = output_file_df
+    config_dict["fitted_element"] = tsfitpy_config.elements_to_fit[0]
 
     return config_dict
 
@@ -543,3 +544,130 @@ def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=Non
         plot_synthetic_spectra_from_grid(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
     plt.show()
     plt.close()
+
+
+class Star:
+    # this class will load abundances from several different files and load them into a class for later use
+    # it will also load linelist such that we get atomic information about different lines
+    def __init__(self, name, input_folders: list, linelist_folder, linelist_filename):
+        self.name = name
+        self.linelist_folder = linelist_folder
+        self.linelist_filename = linelist_filename
+
+        molecules_flag = False
+
+        def read_linelist(filenames):
+            data = {}
+            for filename in filenames:
+                with open(filename) as fp:
+                    # so that we dont read full file if we are not sure that we use it (if it is a molecule)
+                    first_line: str = fp.readline()
+
+                    fields = first_line.strip().split()
+                    sep = '.'
+                    element = fields[0] + fields[1]
+                    elements = element.split(sep, 1)[0]
+                    # opens each file, reads first row, if it is long enough then it is molecule. If fitting molecules, then
+                    # keep it, otherwise ignore molecules
+
+                    if len(elements) > 3 and molecules_flag or len(elements) <= 3:
+                        # now read the whole file
+                        lines_file: list[str] = fp.readlines()
+                        # append the first line to the lines_file
+                        lines_file.insert(0, first_line)
+                        line_number_read_for_element: int = 0
+                        line_number_read_file: int = 0
+                        total_lines_in_file: int = len(lines_file)
+                        while line_number_read_file < total_lines_in_file:  # go through all line
+                            line: str = lines_file[line_number_read_file]
+                            fields: list[str] = line.strip().split()
+
+                            element_name = f"{fields[0]}{fields[1]}"
+
+                            if element_name == "'01.000000'":  # find out whether it is hydrogen
+                                hydrogen_element: bool = True
+                            else:
+                                hydrogen_element: bool = False
+                            if len(fields[0]) > 1:  # save the first two lines of an element for the future
+                                number_of_lines_element: int = int(fields[3])
+                            else:
+                                number_of_lines_element: int = int(fields[4])
+                            line_number_read_file += 1
+                            line: str = lines_file[line_number_read_file]
+                            elem_line_2_to_save: str = f"{line.strip()}"  # second line of the element
+                            element_name_string = elem_line_2_to_save.split()[0].replace("'", "")
+                            ionisation_stage = elem_line_2_to_save.split()[1].replace("'", "")
+
+                            element_name_string = f"{element_name_string}_{ionisation_stage}"
+
+                            if element_name_string not in data:
+                                data[element_name_string] = []
+
+                            # now we are reading the element's wavelength and stuff
+                            line_number_read_file += 1
+                            # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
+                            while line_number_read_for_element < number_of_lines_element:
+                                line_stripped: str = lines_file[
+                                    line_number_read_for_element + line_number_read_file].strip()
+                                data[element_name_string].append(line_stripped.split())
+                                line_number_read_for_element += 1
+
+                            line_number_read_file: int = number_of_lines_element + line_number_read_file
+                            line_number_read_for_element = 0
+
+            # Convert lists to DataFrames
+            data_new = {}
+            for key in data:
+                data[key] = [item[:3] for item in data[key]]
+                #print([item[:3] for item in data[key]])
+
+                # Split the element and ionisation stage
+                element, ionisation_stage = key.split("_")
+
+                # Create a new DataFrame from the existing data using float
+                df = pd.DataFrame(data[key], columns=['wavelength', 'ep', 'loggf']).astype(float)
+
+                # Add a new column for the ionisation stage, setting it to the current ionisation stage for all rows
+                df['ionisation_stage'] = ionisation_stage
+
+                # If the element is not in the dictionary, add it
+                if element not in data_new:
+                    data_new[element] = df
+                else:
+                    # append to the existing DataFrame using concat
+                    data_new[element] = pd.concat([data_new[element], df])
+
+
+            return data_new
+
+        def get_line_data(linelist, element, wavelength, column, ionisation_stage=None):
+            element_data = linelist[element]
+            if element_data is not None:
+                line = element_data[element_data['wavelength'] == wavelength]
+                if not line.empty:
+                    return_values = line[column]
+                    if ionisation_stage is not None:
+                        return_values = return_values[line['ionisation_stage'] == ionisation_stage]
+                    return return_values.values
+            return None
+
+        # Usage
+        linelist = read_linelist(['../input_files/linelists/nlte_ges_linelist_jmg17feb2022_I_II_eu'])
+        line_data = get_line_data(linelist, 'Li', 6707.921, 'wavelength')
+        print(line_data)
+
+        # load each element using dataframe:
+        #self.elements = {}
+        #for input_folder in input_folders:
+        #    config_dict = load_output_data(input_folder)
+        #    fitted_element = config_dict["fitted_element"]
+        #    # find the name of the star in df and only use that one
+        #    df = config_dict["output_file_df"]
+        #    mask = df["specname"] == name
+        #    df = df[mask]
+        #    # get the line wavelength
+        #    line_wavelengths = df["wave_center"].values
+
+
+if __name__ == '__main__':
+    Star("test", ["../output_files/"], "../input_files/linelists/", "nlte_ges_linelist_jmg17feb2022_I_II_eu")
