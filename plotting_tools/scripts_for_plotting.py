@@ -878,10 +878,6 @@ class Star:
             else:
                 abundances_element = None
                 stdev_abundance_element = None
-            # check that abundances_element is not nan
-            if np.isnan(abundances_element):
-                abundances_element = None
-                stdev_abundance_element = None
             average_abundances[f"{element}_mean"] = abundances_element
             stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
 
