@@ -652,7 +652,7 @@ class Star:
         self.parsed_linelist = read_linelist(self.linelist_filenames)
 
         # load each element using dataframe:
-        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}}
+        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}, "chisqr": {}, "rv": {}, "vmic": {}, "vmac": {}, "rotation": {}}
         for input_folder in input_folders:
             config_dict = load_output_data(input_folder)
             fitted_element = config_dict["fitted_element"]
@@ -672,6 +672,21 @@ class Star:
             else:
                 line_abund = df[f"{fitted_element}_Fe"].values
             self.elemental_data["abund"][fitted_element] = line_abund
+            # get the line chi squared
+            line_chisqr = df["chi_squared"].values
+            self.elemental_data["chisqr"][fitted_element] = line_chisqr
+            # get the line rv
+            line_rv = df["Doppler_Shift_add_to_RV"].values
+            self.elemental_data["rv"][fitted_element] = line_rv
+            # get the line microturbulence
+            line_microturbulence = df["Microturb"].values
+            self.elemental_data["vmic"][fitted_element] = line_microturbulence
+            # get the line macroturbulence
+            line_macroturbulence = df["Macroturb"].values
+            self.elemental_data["vmac"][fitted_element] = line_macroturbulence
+            # get the line rotation
+            line_rotation = df["rotation"].values
+            self.elemental_data["rotation"][fitted_element] = line_rotation
 
     def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
         element_data = self.parsed_linelist[element]
@@ -831,7 +846,7 @@ class Star:
 
         plt.show()
 
-    def get_average_abundances(self):
+    def get_average_abundances(self, ew_limits=None, chi_sqr_limits=None):
         # gets average abundances by element
         # get all elements
         elements = self.elemental_data["abund"].keys()
@@ -839,18 +854,32 @@ class Star:
         average_abundances = {}
         stdev_abundances = {}
         for element in elements:
-            abundance_element = self.elemental_data["abund"][element]
-            if len(abundance_element) > 1:
-                abundance_element = np.mean(abundance_element)
-                stdev_abundance_element = np.std(abundance_element)
+            abundances_element = self.elemental_data["abund"][element]
+            ews_element = self.elemental_data["ew"][element]
+            chi_sqrs_element = self.elemental_data["chisqr"][element]
+            abundances_element = np.array(abundances_element)
+            ews_element = np.array(ews_element)
+            chi_sqrs_element = np.array(chi_sqrs_element)
+            # if ew_limits is not None, then remove the lines that are outside the limits
+            if ew_limits is not None:
+                mask = (ews_element >= ew_limits[0]) & (ews_element <= ew_limits[1])
+                abundances_element = abundances_element[mask]
+                chi_sqrs_element = chi_sqrs_element[mask]
+            # if chi_sqr_limits is not None, then remove the lines that are outside the limits
+            if chi_sqr_limits is not None:
+                mask = (chi_sqrs_element >= chi_sqr_limits[0]) & (chi_sqrs_element <= chi_sqr_limits[1])
+                abundances_element = abundances_element[mask]
+            if len(abundances_element) > 1:
+                abundances_element = np.mean(abundances_element)
+                stdev_abundance_element = np.std(abundances_element)
             else:
-                abundance_element = abundance_element[0]
+                abundances_element = abundances_element[0]
                 stdev_abundance_element = 0
-            # check that abundance_element is not nan
-            if np.isnan(abundance_element):
-                abundance_element = None
+            # check that abundances_element is not nan
+            if np.isnan(abundances_element):
+                abundances_element = None
                 stdev_abundance_element = None
-            average_abundances[f"{element}_mean"] = abundance_element
+            average_abundances[f"{element}_mean"] = abundances_element
             stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
 
         # Create an ordered dictionary
@@ -873,7 +902,7 @@ class Star:
         return df
 
 
-def get_average_abundance_all_stars(input_folders, linelist_path):
+def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None, chi_sqr_limits=None):
     config_dict = load_output_data(input_folders[0])
     # get all spectra names from the first folder
     spectra_names = config_dict["output_file_df"]["specname"].unique()
@@ -882,15 +911,18 @@ def get_average_abundance_all_stars(input_folders, linelist_path):
     for spectra_name in spectra_names:
         stars.append(Star(spectra_name, input_folders, linelist_path))
     # get all abundances for different spectra and combine into one dataframe
-    df = pd.concat([star.get_average_abundances() for star in stars], axis=1)
+    df = pd.concat([star.get_average_abundances(ew_limits=ew_limits, chi_sqr_limits=chi_sqr_limits) for star in stars], axis=0)
     return df
 
 
 
 if __name__ == '__main__':
-    test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
+    #test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
     #test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
     #test_star.plot_ep_vs_abundance("Fe")
     #test_star.plot_loggf_vs_abundance("Fe", abund_limits=(-3, 3))
     #test_star.plot_abundance_plot(abund_limits=(-3, 3))
-    print(test_star.get_average_abundances())
+    #print(test_star.get_average_abundances())
+
+    test = get_average_abundance_all_stars(["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/", "../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
+    print(test)
