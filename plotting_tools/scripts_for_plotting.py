@@ -872,9 +872,12 @@ class Star:
             if len(abundances_element) > 1:
                 abundances_element = np.mean(abundances_element)
                 stdev_abundance_element = np.std(abundances_element)
-            else:
+            elif len(abundances_element) == 1:
                 abundances_element = abundances_element[0]
                 stdev_abundance_element = 0
+            else:
+                abundances_element = None
+                stdev_abundance_element = None
             # check that abundances_element is not nan
             if np.isnan(abundances_element):
                 abundances_element = None
