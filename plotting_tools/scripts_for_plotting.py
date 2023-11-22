@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import shutil
+from collections import OrderedDict
 from configparser import ConfigParser
 import numpy as np
 import os
@@ -852,8 +853,23 @@ class Star:
             average_abundances[f"{element}_mean"] = abundance_element
             stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
 
-        # create dataframe from the dictionaries with both mean and stdev. it should be one long row, where each column name is the element with _mean or _stdev
-        df = pd.DataFrame([average_abundances, stdev_abundances])
+        # Create an ordered dictionary
+        ordered_dict = OrderedDict()
+
+        # Iterate over elements in average_abundances
+        for element in average_abundances:
+            # Add mean and stdev for each element to the ordered dictionary
+            ordered_dict[element] = average_abundances[element]
+            # Get the element name without '_mean'
+            element_name = element.replace("_mean", "")
+            ordered_dict[element_name + "_stdev"] = stdev_abundances[element_name + "_stdev"]
+
+        # Create a DataFrame from the ordered dictionary
+        df = pd.DataFrame([ordered_dict])
+
+        # add first column as specname usign self.name
+        df.insert(0, "specname", self.name)
+
         return df
 
 
@@ -873,7 +889,8 @@ def get_average_abundance_all_stars(input_folders, linelist_path):
 
 if __name__ == '__main__':
     test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
-    test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
-    test_star.plot_ep_vs_abundance("Fe")
-    test_star.plot_loggf_vs_abundance("Fe", abund_limits=(-3, 3))
-    test_star.plot_abundance_plot(abund_limits=(-3, 3))
+    #test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
+    #test_star.plot_ep_vs_abundance("Fe")
+    #test_star.plot_loggf_vs_abundance("Fe", abund_limits=(-3, 3))
+    #test_star.plot_abundance_plot(abund_limits=(-3, 3))
+    print(test_star.get_average_abundances())
