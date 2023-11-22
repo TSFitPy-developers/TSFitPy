@@ -858,6 +858,20 @@ class Star:
         return df
 
 
+def get_average_abundance_all_stars(input_folders, linelist_path):
+    config_dict = load_output_data(input_folders[0])
+    # get all spectra names from the first folder
+    spectra_names = config_dict["output_file_df"]["specname"].unique()
+    # create Star objects for each spectra name and add them to a list
+    stars = []
+    for spectra_name in spectra_names:
+        stars.append(Star(spectra_name, input_folders, linelist_path))
+    # get all abundances for different spectra and combine into one dataframe
+    df = pd.concat([star.get_average_abundances() for star in stars], axis=1)
+    return df
+
+
+
 if __name__ == '__main__':
     test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
     test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
