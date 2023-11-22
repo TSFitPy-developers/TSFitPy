@@ -849,12 +849,11 @@ class Star:
             if np.isnan(abundance_element):
                 abundance_element = None
                 stdev_abundance_element = None
-            average_abundances[element] = abundance_element
-            stdev_abundances[element] = stdev_abundance_element
+            average_abundances[f"{element}_mean"] = abundance_element
+            stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
 
-        # create dataframe from the dictionaries with both mean and stdev
-        df = pd.DataFrame.from_dict(average_abundances, orient='index', columns=["mean"])
-        df["stdev"] = stdev_abundances.values()
+        # create dataframe from the dictionaries with both mean and stdev. it should be one long row, where each column name is the element with _mean or _stdev
+        df = pd.DataFrame([average_abundances, stdev_abundances])
         return df
 
 
