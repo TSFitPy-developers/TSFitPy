@@ -830,6 +830,34 @@ class Star:
 
         plt.show()
 
+    def get_average_abundances(self):
+        # gets average abundances by element
+        # get all elements
+        elements = self.elemental_data["abund"].keys()
+        # get average abundances
+        average_abundances = {}
+        stdev_abundances = {}
+        for element in elements:
+            abundance_element = self.elemental_data["abund"][element]
+            if len(abundance_element) > 1:
+                abundance_element = np.mean(abundance_element)
+                stdev_abundance_element = np.std(abundance_element)
+            else:
+                abundance_element = abundance_element[0]
+                stdev_abundance_element = 0
+            # check that abundance_element is not nan
+            if np.isnan(abundance_element):
+                abundance_element = None
+                stdev_abundance_element = None
+            average_abundances[element] = abundance_element
+            stdev_abundances[element] = stdev_abundance_element
+
+        # create dataframe from the dictionaries with both mean and stdev
+        df = pd.DataFrame.from_dict(average_abundances, orient='index', columns=["mean"])
+        df["stdev"] = stdev_abundances.values()
+        return df
+
+
 if __name__ == '__main__':
     test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
     test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
