@@ -204,19 +204,19 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
 
             # other fitted values
             fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
-            column_names = output_file_df.columns.values
-            if "_Fe" in column_names[6]:
-                abund_column_name = column_names[6]
+            fitted_element = config_dict['fitted_element']
+            if fitted_element != "Fe":
+                abund_column_name = f"[{fitted_element}/Fe]"
+                column_name = f"{fitted_element}_Fe"
             else:
-                abund_column_name = column_names[5]
-            fitted_abund = output_file_df[df_correct_specname_indices][abund_column_name].values[output_result_index_to_plot]
+                abund_column_name = "[Fe/H]"
+                column_name = "Fe_H"
+            fitted_abund = output_file_df[df_correct_specname_indices][column_name].values[output_result_index_to_plot]
             fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
 
             # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
             doppler = fitted_rv + rv
             wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
-
-            abund_column_name = f"[{abund_column_name.replace('_', '/')}]"
 
             if plot_title:
                 plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")

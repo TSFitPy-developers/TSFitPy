@@ -1383,15 +1383,16 @@ class Spectra:
             "wave_start": self.line_begins_sorted[line_number],
             "wave_end": self.line_ends_sorted[line_number],
             "Doppler_Shift_add_to_RV": doppler_fit,
-            "Microturb": microturb,
-            "Macroturb": macroturb,
-            "rotation": rotation,
-            "chi_squared": chi_squared
         }
 
         # Add elemental abundances to the dictionary
         for key in elem_abund_dict:
             result_dict[key] = elem_abund_dict[key]
+
+        result_dict["Microturb"] = microturb
+        result_dict["Macroturb"] = macroturb
+        result_dict["rotation"] = rotation
+        result_dict["chi_squared"] = chi_squared
 
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(os.path.join(temp_directory, "spectrum_00000000.spec"),
@@ -1482,15 +1483,16 @@ class Spectra:
             "wave_start": self.line_begins_sorted[line_number],
             "wave_end": self.line_ends_sorted[line_number],
             "Doppler_Shift_add_to_RV": doppler_fit,
-            "Microturb": microturb,
-            "Macroturb": macroturb,
-            "rotation": rotation,
-            "chi_squared": res.fun
         }
 
         # Add elemental abundances to the dictionary
         for key in elem_abund_dict:
             result_dict[key] = elem_abund_dict[key]
+
+        result_dict["Microturb"] = microturb
+        result_dict["Macroturb"] = macroturb
+        result_dict["rotation"] = rotation
+        result_dict["chi_squared"] = res.fun
 
         one_result = result_dict
         try:
