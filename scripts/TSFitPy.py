@@ -8,6 +8,7 @@ from distributed import get_worker
 from scipy.optimize import minimize, root_scalar
 from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
     apply_doppler_correction, create_segment_file
+from scripts.solar_abundances import periodic_table
 from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
 import time
 import os
@@ -23,6 +24,7 @@ from scripts.create_window_linelist_function import create_window_linelist
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 import logging
 from scripts.dask_client import get_dask_client
+import pandas as pd
 
 output_default_configuration_name: str = "configuration.cfg"
 output_default_fitlist_name: str = "fitlist.txt"
@@ -843,7 +845,7 @@ class Spectra:
                          segment_file=self.segment_file, line_mask_file=self.linemask_file)
         ts.run_turbospectrum_and_atmosphere()
 
-    def fit_all(self) -> str:
+    def fit_all(self) -> list:
         """
         Fit all lines at once, trying to minimise chi squared
         :return: Result is a string containing Fitted star name, abundance, RV, chi squared and macroturbulence
@@ -862,14 +864,21 @@ class Spectra:
         # print final result from minimazation
         print(res.x)
 
-        if self.fit_vmac:  # if fitted macroturbulence, return it
-            result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {res.x[2]}"
-        else:  # otherwise return whatever constant macroturbulence was given in the config
-            result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {self.vmac}"
+        if self.fit_feh:
+            output_elem_column = "Fe_H"
+        else:
+            output_elem_column = f"{self.elem_to_fit[0]}_Fe"
 
+        result_dict = {
+            "specname": self.spec_name,
+            output_elem_column: res.x[0],
+            "Doppler_Shift_add_to_RV": res.x[1],
+            "chi_squared": res.fun,
+            "Macroturb": res.x[2] if self.fit_vmac else self.vmac
+        }
         time_end = time.perf_counter()
         print(f"Total runtime was {(time_end - time_start) / 60.:2f} minutes.")
-        return result
+        return [result_dict]
 
     def create_ts_object(self, marcs_models=None):
         if marcs_models is None:
@@ -908,7 +917,7 @@ class Spectra:
             if self.dask_workers != 1:
                 result[line_number] = client.submit(fitting_function, line_number)
                 if find_upper_limit:
-                    _ = client.submit(self.calculate_and_save_upper_limit, result, result_upper_limit, sigmas_upper_limit)
+                    _ = client.submit(self.calculate_and_save_upper_limit, result, result_upper_limit, sigmas_upper_limit, line_number)
                 final_result = client.submit(self.analyse_lbl_fit, result, line_number)
                 result_list.append(final_result)
             else:
@@ -917,7 +926,7 @@ class Spectra:
 
                 result[line_number] = fitting_function(line_number)
                 if find_upper_limit:
-                    self.calculate_and_save_upper_limit(result, result_upper_limit, sigmas_upper_limit)
+                    self.calculate_and_save_upper_limit(result, result_upper_limit, sigmas_upper_limit, line_number)
                 result_list.append(self.analyse_lbl_fit(result, line_number))
 
                 time_end = time.perf_counter()
@@ -925,7 +934,7 @@ class Spectra:
 
         return result_list
 
-    def analyse_lbl_fit(self, result, line_number):
+    def analyse_lbl_fit(self, result: dict, line_number: int) -> dict:
         #result_list = []
         # {"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
 
@@ -981,33 +990,33 @@ class Spectra:
         else:
             equivalent_width = 9999
         #result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
-        return f"{result[line_number]['result']} {equivalent_width * 1000}"
+        result[line_number]["result"]['ew'] = equivalent_width * 1000
+        return result[line_number]
 
-    def calculate_and_save_upper_limit(self, result, result_upper_limit, sigmas_upper_limit):
-        for line_number in range(len(self.line_begins_sorted)):
-            time_start = time.perf_counter()
-            print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
+    def calculate_and_save_upper_limit(self, result, result_upper_limit, sigmas_upper_limit, line_number: int):
+        time_start = time.perf_counter()
+        print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
-            try:
-                result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number,
-                                                                                 result[line_number]["rv"],
-                                                                                 result[line_number]["macroturb"],
-                                                                                 result[line_number]["rotation"],
-                                                                                 result[line_number]["vmic"],
-                                                                                 offset_chisqr=(result[line_number][
-                                                                                                    "chi_sqr"] + np.square(
-                                                                                     sigmas_upper_limit)),
-                                                                                 bound_min_abund=
-                                                                                 result[line_number][
-                                                                                     "fitted_abund"],
-                                                                                 bound_max_abund=
-                                                                                 result[line_number][
-                                                                                     "fitted_abund"] + 7)
-            except ValueError:
-                result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
+        try:
+            result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number,
+                                                                             result[line_number]["rv"],
+                                                                             result[line_number]["macroturb"],
+                                                                             result[line_number]["rotation"],
+                                                                             result[line_number]["vmic"],
+                                                                             offset_chisqr=(result[line_number][
+                                                                                                "chi_sqr"] + np.square(
+                                                                                 sigmas_upper_limit)),
+                                                                             bound_min_abund=
+                                                                             result[line_number][
+                                                                                 "fitted_abund"],
+                                                                             bound_max_abund=
+                                                                             result[line_number][
+                                                                                 "fitted_abund"] + 7)
+        except ValueError:
+            result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
 
-            time_end = time.perf_counter()
-            print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+        time_end = time.perf_counter()
+        print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
 
         # save 5 sigma results
         with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
@@ -1111,10 +1120,21 @@ class Spectra:
         else:
             teff_error = 9999
 
-        result_output = f"{self.spec_name} {teff} {teff_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {chi_squared}"
+        result_dict = {
+            "specname": self.spec_name,
+            "Teff": teff,
+            "Teff_error": teff_error,
+            "wave_center": self.line_centers_sorted[line_number],
+            "wave_start": self.line_begins_sorted[line_number],
+            "wave_end": self.line_ends_sorted[line_number],
+            "Doppler_Shift_add_to_RV": doppler_fit,
+            "Microturb": microturb,
+            "Macroturb": macroturb,
+            "rotation": rotation,
+            "chi_squared": chi_squared
+        }
 
-        one_result = {"result": result_output, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
+        one_result = {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
                       "fit_flux_norm": flux_norm_result, "fit_flux": flux_result, "macroturb": macroturb,
                       "rotation": rotation, "chi_sqr": chi_squared}
 
@@ -1215,10 +1235,26 @@ class Spectra:
         else:
             logg_error = 9999
 
-        result_output = f"{self.spec_name} {logg} {logg_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {chi_squared}"
+        #result_output = f"{self.spec_name} {logg} {logg_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
+        #                f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {chi_squared}"
 
-        one_result = {"result": result_output, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
+        # #specname\tlogg\tlogg_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared\tew
+        # Create a dictionary with column names as keys and corresponding values
+        result_dict = {
+            "specname": self.spec_name,
+            "logg": logg,
+            "logg_error": logg_error,
+            "wave_center": self.line_centers_sorted[line_number],
+            "wave_start": self.line_begins_sorted[line_number],
+            "wave_end": self.line_ends_sorted[line_number],
+            "Doppler_Shift_add_to_RV": doppler_fit,
+            "Microturb": microturb,
+            "Macroturb": macroturb,
+            "rotation": rotation,
+            "chi_squared": chi_squared
+        }
+
+        one_result = {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
                       "fit_flux_norm": flux_norm_result, "fit_flux": flux_result, "macroturb": macroturb,
                       "rotation": rotation, "chi_sqr": chi_squared}
 
@@ -1340,13 +1376,23 @@ class Spectra:
             macroturb = 9999
             rotation = 9999
             chi_squared = 9999
-        result_output = f"{self.spec_name} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit}"
-        for key in elem_abund_dict:
-            result_output += f" {elem_abund_dict[key]}"
+        # Create a dictionary with column names as keys and corresponding values
+        result_dict = {
+            "specname": self.spec_name,
+            "wave_center": self.line_centers_sorted[line_number],
+            "wave_start": self.line_begins_sorted[line_number],
+            "wave_end": self.line_ends_sorted[line_number],
+            "Doppler_Shift_add_to_RV": doppler_fit,
+            "Microturb": microturb,
+            "Macroturb": macroturb,
+            "rotation": rotation,
+            "chi_squared": chi_squared
+        }
 
-        result_output += f" {microturb} {macroturb} {rotation} {chi_squared}"
-        one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+        # Add elemental abundances to the dictionary
+        for key in elem_abund_dict:
+            result_dict[key] = elem_abund_dict[key]
+
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(os.path.join(temp_directory, "spectrum_00000000.spec"),
                                                                     unpack=True)
@@ -1356,7 +1402,7 @@ class Spectra:
             flux_norm_result = np.array([])
             flux_result = np.array([])
         shutil.rmtree(temp_directory)
-        return {"result": one_result, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
+        return {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]]} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
     def find_upper_limit_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_abund=None, bound_max_abund=None) -> dict:
@@ -1429,12 +1475,24 @@ class Spectra:
             rotation = self.rotation_dict[line_number]
         else:
             rotation = self.rotation
-        result_output = f"{self.spec_name} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-                        f"{self.line_ends_sorted[line_number]} {doppler_fit}"
+        # Create a dictionary with column names as keys and corresponding values
+        result_dict = {
+            "specname": self.spec_name,
+            "wave_center": self.line_centers_sorted[line_number],
+            "wave_start": self.line_begins_sorted[line_number],
+            "wave_end": self.line_ends_sorted[line_number],
+            "Doppler_Shift_add_to_RV": doppler_fit,
+            "Microturb": microturb,
+            "Macroturb": macroturb,
+            "rotation": rotation,
+            "chi_squared": res.fun
+        }
+
+        # Add elemental abundances to the dictionary
         for key in elem_abund_dict:
-            result_output += f" {elem_abund_dict[key]}"
-        result_output += f" {microturb} {macroturb} {rotation} {res.fun}"
-        one_result = result_output  # out = open(f"{temp_directory}spectrum_00000000_convolved.spec", 'w')
+            result_dict[key] = elem_abund_dict[key]
+
+        one_result = result_dict
         try:
             wave_result, flux_norm_result, flux_result = np.loadtxt(f"{temp_directory}spectrum_00000000.spec",
                                                                     unpack=True)
@@ -2605,51 +2663,26 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location):
 
     output = os.path.join(tsfitpy_configuration.output_folder_path, tsfitpy_configuration.output_filename)
 
-    f = open(output, 'a')
+    # convert mess above to a pd.DataFrame
+    df_results = pd.DataFrame()
+    for i in range(len(results)):
+        for j in range(len(results[i])):
+            # do concat such that each row has a different index
+            df_results = pd.concat([df_results, pd.DataFrame(results[i][j]['result'], index=[i])], ignore_index=True)
 
-    # result = f"{self.spec_name} {res.x[0]} {res.x[1]} {res.fun} {self.macroturb}"
-    # result.append(f"{self.spec_name} {tsfitpy_configuration.line_centers_sorted[j]} {tsfitpy_configuration.line_begins_sorted[j]} "
-    #                      f"{tsfitpy_configuration.line_ends_sorted[j]} {res.x[0]} {res.x[1]} {microturb} {macroturb} {res.fun}")
+    # reset the index
+    df_results = df_results.reset_index(drop=True)
 
-    if tsfitpy_configuration.fitting_mode == "lbl":
-        output_elem_column = f"Fe_H"
-
-        for i in range(tsfitpy_configuration.nelement):
-            # tsfitpy_configuration.elem_to_fit[i] = element name
-            elem_name = tsfitpy_configuration.elements_to_fit[i]
-            if elem_name != "Fe":
-                output_elem_column += f"\t{elem_name}_Fe"
-    else:
-        if not tsfitpy_configuration.fitting_mode == "teff" or not tsfitpy_configuration.fitting_mode == "logg":
-            if tsfitpy_configuration.fit_feh:
-                output_elem_column = "Fe_H"
+    # go through all columns. if the element is in the periodic table, replace it with element_Fe
+    for column in df_results.columns:
+        if column in periodic_table:
+            if column == 'Fe':
+                df_results.rename(columns={column: f"{column}_H"}, inplace=True)
             else:
-                output_elem_column = f"{tsfitpy_configuration.elements_to_fit[0]}_Fe"
+                df_results.rename(columns={column: f"{column}_Fe"}, inplace=True)
 
-    if tsfitpy_configuration.fitting_mode == "all":
-        print(f"#specname\t{output_elem_column}\tDoppler_Shift_add_to_RV\tchi_squared\tMacroturb", file=f)
-    elif tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "vmic":
-        print(
-            f"#specname\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\t{output_elem_column}\tMicroturb\tMacroturb\trotation\tchi_squared\tew",
-            file=f)
-    elif tsfitpy_configuration.fitting_mode == "teff":
-        output_columns = "#specname\tTeff\tTeff_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared\tew"
-        print(output_columns, file=f)
-    elif tsfitpy_configuration.fitting_mode == "logg":
-        output_columns = "#specname\tlogg\tlogg_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared\tew"
-        print(output_columns, file=f)
-
-    results = np.array(results)
-
-    if np.ndim(results) == 1:
-        for i in range(np.size(results)):
-            print(results[i], file=f)
-    else:
-        for i in range(int(np.size(results) / np.size(results[0]))):
-            for j in range(np.size(results[0])):
-                print(results[i][j], file=f)
-
-    f.close()
+    # save results to csv without index and with tab delimiter
+    df_results.to_csv(output, index=False, sep='\t')
 
     logging.debug("Finished saving results, now removing temporary files")
 
