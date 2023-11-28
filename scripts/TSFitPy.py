@@ -298,7 +298,7 @@ class Spectra:
         self.input_vmac: bool = None
         self.fit_rotation: bool = False
         self.input_rotation: bool = None
-        self.fit_teff: bool = None
+        self.fit_teff: bool = None  # seems like not used anymore atm
         #self.fit_logg: str = None  # does not work atm
         self.nelement: int = None  # how many elements to fit (1 to whatever)
         self.fit_feh: bool = None
@@ -328,9 +328,6 @@ class Spectra:
         self.aux_file_length_dict: dict = None  # loads the length of aux file to not do it everytime later
         self.ndimen: int = None
         self.spec_input_path: str = None
-
-        self.grids_amount: int = 25
-        self.abund_bound: float = 0.2
 
         self.init_guess_dict: dict = None  # initial guess for elements, if given
         self.input_elem_abundance: dict = None  # input elemental abundance for a spectra, not fitted, just used for TS
@@ -582,7 +579,6 @@ class Spectra:
         (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
          self.marcs_models_location, self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
 
-
     def get_all_guess(self):
         """
         Converts init param guess list to the 2D list for the simplex calculation
@@ -618,7 +614,6 @@ class Spectra:
 
 
         return initial_guess[0], initial_guess, minim_bounds
-
 
     def get_elem_micro_guess(self, min_guess_microturb: float, max_guess_microturb: float, min_guess_abundance: float,
                              max_guess_abundance: float, bound_min_abund=None, bound_max_abund=None) -> tuple[np.ndarray, list[tuple]]:
@@ -668,6 +663,7 @@ class Spectra:
         guesses = np.transpose(guesses)
 
         return guesses, bounds
+
     def get_elem_guess(self, min_abundance: float, max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
@@ -703,6 +699,7 @@ class Spectra:
         guesses = np.transpose(guesses)
 
         return guesses, bounds
+
     def get_micro_guess(self, min_microturb: float, max_microturb: float) -> tuple[np.ndarray, list[tuple]]:
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
@@ -930,7 +927,7 @@ class Spectra:
                 result_list.append(self.analyse_lbl_fit(result, line_number))
 
                 time_end = time.perf_counter()
-                print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+                print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
 
         return result_list
 
@@ -1016,7 +1013,7 @@ class Spectra:
             result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
 
         time_end = time.perf_counter()
-        print("Total runtime was {:.2f} minutes.".format((time_end - time_start) / 60.))
+        print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
 
         # save 5 sigma results
         with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
@@ -1194,7 +1191,7 @@ class Spectra:
             rotation = 9999
             chi_squared = 999999
 
-        if logg != 999999:
+        if logg <= 999998:
             try:
                 wave_result, flux_norm_result, flux_result = np.loadtxt(
                     os.path.join(temp_directory, "spectrum_00000000.spec"),
@@ -1211,6 +1208,7 @@ class Spectra:
             flux_result = np.array([])
 
         if self.find_logg_errors and logg != 999999 and not True:
+            # TODO: add ability to fit logg error
             print(f"Fitting {self.logg_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
                 logg_error = np.abs(self.find_logg_error_one_line(line_number, doppler_fit,
@@ -1235,10 +1233,6 @@ class Spectra:
         else:
             logg_error = 9999
 
-        #result_output = f"{self.spec_name} {logg} {logg_error} {self.line_centers_sorted[line_number]} {self.line_begins_sorted[line_number]} " \
-        #                f"{self.line_ends_sorted[line_number]} {doppler_fit} {microturb} {macroturb} {rotation} {chi_squared}"
-
-        # #specname\tlogg\tlogg_error\twave_center\twave_start\twave_end\tDoppler_Shift_add_to_RV\tMicroturb\tMacroturb\trotation\tchi_squared\tew
         # Create a dictionary with column names as keys and corresponding values
         result_dict = {
             "specname": self.spec_name,
