@@ -935,12 +935,32 @@ class Spectra:
         #result_list = []
         # {"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
 
+        flag_error = "00000000"
+        """
+        1st bit: spectra not fitted at all
+        2nd bit: 2 or less points in the line
+        3rd bit: all flux points are above 1 or below 0
+        4th bit: EW of the line is significantly different from the EW of the line in the model; perhaps within factor of 1.5
+        5th bit:
+        6th bit:
+        7th bit: 
+        8th bit:
+        """
+        flag_warning = "00000000"
+        """
+        1st bit: if the fitted parameters are at the edge of the bounds
+        2nd bit: if at least one flux point is above 1.1 or below 0
+        3rd bit:
+        4th bit:
+        5th bit:
+        6th bit:
+        7th bit:
+        8th bit:
+        """
+
         if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                for k in range(len(result[line_number]["fit_wavelength"])):
-                    print(
-                        f"{result[line_number]['fit_wavelength'][k]} {result[line_number]['fit_flux_norm'][k]} {result[line_number]['fit_flux'][k]}",
-                        file=g)
+                np.savetxt(g, np.column_stack((result[line_number]['fit_wavelength'], result[line_number]['fit_flux_norm'], result[line_number]['fit_flux'])))
 
             line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
 
@@ -984,10 +1004,68 @@ class Spectra:
                     print(
                         f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}",
                         file=h)
+
+            wave_ob = apply_doppler_correction(self.wave_ob, self.rv + result[line_number]["Doppler_Shift_add_to_RV"])
+            flux_ob = self.flux_ob
+
+            # cut to the line
+            indices_to_use_cut = np.where((wave_ob <= line_right) & (wave_ob >= line_left))
+            wave_ob_cut, flux_ob_cut = wave_ob[indices_to_use_cut], flux_ob[indices_to_use_cut]
+
+            # ERROR FLAGS
+            # see how many points are in the line
+            wave_ob_points = len(wave_ob_cut)
+            if wave_ob_points <= 2:
+                # change the 2nd bit to 1, while not changing the rest
+                flag_error = flag_error[:1] + "1" + flag_error[2:]
+
+            # check if all flux points are above 1 or below 0
+            if np.all(flux_ob_cut >= 1) or np.all(flux_ob_cut <= 0):
+                flag_error = flag_error[:2] + "1" + flag_error[3:]
+
+            # check if EW is significantly different from the EW of the line in the model
+            ratio_threshold = 1.5
+            # calculate EW of the line in the spectra
+            equivalent_width_ob = calculate_equivalent_width(wave_ob_cut, flux_ob_cut, line_left, line_right)
+            # check if EW of the line in the spectra is within ratio_threshold of the EW of the line in the model
+            if equivalent_width_ob > equivalent_width * ratio_threshold or equivalent_width_ob < equivalent_width / ratio_threshold:
+                flag_error = flag_error[:3] + "1" + flag_error[4:]
+
+            # WARNING FLAGS
+            # check if the fitted parameters are at the edge of the bounds
+            if result[line_number]["fitted_abund"] == self.bound_min_abund or result[line_number]["fitted_abund"] == self.bound_max_abund:
+                flag_warning = "1" + flag_warning[1:]
+
+            if result[line_number]["Doppler_Shift_add_to_RV"] == self.bound_min_doppler or result[line_number]["Doppler_Shift_add_to_RV"] == self.bound_max_doppler:
+                flag_warning = "1" + flag_warning[1:]
+
+            if self.fit_vmac:
+                if result[line_number]["macroturb"] == self.bound_min_vmac or result[line_number]["macroturb"] == self.bound_max_vmac:
+                    flag_warning = "1" + flag_warning[1:]
+
+            if self.fit_rotation:
+                if result[line_number]["rotation"] == self.bound_min_rotation or result[line_number]["rotation"] == self.bound_max_rotation:
+                    flag_warning = "1" + flag_warning[1:]
+
+            if self.fit_teff:
+                if result[line_number]["teff"] == self.bound_min_teff or result[line_number]["teff"] == self.bound_max_teff:
+                    flag_warning = "1" + flag_warning[1:]
+
+            if self.fit_vmic == "Yes":
+                if result[line_number]["vmic"] == self.bound_min_vmic or result[line_number]["vmic"] == self.bound_max_vmic:
+                    flag_warning = "1" + flag_warning[1:]
+
+            # check if at least one flux point is above 1.1 or below 0
+            if np.any(flux_ob_cut >= 1.1) or np.any(flux_ob_cut < 0):
+                flag_warning = flag_warning[:1] + "1" + flag_warning[2:]
+
         else:
             equivalent_width = 9999
+            flag_error = "10000000"
         #result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
         result[line_number]["result"]['ew'] = equivalent_width * 1000
+        result[line_number]["flag_error"] = flag_error
+        result[line_number]["flag_warning"] = flag_warning
         return result[line_number]
 
     def calculate_and_save_upper_limit(self, result, result_upper_limit, sigmas_upper_limit, line_number: int):
