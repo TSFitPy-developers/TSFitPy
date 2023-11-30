@@ -2283,7 +2283,7 @@ class MarcsGridSingleton:
             raise ValueError("big_data hasn't been set yet!")
         return cls._model_temperatures, cls._model_logs, cls._model_mets, cls._marcs_value_keys, cls._marcs_models, cls._marcs_models_location, cls._marcs_values
 
-def run_tsfitpy(output_folder_title, config_location, spectra_location):
+def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     print("\nIMPORTANT UPDATE:")
     print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma"
           "i.e. the error in the observed spectra (sqrt(variance)). If this is not the case, please change the spectra."
