@@ -1049,23 +1049,23 @@ class Spectra:
                         "fitted_abund"] == self.bound_max_abund:
                         flag_warning = "1" + flag_warning[1:]
 
-            if result[line_number]["result_dict"]["Doppler_Shift_add_to_RV"] == self.bound_min_doppler or result[line_number]["result_dict"]["Doppler_Shift_add_to_RV"] == self.bound_max_doppler:
+            if result[line_number]["result"]["Doppler_Shift_add_to_RV"] == self.bound_min_doppler or result[line_number]["result"]["Doppler_Shift_add_to_RV"] == self.bound_max_doppler:
                 flag_warning = "1" + flag_warning[1:]
 
             if self.fit_vmac:
-                if result[line_number]["result_dict"]["Macroturb"] == self.bound_min_vmac or result[line_number]["result_dict"]["Macroturb"] == self.bound_max_vmac:
+                if result[line_number]["result"]["Macroturb"] == self.bound_min_vmac or result[line_number]["result"]["Macroturb"] == self.bound_max_vmac:
                     flag_warning = "1" + flag_warning[1:]
 
             if self.fit_rotation:
-                if result[line_number]["result_dict"]["rotation"] == self.bound_min_rotation or result[line_number]["result_dict"]["rotation"] == self.bound_max_rotation:
+                if result[line_number]["result"]["rotation"] == self.bound_min_rotation or result[line_number]["result"]["rotation"] == self.bound_max_rotation:
                     flag_warning = "1" + flag_warning[1:]
 
             if self.fit_teff:
-                if result[line_number]["result_dict"]["Teff"] == self.bound_min_teff or result[line_number]["result_dict"]["Teff"] == self.bound_max_teff:
+                if result[line_number]["result"]["Teff"] == self.bound_min_teff or result[line_number]["result"]["Teff"] == self.bound_max_teff:
                     flag_warning = "1" + flag_warning[1:]
 
             if self.fit_vmic == "Yes":
-                if result[line_number]["result_dict"]["Microturb"] == self.bound_min_vmic or result[line_number]["result_dict"]["Microturb"] == self.bound_max_vmic:
+                if result[line_number]["result"]["Microturb"] == self.bound_min_vmic or result[line_number]["result"]["Microturb"] == self.bound_max_vmic:
                     flag_warning = "1" + flag_warning[1:]
 
             # check if at least one flux point is above 1.1 or below 0
@@ -1457,12 +1457,12 @@ class Spectra:
             chi_squared = res.fun
         except IndexError as error:
             print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
-            elem_abund_dict = {"Fe": 9999}
-            doppler_fit = 9999
-            microturb = 9999
-            macroturb = 9999
-            rotation = 9999
-            chi_squared = 9999
+            elem_abund_dict = {"Fe": 999999}
+            doppler_fit = 999999
+            microturb = 999999
+            macroturb = 999999
+            rotation = 999999
+            chi_squared = 999999
         # Create a dictionary with column names as keys and corresponding values
         result_dict = {
             "specname": self.spec_name,
