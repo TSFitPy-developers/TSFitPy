@@ -1039,32 +1039,33 @@ class Spectra:
 
             # WARNING FLAGS
             # if fitting feh, check if the fitted parameters are at the edge of the bounds
-            if self.fit_feh:
-                if result[line_number]["fitted_abund"] == self.bound_min_feh or result[line_number]["fitted_abund"] == self.bound_max_feh:
-                    flag_warning = "1" + flag_warning[1:]
-            else:
-                # check if the fitted parameters are at the edge of the bounds
-                if result[line_number]["fitted_abund"] == self.bound_min_abund or result[line_number][
-                    "fitted_abund"] == self.bound_max_abund:
-                    flag_warning = "1" + flag_warning[1:]
+            if self.fitting_mode == "lbl":
+                if self.fit_feh:
+                    if result[line_number]["fitted_abund"] == self.bound_min_feh or result[line_number]["fitted_abund"] == self.bound_max_feh:
+                        flag_warning = "1" + flag_warning[1:]
+                else:
+                    # check if the fitted parameters are at the edge of the bounds
+                    if result[line_number]["fitted_abund"] == self.bound_min_abund or result[line_number][
+                        "fitted_abund"] == self.bound_max_abund:
+                        flag_warning = "1" + flag_warning[1:]
 
-            if result[line_number]["Doppler_Shift_add_to_RV"] == self.bound_min_doppler or result[line_number]["Doppler_Shift_add_to_RV"] == self.bound_max_doppler:
+            if result[line_number]["result_dict"]["Doppler_Shift_add_to_RV"] == self.bound_min_doppler or result[line_number]["result_dict"]["Doppler_Shift_add_to_RV"] == self.bound_max_doppler:
                 flag_warning = "1" + flag_warning[1:]
 
             if self.fit_vmac:
-                if result[line_number]["macroturb"] == self.bound_min_vmac or result[line_number]["macroturb"] == self.bound_max_vmac:
+                if result[line_number]["result_dict"]["Macroturb"] == self.bound_min_vmac or result[line_number]["result_dict"]["Macroturb"] == self.bound_max_vmac:
                     flag_warning = "1" + flag_warning[1:]
 
             if self.fit_rotation:
-                if result[line_number]["rotation"] == self.bound_min_rotation or result[line_number]["rotation"] == self.bound_max_rotation:
+                if result[line_number]["result_dict"]["rotation"] == self.bound_min_rotation or result[line_number]["result_dict"]["rotation"] == self.bound_max_rotation:
                     flag_warning = "1" + flag_warning[1:]
 
             if self.fit_teff:
-                if result[line_number]["teff"] == self.bound_min_teff or result[line_number]["teff"] == self.bound_max_teff:
+                if result[line_number]["result_dict"]["Teff"] == self.bound_min_teff or result[line_number]["result_dict"]["Teff"] == self.bound_max_teff:
                     flag_warning = "1" + flag_warning[1:]
 
             if self.fit_vmic == "Yes":
-                if result[line_number]["vmic"] == self.bound_min_vmic or result[line_number]["vmic"] == self.bound_max_vmic:
+                if result[line_number]["result_dict"]["Microturb"] == self.bound_min_vmic or result[line_number]["result_dict"]["Microturb"] == self.bound_max_vmic:
                     flag_warning = "1" + flag_warning[1:]
 
             # check if at least one flux point is above 1.1 or below 0
