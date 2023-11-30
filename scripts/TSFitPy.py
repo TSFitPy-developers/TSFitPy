@@ -472,6 +472,7 @@ class Spectra:
         self.rotation_dict = {}
         self.doppler_shift_dict = {}
         self.elem_abund_dict_fitting = {}
+        self.number_of_fits = {}
 
     def load_spectra_config(self, tsfitpy_config):
         self.atmosphere_type = tsfitpy_config.atmosphere_type
@@ -941,7 +942,7 @@ class Spectra:
         2nd bit: 2 or less points in the line
         3rd bit: all flux points are above 1 or below 0
         4th bit: EW of the line is significantly different from the EW of the line in the model; perhaps within factor of 1.5
-        5th bit:
+        5th bit: if number of fits of the line is <= 7
         6th bit:
         7th bit: 
         8th bit:
@@ -1005,7 +1006,7 @@ class Spectra:
                         f"{wavelength_fit_conv[indices_to_save_conv][k]} {flux_fit_conv[indices_to_save_conv][k]}",
                         file=h)
 
-            wave_ob = apply_doppler_correction(self.wave_ob, self.rv + result[line_number]["Doppler_Shift_add_to_RV"])
+            wave_ob = apply_doppler_correction(self.wave_ob, self.rv + result[line_number]["rv"])
             flux_ob = self.flux_ob
 
             # cut to the line
@@ -1031,10 +1032,21 @@ class Spectra:
             if equivalent_width_ob > equivalent_width * ratio_threshold or equivalent_width_ob < equivalent_width / ratio_threshold:
                 flag_error = flag_error[:3] + "1" + flag_error[4:]
 
+            # check if number of fits of the line is <= 7, but also check that the dictionary exists
+            if not self.number_of_fits:
+                if self.number_of_fits[line_number] <= 7:
+                    flag_error = flag_error[:4] + "1" + flag_error[5:]
+
             # WARNING FLAGS
-            # check if the fitted parameters are at the edge of the bounds
-            if result[line_number]["fitted_abund"] == self.bound_min_abund or result[line_number]["fitted_abund"] == self.bound_max_abund:
-                flag_warning = "1" + flag_warning[1:]
+            # if fitting feh, check if the fitted parameters are at the edge of the bounds
+            if self.fit_feh:
+                if result[line_number]["fitted_abund"] == self.bound_min_feh or result[line_number]["fitted_abund"] == self.bound_max_feh:
+                    flag_warning = "1" + flag_warning[1:]
+            else:
+                # check if the fitted parameters are at the edge of the bounds
+                if result[line_number]["fitted_abund"] == self.bound_min_abund or result[line_number][
+                    "fitted_abund"] == self.bound_max_abund:
+                    flag_warning = "1" + flag_warning[1:]
 
             if result[line_number]["Doppler_Shift_add_to_RV"] == self.bound_min_doppler or result[line_number]["Doppler_Shift_add_to_RV"] == self.bound_max_doppler:
                 flag_warning = "1" + flag_warning[1:]
@@ -1060,7 +1072,7 @@ class Spectra:
                 flag_warning = flag_warning[:1] + "1" + flag_warning[2:]
 
         else:
-            equivalent_width = 9999
+            equivalent_width = 999999
             flag_error = "10000000"
         #result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
         result[line_number]["result"]['ew'] = equivalent_width * 1000
@@ -1390,6 +1402,8 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
+        self.number_of_fits[line_number] = 0
+
         ts = self.create_ts_object(self._get_marcs_models())
 
         start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
@@ -1675,6 +1689,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
     spectra_to_fit.vmac_dict[line_number] = macroturb
     spectra_to_fit.rotation_dict[line_number] = rotation
+    spectra_to_fit.number_of_fits[line_number] += 1
 
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
 
