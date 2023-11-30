@@ -436,7 +436,7 @@ class Spectra:
             self.error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
         except (IndexError, ValueError) as e:
             # if no error variance is given, set it to 1
-            self.error_obs_variance = np.ones(len(self.wave_ob)) * 0.1
+            self.error_obs_variance = np.ones(len(self.wave_ob)) * 0.0001
             print("No error sigma given in 3rd column, setting to 0.01")
 
         # sort the observed spectra according to wavelength using numpy argsort
