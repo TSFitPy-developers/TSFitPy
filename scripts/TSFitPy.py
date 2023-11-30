@@ -942,7 +942,7 @@ class Spectra:
         2nd bit: 2 or less points in the line
         3rd bit: all flux points are above 1 or below 0
         4th bit: EW of the line is significantly different from the EW of the line in the model; perhaps within factor of 1.5
-        5th bit: if number of fits of the line is <= 7
+        5th bit: if number of iterations of the line is <= 3
         6th bit:
         7th bit: 
         8th bit:
@@ -1032,9 +1032,9 @@ class Spectra:
             if equivalent_width_ob > equivalent_width * ratio_threshold or equivalent_width_ob < equivalent_width / ratio_threshold:
                 flag_error = flag_error[:3] + "1" + flag_error[4:]
 
-            # check if number of fits of the line is <= 7, but also check that the dictionary exists
-            if not self.number_of_fits:
-                if self.number_of_fits[line_number] <= 7:
+            # check if number of fits of the line is <= 3, but also check that the dictionary exists
+            if "fit_iterations" in result[line_number]:
+                if result[line_number]["fit_iterations"] <= 3:
                     flag_error = flag_error[:4] + "1" + flag_error[5:]
 
             # WARNING FLAGS
@@ -1419,7 +1419,13 @@ class Spectra:
         minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
-            print(res.x)
+            print_result = "Converged:"
+            for elem, value in zip(self.elem_to_fit, res.x):
+                print_result += f" {elem}: {value:.2f}"
+
+            print_result += f" Number of iterations: {res.nit}"
+            fit_iterations = res.nit
+            print(print_result)
             if self.fit_feh:
                 met_index = np.where(self.elem_to_fit == "Fe")[0][0]
                 met = res.x[met_index]
@@ -1463,7 +1469,8 @@ class Spectra:
             macroturb = 999999
             rotation = 999999
             chi_squared = 999999
-        # Create a dictionary with column names as keys and corresponding values
+            fit_iterations = 0
+            # Create a dictionary with column names as keys and corresponding values
         result_dict = {
             "specname": self.spec_name,
             "wave_center": self.line_centers_sorted[line_number],
@@ -1491,7 +1498,7 @@ class Spectra:
             flux_result = np.array([])
         shutil.rmtree(temp_directory)
         return {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
-                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]]} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]], "fit_iterations": fit_iterations} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
     def find_upper_limit_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_abund=None, bound_max_abund=None) -> dict:
         """

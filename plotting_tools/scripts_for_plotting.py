@@ -99,6 +99,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     output_file_df = pd.DataFrame(output_file_data_lines, columns=output_file_header)
 
     # Convert columns to appropriate data types
+    # TODO: except for columns with names "flag error" and "flag warning"
     output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
 
     # check if fitlist exists and if not load old fitlist
