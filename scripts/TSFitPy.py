@@ -1077,8 +1077,8 @@ class Spectra:
             flag_error = "10000000"
         #result_list.append(f"{result[line_number]['result']} {equivalent_width * 1000}")
         result[line_number]["result"]['ew'] = equivalent_width * 1000
-        result[line_number]["flag_error"] = flag_error
-        result[line_number]["flag_warning"] = flag_warning
+        result[line_number]["result"]["flag_error"] = flag_error
+        result[line_number]["result"]["flag_warning"] = flag_warning
         return result[line_number]
 
     def calculate_and_save_upper_limit(self, result, result_upper_limit, sigmas_upper_limit, line_number: int):
@@ -1731,10 +1731,11 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         chi_square = 999999.9999
         print("didn't generate spectra or atmosphere")
 
-    output_print = f""
+    output_print = ""
     for key in elem_abund_dict:
-        output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    print(f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
+        output_print += f" [{key}/H]={elem_abund_dict[key]:<7.4f}"
+    print(f"{output_print} rv={doppler_shift:<7.4f} vmic={microturb:<7.4f} vmac={macroturb:<7.4f} "
+          f"rotation={rotation:<7.4f} chisqr={chi_square:<12.8f}")
 
     return chi_square
 
