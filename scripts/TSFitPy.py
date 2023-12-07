@@ -187,14 +187,14 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
         return 999999
 
     flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-    wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
-    flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    wave_line = wave_obs[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
+    flux_line_obs = flux_obs[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
 
     if np.size(flux_line_obs) == 0:
         return 999999
 
-    flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-    error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
+    error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
     # TODO: proper calculation of DOF
     dof = len(flux_line_obs) - 1
     if dof <= 0:
@@ -969,7 +969,7 @@ class Spectra:
             norm_flux_fit_array = result[line_number]['fit_flux_norm']
 
             indices_to_use_cut = np.where(
-                (wavelength_fit_array <= line_right + 5) & (wavelength_fit_array >= line_left - 5))
+                (wavelength_fit_array <= line_right) & (wavelength_fit_array >= line_left))
             wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], \
             norm_flux_fit_array[indices_to_use_cut]
             wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut,
@@ -1132,7 +1132,7 @@ class Spectra:
 
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        function_argsuments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], temp_directory, line_number)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
         try:
             res = minimize_function(lbl_teff, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
@@ -1247,7 +1247,7 @@ class Spectra:
 
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        function_argsuments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], temp_directory, line_number)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.00001, 'fatol': 0.00001}
         try:
             res = minimize_function(lbl_logg, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
@@ -1360,7 +1360,7 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number] , self.line_ends_sorted[line_number], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
             res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
             print(res)
@@ -1415,7 +1415,7 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number, offset_chisqr)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], temp_directory, line_number, offset_chisqr)
         minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
@@ -1515,7 +1515,7 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
             print(res)
@@ -1544,7 +1544,7 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], temp_directory, line_number)
         minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
@@ -1849,7 +1849,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
 
 
-        dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax - 5.) & (spectra_to_fit.flux_ob >= lmin + 5.))]) - 1
+        dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax) & (spectra_to_fit.flux_ob >= lmin))]) - 1
         # TODO: proper calculation of DOF
         if dof <= 0:
             dof = 1
@@ -2619,7 +2619,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
 
     tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends = create_segment_file(tsfitpy_configuration.segment_size, tsfitpy_configuration.line_begins_sorted, tsfitpy_configuration.line_ends_sorted)
     # save segment in a separate file where each line is an index of the seg_begins and seg_ends
-    np.savetxt(tsfitpy_configuration.segment_file, np.column_stack((tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)), fmt="%d")
+    np.savetxt(tsfitpy_configuration.segment_file, np.column_stack((tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)), fmt="%.3f")
 
     # check inputs
 
