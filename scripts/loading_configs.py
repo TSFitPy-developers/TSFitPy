@@ -644,6 +644,9 @@ class TSFitPyConfig:
         if check_valid_path:
             self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
             self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
+        else:
+            self.linemasks_path = self.config_parser["MainPaths"]["linemasks_path"]
+            self.fitlist_input_path = self.config_parser["MainPaths"]["fitlist_input_path"]
         if self.spectra_input_path is None:
             self.spectra_input_path = self.config_parser["MainPaths"]["spectra_input_path"]
 
