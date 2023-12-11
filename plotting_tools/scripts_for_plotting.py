@@ -160,16 +160,6 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         filename_fitted_spectra = filenames_output_folder[index_to_plot]
         filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
 
-
-        if remove_errors:
-            # check if flag error is not 0, then return
-            if config_dict["output_file_df"]["flag_error"].values[df_correct_specname_indices] != 0 and config_dict["output_file_df"]["flag_error"].values[df_correct_specname_indices] != "0":
-                return
-        if remove_warnings:
-            # check if flag warning is not 0, then return
-            if config_dict["output_file_df"]["flag_warning"].values[df_correct_specname_indices] != 0 and config_dict["output_file_df"]["flag_warning"].values[df_correct_specname_indices] != "0":
-                return
-
         # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
         #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
         df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
@@ -210,6 +200,17 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         for linemask_center_wavelength, linemask_left_wavelength, linemask_right_wavelength in zip(linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths):
             # finds in the output results, which of the wavelengths are equal to the linemask. Comparison is done using argmin to minimise risk of comparing floats. As downside, there is no check if line is actually the same
             output_result_index_to_plot = (np.abs(output_file_df[df_correct_specname_indices]["wave_center"] - linemask_center_wavelength)).argmin()
+
+            if remove_errors:
+                # check if flag error is not 0, then return
+                if output_file_df[df_correct_specname_indices]["flag_error"].values[output_result_index_to_plot] != 0 and \
+                        output_file_df[df_correct_specname_indices]["flag_error"].values[output_result_index_to_plot] != "0":
+                    continue
+            if remove_warnings:
+                # check if flag warning is not 0, then return
+                if output_file_df[df_correct_specname_indices]["flag_warning"].values[output_result_index_to_plot] != 0 and \
+                        output_file_df[df_correct_specname_indices]["flag_warning"].values[output_result_index_to_plot] != "0":
+                    continue
 
             # this is the fitted rv in this case then
             fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
