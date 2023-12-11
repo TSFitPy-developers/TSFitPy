@@ -156,19 +156,19 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         # Take first occurrence of the name, hopefully the only one
         index_to_plot = indices_to_plot[0]
 
-        if remove_errors:
-            # check if flag error is not 0, then return
-            if config_dict["output_file_df"]["flag_error"].values[index_to_plot] != 0 and config_dict["output_file_df"]["flag_error"].values[index_to_plot] != "0":
-                return
-        if remove_warnings:
-            # check if flag warning is not 0, then return
-            if config_dict["output_file_df"]["flag_warning"].values[index_to_plot] != 0 and config_dict["output_file_df"]["flag_warning"].values[index_to_plot] != "0":
-                return
-
-
         # get the name of the fitted and observed spectra
         filename_fitted_spectra = filenames_output_folder[index_to_plot]
         filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
+
+
+        if remove_errors:
+            # check if flag error is not 0, then return
+            if config_dict["output_file_df"]["flag_error"].values[df_correct_specname_indices] != 0 and config_dict["output_file_df"]["flag_error"].values[df_correct_specname_indices] != "0":
+                return
+        if remove_warnings:
+            # check if flag warning is not 0, then return
+            if config_dict["output_file_df"]["flag_warning"].values[df_correct_specname_indices] != 0 and config_dict["output_file_df"]["flag_warning"].values[df_correct_specname_indices] != "0":
+                return
 
         # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
         #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
