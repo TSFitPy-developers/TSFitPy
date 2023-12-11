@@ -143,11 +143,31 @@ Also, Windows is not supported (?).
       - Then provide their values in the next row:
       - `HD000001 0.0 5000.0 2.0 0.0 1.0 1.0 0.2 0.1 0.3`
       - The code will automatically convert them to [X/Fe] for fitting
-      - Order doesn't matter (the code reads the header and then matches the values)
+      - Order doesn't matter, except for the first being a name of the spectra (the code reads the header and then matches the values)
       - Use `;` for comments
 - Now you can run the fitting. To do so, you need to run the `main.py` script. You can do by running:
   - `python3 main.py ./input_files/tsfitpy_input_configuration.cfg` - this will run the fitting on your local computer
   - This will run the job and save output in its unique folder in `./output_files/`
+    - In the output, you will have the fitted parameters. But beyond that there are two flags: `flag_error` and `flag_warning`. It is 8 bit number. `00000000` means no issues were found. Any bit > `1` means some issue was discovered. Not all flags exist, so to be updated later, perhaps.
+      - `flag_error`: if any bits are `1`, then it is incredibly certain that you should not believe the output
+        - 1st bit: spectra failed to fit for one or another reason
+        - 2nd bit: there are only <= 2 points in the observed spectra within the linemask (do you really trust the fit then?)
+        - 3rd bit: all of flux points of the observed spectra are above 1 or below 0
+        - 4th bit: EW of the line is significantly different from the EW of the line in the model (within factor of 1.5). Perhaps a broken pixel might result in a trigger of this flag? 1.5 should be quite a conservative factor though
+        - 5th bit: number of iterations of the fit is <= 3 (most likely the line doesn't exist within the linemask or some other issue resulted in a bad fit). Normally it takes ~9 iterations for a lbl fit.
+        - 6th bit:
+        - 7th bit: 
+        - 8th bit:
+      - `flag_warning`: if any bits are `1`, then it could be that the fit is bad, but that is not guaranteed. For a big sample, you might want to remove any of these objects as well. For a small one, maybe check them by eye.
+        - 1st bit: if the fitted parameters are at the edge of the bounds (abundance, vmic, vmac, rotation, teff, extra rv)
+        - 2nd bit: if at least one flux point in the observed spectra is above 1.1 or below 0
+        - 3rd bit:
+        - 4th bit:
+        - 5th bit:
+        - 6th bit:
+        - 7th bit:
+        - 8th bit:
+    - Don't take the output for granted. Check the flags, look at chi-squared, make sure the output makes sense. Check by eye as well.
 - You can also easily plot the results:
   - Open `./plotting_tools/plot_output.ipynb` (I would create a copy of it first so that it doesn't interfere with `git pull` later on)
   - Run the first cell to import all the necessary libraries

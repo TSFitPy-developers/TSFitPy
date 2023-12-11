@@ -62,7 +62,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
                  depart_aux_file=ts_config["depart_aux_file"],
                  model_atom_file=ts_config["model_atom_file"])
 
-    ts.run_turbospectrum_and_atmosphere()
+    ts.synthesize_spectra()
 
     try:
         wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt(os.path.join(temp_directory, 'spectrum_00000000.spec'), usecols=(0,1,2), unpack=True)

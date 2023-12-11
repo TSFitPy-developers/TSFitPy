@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import shutil
+from collections import OrderedDict
 from configparser import ConfigParser
 import numpy as np
 import os
@@ -12,11 +13,13 @@ from scipy.stats import gaussian_kde
 from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.synthetic_code_class import fetch_marcs_grid
 from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
                              output_default_linemask_name)
 from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
+from scripts.solar_abundances import periodic_table
 
 
 def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
@@ -60,10 +63,10 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
             config_file_location = os.path.join(output_folder_location, output_default_configuration_name)
 
     tsfitpy_config = TSFitPyConfig(config_file_location, "none")
-    tsfitpy_config.load_config()
+    tsfitpy_config.load_config(check_valid_path=False)
     tsfitpy_config.validate_input(check_valid_path=False)
 
-    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic']:
+    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic', 'logg']:
         raise ValueError("Non-lbl fitting methods are not supported yet")
 
     output_elem_column = f"Fe_H"
@@ -97,6 +100,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     output_file_df = pd.DataFrame(output_file_data_lines, columns=output_file_header)
 
     # Convert columns to appropriate data types
+    # TODO: except for columns with names "flag error" and "flag warning"
     output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
 
     # check if fitlist exists and if not load old fitlist
@@ -126,122 +130,137 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist
     config_dict["output_folder_location"] = output_folder_location
     config_dict["output_file_df"] = output_file_df
+    config_dict["fitted_element"] = tsfitpy_config.elements_to_fit[0]
 
     return config_dict
 
-def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None, xlim=None, ylim=None, font_size=None):
-    # unpack the config dict into separate variables
-    filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
-    observed_spectra_location: str = config_dict["observed_spectra_location"]
-    linemask_location: str = config_dict["linemask_location"]
-    specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
-    rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
-    output_file_df: pd.DataFrame = config_dict["output_file_df"]
+def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None, xlim=None, ylim=None, font_size=None, remove_errors=False, remove_warnings=False):
+    try:
+        # unpack the config dict into separate variables
+        filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
+        observed_spectra_location: str = config_dict["observed_spectra_location"]
+        linemask_location: str = config_dict["linemask_location"]
+        specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
+        rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
+        output_file_df: pd.DataFrame = config_dict["output_file_df"]
 
-    # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
-    # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
-    indices_to_plot = np.where(np.char.find(filenames_output_folder, name_of_spectra_to_plot) != -1)[0]
-    if len(indices_to_plot) > 1:
-        # Warning if part of several specnames, just in case
-        print(f"Warning, several specnames were found with that name {name_of_spectra_to_plot}, using first one")
-    if len(indices_to_plot) == 0:
-        raise ValueError(f"Could not find {name_of_spectra_to_plot} in the spectra to plot")
+        # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
+        # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
+        indices_to_plot = np.where(np.char.find(filenames_output_folder, name_of_spectra_to_plot) != -1)[0]
+        if len(indices_to_plot) > 1:
+            # Warning if part of several specnames, just in case
+            print(f"Warning, several specnames were found with that name {name_of_spectra_to_plot}, using first one")
+        if len(indices_to_plot) == 0:
+            raise ValueError(f"Could not find {name_of_spectra_to_plot} in the spectra to plot")
 
-    # Take first occurrence of the name, hopefully the only one
-    index_to_plot = indices_to_plot[0]
+        # Take first occurrence of the name, hopefully the only one
+        index_to_plot = indices_to_plot[0]
 
-    # get the name of the fitted and observed spectra
-    filename_fitted_spectra = filenames_output_folder[index_to_plot]
-    filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
+        # get the name of the fitted and observed spectra
+        filename_fitted_spectra = filenames_output_folder[index_to_plot]
+        filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
 
-    # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
-    #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
-    df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
+        # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
+        #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
+        df_correct_specname_indices = output_file_df["specname"] == filename_observed_spectra
 
-    # find RV in the fitlist that was input into the star
-    if filename_observed_spectra not in specname_fitlist:
-        raise ValueError(f"{filename_observed_spectra} not found in the fitlist names, which are {specname_fitlist}")
-    rv_index = np.where(specname_fitlist == filename_observed_spectra)[0][0]
-    rv = rv_fitlist[rv_index]
+        # find RV in the fitlist that was input into the star
+        if filename_observed_spectra not in specname_fitlist:
+            raise ValueError(f"{filename_observed_spectra} not found in the fitlist names, which are {specname_fitlist}")
+        rv_index = np.where(specname_fitlist == filename_observed_spectra)[0][0]
+        rv = rv_fitlist[rv_index]
 
-    # loads fitted and observed wavelength and flux
-    wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
-    wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
+        # loads fitted and observed wavelength and flux
+        wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
+        wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
 
-    # sort the observed spectra, just like in TSFitPy
-    if wavelength_observed.size > 1:
-        sorted_obs_wavelength_index = np.argsort(wavelength_observed)
-        wavelength_observed, flux_observed = wavelength_observed[sorted_obs_wavelength_index], flux_observed[sorted_obs_wavelength_index]
+        # sort the observed spectra, just like in TSFitPy
+        if wavelength_observed.size > 1:
+            sorted_obs_wavelength_index = np.argsort(wavelength_observed)
+            wavelength_observed, flux_observed = wavelength_observed[sorted_obs_wavelength_index], flux_observed[sorted_obs_wavelength_index]
 
-        sorted_wavelength_index = np.argsort(wavelength)
-        wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
+            sorted_wavelength_index = np.argsort(wavelength)
+            wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
 
 
-    # loads the linemask
-    linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
+        # loads the linemask
+        linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
 
-    # sorts linemask, just like in TSFitPy
-    if linemask_center_wavelengths.size > 1:
-        linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
-        linemask_left_wavelengths = np.array(sorted(linemask_left_wavelengths))
-        linemask_right_wavelengths = np.array(sorted(linemask_right_wavelengths))
-    elif linemask_center_wavelengths.size == 1:
-        linemask_center_wavelengths = np.array([linemask_center_wavelengths])
-        linemask_left_wavelengths = np.array([linemask_left_wavelengths])
-        linemask_right_wavelengths = np.array([linemask_right_wavelengths])
+        # sorts linemask, just like in TSFitPy
+        if linemask_center_wavelengths.size > 1:
+            linemask_center_wavelengths = np.array(sorted(linemask_center_wavelengths))
+            linemask_left_wavelengths = np.array(sorted(linemask_left_wavelengths))
+            linemask_right_wavelengths = np.array(sorted(linemask_right_wavelengths))
+        elif linemask_center_wavelengths.size == 1:
+            linemask_center_wavelengths = np.array([linemask_center_wavelengths])
+            linemask_left_wavelengths = np.array([linemask_left_wavelengths])
+            linemask_right_wavelengths = np.array([linemask_right_wavelengths])
 
-    # makes a separate plot for each line
-    for linemask_center_wavelength, linemask_left_wavelength, linemask_right_wavelength in zip(linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths):
-        # finds in the output results, which of the wavelengths are equal to the linemask. Comparison is done using argmin to minimise risk of comparing floats. As downside, there is no check if line is actually the same
-        output_result_index_to_plot = (np.abs(output_file_df[df_correct_specname_indices]["wave_center"] - linemask_center_wavelength)).argmin()
+        # makes a separate plot for each line
+        for linemask_center_wavelength, linemask_left_wavelength, linemask_right_wavelength in zip(linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths):
+            # finds in the output results, which of the wavelengths are equal to the linemask. Comparison is done using argmin to minimise risk of comparing floats. As downside, there is no check if line is actually the same
+            output_result_index_to_plot = (np.abs(output_file_df[df_correct_specname_indices]["wave_center"] - linemask_center_wavelength)).argmin()
 
-        # this is the fitted rv in this case then
-        fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
+            if remove_errors:
+                # check if flag error is not 0, then return
+                if output_file_df[df_correct_specname_indices]["flag_error"].values[output_result_index_to_plot] != 0 and \
+                        output_file_df[df_correct_specname_indices]["flag_error"].values[output_result_index_to_plot] != "0":
+                    continue
+            if remove_warnings:
+                # check if flag warning is not 0, then return
+                if output_file_df[df_correct_specname_indices]["flag_warning"].values[output_result_index_to_plot] != 0 and \
+                        output_file_df[df_correct_specname_indices]["flag_warning"].values[output_result_index_to_plot] != "0":
+                    continue
 
-        # other fitted values
-        fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
-        column_names = output_file_df.columns.values
-        if "_Fe" in column_names[6]:
-            abund_column_name = column_names[6]
-        else:
-            abund_column_name = column_names[5]
-        fitted_abund = output_file_df[df_correct_specname_indices][abund_column_name].values[output_result_index_to_plot]
-        fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
+            # this is the fitted rv in this case then
+            fitted_rv = output_file_df[df_correct_specname_indices]["Doppler_Shift_add_to_RV"].values[output_result_index_to_plot]
 
-        # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
-        doppler = fitted_rv + rv
-        wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
+            # other fitted values
+            fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
+            fitted_element = config_dict['fitted_element']
+            if fitted_element != "Fe":
+                abund_column_name = f"[{fitted_element}/Fe]"
+                column_name = f"{fitted_element}_Fe"
+            else:
+                abund_column_name = "[Fe/H]"
+                column_name = "Fe_H"
+            fitted_abund = output_file_df[df_correct_specname_indices][column_name].values[output_result_index_to_plot]
+            fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
 
-        abund_column_name = f"[{abund_column_name.replace('_', '/')}]"
+            # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
+            doppler = fitted_rv + rv
+            wavelength_observed_rv = apply_doppler_correction(wavelength_observed, doppler)
 
-        if plot_title:
-            plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
-        plt.plot(wavelength, flux, color='red')
-        plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
-        # xlimit is wavelength left/right +/- 0.3 AA
-        if xlim is not None:
-            plt.xlim(xlim)
-        else:
-            plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
-        if ylim is not None:
-            plt.ylim(ylim)
-        else:
-            plt.ylim(0, 1.05)
-        # plot x-ticks without scientific notation
-        plt.ticklabel_format(useOffset=False)
-        # change font size
-        if font_size is not None:
-            plt.rcParams.update({'font.size': font_size})
-        plt.plot([linemask_left_wavelength, linemask_left_wavelength], [0, 2], color='green', alpha=0.2)
-        plt.plot([linemask_right_wavelength, linemask_right_wavelength], [0, 2], color='green', alpha=0.2)
-        plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
-        plt.xlabel("Wavelength [Å]")
-        plt.ylabel("Normalised flux")
-        if save_figure is not None:
-            # save figure without cutting off labels
-            plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}", bbox_inches='tight')
-        plt.show()
-        plt.close()
+            if plot_title:
+                plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
+            plt.plot(wavelength, flux, color='red')
+            plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
+            # xlimit is wavelength left/right +/- 0.3 AA
+            if xlim is not None:
+                plt.xlim(xlim)
+            else:
+                plt.xlim(linemask_left_wavelength - 0.3, linemask_right_wavelength + 0.3)
+            if ylim is not None:
+                plt.ylim(ylim)
+            else:
+                plt.ylim(0, 1.05)
+            # plot x-ticks without scientific notation
+            plt.ticklabel_format(useOffset=False)
+            # change font size
+            if font_size is not None:
+                plt.rcParams.update({'font.size': font_size})
+            plt.plot([linemask_left_wavelength, linemask_left_wavelength], [0, 2], color='green', alpha=0.2)
+            plt.plot([linemask_right_wavelength, linemask_right_wavelength], [0, 2], color='green', alpha=0.2)
+            plt.plot([linemask_center_wavelength, linemask_center_wavelength], [0, 2], color='grey', alpha=0.35)
+            plt.xlabel("Wavelength [Å]")
+            plt.ylabel("Normalised flux")
+            if save_figure is not None:
+                # save figure without cutting off labels
+                plt.savefig(f"{str(linemask_center_wavelength)}_{save_figure}", bbox_inches='tight')
+            plt.show()
+            plt.close()
+    except (ValueError, IndexError, FileNotFoundError) as e:
+        print(f"Error: {e}")
 
 def plot_scatter_df_results(df_results: pd.DataFrame, x_axis_column: str, y_axis_column: str, xlim=None, ylim=None,
                             color='black', invert_x_axis=False, invert_y_axis=False, **pltargs):
@@ -456,7 +475,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
-    ts.run_turbospectrum_and_atmosphere()
+    ts.synthesize_spectra()
     print("TS completed")
     try:
         wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
@@ -543,3 +562,379 @@ def plot_many_spectra_same_plot(input_folder, spectra_names, xlim=None, ylim=Non
         plot_synthetic_spectra_from_grid(input_folder, spectra_name, xlim=xlim, ylim=ylim, plt_show=False, **kwargs)
     plt.show()
     plt.close()
+
+
+class Star:
+    # this class will load abundances from several different files and load them into a class for later use
+    # it will also load linelist such that we get atomic information about different lines
+    def __init__(self, name, input_folders: list, linelist_folder):
+        self.name = name
+        self.linelist_folder = linelist_folder
+        # get names of all files in the linelist folder
+        self.linelist_filenames = get_all_file_names_in_a_folder(linelist_folder)
+        # add the path to the filenames
+        for i in range(len(self.linelist_filenames)):
+            self.linelist_filenames[i] = os.path.join(linelist_folder, self.linelist_filenames[i])
+
+        molecules_flag = False
+
+        def read_linelist(filenames):
+            data = {}
+            for filename in filenames:
+                with open(filename) as fp:
+                    # so that we dont read full file if we are not sure that we use it (if it is a molecule)
+                    first_line: str = fp.readline()
+
+                    fields = first_line.strip().split()
+                    sep = '.'
+                    element = fields[0] + fields[1]
+                    elements = element.split(sep, 1)[0]
+                    # opens each file, reads first row, if it is long enough then it is molecule. If fitting molecules, then
+                    # keep it, otherwise ignore molecules
+
+                    if len(elements) > 3 and molecules_flag or len(elements) <= 3:
+                        # now read the whole file
+                        lines_file: list[str] = fp.readlines()
+                        # append the first line to the lines_file
+                        lines_file.insert(0, first_line)
+                        line_number_read_for_element: int = 0
+                        line_number_read_file: int = 0
+                        total_lines_in_file: int = len(lines_file)
+                        while line_number_read_file < total_lines_in_file:  # go through all line
+                            line: str = lines_file[line_number_read_file]
+                            fields: list[str] = line.strip().split()
+
+                            element_name = f"{fields[0]}{fields[1]}"
+
+                            if element_name == "'01.000000'":  # find out whether it is hydrogen
+                                hydrogen_element: bool = True
+                            else:
+                                hydrogen_element: bool = False
+                            if len(fields[0]) > 1:  # save the first two lines of an element for the future
+                                number_of_lines_element: int = int(fields[3])
+                            else:
+                                number_of_lines_element: int = int(fields[4])
+                            line_number_read_file += 1
+                            line: str = lines_file[line_number_read_file]
+                            elem_line_2_to_save: str = f"{line.strip()}"  # second line of the element
+                            element_name_string = elem_line_2_to_save.split()[0].replace("'", "")
+                            ionisation_stage = elem_line_2_to_save.split()[1].replace("'", "")
+
+                            element_name_string = f"{element_name_string}_{ionisation_stage}"
+
+                            if element_name_string not in data:
+                                data[element_name_string] = []
+
+                            # now we are reading the element's wavelength and stuff
+                            line_number_read_file += 1
+                            # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
+                            while line_number_read_for_element < number_of_lines_element:
+                                line_stripped: str = lines_file[
+                                    line_number_read_for_element + line_number_read_file].strip()
+                                data[element_name_string].append(line_stripped.split())
+                                line_number_read_for_element += 1
+
+                            line_number_read_file: int = number_of_lines_element + line_number_read_file
+                            line_number_read_for_element = 0
+
+            # Convert lists to DataFrames
+            data_new = {}
+            for key in data:
+                data[key] = [item[:3] for item in data[key]]
+                #print([item[:3] for item in data[key]])
+
+                # Split the element and ionisation stage
+                element, ionisation_stage = key.split("_")
+
+                # Create a new DataFrame from the existing data using float
+                df = pd.DataFrame(data[key], columns=['wavelength', 'ep', 'loggf']).astype(float)
+
+                # Add a new column for the ionisation stage, setting it to the current ionisation stage for all rows
+                df['ionisation_stage'] = ionisation_stage
+
+                # If the element is not in the dictionary, add it
+                if element not in data_new:
+                    data_new[element] = df
+                else:
+                    # append to the existing DataFrame using concat
+                    data_new[element] = pd.concat([data_new[element], df], ignore_index=True)
+
+            return data_new
+
+        # Usage
+        self.parsed_linelist = read_linelist(self.linelist_filenames)
+
+        # load each element using dataframe:
+        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}, "chisqr": {}, "rv": {}, "vmic": {}, "vmac": {}, "rotation": {}}
+        for input_folder in input_folders:
+            config_dict = load_output_data(input_folder)
+            fitted_element = config_dict["fitted_element"]
+            # find the name of the star in df and only use that one
+            df = config_dict["output_file_df"]
+            mask = df["specname"] == name
+            df = df[mask]
+            # get the line wavelength
+            line_wavelengths = df["wave_center"].values
+            self.elemental_data["wavelength"][fitted_element] = line_wavelengths
+            # get the line equivalent width
+            line_ew = df["ew"].values
+            self.elemental_data["ew"][fitted_element] = line_ew
+            # get the line abundance
+            if fitted_element == "Fe":
+                line_abund = df["Fe_H"].values
+            else:
+                line_abund = df[f"{fitted_element}_Fe"].values
+            self.elemental_data["abund"][fitted_element] = line_abund
+            # get the line chi squared
+            line_chisqr = df["chi_squared"].values
+            self.elemental_data["chisqr"][fitted_element] = line_chisqr
+            # get the line rv
+            line_rv = df["Doppler_Shift_add_to_RV"].values
+            self.elemental_data["rv"][fitted_element] = line_rv
+            # get the line microturbulence
+            line_microturbulence = df["Microturb"].values
+            self.elemental_data["vmic"][fitted_element] = line_microturbulence
+            # get the line macroturbulence
+            line_macroturbulence = df["Macroturb"].values
+            self.elemental_data["vmac"][fitted_element] = line_macroturbulence
+            # get the line rotation
+            line_rotation = df["rotation"].values
+            self.elemental_data["rotation"][fitted_element] = line_rotation
+
+    def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
+        element_data = self.parsed_linelist[element]
+        result = []
+        ionisation_stages = []
+
+        # Ensure wavelengths is a list
+        if not isinstance(wavelengths, list) and not isinstance(wavelengths, np.ndarray):
+            wavelengths = [wavelengths]
+
+        for wavelength in wavelengths:
+            # Calculate the absolute difference between each wavelength and the provided wavelength
+            differences = np.abs(element_data['wavelength'] - wavelength)
+
+            # Find the index of the smallest difference that is within the tolerance
+            try:
+                idx_min_difference = differences[differences <= tolerance].idxmin()
+
+                # If a matching row was found
+                if not np.isnan(idx_min_difference):
+                    line = element_data.loc[idx_min_difference]
+                    if ionisation_stage is not None:
+                        # choose the ionisation stage
+                        line = line[line['ionisation_stage'] == ionisation_stage]
+                    result.append(line[column])
+                    ionisation_stages.append(line['ionisation_stage'])
+                else:
+                    result.append(None)
+            except ValueError:
+                result.append(None)
+
+        return result, ionisation_stages
+
+    def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None):
+        allowed_params = ["wavelength", "ew"]
+        if fit_parameter not in allowed_params:
+            raise ValueError(f"Fit parameter must be {allowed_params}, not {fit_parameter}")
+        corresponding_labels = {"wavelength": "Wavelength [Å]", "ew": "Equivalent width"}
+        x_data = self.elemental_data[fit_parameter][element]
+        y_data = self.elemental_data["abund"][element]
+        # if abund_limits is not None, then remove the lines that are outside the limits
+        if abund_limits is not None:
+            x_data = np.array(x_data)
+            y_data = np.array(y_data)
+            mask = (y_data >= abund_limits[0]) & (y_data <= abund_limits[1])
+            x_data = x_data[mask]
+            y_data = y_data[mask]
+        plt.scatter(x_data, y_data)
+        plt.xlabel(corresponding_labels[fit_parameter])
+        if element == "Fe":
+            plt.ylabel("[Fe/H]")
+        else:
+            plt.ylabel(f"[{element}/Fe]")
+        plt.title(f"{self.name}")
+        plt.show()
+
+    def plot_vs_abundance(self, element, column, abund_limits=None):
+        data, ionisation_stages = self.get_line_data(element, self.elemental_data["wavelength"][element], column)
+        stellar_param_data = self.elemental_data["abund"][element]
+
+        # if abund_limits is not None, then remove the lines that are outside the limits
+        ionisation_stages = np.array(ionisation_stages)
+        data = np.array(data)
+        if abund_limits is not None:
+            stellar_param_data = np.array(stellar_param_data)
+            mask = (stellar_param_data >= abund_limits[0]) & (stellar_param_data <= abund_limits[1])
+            data = data[mask]
+            stellar_param_data = stellar_param_data[mask]
+            ionisation_stages = ionisation_stages[mask]
+
+        # find those with ionisation stage 1
+        mask = ionisation_stages == "I"
+        if np.sum(mask) != 0:
+            data_neutral = data[mask]
+            stellar_param_data_neutral = stellar_param_data[mask]
+            plt.scatter(data_neutral, stellar_param_data_neutral, label="Neutral", color='black')
+
+        # find those with any other ionisation stage
+        mask = ionisation_stages != "I"
+        if np.sum(mask) != 0:
+            data_other = data[mask]
+            stellar_param_data_other = stellar_param_data[mask]
+            plt.scatter(data_other, stellar_param_data_other, label="Other", color='red')
+
+        plt.xlabel(column)
+        if element == "Fe":
+            plt.ylabel("[Fe/H]")
+        else:
+            plt.ylabel(f"[{element}/Fe]")
+        plt.title(f"{self.name}")
+        plt.legend()
+        plt.show()
+
+    def plot_ep_vs_abundance(self, element, abund_limits=None):
+        self.plot_vs_abundance(element, 'ep', abund_limits)
+
+    def plot_loggf_vs_abundance(self, element, abund_limits=None):
+        self.plot_vs_abundance(element, 'loggf', abund_limits)
+
+    def plot_abundance_plot(self, abund_limits, fontsize=16):
+        # plots all abundances as a function of atomic number
+        # get all elements
+        elements = self.elemental_data["abund"].keys()
+        # get atomic numbers
+        atomic_numbers = []
+        # use periodic table to get atomic numbers
+        for element in elements:
+            atomic_numbers.append(periodic_table.index(element) + 1)
+
+        # get abundances
+        abundances = []
+        for element in elements:
+            abundance_element = self.elemental_data["abund"][element]
+            if len(abundance_element) > 1:
+                # if abund_limits is not None, then remove the lines that are outside the limits
+                if abund_limits is not None:
+                    abundance_element = np.array(abundance_element)
+                    mask = (abundance_element >= abund_limits[0]) & (abundance_element <= abund_limits[1])
+                    abundance_element = abundance_element[mask]
+                abundance_element = np.mean(abundance_element)
+            else:
+                abundance_element = abundance_element[0]
+            # check that abundance_element is not nan
+            if np.isnan(abundance_element):
+                abundance_element = None
+            abundances.append(abundance_element)
+        # plot
+        plt.scatter(atomic_numbers, abundances, color='black', zorder=3)
+        for i, element in enumerate(elements):
+            # every second element has y offset of 0.1
+            label_y_def = max(abundances) + 0.4
+            if i % 2 == 0:
+                label_y = label_y_def + 0.1
+            else:
+                label_y = label_y_def - 0.1
+            plt.text(atomic_numbers[i], label_y, element, horizontalalignment='center',
+                     verticalalignment='center', color='black', fontsize=fontsize)
+        plt.ylabel('[X/Fe]', fontsize=fontsize)
+        plt.xlabel('Atomic Number (Z)', fontsize=fontsize)
+        plt.title(f'Chemical Abundance {self.name}', fontsize=fontsize)
+        atomic_numbers = [0, 63]
+        # grid should repeat every 2 x-values, but x-ticks themselves should be every 10 x-values
+        plt.xticks(ticks=np.arange(min(atomic_numbers), max(atomic_numbers) + 1, 10))  # Set x-ticks every 10
+        plt.grid(which='major', linestyle='-', linewidth=0.5)  # Major grid lines
+        plt.grid(which='minor', axis='x', linestyle=':', linewidth=0.5)  # Minor grid lines
+        plt.minorticks_on()  # Turn on the minor ticks
+        ax = plt.gca()  # Get the current Axes instance
+        ax.set_xticks(np.arange(min(atomic_numbers), max(atomic_numbers) + 1, 2),
+                      minor=True)  # Set minor x-ticks every 2
+        plt.axhline(0, color='black', linewidth=0.5, zorder=1)
+        # change font size of ticks
+        ax.tick_params(axis='both', which='major', labelsize=fontsize)
+        plt.tight_layout()
+        # plot y=0 line
+        plt.axhline(0, color='black', linewidth=2.0, zorder=1)
+        plt.ylim(min(abundances) - 0.4, max(abundances) + 0.6)
+
+        plt.show()
+
+    def get_average_abundances(self, ew_limits=None, chi_sqr_limits=None):
+        # gets average abundances by element
+        # get all elements
+        elements = self.elemental_data["abund"].keys()
+        # get average abundances
+        average_abundances = {}
+        stdev_abundances = {}
+        for element in elements:
+            abundances_element = self.elemental_data["abund"][element]
+            ews_element = self.elemental_data["ew"][element]
+            chi_sqrs_element = self.elemental_data["chisqr"][element]
+            abundances_element = np.array(abundances_element)
+            ews_element = np.array(ews_element)
+            chi_sqrs_element = np.array(chi_sqrs_element)
+            # if ew_limits is not None, then remove the lines that are outside the limits
+            if ew_limits is not None:
+                mask = (ews_element >= ew_limits[0]) & (ews_element <= ew_limits[1])
+                abundances_element = abundances_element[mask]
+                chi_sqrs_element = chi_sqrs_element[mask]
+            # if chi_sqr_limits is not None, then remove the lines that are outside the limits
+            if chi_sqr_limits is not None:
+                mask = (chi_sqrs_element >= chi_sqr_limits[0]) & (chi_sqrs_element <= chi_sqr_limits[1])
+                abundances_element = abundances_element[mask]
+            if len(abundances_element) > 1:
+                abundances_element = np.mean(abundances_element)
+                stdev_abundance_element = np.std(abundances_element)
+            elif len(abundances_element) == 1:
+                abundances_element = abundances_element[0]
+                stdev_abundance_element = 0
+            else:
+                abundances_element = None
+                stdev_abundance_element = None
+            average_abundances[f"{element}_mean"] = abundances_element
+            stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
+
+        # Create an ordered dictionary
+        ordered_dict = OrderedDict()
+
+        # Iterate over elements in average_abundances
+        for element in average_abundances:
+            # Add mean and stdev for each element to the ordered dictionary
+            ordered_dict[element] = average_abundances[element]
+            # Get the element name without '_mean'
+            element_name = element.replace("_mean", "")
+            ordered_dict[element_name + "_stdev"] = stdev_abundances[element_name + "_stdev"]
+
+        # Create a DataFrame from the ordered dictionary
+        df = pd.DataFrame([ordered_dict])
+
+        # add first column as specname usign self.name
+        df.insert(0, "specname", self.name)
+
+        return df
+
+
+def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None, chi_sqr_limits=None):
+    config_dict = load_output_data(input_folders[0])
+    # get all spectra names from the first folder
+    spectra_names = config_dict["output_file_df"]["specname"].unique()
+    # create Star objects for each spectra name and add them to a list
+    stars = []
+    for spectra_name in spectra_names:
+        stars.append(Star(spectra_name, input_folders, linelist_path))
+    # get all abundances for different spectra and combine into one dataframe
+    df = pd.concat([star.get_average_abundances(ew_limits=ew_limits, chi_sqr_limits=chi_sqr_limits) for star in stars], axis=0)
+    return df
+
+
+
+if __name__ == '__main__':
+    #test_star = Star("150429001101153.spec", ["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
+    #test_star.plot_fit_parameters_vs_abundance("ew", "Fe", abund_limits=(-3, 3))
+    #test_star.plot_ep_vs_abundance("Fe")
+    #test_star.plot_loggf_vs_abundance("Fe", abund_limits=(-3, 3))
+    #test_star.plot_abundance_plot(abund_limits=(-3, 3))
+    #print(test_star.get_average_abundances())
+
+    test = get_average_abundance_all_stars(["../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/", "../output_files/Nov-17-2023-00-23-55_0.1683492858486244_NLTE_Fe_1D/"], "../input_files/linelists/linelist_for_fitting/")
+    print(test)

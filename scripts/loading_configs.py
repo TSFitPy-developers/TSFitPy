@@ -46,7 +46,8 @@ class SpectraParameters:
                          'logg': ['grav'],
                          'feh': ['met', 'metallicity', 'metallicityfeh', 'metallicityfeh', 'mh', 'mh', 'mh'],
                          'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini'],
-                         'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrumname', 'spectrumname']}
+                         'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrumname', 'spectrumname'],
+                         'resolution': ['res', 'resolution', 'resolvingpower', 'resolvingpower', 'r'],}
 
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
@@ -174,11 +175,16 @@ class SpectraParameters:
             rotation_list = self.spectra_parameters_df['rotation'].values
         else:
             rotation_list = np.zeros(len(specname_list))
+        # if resolution is in the columns, add it
+        if 'resolution' in self.spectra_parameters_df.columns:
+            resolution_list = self.spectra_parameters_df['resolution'].values
+        else:
+            resolution_list = np.zeros(len(specname_list))
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
         abundance_list = self._get_abundance_list()
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list), axis=1)
+        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list, resolution_list), axis=1)
 
         return stacked_parameters
 
@@ -317,6 +323,9 @@ class TSFitPyConfig:
         self.bounds_teff: list[float] = None
         self.guess_range_teff: list[float] = None
 
+        self.bounds_logg: list[float] = None
+        self.guess_range_logg: list[float] = None
+
         self.bounds_vmac: list[float] = None
         self.bounds_rotation: list[float] = None
         self.bounds_abundance: list[float] = None
@@ -373,6 +382,9 @@ class TSFitPyConfig:
         self.find_teff_errors: bool = False
         self.teff_error_sigma: float = 3
 
+        self.find_logg_errors: bool = False
+        self.logg_error_sigma: float = 3
+
         # new options for the slurm cluster
         self.cluster_type = "local"
         self.number_of_nodes = 1
@@ -385,10 +397,10 @@ class TSFitPyConfig:
         self.time_limit_hours = 71
         self.slurm_partition = "debug"
 
-    def load_config(self):
+    def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
-            self.load_new_config()
+            self.load_new_config(check_valid_path=check_valid_path)
         else:
             self.load_old_config()
 
@@ -611,7 +623,7 @@ class TSFitPyConfig:
                             self.experimental_parallelisation = False
                 line = fp.readline()
 
-    def load_new_config(self):
+    def load_new_config(self, check_valid_path=True):
         # check if the config file exists
         if not os.path.isfile(self.config_location):
             raise ValueError(f"The configuration file {self.config_location} does not exist.")
@@ -629,14 +641,18 @@ class TSFitPyConfig:
         self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
         self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
         self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
+        if check_valid_path:
+            self.linemasks_path = self._check_if_path_exists(self.config_parser["MainPaths"]["linemasks_path"])
+            self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
+        else:
+            self.linemasks_path = self.config_parser["MainPaths"]["linemasks_path"]
+            self.fitlist_input_path = self.config_parser["MainPaths"]["fitlist_input_path"]
         if self.spectra_input_path is None:
             self.spectra_input_path = self.config_parser["MainPaths"]["spectra_input_path"]
-        self.fitlist_input_path = self._check_if_path_exists(self.config_parser["MainPaths"]["fitlist_input_path"])
-        self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
 
+        self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
         self.atmosphere_type = self._validate_string_input(self.config_parser["FittingParameters"]["atmosphere_type"], ["1d", "3d"])
-        self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic"])
+        self.fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fitting_mode"], ["all", "lbl", "teff", "lbl_quick", "vmic", "logg"])
         self.include_molecules = self._convert_string_to_bool(self.config_parser["FittingParameters"]["include_molecules"])
         self.nlte_flag = self._convert_string_to_bool(self.config_parser["FittingParameters"]["nlte"])
         vmic_fitting_mode = self._validate_string_input(self.config_parser["FittingParameters"]["fit_vmic"], ["yes", "no", "input"])
@@ -692,6 +708,17 @@ class TSFitPyConfig:
         except KeyError:
             self.find_teff_errors = False
             self.teff_error_sigma = 5.0
+
+        try:
+            self.bounds_logg = self._split_string_to_float_list(self.config_parser["ParametersForModeLogg"]["bounds_logg"])
+            self.guess_range_logg = self._split_string_to_float_list(self.config_parser["ParametersForModeLogg"]["guess_range_logg"])
+            self.find_logg_errors = self._convert_string_to_bool(self.config_parser["ParametersForModeLogg"]["find_logg_errors"])
+            self.logg_error_sigma = float(self.config_parser["ParametersForModeLogg"]["logg_error_sigma"])
+        except KeyError:
+            self.bounds_logg = [-0.5, 5]
+            self.guess_range_logg = [-0.5, 0.5]
+            self.find_logg_errors = False
+            self.logg_error_sigma = 5.0
 
         self.bounds_vmac = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_vmac"])
         self.bounds_rotation = self._split_string_to_float_list(self.config_parser["Bounds"]["bounds_rotation"])

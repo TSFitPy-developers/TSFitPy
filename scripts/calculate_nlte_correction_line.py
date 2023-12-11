@@ -14,7 +14,8 @@ from scipy.optimize import minimize, root_scalar
 from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
 from scripts.auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.synthetic_code_class import fetch_marcs_grid
 
 
 def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
@@ -184,7 +185,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
                  depart_aux_file=abusingclasses.depart_aux_file_dict,
                  model_atom_file=abusingclasses.model_atom_file_dict)
 
-    ts.run_turbospectrum_and_atmosphere()
+    ts.synthesize_spectra()
     # ts.run_turbospectrum()
 
     try:
@@ -422,7 +423,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     futures = []
     for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
         # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
-        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
         # if element is Fe, then take abundance from metallicity
         if abusingclasses.elem_to_fit[0] == "Fe":
             abundance = met1
