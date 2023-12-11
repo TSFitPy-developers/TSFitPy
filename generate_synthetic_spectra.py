@@ -6,7 +6,8 @@ import sys
 from configparser import ConfigParser
 
 from scripts.dask_client import get_dask_client
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.synthetic_code_class import fetch_marcs_grid
 from scripts.convolve import *
 import datetime
 from scripts.create_window_linelist_function import create_window_linelist

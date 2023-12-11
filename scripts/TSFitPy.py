@@ -9,7 +9,8 @@ from scipy.optimize import minimize, root_scalar
 from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
     apply_doppler_correction, create_segment_file
 from scripts.solar_abundances import periodic_table
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.synthetic_code_class import fetch_marcs_grid
 import time
 import os
 from os import path as os_path
@@ -843,7 +844,7 @@ class Spectra:
                          verbose=self.turbospectrum_verbose,
                          atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
                          segment_file=self.segment_file, line_mask_file=self.linemask_file)
-        ts.run_turbospectrum_and_atmosphere()
+        ts.synthesize_spectra()
 
     def fit_all(self) -> list:
         """

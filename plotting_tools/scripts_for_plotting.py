@@ -13,7 +13,8 @@ from scipy.stats import gaussian_kde
 from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
-from scripts.turbospectrum_class_nlte import TurboSpectrum, fetch_marcs_grid
+from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.synthetic_code_class import fetch_marcs_grid
 from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
                              output_default_linemask_name)
 from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
@@ -463,7 +464,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
-    ts.run_turbospectrum_and_atmosphere()
+    ts.synthesize_spectra()
     print("TS completed")
     try:
         wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),

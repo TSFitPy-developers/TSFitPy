@@ -107,3 +107,19 @@ def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -
     segments_right.append(end)
 
     return np.asarray(segments_left), np.asarray(segments_right)
+
+
+def closest_available_value(target: float, options: list[float]) -> float:
+    """
+    Return the option from a list which most closely matches some target value.
+
+    :param target:
+        The target value that we're trying to match.
+    :param options:
+        The list of possible values that we can try to match to target.
+    :return:
+        The option value which is closest to <target>.
+    """
+    options = np.asarray(options)
+    idx = (np.abs(options - target)).argmin()
+    return options[idx]
