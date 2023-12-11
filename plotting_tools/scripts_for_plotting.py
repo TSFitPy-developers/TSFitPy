@@ -136,14 +136,6 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
 
 def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=True, save_figure=None, xlim=None, ylim=None, font_size=None, remove_errors=False, remove_warnings=False):
     try:
-        if remove_errors:
-            # check if flag error is not 0, then return
-            if config_dict["output_file_df"]["flag_error"].values[0] != 0 and config_dict["output_file_df"]["flag_error"].values[0] != "0":
-                return
-        if remove_warnings:
-            # check if flag warning is not 0, then return
-            if config_dict["output_file_df"]["flag_warning"].values[0] != 0 and config_dict["output_file_df"]["flag_warning"].values[0] != "0":
-                return
         # unpack the config dict into separate variables
         filenames_output_folder: list[dir] = config_dict["filenames_output_folder"]
         observed_spectra_location: str = config_dict["observed_spectra_location"]
@@ -163,6 +155,16 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
 
         # Take first occurrence of the name, hopefully the only one
         index_to_plot = indices_to_plot[0]
+
+        if remove_errors:
+            # check if flag error is not 0, then return
+            if config_dict["output_file_df"]["flag_error"].values[index_to_plot] != 0 and config_dict["output_file_df"]["flag_error"].values[index_to_plot] != "0":
+                return
+        if remove_warnings:
+            # check if flag warning is not 0, then return
+            if config_dict["output_file_df"]["flag_warning"].values[index_to_plot] != 0 and config_dict["output_file_df"]["flag_warning"].values[index_to_plot] != "0":
+                return
+
 
         # get the name of the fitted and observed spectra
         filename_fitted_spectra = filenames_output_folder[index_to_plot]
