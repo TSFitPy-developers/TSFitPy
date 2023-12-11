@@ -422,7 +422,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     futures = []
     for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
         # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
-        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
         # if element is Fe, then take abundance from metallicity
         if abusingclasses.elem_to_fit[0] == "Fe":
             abundance = met1

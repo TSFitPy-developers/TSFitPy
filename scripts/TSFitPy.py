@@ -278,7 +278,7 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
-                 rotation: float, abundances_dict: dict, line_list_path_trimmed: str, index_temp_dir: float,
+                 rotation: float, abundances_dict: dict, resolution: float, line_list_path_trimmed: str, index_temp_dir: float,
                  tsfitpy_config, n_workers=1):
         # Default values
         self.turbospec_path: str = None  # path to the /exec/ file
@@ -420,6 +420,8 @@ class Spectra:
             self.vmac: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
         if self.input_rotation:
             self.rotation: float = float(rotation)  # rotation km/s, constant for all stars if not fitted
+        if resolution != 0.0 and resolution is not None and not np.isnan(resolution):
+            self.resolution: float = float(resolution)  # resolution coming from resolution, if given input here:  central lambda / FWHM
 
         self.temp_dir: str = os.path.join(self.global_temp_dir, self.spec_name + str(index_temp_dir),
                                           '')  # temp directory, including date and name of the star fitted
@@ -2188,10 +2190,11 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 
 def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
-                           macroturb: float, rotation1: float, abundances_dict1: dict, line_list_path_trimmed: str,
+                           macroturb: float, rotation1: float, abundances_dict1: dict, resolution1: float, line_list_path_trimmed: str,
                            index: float, tsfitpy_configuration) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
+    :param resolution1: resolution
     :param dask_client: Dask client
     :param specname: Name of the textfile
     :param teff: Teff in K
@@ -2215,7 +2218,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     if tsfitpy_configuration.number_of_cpus != 1:
         tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
 
-    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1,
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers)
 
     #spectra.dask_client = dask_client
@@ -2739,10 +2742,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
-            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
-            logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}")
+            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
+            logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
             future = create_and_fit_spectra(client, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   rotation1, abundances_dict1, line_list_path_trimmed, idx, tsfitpy_configuration)
+                                   rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx, tsfitpy_configuration)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
@@ -2752,9 +2755,11 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     else:
         results = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
-            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1 = one_spectra_parameters
+            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
+            logging.debug(
+                f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
             results.append(create_and_fit_spectra(None, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                                  rotation1, abundances_dict1,
+                                                  rotation1, abundances_dict1, resolution1,
                                                   line_list_path_trimmed, idx, tsfitpy_configuration))
 
     logging.debug("Finished fitting, now saving results")

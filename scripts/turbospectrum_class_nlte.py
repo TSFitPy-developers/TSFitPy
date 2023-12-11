@@ -847,6 +847,7 @@ class TurboSpectrum:
                         for j in range(len(fields_low)):
                             fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
                         fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
+                        # TODO check if any nans or negative values
                         print(*fields_interp_print, file=g)
                     for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
                         print(lines_coef_low[i], file=g)
