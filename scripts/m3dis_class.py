@@ -135,13 +135,13 @@ class m3disCall(SyntheticSpectrumGenerator):
             temp.write(bytes(input_in, "utf-8"))
             temp_file_name = temp.name
 
-        print(input_in)
+        #print(input_in)
 
         # check if file exists
-        if not os.path.exists("./dispatch.x"):
-            print("File does not exist")
-        else:
-            print("File exists")
+        #if not os.path.exists("./dispatch.x"):
+        #    print("File does not exist")
+        #else:
+        #    print("File exists")
 
         # Now, you can use temp_file_name as an argument to dispatch.x
         pr1 = subprocess.Popen(
@@ -256,8 +256,8 @@ class m3disCall(SyntheticSpectrumGenerator):
 &atmos_params       dims=1 atmos_format='Marcs' vmic={self.turbulent_velocity} atmos_file='./input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod'/\n\
 &atom_params        atom_file='./input_multi3d/atoms/atom.ba06' convlim=1d-2 use_atom_abnd=T /\n\
 &m3d_params         verbose=0 n_nu=1 maxiter=0 /\n\
-&linelist_params    linelist_file='{self.line_list_files[0]}' /\n\
-&spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
+!&linelist_params    linelist_file='{self.line_list_files[0]}' /\n\
+!&spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size=10 /\n")
 
@@ -302,7 +302,7 @@ class m3disCall(SyntheticSpectrumGenerator):
 
 
 if __name__ == "__main__":
-    time_start = time.perf_counter()
+
 
     test_class = m3disCall(
         m3dis_path="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/",
@@ -343,10 +343,11 @@ if __name__ == "__main__":
     # create temp directory
     global_temp_dir = "/Users/storm/docker_common_folder/TSFitPy/temp_directory/"
     temp_directory = tempfile.mkdtemp(dir=global_temp_dir)
-    print(temp_directory)
+    #print(temp_directory)
     test_class.configure(temp_directory=temp_directory, lambda_min=6707, lambda_max=6808, lambda_delta=0.01,
                          line_list_files=["/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/nlte_ges_linelist_jmg17feb2022_I_II_li"],
                          turbulent_velocity=1.0, free_abundances={}, verbose=True)
+    time_start = time.perf_counter()
     test_class.synthesize_spectra()
     time_end = time.perf_counter()
     print("Time taken to read: ", time_end - time_start)
@@ -385,11 +386,9 @@ if __name__ == "__main__":
     # result = pkg.some_function()
 
     run = m3dis.read(
-        "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_test/"
+        #"/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_test/"
+        temp_directory
     )
-    run.plot_spectrum()
-
-
-
+    run.line[0].plot()
     # run.plot_spectrum()
     #plt.show()
