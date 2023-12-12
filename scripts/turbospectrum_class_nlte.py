@@ -595,7 +595,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 self.run_turbospectrum()
             except AttributeError:
                 print("No attribute, fail of generation?")
-        except (FileNotFoundError, ValueError, IndexError) as error:
+        except (FileNotFoundError, ValueError, TypeError) as error:
             print(f"Interpolation failed? {error}")
             print("ValueError can sometimes imply problem with the departure coefficients grid")
 
