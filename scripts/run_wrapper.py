@@ -155,17 +155,17 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
         for element, value in abundances_dict.items():
             if nlte_flag:
                 if element in nlte_elements:
-                    nlte_flag = "NLTE"
+                    nlte_flag_label = "NLTE"
                 else:
-                    nlte_flag = "LTE"
+                    nlte_flag_label = "LTE"
             else:
-                nlte_flag = "LTE"
+                nlte_flag_label = "LTE"
             if element != "Fe":
-                print(f"#[{element}/Fe]={value} {nlte_flag}", file=f)
+                print(f"#[{element}/Fe]={value} {nlte_flag_label}", file=f)
             else:
                 # if Fe, it is given as weird Fe/Fe way, which can be fixed back by:
                 # xfe + feh + A(X)_sun = A(X)_star
-                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag}", file=f)
+                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag_label}", file=f)
         print("#", file=f)
 
         if save_unnormalised_spectra:
