@@ -282,7 +282,7 @@ class Spectra:
                  rotation: float, abundances_dict: dict, resolution: float, line_list_path_trimmed: str, index_temp_dir: float,
                  tsfitpy_config, n_workers=1):
         # Default values
-        self.turbospec_path: str = None  # path to the /exec/ file
+        self.spectral_code_path: str = None  # path to the /exec/ file
         self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
         self.model_atmosphere_grid_path: str = None
         self.model_atmosphere_list: str = None
@@ -540,7 +540,7 @@ class Spectra:
         self.experimental_parallelisation = tsfitpy_config.experimental_parallelisation
 
         self.nelement = tsfitpy_config.nelement
-        self.turbospec_path = tsfitpy_config.turbospectrum_path
+        self.spectral_code_path = tsfitpy_config.spectral_code_path
 
         self.interpol_path = tsfitpy_config.interpolators_path
 
@@ -885,7 +885,7 @@ class Spectra:
         if marcs_models is None:
             marcs_models = self.marcs_models
         ts = TurboSpectrum(
-            turbospec_path=self.turbospec_path,
+            turbospec_path=self.spectral_code_path,
             interpol_path=self.interpol_path,
             line_list_paths=self.line_list_path_trimmed,
             marcs_grid_path=self.model_atmosphere_grid_path,

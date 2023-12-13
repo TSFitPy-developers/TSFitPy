@@ -261,7 +261,7 @@ class TSFitPyConfig:
             self.output_folder_title: str = "none"
 
         self.compiler: str = None
-        self.turbospectrum_path: str = None
+        self.spectral_code_path: str = None
         self.interpolators_path: str = None
         self.line_list_path: str = None
         self.model_atmosphere_grid_path_1d: str = None
@@ -424,7 +424,7 @@ class TSFitPyConfig:
         self.bounds_teff = [2000, 8000] # default value
         self.guess_range_teff = [-250, 250] # default value
 
-        self.turbospectrum_path = "../turbospectrum/"
+        self.spectral_code_path = "../turbospectrum/"
         self.cluster_name = "None"
         self.debug_mode = 0
 
@@ -632,7 +632,7 @@ class TSFitPyConfig:
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
         self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
-        self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
+        self.spectral_code_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
         self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
@@ -947,18 +947,21 @@ class TSFitPyConfig:
 
         self.nelement = len(self.elements_to_fit)
 
-        if self.turbospectrum_path is None:
-            self.turbospectrum_path = "../turbospectrum/"
-        self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path))
+        if self.spectral_code_path is None:
+            self.spectral_code_path = "../turbospectrum/"
+        self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path))
         if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec-gf", "")
+        elif self.compiler.lower() == "m3dis":
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_file_exists(os.path.join(self.spectral_code_path, "dispatch.x"), check_valid_path),
+                                                   "dispatch.x", "")
         else:
             raise ValueError("Compiler not recognized")
-        self.turbospectrum_path = self.turbospectrum_path
+        self.spectral_code_path = self.spectral_code_path
 
         if os.path.exists(self.interpolators_path):
             self.interpolators_path = os.path.join(os.getcwd(), self.interpolators_path)
@@ -1057,7 +1060,7 @@ class TSFitPyConfig:
         spectra_object.experimental_parallelisation = self.experimental_parallelisation
 
         spectra_object.nelement = self.nelement
-        spectra_object.turbospec_path = self.turbospectrum_path
+        spectra_object.spectral_code_path = self.spectral_code_path
 
         spectra_object.interpol_path = self.interpolators_path
 

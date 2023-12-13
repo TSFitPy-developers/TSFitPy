@@ -35,6 +35,7 @@ class m3disCall(SyntheticSpectrumGenerator):
                  marcs_value_keys, marcs_values, marcs_models, model_temperatures,
                  model_logs, model_mets)
         self.m3dis_path = self.code_path
+        self.mpi_cores: int = 1
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -42,7 +43,7 @@ class m3disCall(SyntheticSpectrumGenerator):
                   sphere=None, alpha=None, s_process=None, r_process=None,
                   line_list_paths=None, line_list_files=None,
                   verbose=None, temp_directory=None, nlte_flag: bool = None, atmosphere_dimension=None,
-                  model_atom_file=None):
+                  mpi_cores:int=None):
         """
         Set the stellar parameters of the synthetic spectra to generate. This can be called as often as needed
         to generate many synthetic spectra with one class instance. All arguments are optional; any which are not
@@ -128,6 +129,8 @@ class m3disCall(SyntheticSpectrumGenerator):
             self.atmosphere_dimension = atmosphere_dimension
         if self.atmosphere_dimension == "3D":
             self.turbulent_velocity = None
+        if mpi_cores is not None:
+            self.mpi_cores = mpi_cores
 
     def run_m3dis(self, input_in, stderr, stdout):
         # Write the input data to a temporary file
@@ -143,6 +146,11 @@ class m3disCall(SyntheticSpectrumGenerator):
         #else:
         #    print("File exists")
 
+        # Create a copy of the current environment variables
+        env = os.environ.copy()
+        # Set OMP_NUM_THREADS for the subprocess
+        env['OMP_NUM_THREADS'] = str(self.mpi_cores)
+
         # Now, you can use temp_file_name as an argument to dispatch.x
         pr1 = subprocess.Popen(
             [
@@ -152,6 +160,7 @@ class m3disCall(SyntheticSpectrumGenerator):
             stdin=subprocess.PIPE,
             stdout=stdout,
             stderr=stderr,
+            env=env,
         )
         # pr1.stdin.write(bytes(input_in, "utf-8"))
         stdout_bytes, stderr_bytes = pr1.communicate()
