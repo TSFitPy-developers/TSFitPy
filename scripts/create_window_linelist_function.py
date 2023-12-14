@@ -4,7 +4,7 @@ import glob
 import numpy as np
 
 def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
-                           molecules_flag: bool, lbl=False):
+                           molecules_flag: bool, lbl=False, do_hydrogen=True):
     line_list_path: str = old_path_name
     line_list_files: list = [i for i in glob.glob(os.path.join(line_list_path, "*")) if os.path.isfile(i)]
     # print(line_list_files)
@@ -120,19 +120,20 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
                                         pass
                     else:
                         while line_number_read_for_element < number_of_lines_element:
-                            line_stripped: str = lines_file[line_number_read_for_element + line_number_read_file].strip()
-                            if 0 not in all_lines_to_write:
-                                if not lbl:
-                                    all_lines_to_write[0] = [f"{line_stripped} \n"]
+                            if do_hydrogen:
+                                line_stripped: str = lines_file[line_number_read_for_element + line_number_read_file].strip()
+                                if 0 not in all_lines_to_write:
+                                    if not lbl:
+                                        all_lines_to_write[0] = [f"{line_stripped} \n"]
+                                    else:
+                                        for seg_index in range(len(seg_begins)):
+                                            all_lines_to_write[seg_index] = [f"{line_stripped} \n"]
                                 else:
-                                    for seg_index in range(len(seg_begins)):
-                                        all_lines_to_write[seg_index] = [f"{line_stripped} \n"]
-                            else:
-                                if not lbl:
-                                    all_lines_to_write[0].append(f"{line_stripped} \n")
-                                else:
-                                    for seg_index in range(len(seg_begins)):
-                                        all_lines_to_write[seg_index].append(f"{line_stripped} \n")
+                                    if not lbl:
+                                        all_lines_to_write[0].append(f"{line_stripped} \n")
+                                    else:
+                                        for seg_index in range(len(seg_begins)):
+                                            all_lines_to_write[seg_index].append(f"{line_stripped} \n")
                             line_number_read_for_element += 1
 
                     line_number_read_file: int = number_of_lines_element + line_number_read_file

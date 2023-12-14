@@ -7,9 +7,10 @@ import numpy as np
 from distributed import get_worker
 from scipy.optimize import minimize, root_scalar
 from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
-    apply_doppler_correction, create_segment_file
+    apply_doppler_correction, create_segment_file, import_module_from_path
 from scripts.solar_abundances import periodic_table
 from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.m3dis_class import m3disCall
 from scripts.synthetic_code_class import fetch_marcs_grid
 import time
 import os
@@ -282,6 +283,7 @@ class Spectra:
                  rotation: float, abundances_dict: dict, resolution: float, line_list_path_trimmed: str, index_temp_dir: float,
                  tsfitpy_config, n_workers=1):
         # Default values
+        self.compiler: str = None  # intel, gfotran, m3dis
         self.spectral_code_path: str = None  # path to the /exec/ file
         self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
         self.model_atmosphere_grid_path: str = None
@@ -538,6 +540,7 @@ class Spectra:
         self.guess_plus_minus_neg_logg = tsfitpy_config.guess_range_logg[1]
         self.debug_mode = tsfitpy_config.debug_mode
         self.experimental_parallelisation = tsfitpy_config.experimental_parallelisation
+        self.compiler = tsfitpy_config.compiler
 
         self.nelement = tsfitpy_config.nelement
         self.spectral_code_path = tsfitpy_config.spectral_code_path
@@ -884,21 +887,40 @@ class Spectra:
     def create_ts_object(self, marcs_models=None):
         if marcs_models is None:
             marcs_models = self.marcs_models
-        ts = TurboSpectrum(
-            turbospec_path=self.spectral_code_path,
-            interpol_path=self.interpol_path,
-            line_list_paths=self.line_list_path_trimmed,
-            marcs_grid_path=self.model_atmosphere_grid_path,
-            marcs_grid_list=self.model_atmosphere_list,
-            model_atom_path=self.model_atom_path,
-            departure_file_path=self.departure_file_path,
-            aux_file_length_dict=self.aux_file_length_dict,
-            model_temperatures=self.model_temperatures,
-            model_logs=self.model_logs,
-            model_mets=self.model_mets,
-            marcs_value_keys=self.marcs_value_keys,
-            marcs_models=marcs_models,
-            marcs_values=self.marcs_values)
+        if self.compiler.lower() == "m3dis":
+            ts = m3disCall(
+                m3dis_path=self.spectral_code_path,
+                interpol_path=self.interpol_path,
+                line_list_paths=self.line_list_path_trimmed,
+                marcs_grid_path=self.model_atmosphere_grid_path,
+                marcs_grid_list=self.model_atmosphere_list,
+                model_atom_path=self.model_atom_path,
+                departure_file_path=self.departure_file_path,
+                aux_file_length_dict=self.aux_file_length_dict,
+                model_temperatures=self.model_temperatures,
+                model_logs=self.model_logs,
+                model_mets=self.model_mets,
+                marcs_value_keys=self.marcs_value_keys,
+                marcs_models=marcs_models,
+                marcs_values=self.marcs_values,
+                m3dis_python_module=m3dis_python_module
+            )
+        else:
+            ts = TurboSpectrum(
+                turbospec_path=self.spectral_code_path,
+                interpol_path=self.interpol_path,
+                line_list_paths=self.line_list_path_trimmed,
+                marcs_grid_path=self.model_atmosphere_grid_path,
+                marcs_grid_list=self.model_atmosphere_list,
+                model_atom_path=self.model_atom_path,
+                departure_file_path=self.departure_file_path,
+                aux_file_length_dict=self.aux_file_length_dict,
+                model_temperatures=self.model_temperatures,
+                model_logs=self.model_logs,
+                model_mets=self.model_mets,
+                marcs_value_keys=self.marcs_value_keys,
+                marcs_models=marcs_models,
+                marcs_values=self.marcs_values)
         return ts
 
     def fit_lbl(self, client, fitting_function, find_upper_limit) -> list:
@@ -2300,6 +2322,19 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
 
     logging.debug(f"Configuration: {tsfitpy_configuration.__dict__}")
 
+    do_hydrogen_linelist = True
+
+    if tsfitpy_configuration.compiler.lower() == "m3dis": # "experiments/Multi3D/",
+        module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
+        #module_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/m3dis/__init__.py"  # Replace with the actual path
+        global m3dis_python_module
+        m3dis_python_module = import_module_from_path("m3dis", module_path)
+
+        # set molecules to False
+        tsfitpy_configuration.include_molecules = False
+        do_hydrogen_linelist = False
+        # TODO: if several linelists, will need to combine them
+
     if not config_location[-4:] == ".cfg":
         logging.debug("Configuration: Config file does not end with .cfg. Converting to new format.")
         tsfitpy_configuration.convert_old_config()
@@ -2695,13 +2730,13 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     if tsfitpy_configuration.fitting_mode == "all":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", output_folder_title, '')
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig, line_list_path_trimmed,
-                               tsfitpy_configuration.include_molecules, lbl=False)
+                               tsfitpy_configuration.include_molecules, lbl=False, do_hydrogen=do_hydrogen_linelist)
         line_list_path_trimmed =  os.path.join(line_list_path_trimmed, "0", "")
     elif tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "teff" or tsfitpy_configuration.fitting_mode == "vmic" or tsfitpy_configuration.fitting_mode == "logg":
         line_list_path_trimmed = os.path.join(line_list_path_trimmed, "lbl", output_folder_title, '')
         create_window_linelist(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends, line_list_path_orig,
                                line_list_path_trimmed,
-                               tsfitpy_configuration.include_molecules, lbl=True)
+                               tsfitpy_configuration.include_molecules, lbl=True, do_hydrogen=do_hydrogen_linelist)
     else:
         raise ValueError("Unknown fitting method")
     print("Finished trimming linelist")

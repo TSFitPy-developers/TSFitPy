@@ -41,7 +41,7 @@ class MARCSModel:
         self.alpha = float(lines_marcs_model[current_line].strip().split()[1])
         current_line += 1
         # eighth line is 1 cm radius for plane-parallel models with junk at the end
-        self.radius_1cm = float(lines_marcs_model[current_line].strip().split()[0])
+        self.radius = float(lines_marcs_model[current_line].strip().split()[0])
         current_line += 1
         # ninth line is Luminosity [Lsun] FOR A RADIUS OF 1 cm! with junk at the end
         self.luminosity_1cm = float(lines_marcs_model[current_line].strip().split()[0])
@@ -205,6 +205,8 @@ if __name__ == '__main__':
     file = "/Users/storm/docker_common_folder/TSFitPy/input_files/model_atmospheres/1D/p5750_g+4.5_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
     file = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
     marcs_model = MARCSModel(file)
+    #marcs_model.depth = marcs_model.radius - marcs_model.depth
+    #print(marcs_model.depth)
     #marcs_model.plot_temperature()
     #plt.plot(marcs_model.depth, marcs_model.lgTauR)
     # plot y = x
@@ -213,12 +215,18 @@ if __name__ == '__main__':
     #plt.xlabel("Depth [cm]")
     #plt.show()
 
+    sunint_file = "/Users/storm/docker_common_folder/TSFitPy/temp_directory_Dec-14-2023-11-52-14__0.06273117145467688/marcs_tef5777.0_g4.40_z0.00_tur1.00.interpol"
+    sunint_temperature, sunint_depth = np.loadtxt(sunint_file, unpack=True, usecols=(1,5), dtype=float, skiprows=1, comments="/")
+    sunint_depth = marcs_model.radius - sunint_depth
+
     marcs_50_depth, marcs_50_temperature = np.loadtxt("/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/atmos.sun_MARCS_50", unpack=True, usecols=(0,1), dtype=float, skiprows=2)
-    plt.plot(marcs_50_depth, marcs_50_temperature, label="MARCS 50", color="red")
-    xx, yy = marcs_model.interpolate_temperature(50)
-    plt.plot(xx, yy, label="MARCS 50 interpolated", color="blue", linestyle="--")
+    #plt.plot(marcs_50_depth, marcs_50_temperature, label="MARCS 50", color="red")
+    plt.plot(sunint_depth, sunint_temperature, label="MARCS TS interpolated", color="black")
+    #xx, yy = marcs_model.interpolate_temperature(50)
+    #plt.plot(xx, yy, label="MARCS 50 interpolated", color="blue", linestyle="--")
     xx2, yy2 = marcs_model.interpolate_temperature(marcs_50_depth)
-    plt.plot(xx2, yy2, label="MARCS 50 interpolated v2", color="black", linestyle="-.")
+    xx2, yy2 = marcs_model.interpolate_temperature(marcs_model.depth)
+    plt.plot(xx2, yy2, label="MARCS 50 interpolated v2", color="red", linestyle="--")
     plt.legend()
     plt.show()
 

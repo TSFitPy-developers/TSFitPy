@@ -5,6 +5,8 @@ import os
 import numpy as np
 from scipy import integrate
 from scipy.interpolate import interp1d
+import importlib.util
+import sys
 
 
 def create_dir(directory: str):
@@ -123,3 +125,22 @@ def closest_available_value(target: float, options: list[float]) -> float:
     options = np.asarray(options)
     idx = (np.abs(options - target)).argmin()
     return options[idx]
+
+def import_module_from_path(module_name, file_path):
+    """
+    Dynamically imports a module or package from a given file path.
+
+    Parameters:
+    module_name (str): The name to assign to the module.
+    file_path (str): The file path to the module or package.
+
+    Returns:
+    module: The imported module.
+    """
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None:
+        raise ImportError(f"Module spec not found for {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module

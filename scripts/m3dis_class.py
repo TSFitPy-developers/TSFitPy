@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 import time
 import tempfile
+import importlib.util
+import sys
 
 from scripts.solar_abundances import periodic_table, solar_abundances
 from scripts.solar_isotopes import solar_isotopes
@@ -17,9 +19,10 @@ from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 
 class m3disCall(SyntheticSpectrumGenerator):
     def __init__(self, m3dis_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
-                 marcs_grid_list: str, model_atom_path: str,
+                 marcs_grid_list: str, model_atom_path: str, departure_file_path: str,
+                 aux_file_length_dict: dict,
                  marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
-                 model_logs: np.ndarray, model_mets: np.ndarray):
+                 model_logs: np.ndarray, model_mets: np.ndarray, m3dis_python_module):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -36,6 +39,9 @@ class m3disCall(SyntheticSpectrumGenerator):
                  model_logs, model_mets)
         self.m3dis_path = self.code_path
         self.mpi_cores: int = 1
+        self.departure_file_path = departure_file_path
+        self.aux_file_length_dict = aux_file_length_dict
+        self.m3dis_python_module = m3dis_python_module
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -43,7 +49,9 @@ class m3disCall(SyntheticSpectrumGenerator):
                   sphere=None, alpha=None, s_process=None, r_process=None,
                   line_list_paths=None, line_list_files=None,
                   verbose=None, temp_directory=None, nlte_flag: bool = None, atmosphere_dimension=None,
-                  mpi_cores:int=None):
+                  mpi_cores:int=None,
+                  windows_flag=None, segment_file=None, line_mask_file=None, depart_bin_file=None,
+                  depart_aux_file=None, model_atom_file=None):
         """
         Set the stellar parameters of the synthetic spectra to generate. This can be called as often as needed
         to generate many synthetic spectra with one class instance. All arguments are optional; any which are not
@@ -179,7 +187,7 @@ class m3disCall(SyntheticSpectrumGenerator):
             for element in periodic_table:
                 if element != "":
                     if element in self.free_abundances:
-                        file.write(f"{element:<4} {self.free_abundances[element]:>6.3f}\n")
+                        file.write(f"{element:<4} {self.free_abundances[element] + solar_abundances[element]:>6.3f}\n")
                     else:
                         file.write(f"{element:<4} {solar_abundances[element]:>6.3f}\n")
         return file_path
@@ -202,7 +210,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         separator = "_"
 
         atomic_weights = {}
-        with open("atomicweights.dat", "r") as file:
+        with open("scripts/atomicweights.dat", "r") as file:
             skip_section = True
             current_element_atomic_number = 0
             for line in file:
@@ -258,17 +266,23 @@ class m3disCall(SyntheticSpectrumGenerator):
         abund_file_path = self.write_abund_file()
         isotope_file_path = self.write_isotope_file()
 
+        atmos_path = "./input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
+
+        # get all files from self.line_list_paths[0]
+        self.line_list_files = os.listdir(self.line_list_paths[0])
+
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
-&atmos_params       dims=1 atmos_format='Marcs' vmic={self.turbulent_velocity} atmos_file='./input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod'/\n\
-&atom_params        atom_file='./input_multi3d/atoms/atom.ba06' convlim=1d-2 use_atom_abnd=T /\n\
+&atmos_params       dims=1 atmos_format='Marcs' vmic={self.turbulent_velocity} atmos_file='{atmos_path}'/\n\
+!&atom_params        atom_file='./input_multi3d/atoms/atom.ba06' convlim=1d-2 use_atom_abnd=T /\n\
 &m3d_params         verbose=0 n_nu=1 maxiter=0 /\n\
-!&linelist_params    linelist_file='{self.line_list_files[0]}' /\n\
-!&spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
+&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' /\n\
+&spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size=10 /\n")
+        #print(config_m3dis)
 
         # Select whether we want to see all the output that babsma and bsyn send to the terminal
         if self.verbose:
@@ -281,8 +295,8 @@ class m3disCall(SyntheticSpectrumGenerator):
         cwd = os.getcwd()
 
         try:  # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
-            os.chdir(os.path.join(self.m3dis_path, "experiments/Multi3D/", ""))  #
-            print(os.getcwd())
+            os.chdir(os.path.join(self.m3dis_path, ""))  #
+            #print(os.getcwd())
             pr1, stderr_bytes = self.run_m3dis(config_m3dis, stderr, stdout)
         except subprocess.CalledProcessError:
             output["errors"] = "babsma failed with CalledProcessError"
@@ -308,6 +322,17 @@ class m3disCall(SyntheticSpectrumGenerator):
         output = self.call_m3dis()
         if "errors" in output:
             print(output["errors"], "m3dis failed")
+        else:
+            completed_run = self.m3dis_python_module.read(
+                self.tmp_dir
+            )
+            wavelength, _ = completed_run.get_xx(completed_run.lam)
+            normalised_flux, flux = completed_run.get_yy(norm=True)
+            # save to file as append
+            file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
+            # save to file using numpy, wavelength, normalised_flux, flux
+            np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
+
 
 
 if __name__ == "__main__":
@@ -361,28 +386,7 @@ if __name__ == "__main__":
     time_end = time.perf_counter()
     print("Time taken to read: ", time_end - time_start)
 
-    import importlib.util
-    import sys
 
-
-    def import_module_from_path(module_name, file_path):
-        """
-        Dynamically imports a module or package from a given file path.
-
-        Parameters:
-        module_name (str): The name to assign to the module.
-        file_path (str): The file path to the module or package.
-
-        Returns:
-        module: The imported module.
-        """
-        spec = importlib.util.spec_from_file_location(module_name, file_path)
-        if spec is None:
-            raise ImportError(f"Module spec not found for {file_path}")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return module
 
 
     # Example usage

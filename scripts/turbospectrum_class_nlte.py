@@ -481,7 +481,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         # Run babsma. This creates an opacity file .opac from the MARCS atmospheric model
         try:  # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
-            os.chdir(turbospec_root)  # Time wasted trying to make asyncio work here: 6 hours. Halts program halfway
+            os.chdir(turbospec_root)
             pr1, stderr_bytes = self.run_babsma(babsma_in, stderr, stdout)
         except subprocess.CalledProcessError:
             output["errors"] = "babsma failed with CalledProcessError"

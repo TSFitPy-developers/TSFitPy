@@ -631,7 +631,7 @@ class TSFitPyConfig:
         # read the configuration file
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
-        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
+        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "m3dis"])
         self.spectral_code_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
@@ -957,8 +957,8 @@ class TSFitPyConfig:
             self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec-gf", "")
         elif self.compiler.lower() == "m3dis":
-            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_file_exists(os.path.join(self.spectral_code_path, "dispatch.x"), check_valid_path),
-                                                   "dispatch.x", "")
+            _ = self._check_if_file_exists(os.path.join(self.spectral_code_path, "dispatch.x"), check_valid_path)
+            self.spectral_code_path = os.path.join(os.getcwd(), self.spectral_code_path, "")
         else:
             raise ValueError("Compiler not recognized")
         self.spectral_code_path = self.spectral_code_path
@@ -1061,6 +1061,7 @@ class TSFitPyConfig:
 
         spectra_object.nelement = self.nelement
         spectra_object.spectral_code_path = self.spectral_code_path
+        spectra_object.compiler = self.compiler
 
         spectra_object.interpol_path = self.interpolators_path
 
