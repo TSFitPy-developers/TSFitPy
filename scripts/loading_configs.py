@@ -397,6 +397,18 @@ class TSFitPyConfig:
         self.time_limit_hours = 71
         self.slurm_partition = "debug"
 
+        # new options for the m3dis
+        self.n_nu = 1
+        self.hash_table_size = 10
+        self.mpi_cores = 1
+        self.iterations_max = 0
+        self.convlim = 0.01
+        self.snap = 1
+        self.dims = 23
+        self.nx = 10
+        self.ny = 10
+        self.nz = 230
+
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -750,6 +762,31 @@ class TSFitPyConfig:
             self.time_limit_hours = 71
             self.slurm_partition = "debug"
 
+        # m3dis stuff
+        try:
+            self.n_nu = int(self.config_parser["m3disParameters"]["n_nu"])
+            self.hash_table_size = int(self.config_parser["m3disParameters"]["hash_table_size"])
+            self.mpi_cores = int(self.config_parser["m3disParameters"]["mpi_cores"])
+            self.iterations_max = int(self.config_parser["m3disParameters"]["iterations_max"])
+            self.convlim = float(self.config_parser["m3disParameters"]["convlim"])
+            self.snap = int(self.config_parser["m3disParameters"]["snap"])
+            self.dims = int(self.config_parser["m3disParameters"]["dims"])
+            self.nx = int(self.config_parser["m3disParameters"]["nx"])
+            self.ny = int(self.config_parser["m3disParameters"]["ny"])
+            self.nz = int(self.config_parser["m3disParameters"]["nz"])
+        except KeyError:
+            self.n_nu = 1
+            self.hash_table_size = 10
+            self.mpi_cores = 1
+            self.iterations_max = 0
+            self.convlim = 0.01
+            self.snap = 1
+            self.dims = 23
+            self.nx = 10
+            self.ny = 10
+            self.nz = 230
+
+
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
         fit_variable, input_variable = None, None  # both booleans
@@ -1000,6 +1037,27 @@ class TSFitPyConfig:
 
         if self.fit_teff:
             self.fit_feh = False
+
+        if self.n_nu <= 0:
+            raise ValueError("n_nu must be greater than 0")
+        if self.hash_table_size <= 0:
+            raise ValueError("hash_table_size must be greater than 0")
+        if self.mpi_cores <= 0:
+            raise ValueError("mpi_cores must be greater than 0")
+        if self.iterations_max < 0:
+            raise ValueError("iterations_max must be greater than or equal to 0")
+        if self.convlim < 0:
+            raise ValueError("convlim must be greater than or equal to 0")
+        if self.snap < 0:
+            raise ValueError("snap must be greater than or equal to 0")
+        if self.dims <= 0:
+            raise ValueError("dims must be greater than 0")
+        if self.nx <= 0:
+            raise ValueError("nx must be greater than 0")
+        if self.ny <= 0:
+            raise ValueError("ny must be greater than 0")
+        if self.nz <= 0:
+            raise ValueError("nz must be greater than 0")
 
     def load_spectra_config(self, spectra_object):
         spectra_object.atmosphere_type = self.atmosphere_type

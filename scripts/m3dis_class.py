@@ -22,7 +22,16 @@ class m3disCall(SyntheticSpectrumGenerator):
                  marcs_grid_list: str, model_atom_path: str, departure_file_path: str,
                  aux_file_length_dict: dict,
                  marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
-                 model_logs: np.ndarray, model_mets: np.ndarray, m3dis_python_module):
+                 model_logs: np.ndarray, model_mets: np.ndarray, m3dis_python_module, n_nu=None,
+                hash_table_size=None,
+                mpi_cores=None,
+                iterations_max=None,
+                convlim=None,
+                snap=None,
+                dims=None,
+                nx=None,
+                ny=None,
+                nz=None):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -42,6 +51,15 @@ class m3disCall(SyntheticSpectrumGenerator):
         self.departure_file_path = departure_file_path
         self.aux_file_length_dict = aux_file_length_dict
         self.m3dis_python_module = m3dis_python_module
+        self.n_nu = n_nu
+        self.hash_table_size = hash_table_size
+        self.iterations_max = iterations_max
+        self.convlim = convlim
+        self.snap = snap
+        self.dims = dims
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -271,17 +289,26 @@ class m3disCall(SyntheticSpectrumGenerator):
         # get all files from self.line_list_paths[0]
         self.line_list_files = os.listdir(self.line_list_paths[0])
 
+        if self.atmosphere_dimension == "1D":
+            atmo_param = "atmos_format='Marcs' vmic={self.turbulent_velocity}"
+        elif self.atmosphere_dimension == "3D":
+            atmo_param = "atmos_format='MUST'"
+
+        if self.nlte_flag:
+            atom_path = self.model_atom_path
+            atom_params = f"&atom_params        atom_file='{atom_path}' convlim={self.convlim} use_atom_abnd=F /\n"
+            # TODO: add exlucion of atom from line list
+
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
-&atmos_params       dims=1 atmos_format='Marcs' vmic={self.turbulent_velocity} atmos_file='{atmos_path}'/\n\
-!&atom_params        atom_file='./input_multi3d/atoms/atom.ba06' convlim=1d-2 use_atom_abnd=T /\n\
-&m3d_params         verbose=0 n_nu=1 maxiter=0 /\n\
+&atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path} {atmo_param}'/\n{atom_params}\
+&m3d_params         verbose=0 n_nu={self.n_nu} maxiter={self.iterations_max} /\n\
 &linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' /\n\
 &spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
-&task_list_params   hash_table_size=10 /\n")
+&task_list_params   hash_table_size={self.hash_table_size} /\n")
         #print(config_m3dis)
 
         # Select whether we want to see all the output that babsma and bsyn send to the terminal

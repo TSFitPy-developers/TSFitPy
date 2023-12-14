@@ -393,6 +393,17 @@ class Spectra:
         self.debug_mode = 0  # 0: no debug, 1: show Python warnings, 2: turn Fortran TS verbose setting on
         self.experimental_parallelisation = False  # experimental parallelisation of the TS code
 
+        self.m3dis_n_nu: int = None
+        self.m3dis_hash_table_size: int = None
+        self.m3dis_mpi_cores: int = None
+        self.m3dis_iterations_max: int = None
+        self.m3dis_convlim: float = None
+        self.m3dis_snap: int = None
+        self.m3dis_dims: int = None
+        self.m3dis_nx: int = None
+        self.m3dis_ny: int = None
+        self.m3dis_nz: int = None
+
         # Set values from config
         if n_workers != 1:
             tsfitpy_config = tsfitpy_config.result()
@@ -579,6 +590,17 @@ class Spectra:
         self.sigmas_upper_limit = tsfitpy_config.sigmas_upper_limit
         self.find_teff_errors = tsfitpy_config.find_teff_errors
         self.teff_error_sigma = tsfitpy_config.teff_error_sigma
+
+        self.m3dis_n_nu = tsfitpy_config.n_nu
+        self.m3dis_hash_table_size = tsfitpy_config.hash_table_size
+        self.m3dis_mpi_cores = tsfitpy_config.mpi_cores
+        self.m3dis_iterations_max = tsfitpy_config.iterations_max
+        self.m3dis_convlim = tsfitpy_config.convlim
+        self.m3dis_snap = tsfitpy_config.snap
+        self.m3dis_dims = tsfitpy_config.dims
+        self.m3dis_nx = tsfitpy_config.nx
+        self.m3dis_ny = tsfitpy_config.ny
+        self.m3dis_nz = tsfitpy_config.nz
 
         self._load_marcs_grids()
 
@@ -903,7 +925,17 @@ class Spectra:
                 marcs_value_keys=self.marcs_value_keys,
                 marcs_models=marcs_models,
                 marcs_values=self.marcs_values,
-                m3dis_python_module=m3dis_python_module
+                m3dis_python_module=m3dis_python_module,
+                n_nu=self.m3dis_n_nu,
+                hash_table_size=self.m3dis_hash_table_size,
+                mpi_cores=self.m3dis_mpi_cores,
+                iterations_max=self.m3dis_iterations_max,
+                convlim=self.m3dis_convlim,
+                snap=self.m3dis_snap,
+                dims=self.m3dis_dims,
+                nx=self.m3dis_nx,
+                ny=self.m3dis_ny,
+                nz=self.m3dis_nz
             )
         else:
             ts = TurboSpectrum(
