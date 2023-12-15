@@ -281,8 +281,9 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  rotation: float, abundances_dict: dict, resolution: float, line_list_path_trimmed: str, index_temp_dir: float,
-                 tsfitpy_config, n_workers=1):
+                 tsfitpy_config, n_workers=1, m3dis_python_module=None):
         # Default values
+        self.m3dis_python_module = m3dis_python_module  # python module for reading m3dis output
         self.compiler: str = None  # intel, gfotran, m3dis
         self.spectral_code_path: str = None  # path to the /exec/ file
         self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
@@ -925,7 +926,7 @@ class Spectra:
                 marcs_value_keys=self.marcs_value_keys,
                 marcs_models=marcs_models,
                 marcs_values=self.marcs_values,
-                m3dis_python_module=m3dis_python_module,
+                m3dis_python_module=self.m3dis_python_module,
                 n_nu=self.m3dis_n_nu,
                 hash_table_size=self.m3dis_hash_table_size,
                 mpi_cores=self.m3dis_mpi_cores,
@@ -2246,7 +2247,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, rotation1: float, abundances_dict1: dict, resolution1: float, line_list_path_trimmed: str,
-                           index: float, tsfitpy_configuration) -> list:
+                           index: float, tsfitpy_configuration, m3dis_python_module) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param resolution1: resolution
@@ -2274,7 +2275,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
 
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
-                      line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers)
+                      line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
 
     #spectra.dask_client = dask_client
 
@@ -2359,13 +2360,14 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     if tsfitpy_configuration.compiler.lower() == "m3dis": # "experiments/Multi3D/",
         module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
         #module_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/m3dis/__init__.py"  # Replace with the actual path
-        global m3dis_python_module
         m3dis_python_module = import_module_from_path("m3dis", module_path)
 
         # set molecules to False
         tsfitpy_configuration.include_molecules = False
         do_hydrogen_linelist = False
         # TODO: if several linelists, will need to combine them
+    else:
+        m3dis_python_module = None
 
     if not config_location[-4:] == ".cfg":
         logging.debug("Configuration: Config file does not end with .cfg. Converting to new format.")
@@ -2818,13 +2820,14 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
             logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
             future = create_and_fit_spectra(client, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx, tsfitpy_configuration)
+                                   rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx, tsfitpy_configuration, m3dis_python_module)
             futures.append(future)  # prepares to get values
 
         print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
         futures = np.array(client.gather(futures))  # starts the calculations (takes a long time here)
         results = futures
         print("Worker calculation done")  # when done, save values
+        client.close()  # close dask client
     else:
         results = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
@@ -2833,7 +2836,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
                 f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
             results.append(create_and_fit_spectra(None, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
                                                   rotation1, abundances_dict1, resolution1,
-                                                  line_list_path_trimmed, idx, tsfitpy_configuration))
+                                                  line_list_path_trimmed, idx, tsfitpy_configuration, m3dis_python_module))
 
     logging.debug("Finished fitting, now saving results")
 

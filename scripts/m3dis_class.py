@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import subprocess
 
-#from m3dis_l.m3dis.experiments.Multi3D import m3dis
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -47,7 +48,7 @@ class m3disCall(SyntheticSpectrumGenerator):
                  marcs_value_keys, marcs_values, marcs_models, model_temperatures,
                  model_logs, model_mets)
         self.m3dis_path = self.code_path
-        self.mpi_cores: int = 1
+        self.mpi_cores: int = mpi_cores
         self.departure_file_path = departure_file_path
         self.aux_file_length_dict = aux_file_length_dict
         self.m3dis_python_module = m3dis_python_module
@@ -177,6 +178,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         # Create a copy of the current environment variables
         env = os.environ.copy()
         # Set OMP_NUM_THREADS for the subprocess
+
         env['OMP_NUM_THREADS'] = str(self.mpi_cores)
 
         # Now, you can use temp_file_name as an argument to dispatch.x
@@ -374,13 +376,14 @@ class m3disCall(SyntheticSpectrumGenerator):
                     self.tmp_dir
                 )
                 wavelength, _ = completed_run.get_xx(completed_run.lam)
-                normalised_flux, flux = completed_run.get_yy(norm=True)
+                flux, continuum = completed_run.get_yy(norm=False)
+                normalised_flux = flux / continuum
                 # save to file as append
                 file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
                 # save to file using numpy, wavelength, normalised_flux, flux
                 np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
-            except FileNotFoundError:
-                print("m3dis failed")
+            except FileNotFoundError as e:
+                print(f"m3dis failed {e}")
 
 
 
