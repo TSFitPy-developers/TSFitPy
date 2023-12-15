@@ -215,6 +215,11 @@ if __name__ == '__main__':
     #plt.xlabel("Depth [cm]")
     #plt.show()
 
+    plt.plot(marcs_model.prad, marcs_model.density)
+    plt.ylabel("Density [cgs]")
+    plt.xlabel("Pg [cgs]")
+    plt.show()
+
     sunint_file = "/Users/storm/docker_common_folder/TSFitPy/temp_directory_Dec-14-2023-11-52-14__0.06273117145467688/marcs_tef5777.0_g4.40_z0.00_tur1.00.interpol"
     sunint_temperature, sunint_depth = np.loadtxt(sunint_file, unpack=True, usecols=(1,5), dtype=float, skiprows=1, comments="/")
     sunint_depth = marcs_model.radius - sunint_depth

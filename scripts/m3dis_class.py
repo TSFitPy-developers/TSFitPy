@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 
 import numpy as np
@@ -160,6 +161,16 @@ class m3disCall(SyntheticSpectrumGenerator):
             self.mpi_cores = mpi_cores
         if model_atom_file is not None:
             self.model_atom_file = model_atom_file
+        if windows_flag is not None:
+            self.windows_flag = windows_flag
+        if depart_bin_file is not None:
+            self.depart_bin_file = depart_bin_file
+        if depart_aux_file is not None:
+            self.depart_aux_file = depart_aux_file
+        if model_atom_file is not None:
+            self.model_atom_file = model_atom_file
+        if segment_file is not None:
+            self.segment_file = segment_file
 
     def run_m3dis(self, input_in, stderr, stdout):
         # Write the input data to a temporary file
@@ -228,12 +239,8 @@ class m3disCall(SyntheticSpectrumGenerator):
         # count the number of each element, such that we have e.g. 3: 2, 4: 1, 5: 1
         elements_count = {element: elements_atomic_number.count(element) for element in elements_atomic_number}
         # remove duplicates
-        elements_atomic_number_unique = list(set(elements_atomic_number))
-
-        # parse the atomic weights file
-        elements_atomic_number_unique = set(
-            elements_atomic_number_unique)  # Convert list to set for faster membership testing
-        separator = "_"
+        elements_atomic_number_unique = set(elements_atomic_number)
+        separator = "_"  # separator between sections in the file from NIST
 
         atomic_weights = {}
         with open("scripts/atomicweights.dat", "r") as file:
@@ -286,13 +293,45 @@ class m3disCall(SyntheticSpectrumGenerator):
                     f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>8.4f} {isotope:>8.4f}\n")
         return file_path
 
+    def convert_interpolated_atmo_to_m3dis(self, atmos_path):
+        log_taur, teff, log_pe, log_pg, vmic, subt_depth, log_tau5 = np.loadtxt(atmos_path, unpack=True, skiprows=1, usecols=(0, 1, 2, 3, 4, 5, 6), comments="/")
+        # convert subt_depth to depth. depends whether spherical or plane-parallel
+        spherical_model: bool = self.atmosphere_properties["spherical"]
+        if not spherical_model:
+            depth = 1 - subt_depth
+        else:
+            raise ValueError("Spherical models not implemented yet")
+        # interpolate to the equidistant depth grid. first get the new depth grid based on minimum and maximum depth
+        depth_min = np.min(depth)
+        depth_max = np.max(depth)
+        depth_points = np.size(depth)
+        depth_new = np.linspace(depth_min, depth_max, depth_points)
+        # interpolate all the other parameters to the new depth grid
+        teff_new = np.interp(depth_new, depth, teff)
+        log_pe_new = np.interp(depth_new, depth, log_pe)
+        log_pg_new = np.interp(depth_new, depth, log_pg)
+        # vmic not needed because it is constant
+        #vmic_new = np.interp(depth_new, depth, vmic)
+
+        # write the file, format: depth temp pe pg vmic, so need to convert log_pe and log_pg
+        file_path = os.path.join(self.tmp_dir, f"atmos.{self.marcs_model_name}")
+        with open(file_path, "w") as file:
+            # first is name of file
+            file.write(f"{self.marcs_model_name}\n")
+            # next is number of points as integer
+            file.write(f"{depth_points}\n")
+            # next is the format
+            file.write("* depth      temp       pe        pg      vmic\n")
+            for i in range(len(depth_new)):
+                file.write(f"{depth_new[i]:>13.6e} {teff_new[i]:>8.1f} {np.power(10, log_pe_new[i]):>12.4E} {np.power(10, log_pg_new[i]):>12.4E} {vmic[i]:>3.1f}\n")
+        return file_path
 
 
     def call_m3dis(self):
         abund_file_path = self.write_abund_file()
         isotope_file_path = self.write_isotope_file()
 
-        atmos_path = "./input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
+
 
         # get all files from self.line_list_paths[0]
         self.line_list_files = os.listdir(self.line_list_paths[0])
@@ -300,7 +339,14 @@ class m3disCall(SyntheticSpectrumGenerator):
         if self.atmosphere_dimension == "1D":
             atmo_param = f"atmos_format='Marcs' vmic={round(self.turbulent_velocity, 5)}"
             self.dims = 1
+            #atmos_path = "./input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
+
+            atmo_param = f"atmos_format='Text' vmic={round(self.turbulent_velocity, 5)}"
+            atmos_path = f"{os.path.join(self.tmp_dir, self.marcs_model_name)}.interpol"
+            # convert to m3dis format
+            atmos_path = self.convert_interpolated_atmo_to_m3dis(atmos_path)
         elif self.atmosphere_dimension == "3D":
+            raise ValueError("3D atmospheres not implemented yet")
             atmo_param = "atmos_format='MUST'"
         else:
             raise ValueError("Atmosphere dimension must be either 1D or 3D: m3dis_class.py")
@@ -330,9 +376,6 @@ class m3disCall(SyntheticSpectrumGenerator):
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
         #print(config_m3dis)
 
-
-
-        # Select whether we want to see all the output that babsma and bsyn send to the terminal
         if self.verbose:
             stdout = None
             stderr = subprocess.STDOUT
@@ -354,9 +397,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         if stderr_bytes is None:
             stderr_bytes = b""
         if pr1.returncode != 0:
-            output["errors"] = "m3dis failed"
-            # logging.info("Babsma failed. Return code {}. Error text <{}>".
-            #             format(pr1.returncode, stderr_bytes.decode('utf-8')))
+            output["errors"] = f"m3dis failed with return code {pr1.returncode} {stderr_bytes.decode('utf-8')}"
             return output
 
         # Return output
@@ -367,23 +408,29 @@ class m3disCall(SyntheticSpectrumGenerator):
         return output
 
     def synthesize_spectra(self):
-        output = self.call_m3dis()
-        if "errors" in output:
-            print(output["errors"], "m3dis failed")
-        else:
-            try:
-                completed_run = self.m3dis_python_module.read(
-                    self.tmp_dir
-                )
-                wavelength, _ = completed_run.get_xx(completed_run.lam)
-                flux, continuum = completed_run.get_yy(norm=False)
-                normalised_flux = flux / continuum
-                # save to file as append
-                file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
-                # save to file using numpy, wavelength, normalised_flux, flux
-                np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
-            except FileNotFoundError as e:
-                print(f"m3dis failed {e}")
+        try:
+            logging.debug("Running m3dis and atmosphere")
+            self.calculate_atmosphere()
+            logging.debug("Running m3dis")
+            output = self.call_m3dis()
+            if "errors" in output:
+                print(output["errors"], "m3dis failed")
+            else:
+                try:
+                    completed_run = self.m3dis_python_module.read(
+                        self.tmp_dir
+                    )
+                    wavelength, _ = completed_run.get_xx(completed_run.lam)
+                    flux, continuum = completed_run.get_yy(norm=False)
+                    normalised_flux = flux / continuum
+                    # save to file as append
+                    file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
+                    # save to file using numpy, wavelength, normalised_flux, flux
+                    np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
+                except FileNotFoundError as e:
+                    print(f"m3dis, cannot find  {e}")
+        except (FileNotFoundError, ValueError, TypeError) as error:
+            print(f"Interpolation failed? {error}")
 
 
 

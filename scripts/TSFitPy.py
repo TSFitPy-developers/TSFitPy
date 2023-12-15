@@ -1522,6 +1522,12 @@ class Spectra:
         except IndexError as error:
             print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
             elem_abund_dict = {"Fe": 999999}
+            for i in range(self.nelement):
+                # self.elem_to_fit[i] = element name
+                # param[1:nelement] = abundance of the element
+                elem_name = self.elem_to_fit[i]
+                if elem_name != "Fe":
+                    elem_abund_dict[elem_name] = 999999  # + met
             doppler_fit = 999999
             microturb = 999999
             macroturb = 999999
