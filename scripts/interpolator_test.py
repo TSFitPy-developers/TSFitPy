@@ -9,10 +9,10 @@ from scripts import marcs_class
 
 modelAtmGrid = {'teff':[], 'logg':[], 'feh':[], 'vturb':[], 'file':[], 'structure':[], 'structure_keys':[], 'mass':[]} # data
 
-marcs_models_to_load = ["p5000_g+4.0_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
-                        "p5000_g+4.5_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
-                        "p5000_g+4.0_m0.0_t01_st_z+0.50_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
-                        "p5000_g+4.5_m0.0_t01_st_z+0.50_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
+marcs_models_to_load = ["p5500_g+4.0_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
+                        "p5500_g+4.5_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
+                        "p5500_g+4.0_m0.0_t01_st_z+0.50_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
+                        "p5500_g+4.5_m0.0_t01_st_z+0.50_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
                         "p6000_g+4.0_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
                         "p6000_g+4.5_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
                         "p6000_g+4.0_m0.0_t01_st_z+0.50_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod",
@@ -28,7 +28,7 @@ for marcs_model in marcs_models_to_load:
     modelAtmGrid['feh'].append(one_model.metallicity)
     modelAtmGrid['vturb'].append(one_model.vmicro)
     modelAtmGrid['file'].append(one_model.file)
-    modelAtmGrid['structure'].append(np.vstack((one_model.lgTau5, one_model.temperature, one_model.pe, np.full(one_model.depth.shape, one_model.vmicro))))
+    modelAtmGrid['structure'].append(np.vstack((one_model.lgTau5, one_model.temperature, one_model.pe, np.full(one_model.depth.shape, one_model.vmicro), one_model.density, one_model.depth)))
     modelAtmGrid['structure_keys'].append(['tau500', 'temp', 'pe', 'vmic'])
     modelAtmGrid['mass'].append(one_model.mass)
 
@@ -52,10 +52,12 @@ points = np.array(points).T
 values = np.array(modelAtmGrid['structure'])
 interp_f = LinearNDInterpolator(points, values)
 
-tau500_new, temp_new, pe_new, vmic_new = interp_f([5777, 4.44, 0])[0]
+tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f([5777, 4.44, 0])[0]
+tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f([5750, 4.5, 0])[0]
 # plot tau vs temp, pe, vmic in 3 different plots
 # together with it plot solar values
 solar_model = marcs_class.MARCSModel("/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod")
+solar_model = marcs_class.MARCSModel(os.path.join(marcs_path, "p5750_g+4.5_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"))
 # plot
 plt.figure(figsize=(10, 8))
 plt.plot(solar_model.temperature, solar_model.lgTau5, label="solar")
@@ -74,10 +76,26 @@ plt.legend()
 plt.show()
 
 plt.figure(figsize=(10, 8))
-plt.plot(solar_model.temperature, solar_model.vmicro, label="solar")
+plt.plot(solar_model.temperature, np.full(solar_model.depth.shape, solar_model.vmicro), label="solar")
 plt.plot(temp_new, vmic_new, label="interpolated")
 plt.xlabel("temperature")
 plt.ylabel("vmic")
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(10, 8))
+plt.plot(solar_model.temperature, solar_model.density, label="solar")
+plt.plot(temp_new, density_new, label="interpolated")
+plt.xlabel("temperature")
+plt.ylabel("density")
+plt.legend()
+plt.show()
+
+plt.figure(figsize=(10, 8))
+plt.plot(solar_model.temperature, solar_model.depth, label="solar")
+plt.plot(temp_new, depth_new, label="interpolated")
+plt.xlabel("temperature")
+plt.ylabel("depth")
 plt.legend()
 plt.show()
 
