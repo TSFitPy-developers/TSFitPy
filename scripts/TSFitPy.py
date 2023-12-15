@@ -2738,12 +2738,13 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
               f"you fit it.")
     # check done in tsfitpyconfiguration
     if tsfitpy_configuration.nlte_flag:
-        for file in tsfitpy_configuration.depart_bin_file_dict:
-            if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_bin_file_dict[file])):
-                print(f"{tsfitpy_configuration.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
-        for file in tsfitpy_configuration.depart_aux_file_dict:
-            if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_aux_file_dict[file])):
-                print(f"{tsfitpy_configuration.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
+        if tsfitpy_configuration.compiler.lower() != "m3dis":
+            for file in tsfitpy_configuration.depart_bin_file_dict:
+                if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_bin_file_dict[file])):
+                    print(f"{tsfitpy_configuration.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
+            for file in tsfitpy_configuration.depart_aux_file_dict:
+                if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_aux_file_dict[file])):
+                    print(f"{tsfitpy_configuration.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
         for file in tsfitpy_configuration.model_atom_file_dict:
             if not os.path.isfile(os.path.join(tsfitpy_configuration.model_atoms_path, tsfitpy_configuration.model_atom_file_dict[file])):
                 print(f"{tsfitpy_configuration.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
@@ -2789,8 +2790,12 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     if tsfitpy_configuration.nlte_flag:
         tsfitpy_configuration.aux_file_length_dict = {}
 
-        for element in model_atom_file_dict:
-            tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+        if not tsfitpy_configuration.compiler.lower() == "m3dis":
+            for element in model_atom_file_dict:
+                tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+        else:
+            for element in model_atom_file_dict:
+                tsfitpy_configuration.aux_file_length_dict[element] = 0
 
     # pickle the configuration file into the temp folder
     #with open(os.path.join(tsfitpy_configuration.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:

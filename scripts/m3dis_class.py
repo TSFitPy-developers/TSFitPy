@@ -157,6 +157,8 @@ class m3disCall(SyntheticSpectrumGenerator):
             self.turbulent_velocity = None
         if mpi_cores is not None:
             self.mpi_cores = mpi_cores
+        if model_atom_file is not None:
+            self.model_atom_file = model_atom_file
 
     def run_m3dis(self, input_in, stderr, stdout):
         # Write the input data to a temporary file
@@ -204,10 +206,14 @@ class m3disCall(SyntheticSpectrumGenerator):
             # write the elements and their abundances
             for element in periodic_table:
                 if element != "":
-                    if element in self.free_abundances:
-                        file.write(f"{element:<4} {self.free_abundances[element] + solar_abundances[element]:>6.3f}\n")
+                    if element == "H" or element == "He":
+                        abundance_to_write = solar_abundances[element]
                     else:
-                        file.write(f"{element:<4} {solar_abundances[element]:>6.3f}\n")
+                        if element in self.free_abundances:
+                            abundance_to_write = self.free_abundances[element] + solar_abundances[element] + self.metallicity
+                        else:
+                            abundance_to_write = solar_abundances[element] + self.metallicity
+                    file.write(f"{element:<4} {abundance_to_write:>6.3f}\n")
         return file_path
 
     def write_isotope_file(self):
@@ -290,26 +296,39 @@ class m3disCall(SyntheticSpectrumGenerator):
         self.line_list_files = os.listdir(self.line_list_paths[0])
 
         if self.atmosphere_dimension == "1D":
-            atmo_param = "atmos_format='Marcs' vmic={self.turbulent_velocity}"
+            atmo_param = f"atmos_format='Marcs' vmic={round(self.turbulent_velocity, 5)}"
+            self.dims = 1
         elif self.atmosphere_dimension == "3D":
             atmo_param = "atmos_format='MUST'"
+        else:
+            raise ValueError("Atmosphere dimension must be either 1D or 3D: m3dis_class.py")
 
         if self.nlte_flag:
             atom_path = self.model_atom_path
-            atom_params = f"&atom_params        atom_file='{atom_path}' convlim={self.convlim} use_atom_abnd=F /\n"
-            # TODO: add exlucion of atom from line list
+            atom_files = list(self.model_atom_file.keys())
+            atom_file_element = atom_files[0]
+            if len(atom_files) > 1:
+                print(f"Only one atom file is allowed for NLTE: m3dis, using the first one {atom_file_element}")
+            atom_params = f"&atom_params        atom_file='{os.path.join(atom_path, self.model_atom_file[atom_file_element])}' convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=F exclude_from_line_list=T /\n"
+            # linelist_param_extra
+            linelist_param_extra = f"exclude_elements='{atom_file_element}'"
+        else:
+            atom_params = ""
+            linelist_param_extra = ""
 
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
-&atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path} {atmo_param}'/\n{atom_params}\
-&m3d_params         verbose=0 n_nu={self.n_nu} maxiter={self.iterations_max} /\n\
-&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' /\n\
+&atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
+&m3d_params         verbose=0 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
+&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' {linelist_param_extra}/\n\
 &spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
         #print(config_m3dis)
+
+
 
         # Select whether we want to see all the output that babsma and bsyn send to the terminal
         if self.verbose:
@@ -350,15 +369,19 @@ class m3disCall(SyntheticSpectrumGenerator):
         if "errors" in output:
             print(output["errors"], "m3dis failed")
         else:
-            completed_run = self.m3dis_python_module.read(
-                self.tmp_dir
-            )
-            wavelength, _ = completed_run.get_xx(completed_run.lam)
-            normalised_flux, flux = completed_run.get_yy(norm=True)
-            # save to file as append
-            file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
-            # save to file using numpy, wavelength, normalised_flux, flux
-            np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
+            try:
+                completed_run = self.m3dis_python_module.read(
+                    self.tmp_dir
+                )
+                wavelength, _ = completed_run.get_xx(completed_run.lam)
+                normalised_flux, flux = completed_run.get_yy(norm=True)
+                # save to file as append
+                file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
+                # save to file using numpy, wavelength, normalised_flux, flux
+                np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
+            except FileNotFoundError:
+                print("m3dis failed")
+
 
 
 
