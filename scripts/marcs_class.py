@@ -22,13 +22,13 @@ class MARCSModel:
         self.name = lines_marcs_model[current_line].strip()
         current_line += 1
         # second line is temperature with junk at the end
-        self.temperature = float(lines_marcs_model[current_line].strip().split()[0])
+        self.teff = float(lines_marcs_model[current_line].strip().split()[0])
         current_line += 1
         # third line if flux in erg/s/cm^2 with junk at the end
         self.flux = float(lines_marcs_model[current_line].strip().split()[0])
         current_line += 1
         # fourth line is log(g) with junk at the end
-        self.logg = float(lines_marcs_model[current_line].strip().split()[0])
+        self.logg = np.log10(float(lines_marcs_model[current_line].strip().split()[0]))
         current_line += 1
         # fifth line is vmicro with junk at the end
         self.vmicro = float(lines_marcs_model[current_line].strip().split()[0])
@@ -107,6 +107,28 @@ class MARCSModel:
         self.rhox = data[:, 7].astype(float)
         # next lines are elemental pressures, skipped
         # done
+
+    def interpolate_all_parameters(self, number_depth_points: int) -> None:
+        # interpolate all parameters to the number of depth points: lgTauR, lgTau5, depth, temperature, pe, pg, prad, pturb, kappaRoss, density, mu, vconv, fconv_f, rhox
+        # number_depth_points: number of depth points to interpolate to
+        self.number_depth_points = number_depth_points
+        # first create new depth points
+        depth_new = np.linspace(self.depth[0], self.depth[-1], number_depth_points)
+        # interpolate all parameters
+        self.lgTauR = interp1d(self.depth, self.lgTauR, kind='linear')(depth_new)
+        self.lgTau5 = interp1d(self.depth, self.lgTau5, kind='linear')(depth_new)
+        self.depth = interp1d(self.depth, self.depth, kind='linear')(depth_new)
+        self.temperature = interp1d(self.depth, self.temperature, kind='linear')(depth_new)
+        self.pe = interp1d(self.depth, self.pe, kind='linear')(depth_new)
+        self.pg = interp1d(self.depth, self.pg, kind='linear')(depth_new)
+        self.prad = interp1d(self.depth, self.prad, kind='linear')(depth_new)
+        self.pturb = interp1d(self.depth, self.pturb, kind='linear')(depth_new)
+        self.kappaRoss = interp1d(self.depth, self.kappaRoss, kind='linear')(depth_new)
+        self.density = interp1d(self.depth, self.density, kind='linear')(depth_new)
+        self.mu = interp1d(self.depth, self.mu, kind='linear')(depth_new)
+        self.vconv = interp1d(self.depth, self.vconv, kind='linear')(depth_new)
+        self.fconv_f = interp1d(self.depth, self.fconv_f, kind='linear')(depth_new)
+        self.rhox = interp1d(self.depth, self.rhox, kind='linear')(depth_new)
 
     def plot_temperature(self):
         plt.plot(self.depth, self.temperature)
