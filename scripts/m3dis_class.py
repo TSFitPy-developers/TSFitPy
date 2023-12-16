@@ -65,6 +65,8 @@ class m3disCall(SyntheticSpectrumGenerator):
         self.nx = nx
         self.ny = ny
         self.nz = nz
+        self.skip_linelist = False
+        self.save_spectra = True
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -297,7 +299,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         return file_path
 
 
-    def call_m3dis(self):
+    def call_m3dis(self, skip_linelist=False):
         abund_file_path = self.write_abund_file()
         isotope_file_path = self.write_isotope_file()
 
@@ -325,12 +327,24 @@ class m3disCall(SyntheticSpectrumGenerator):
             atom_file_element = atom_files[0]
             if len(atom_files) > 1:
                 print(f"Only one atom file is allowed for NLTE: m3dis, using the first one {atom_file_element}")
-            atom_params = f"&atom_params        atom_file='{os.path.join(atom_path, self.model_atom_file[atom_file_element])}' convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=F exclude_from_line_list=T /\n"
+            if not skip_linelist:
+                precomputed_depart = f"precomputed_depart='{os.path.join(self.tmp_dir, '../precomputed_depart', '')}'"
+            else:
+                precomputed_depart = ""
+            atom_params = (f"&atom_params        atom_file='{os.path.join(atom_path, self.model_atom_file[atom_file_element])}' "
+                           f"convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=F exclude_from_line_list=T "
+                           f"{precomputed_depart}/\n")
             # linelist_param_extra
             linelist_param_extra = f"exclude_elements='{atom_file_element}'"
         else:
             atom_params = ""
             linelist_param_extra = ""
+
+        if skip_linelist:
+            linelist_parameters = ""
+        else:
+            linelist_parameters = (f"&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' {linelist_param_extra}/\n\
+                                     &spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n")
 
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
@@ -338,11 +352,10 @@ class m3disCall(SyntheticSpectrumGenerator):
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
 &m3d_params         verbose=0 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
-&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' {linelist_param_extra}/\n\
-&spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n\
+{linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
-        #print(config_m3dis)
+        logging.debug(config_m3dis)
 
         if self.verbose:
             stdout = None
@@ -552,11 +565,13 @@ class m3disCall(SyntheticSpectrumGenerator):
                     f"{depth_interp[i]:>13.6e} {temp_interp[i]:>8.1f} {pe_interp[i]:>12.4E} {density_interp[i]:>12.4E} {vmic_interp[i]:>5.3f}\n")
 
     def synthesize_spectra(self):
+        skip_linelist = self.skip_linelist
+        save_spectra = self.save_spectra
         try:
             logging.debug("Running m3dis and atmosphere")
             self.calculate_atmosphere()
             logging.debug("Running m3dis")
-            output = self.call_m3dis()
+            output = self.call_m3dis(skip_linelist=skip_linelist)
             if "errors" in output:
                 print(output["errors"], "m3dis failed")
             else:
@@ -564,88 +579,16 @@ class m3disCall(SyntheticSpectrumGenerator):
                     completed_run = self.m3dis_python_module.read(
                         self.tmp_dir
                     )
-                    wavelength, _ = completed_run.get_xx(completed_run.lam)
-                    flux, continuum = completed_run.get_yy(norm=False)
-                    normalised_flux = flux / continuum
-                    # save to file as append
-                    file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
-                    # save to file using numpy, wavelength, normalised_flux, flux
-                    np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
+                    if save_spectra:
+                        wavelength, _ = completed_run.get_xx(completed_run.lam)
+                        flux, continuum = completed_run.get_yy(norm=False)
+                        normalised_flux = flux / continuum
+                        # save to file as append
+                        file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
+                        # save to file using numpy, wavelength, normalised_flux, flux
+                        np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
                 except FileNotFoundError as e:
                     print(f"m3dis, cannot find  {e}")
         except (FileNotFoundError, ValueError, TypeError) as error:
             print(f"Interpolation failed? {error}")
 
-
-
-
-if __name__ == "__main__":
-
-
-    test_class = m3disCall(
-        m3dis_path="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/",
-        interpol_path="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/",
-        line_list_paths="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_multi3d/",
-        marcs_grid_path="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_multi3d/atmos/",
-        marcs_grid_list="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_multi3d/atmos/marcs_grid_list.txt",
-        model_atom_path="/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_multi3d/atoms/",
-        marcs_value_keys=[
-            "spherical",
-            "temperature",
-            "log_g",
-            "mass",
-            "turbulence",
-            "model_type",
-            "metallicity",
-        ],
-        marcs_values={
-            "spherical": [],
-            "temperature": [],
-            "log_g": [],
-            "mass": [],
-            "turbulence": [],
-            "model_type": [],
-            "metallicity": [],
-            "a": [],
-            "c": [],
-            "n": [],
-            "o": [],
-            "r": [],
-            "s": [],
-        },
-        marcs_models={},
-        model_temperatures=np.array([]),
-        model_logs=np.array([]),
-        model_mets=np.array([]),
-    )
-    # create temp directory
-    global_temp_dir = "/Users/storm/docker_common_folder/TSFitPy/temp_directory/"
-    temp_directory = tempfile.mkdtemp(dir=global_temp_dir)
-    #print(temp_directory)
-    test_class.configure(temp_directory=temp_directory, lambda_min=6707, lambda_max=6808, lambda_delta=0.01,
-                         line_list_files=["/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/nlte_ges_linelist_jmg17feb2022_I_II_li"],
-                         turbulent_velocity=1.0, free_abundances={}, verbose=True)
-    time_start = time.perf_counter()
-    test_class.synthesize_spectra()
-    time_end = time.perf_counter()
-    print("Time taken to read: ", time_end - time_start)
-
-
-
-
-    # Example usage
-    # Assuming the package is in a folder named 'somecode' and the main module is 'package.py'
-    module_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/m3dis/__init__.py"  # Replace with the actual path
-    m3dis = import_module_from_path("m3dis", module_path)
-
-    # Now you can use pkg as if you imported it normally
-    # For example:
-    # result = pkg.some_function()
-
-    run = m3dis.read(
-        #"/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/data2/input_test/"
-        temp_directory
-    )
-    run.line[0].plot()
-    # run.plot_spectrum()
-    #plt.show()

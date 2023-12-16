@@ -938,6 +938,24 @@ class Spectra:
                 ny=self.m3dis_ny,
                 nz=self.m3dis_nz
             )
+            if self.nlte_flag:
+                # need to run NLTE run once, so that can reuse precomputed departure coefficients
+                if self.elem_to_fit[0] == "Fe":
+                    input_abund = {"Fe": self.met}
+                    met = 0
+                else:
+                    input_abund = {"Fe": self.met, f"{self.elem_to_fit[0]}": 0 + self.met}
+                    met = self.met
+                if self.input_vmic:
+                    vmic = self.vmic
+                else:
+                    vmic = calculate_vturb(self.teff, self.logg, self.met)
+                temp_dir = os.path.join(self.temp_dir, "precomputed_depart")
+                ts.skip_linelist = True
+                ts.save_spectra = False
+                self.configure_and_run_ts(ts, met, input_abund, vmic, self.lmin, self.lmax, False, temp_dir=temp_dir)
+                ts.skip_linelist = False
+                ts.save_spectra = True
         else:
             ts = TurboSpectrum(
                 turbospec_path=self.spectral_code_path,
