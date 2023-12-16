@@ -143,7 +143,7 @@ class SyntheticSpectrumGenerator:
         return element_abundance
 
 
-    def _generate_model_atmosphere(self):
+    def _generate_model_atmosphere(self, run_ts_interpolator: bool = True):
         """
         Generates an interpolated model atmosphere from the MARCS grid using the interpol.f routine developed by
         T. Masseron (Masseron, PhD Thesis, 2006). This is a python wrapper for that fortran code.
@@ -341,6 +341,8 @@ class SyntheticSpectrumGenerator:
                     parameter_descriptor[1] = options[parameter_descriptor[3]]
 
         logging.debug(marcs_model_list)
+        if not run_ts_interpolator:
+            return {"errors": None, "marcs_model_list": marcs_model_list, "spherical": spherical}
         # save marcs model list in a file as one line at a time
         #with open(os_path.join("test12312123.txt"), 'a') as f:
         #    for item in marcs_model_list:

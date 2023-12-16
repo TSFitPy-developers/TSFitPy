@@ -12,6 +12,9 @@ import tempfile
 import importlib.util
 import sys
 
+from scipy.interpolate import LinearNDInterpolator
+
+from scripts import marcs_class
 from scripts.solar_abundances import periodic_table, solar_abundances
 from scripts.solar_isotopes import solar_isotopes
 from scripts.synthetic_code_class import SyntheticSpectrumGenerator
@@ -293,45 +296,10 @@ class m3disCall(SyntheticSpectrumGenerator):
                     f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>8.4f} {isotope:>8.4f}\n")
         return file_path
 
-    def convert_interpolated_atmo_to_m3dis(self, atmos_path):
-        log_taur, teff, log_pe, log_pg, vmic, subt_depth, log_tau5 = np.loadtxt(atmos_path, unpack=True, skiprows=1, usecols=(0, 1, 2, 3, 4, 5, 6), comments="/")
-        # convert subt_depth to depth. depends whether spherical or plane-parallel
-        spherical_model: bool = self.atmosphere_properties["spherical"]
-        if not spherical_model:
-            depth = 1 - subt_depth
-        else:
-            raise ValueError("Spherical models not implemented yet")
-        # interpolate to the equidistant depth grid. first get the new depth grid based on minimum and maximum depth
-        depth_min = np.min(depth)
-        depth_max = np.max(depth)
-        depth_points = np.size(depth)
-        depth_new = np.linspace(depth_min, depth_max, depth_points)
-        # interpolate all the other parameters to the new depth grid
-        teff_new = np.interp(depth_new, depth, teff)
-        log_pe_new = np.interp(depth_new, depth, log_pe)
-        log_pg_new = np.interp(depth_new, depth, log_pg)
-        # vmic not needed because it is constant
-        #vmic_new = np.interp(depth_new, depth, vmic)
-
-        # write the file, format: depth temp pe pg vmic, so need to convert log_pe and log_pg
-        file_path = os.path.join(self.tmp_dir, f"atmos.{self.marcs_model_name}")
-        with open(file_path, "w") as file:
-            # first is name of file
-            file.write(f"{self.marcs_model_name}\n")
-            # next is number of points as integer
-            file.write(f"{depth_points}\n")
-            # next is the format
-            file.write("* depth      temp       pe        pg      vmic\n")
-            for i in range(len(depth_new)):
-                file.write(f"{depth_new[i]:>13.6e} {teff_new[i]:>8.1f} {np.power(10, log_pe_new[i]):>12.4E} {np.power(10, log_pg_new[i]):>12.4E} {vmic[i]:>3.1f}\n")
-        return file_path
-
 
     def call_m3dis(self):
         abund_file_path = self.write_abund_file()
         isotope_file_path = self.write_isotope_file()
-
-
 
         # get all files from self.line_list_paths[0]
         self.line_list_files = os.listdir(self.line_list_paths[0])
@@ -342,9 +310,9 @@ class m3disCall(SyntheticSpectrumGenerator):
             #atmos_path = "./input_multi3d/atmos/p5777_g+4.4_m0.0_t01_st_z+0.00_a+0.00_c+0.00_n+0.00_o+0.00_r+0.00_s+0.00.mod"
 
             atmo_param = f"atmos_format='Text' vmic={round(self.turbulent_velocity, 5)}"
-            atmos_path = f"{os.path.join(self.tmp_dir, self.marcs_model_name)}.interpol"
+            atmos_path = f"{os.path.join(self.tmp_dir, self.marcs_model_name)}"
             # convert to m3dis format
-            atmos_path = self.convert_interpolated_atmo_to_m3dis(atmos_path)
+            #atmos_path = self.convert_interpolated_atmo_to_m3dis(atmos_path)
         elif self.atmosphere_dimension == "3D":
             raise ValueError("3D atmospheres not implemented yet")
             atmo_param = "atmos_format='MUST'"
@@ -406,6 +374,182 @@ class m3disCall(SyntheticSpectrumGenerator):
         #    self.tmp_dir, "spectrum_{:08d}.spec".format(self.counter_spectra)
         # )
         return output
+
+    def interpolate_m3dis_atmosphere(self, marcs_models_to_load):
+        modelAtmGrid = {'teff': [], 'logg': [], 'feh': [], 'vturb': [], 'file': [], 'structure': [],
+                        'structure_keys': [], 'mass': []}  # data
+
+        all_marcs_models = []
+        marcs_path = self.marcs_grid_path
+        for marcs_model in marcs_models_to_load:
+            one_model = marcs_class.MARCSModel(os.path.join(marcs_path, marcs_model))
+            all_marcs_models.append(one_model)
+            modelAtmGrid['teff'].append(one_model.teff)
+            modelAtmGrid['logg'].append(one_model.logg)
+            modelAtmGrid['feh'].append(one_model.metallicity)
+            modelAtmGrid['vturb'].append(one_model.vmicro)
+            modelAtmGrid['file'].append(one_model.file)
+            modelAtmGrid['structure'].append(np.vstack((one_model.lgTau5, one_model.temperature, one_model.pe,
+                                                        np.full(one_model.depth.shape, one_model.vmicro),
+                                                        one_model.density, one_model.depth)))
+            modelAtmGrid['structure_keys'].append(['tau500', 'temp', 'pe', 'vmic', 'density', 'depth'])
+            modelAtmGrid['mass'].append(one_model.mass)
+
+        interpolate_variables = ['teff', 'logg', 'feh']  # , 'vmic'
+
+        # convert all to numpy arrays
+        for k in modelAtmGrid:
+            modelAtmGrid[k] = np.asarray(modelAtmGrid[k])
+
+        points = []
+        norm_coord = {}
+        for k in interpolate_variables:
+            points.append(modelAtmGrid[k])  # / max(modelAtmGrid[k]) )
+            norm_coord.update({k: max(modelAtmGrid[k])})
+        points = np.array(points).T
+        values = np.array(modelAtmGrid['structure'])
+        interp_f = LinearNDInterpolator(points, values)
+
+        tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f([self.t_eff, self.log_g, self.metallicity])[0]
+        # interpolate all variables to equidistant depth grid
+        depth_min = np.min(depth_new)
+        depth_max = np.max(depth_new)
+        depth_points = np.size(depth_new)
+        depth_new_equi = np.linspace(depth_min, depth_max, depth_points)
+        tau500_new = np.interp(depth_new_equi, depth_new, tau500_new)
+        temp_new = np.interp(depth_new_equi, depth_new, temp_new)
+        pe_new = np.interp(depth_new_equi, depth_new, pe_new)
+        vmic_new = np.interp(depth_new_equi, depth_new, vmic_new)
+        density_new = np.interp(depth_new_equi, depth_new, density_new)
+        depth_new = depth_new_equi
+        return tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new
+
+    def calculate_atmosphere(self):
+        possible_turbulence = [0.0, 1.0, 2.0, 5.0]
+        flag_dont_interp_microturb = False
+        for i in range(len(possible_turbulence)):
+            if self.turbulent_velocity == possible_turbulence[i]:
+                flag_dont_interp_microturb = True
+
+        if self.log_g < 3:
+            flag_dont_interp_microturb = True
+
+        logging.debug(
+            f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
+
+
+        if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
+                self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
+            # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
+            turbulence_low = 0.0
+            microturbulence = self.turbulent_velocity
+            for i in range(len(possible_turbulence)):
+                if self.turbulent_velocity > possible_turbulence[i]:
+                    turbulence_low = possible_turbulence[i]
+                    place = i
+            turbulence_high = possible_turbulence[place + 1]
+
+            self.turbulent_velocity = turbulence_low
+            marcs_model_list_low = self._generate_model_atmosphere(run_ts_interpolator=False)
+            if marcs_model_list_low["errors"] is not None:
+                raise ValueError(f"{marcs_model_list_low['errors']}")
+            tau500_low, temp_low, pe_low, vmic_low, density_low, depth_low = self.interpolate_m3dis_atmosphere(marcs_model_list_low["marcs_model_list"])
+            self.turbulent_velocity = turbulence_high
+
+            marcs_model_list_high = self._generate_model_atmosphere(run_ts_interpolator=False)
+            if marcs_model_list_high["errors"] is not None:
+                raise ValueError(f"{marcs_model_list_high['errors']}")
+            tau500_high, temp_high, pe_high, vmic_high, density_high, depth_high = self.interpolate_m3dis_atmosphere(marcs_model_list_high["marcs_model_list"])
+            atmosphere_properties = marcs_model_list_high
+            self.turbulent_velocity = microturbulence
+
+            # interpolate and find a model atmosphere for the microturbulence
+            fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
+            fxlow = 1.0 - fxhigh
+
+            tau500_interp = tau500_low * fxlow + tau500_high * fxhigh
+            temp_interp = temp_low * fxlow + temp_high * fxhigh
+            pe_interp = pe_low * fxlow + pe_high * fxhigh
+            vmic_interp = vmic_low * fxlow + vmic_high * fxhigh
+            density_interp = density_low * fxlow + density_high * fxhigh
+            depth_interp = depth_low * fxlow + depth_high * fxhigh
+
+            # print(interp_model_name)
+            self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                             self.metallicity,
+                                                                                             self.turbulent_velocity)
+            interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+            self.save_m3dis_model(interp_model_name, depth_interp, temp_interp, pe_interp, density_interp, vmic_interp)
+
+
+        elif not flag_dont_interp_microturb and self.turbulent_velocity > 2.0:  # not enough models to interp if higher than 2
+            microturbulence = self.turbulent_velocity  # just use 2.0 for the model if between 2 and 3
+            self.turbulent_velocity = 2.0
+            marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+            atmosphere_properties = marcs_model_list
+            if marcs_model_list["errors"] is not None:
+                raise ValueError(f"{marcs_model_list['errors']}")
+            tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
+            self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                             self.metallicity,
+                                                                                             self.turbulent_velocity)
+            interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+            self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+            self.turbulent_velocity = microturbulence
+
+        elif not flag_dont_interp_microturb and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.:  # not enough models to interp if lower than 1 and t_eff > 3900
+            microturbulence = self.turbulent_velocity
+            self.turbulent_velocity = 1.0
+            marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+            atmosphere_properties = marcs_model_list
+            if marcs_model_list["errors"] is not None:
+                raise ValueError(f"{marcs_model_list['errors']}")
+            tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
+            self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                             self.metallicity,
+                                                                                             self.turbulent_velocity)
+            interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+            self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+            self.turbulent_velocity = microturbulence
+
+
+        elif flag_dont_interp_microturb:
+            if self.log_g < 3:
+                microturbulence = self.turbulent_velocity
+                self.turbulent_velocity = 2.0
+            marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+            atmosphere_properties = marcs_model_list
+            if marcs_model_list["errors"] is not None:
+                raise ValueError(f"{marcs_model_list['errors']}")
+            tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
+            self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                             self.metallicity,
+                                                                                             self.turbulent_velocity)
+            interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+            self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+
+            if self.log_g < 3:
+                self.turbulent_velocity = microturbulence
+        else:
+            print("Unexpected error?")
+        self.atmosphere_properties = atmosphere_properties
+
+    def save_m3dis_model(self, interp_model_name, depth_interp, temp_interp, pe_interp, density_interp, vmic_interp):
+        with open(interp_model_name, "w") as file:
+            # first is name of file
+            file.write(f"{self.marcs_model_name}\n")
+            # next is number of points as integer
+            depth_points = np.size(depth_interp)
+            file.write(f"{depth_points}\n")
+            # next is the format
+            file.write("* depth      temp       pe        pg      vmic\n")
+            for i in range(len(depth_interp)):
+                file.write(
+                    f"{depth_interp[i]:>13.6e} {temp_interp[i]:>8.1f} {pe_interp[i]:>12.4E} {density_interp[i]:>12.4E} {vmic_interp[i]:>5.3f}\n")
 
     def synthesize_spectra(self):
         try:
