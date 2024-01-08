@@ -402,6 +402,7 @@ class TSFitPyConfig:
         self.hash_table_size = 10
         self.mpi_cores = 1
         self.iterations_max = 0
+        self.iterations_max_precompute = 0
         self.convlim = 0.01
         self.snap = 1
         self.dims = 23
@@ -768,6 +769,7 @@ class TSFitPyConfig:
             self.hash_table_size = int(self.config_parser["m3disParameters"]["hash_table_size"])
             self.mpi_cores = int(self.config_parser["m3disParameters"]["mpi_cores"])
             self.iterations_max = int(self.config_parser["m3disParameters"]["iterations_max"])
+            self.iterations_max_precompute = int(self.config_parser["m3disParameters"]["iterations_max_precompute"])
             self.convlim = float(self.config_parser["m3disParameters"]["convlim"])
             self.snap = int(self.config_parser["m3disParameters"]["snap"])
             self.dims = int(self.config_parser["m3disParameters"]["dims"])
@@ -779,6 +781,7 @@ class TSFitPyConfig:
             self.hash_table_size = 10
             self.mpi_cores = 1
             self.iterations_max = 0
+            self.iterations_max_precompute = 0
             self.convlim = 0.01
             self.snap = 1
             self.dims = 23
@@ -1046,6 +1049,8 @@ class TSFitPyConfig:
             raise ValueError("mpi_cores must be greater than 0")
         if self.iterations_max < 0:
             raise ValueError("iterations_max must be greater than or equal to 0")
+        if self.iterations_max_precompute < 0:
+            raise ValueError("iterations_max_precompute must be greater than or equal to 0")
         if self.convlim < 0:
             raise ValueError("convlim must be greater than or equal to 0")
         if self.snap < 0:

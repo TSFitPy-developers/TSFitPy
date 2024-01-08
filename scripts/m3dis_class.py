@@ -351,11 +351,11 @@ class m3disCall(SyntheticSpectrumGenerator):
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
-&m3d_params         verbose=0 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
+&m3d_params         verbose=1 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
 {linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
-        logging.debug(config_m3dis)
+        logging.debug(config_m3dis) # 6.13 min
 
         if self.verbose:
             stdout = None
@@ -421,6 +421,15 @@ class m3disCall(SyntheticSpectrumGenerator):
             norm_coord.update({k: max(modelAtmGrid[k])})
         points = np.array(points).T
         values = np.array(modelAtmGrid['structure'])
+        # perturb the points slightly to avoid interpolation errors
+        max_perturbation = 0.0000001
+        for i in range(len(interpolate_variables)):
+            # get the column
+            column = points[:, i]
+            # check if all elements are the same
+            if np.all(column == column[0]):
+                # if so, then perturb all values by a small amount
+                points[:, i] += np.random.uniform(0, max_perturbation, len(points))
         interp_f = LinearNDInterpolator(points, values)
 
         tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f([self.t_eff, self.log_g, self.metallicity])[0]

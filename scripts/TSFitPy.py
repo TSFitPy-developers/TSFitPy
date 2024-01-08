@@ -292,7 +292,7 @@ class Spectra:
         self.model_atom_path: str = None
         self.departure_file_path: str = None
         self.linemask_file: str = None
-        self.segment_file: str = None  # TODO: add this to the config file
+        self.segment_file: str = None
         self.atmosphere_type: str = None  # "1D" or "3D", string
         self.include_molecules: bool = None  # "True" or "False", bool
         self.nlte_flag: bool = None
@@ -398,6 +398,7 @@ class Spectra:
         self.m3dis_hash_table_size: int = None
         self.m3dis_mpi_cores: int = None
         self.m3dis_iterations_max: int = None
+        self.m3dis_iterations_max_precompute: int = None
         self.m3dis_convlim: float = None
         self.m3dis_snap: int = None
         self.m3dis_dims: int = None
@@ -567,7 +568,7 @@ class Spectra:
         self.output_folder = tsfitpy_config.output_folder_path
         self.spec_input_path = tsfitpy_config.spectra_input_path
 
-        self.fit_teff = tsfitpy_config.fit_teff  # TODO: not used anywhere, remove
+        self.fit_teff = tsfitpy_config.fit_teff
 
         self.line_begins_sorted = tsfitpy_config.line_begins_sorted
         self.line_ends_sorted = tsfitpy_config.line_ends_sorted
@@ -596,6 +597,7 @@ class Spectra:
         self.m3dis_hash_table_size = tsfitpy_config.hash_table_size
         self.m3dis_mpi_cores = tsfitpy_config.mpi_cores
         self.m3dis_iterations_max = tsfitpy_config.iterations_max
+        self.m3dis_iterations_max_precompute = tsfitpy_config.iterations_max_precompute
         self.m3dis_convlim = tsfitpy_config.convlim
         self.m3dis_snap = tsfitpy_config.snap
         self.m3dis_dims = tsfitpy_config.dims
@@ -953,9 +955,11 @@ class Spectra:
                 temp_dir = os.path.join(self.temp_dir, "precomputed_depart")
                 ts.skip_linelist = True
                 ts.save_spectra = False
+                ts.iterations_max = self.m3dis_iterations_max_precompute
                 self.configure_and_run_ts(ts, met, input_abund, vmic, self.lmin, self.lmax, False, temp_dir=temp_dir)
                 ts.skip_linelist = False
                 ts.save_spectra = True
+                ts.iterations_max = self.m3dis_iterations_max
         else:
             ts = TurboSpectrum(
                 turbospec_path=self.spectral_code_path,
@@ -2385,9 +2389,8 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
 
     do_hydrogen_linelist = True
 
-    if tsfitpy_configuration.compiler.lower() == "m3dis": # "experiments/Multi3D/",
+    if tsfitpy_configuration.compiler.lower() == "m3dis":
         module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
-        #module_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/m3dis/__init__.py"  # Replace with the actual path
         m3dis_python_module = import_module_from_path("m3dis", module_path)
 
         # set molecules to False
