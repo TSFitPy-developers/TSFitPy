@@ -2037,11 +2037,16 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     met = spectra_to_fit.elem_abund_dict_fitting[line_number]["Fe"]
     elem_abund_dict = spectra_to_fit.elem_abund_dict_fitting[line_number]
 
+    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+
+    # delete the temporary directory if it exists
+    if os_path.exists(temp_spectra_location):
+        os.remove(temp_spectra_location)
+
     spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
 
-    if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-            '{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec',
+    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
+        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location,
                                                   usecols=(0, 1), unpack=True)
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
@@ -2062,8 +2067,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         else:
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
-    elif os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat(
-            '{}/spectrum_00000000.spec'.format(temp_directory)).st_size == 0:
+    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
         chi_square = 999.99
         print("empty spectrum file.")
     else:
