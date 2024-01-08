@@ -12,7 +12,7 @@ import tempfile
 import importlib.util
 import sys
 
-from scipy.interpolate import LinearNDInterpolator
+from scipy.interpolate import LinearNDInterpolator, interp1d
 
 from scripts import marcs_class
 from scripts.solar_abundances import periodic_table, solar_abundances
@@ -421,24 +421,50 @@ class m3disCall(SyntheticSpectrumGenerator):
             norm_coord.update({k: max(modelAtmGrid[k])})
         points = np.array(points).T
         values = np.array(modelAtmGrid['structure'])
-        # perturb the points slightly to avoid interpolation errors
-        max_perturbation = 0.0000001
         interpolate_point = [self.t_eff, self.log_g, self.metallicity]
+
+        points, unique_indices = np.unique(points, axis=0, return_index=True)
+        values = values[unique_indices]
+
+        indices_to_delete = []
+
         for i in range(len(interpolate_variables)):
             # get the column
             column = points[:, i]
             # check if all elements are the same
             if np.all(column == column[0]):
-                # if so, then perturb all values by a small amount
-                points[:, i] += np.random.uniform(0, max_perturbation, len(points))
-                interpolate_point[i] = np.mean(points[:, i])
-        interp_f = LinearNDInterpolator(points, values)
+                indices_to_delete.append(i)
+                #interpolate_point_new.pop(i)
+                #interpolate_variables_new.pop(i)
+                ## also remove ith column from points
+                #points_new = np.delete(points_new, i, axis=1)
 
-        tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f(interpolate_point)[0]
+        # remove the indices
+        points = np.delete(points, indices_to_delete, axis=1)
+        interpolate_point = np.delete(interpolate_point, indices_to_delete)
+        interpolate_variables = np.delete(interpolate_variables, indices_to_delete)
+
+        if len(interpolate_point) > 1:
+            interp_f = LinearNDInterpolator(points, values)
+            tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f(interpolate_point)[0]
+        elif len(interpolate_point) == 1:
+            # linear interpolation
+            # flatten points
+            points = points.flatten()
+
+            # take the first element of the array
+            interpolate_point = interpolate_point[0]
+
+            interp_f = interp1d(points, values, axis=0, kind='linear')
+            tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f(interpolate_point)
+        else:
+            # only one model, so return that
+            tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = values[0]
+
         # check if nan
         if np.any(np.isnan(tau500_new)):
-            print("NAN")
-            print(interpolate_point, points)
+            print("NAN in model atmosphere")
+
         # interpolate all variables to equidistant depth grid
         depth_min = np.min(depth_new)
         depth_max = np.max(depth_new)
