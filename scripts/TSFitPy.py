@@ -830,6 +830,10 @@ class Spectra:
 
         return guesses, bounds
 
+    def save_observed_spectra(self, path: str):
+        # save observed spectra using np.savetxt, with up to 5 decimals
+        np.savetxt(path, np.transpose([self.wave_ob, self.flux_ob]), fmt='%.5f')
+
     def configure_and_run_ts(self, ts:TurboSpectrum, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
                              windows_flag: bool, temp_dir=None, teff=None, logg=None):
         """
@@ -2329,6 +2333,8 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     if tsfitpy_configuration.compiler.lower() == "m3dis":
         spectra.precompute_departure()
         print("Precomputed departure coefficients")
+
+    spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")

@@ -143,6 +143,7 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
         rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
         output_file_df: pd.DataFrame = config_dict["output_file_df"]
+        output_folder_location: str = config_dict["output_folder_location"]
 
         # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
         # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
@@ -172,7 +173,11 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
 
         # loads fitted and observed wavelength and flux
         wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
-        wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
+        # check if file is located in the output folder, if not, load from the original folder
+        if not os.path.isfile(os.path.join(output_folder_location, filename_observed_spectra)):
+            wavelength_observed, flux_observed = np.loadtxt(os.path.join(output_folder_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1))  # normalised flux observed
+        else:
+            wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
 
         # sort the observed spectra, just like in TSFitPy
         if wavelength_observed.size > 1:
