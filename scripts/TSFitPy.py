@@ -940,26 +940,6 @@ class Spectra:
                 ny=self.m3dis_ny,
                 nz=self.m3dis_nz
             )
-            if self.nlte_flag:
-                # need to run NLTE run once, so that can reuse precomputed departure coefficients
-                if self.elem_to_fit[0] == "Fe":
-                    input_abund = {"Fe": self.met}
-                    met = 0
-                else:
-                    input_abund = {"Fe": self.met, f"{self.elem_to_fit[0]}": 0 + self.met}
-                    met = self.met
-                if self.input_vmic:
-                    vmic = self.vmic
-                else:
-                    vmic = calculate_vturb(self.teff, self.logg, self.met)
-                temp_dir = os.path.join(self.temp_dir, "precomputed_depart")
-                ts.skip_linelist = True
-                ts.save_spectra = False
-                ts.iterations_max = self.m3dis_iterations_max_precompute
-                self.configure_and_run_ts(ts, met, input_abund, vmic, self.lmin, self.lmax, False, temp_dir=temp_dir)
-                ts.skip_linelist = False
-                ts.save_spectra = True
-                ts.iterations_max = self.m3dis_iterations_max
         else:
             ts = TurboSpectrum(
                 turbospec_path=self.spectral_code_path,
@@ -977,6 +957,29 @@ class Spectra:
                 marcs_models=marcs_models,
                 marcs_values=self.marcs_values)
         return ts
+
+    def precompute_departure(self):
+        if self.nlte_flag:
+            ts = self.create_ts_object(self._get_marcs_models())
+            # need to run NLTE run once, so that can reuse precomputed departure coefficients
+            if self.elem_to_fit[0] == "Fe":
+                input_abund = {"Fe": self.met}
+                met = 0
+            else:
+                # 0 because assume [X/Fe] = 0
+                input_abund = {"Fe": self.met, f"{self.elem_to_fit[0]}": 0 + self.met}
+                met = self.met
+            if self.input_vmic:
+                vmic = self.vmic
+            else:
+                vmic = calculate_vturb(self.teff, self.logg, self.met)
+            temp_dir = os.path.join(self.temp_dir, "precomputed_depart")
+            ts.skip_linelist = True
+            ts.save_spectra = False
+            ts.iterations_max = self.m3dis_iterations_max_precompute
+            self.configure_and_run_ts(ts, met, input_abund, vmic, self.lmin, self.lmax, False, temp_dir=temp_dir)
+            # delete ts
+            del ts
 
     def fit_lbl(self, client, fitting_function, find_upper_limit) -> list:
         """
@@ -2309,7 +2312,9 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
 
-    #spectra.dask_client = dask_client
+    if tsfitpy_configuration.compiler.lower() == "m3dis":
+        spectra.precompute_departure()
+        print("Precomputed departure coefficients")
 
     print(f"Fitting {spectra.spec_name}")
     print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
@@ -2396,7 +2401,6 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
         # set molecules to False
         tsfitpy_configuration.include_molecules = False
         do_hydrogen_linelist = False
-        # TODO: if several linelists, will need to combine them
     else:
         m3dis_python_module = None
 

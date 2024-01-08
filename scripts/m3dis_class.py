@@ -423,6 +423,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         values = np.array(modelAtmGrid['structure'])
         # perturb the points slightly to avoid interpolation errors
         max_perturbation = 0.0000001
+        interpolate_point = [self.t_eff, self.log_g, self.metallicity]
         for i in range(len(interpolate_variables)):
             # get the column
             column = points[:, i]
@@ -430,9 +431,14 @@ class m3disCall(SyntheticSpectrumGenerator):
             if np.all(column == column[0]):
                 # if so, then perturb all values by a small amount
                 points[:, i] += np.random.uniform(0, max_perturbation, len(points))
+                interpolate_point[i] = np.mean(points[:, i])
         interp_f = LinearNDInterpolator(points, values)
 
-        tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f([self.t_eff, self.log_g, self.metallicity])[0]
+        tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new = interp_f(interpolate_point)[0]
+        # check if nan
+        if np.any(np.isnan(tau500_new)):
+            print("NAN")
+            print(interpolate_point, points)
         # interpolate all variables to equidistant depth grid
         depth_min = np.min(depth_new)
         depth_max = np.max(depth_new)
