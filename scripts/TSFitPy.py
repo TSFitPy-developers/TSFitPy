@@ -2805,6 +2805,22 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
                                tsfitpy_configuration.include_molecules, lbl=True, do_hydrogen=do_hydrogen_linelist)
     else:
         raise ValueError("Unknown fitting method")
+    if tsfitpy_configuration.compiler.lower() == "m3dis":
+        # if m3dis, then combine all linelists into one
+        # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
+        for folder in os.listdir(line_list_path_trimmed):
+            if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
+                # go into each folder and combine all linelists into one
+                combined_linelist = os.path.join(line_list_path_trimmed, folder, "combined_linelist.bsyn")
+                with open(combined_linelist, "w") as combined_linelist_file:
+                    for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
+                        if file.endswith(".bsyn") and not file == "combined_linelist.bsyn":
+                            with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
+                                combined_linelist_file.write(linelist_file.read())
+                            # delete the file
+                            os.remove(os.path.join(line_list_path_trimmed, folder, file))
+                            #print(os.path.join(line_list_path_trimmed, folder, file))
+
     print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(tsfitpy_configuration.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
