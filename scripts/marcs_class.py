@@ -9,7 +9,7 @@ from scripts.solar_abundances import  periodic_table
 import matplotlib
 from scipy.interpolate import interp1d
 
-matplotlib.use("MacOSX")
+#matplotlib.use("MacOSX")
 
 class MARCSModel:
     def __init__(self, file):
