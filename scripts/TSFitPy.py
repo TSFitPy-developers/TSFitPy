@@ -189,14 +189,14 @@ def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_ob
         return 999999
 
     flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-    wave_line = wave_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]  # 5 AA i guess to remove extra edges??
-    flux_line_obs = flux_obs[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    wave_line = wave_obs[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
+    flux_line_obs = flux_obs[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
 
     if np.size(flux_line_obs) == 0:
         return 999999
 
-    flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
-    error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax - 5.) & (wave_obs >= lmin + 5.))]
+    flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
+    error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
     # TODO: proper calculation of DOF
     dof = len(flux_line_obs) - 1
     if dof <= 0:
@@ -1052,7 +1052,7 @@ class Spectra:
             norm_flux_fit_array = result[line_number]['fit_flux_norm']
 
             indices_to_use_cut = np.where(
-                (wavelength_fit_array <= line_right + 5) & (wavelength_fit_array >= line_left - 5))
+                (wavelength_fit_array <= line_right) & (wavelength_fit_array >= line_left))
             wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], \
             norm_flux_fit_array[indices_to_use_cut]
             wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut,
@@ -1215,10 +1215,10 @@ class Spectra:
 
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
         try:
-            res = minimize_function(lbl_teff, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
+            res = minimize_function(lbl_teff, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
 
             print(res.x)
 
@@ -1330,10 +1330,10 @@ class Spectra:
 
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_argsuments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
         minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.00001, 'fatol': 0.00001}
         try:
-            res = minimize_function(lbl_logg, param_guess[0], function_argsuments, min_bounds, 'Nelder-Mead', minimize_options)
+            res = minimize_function(lbl_logg, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
 
             print(res.x)
 
@@ -1443,7 +1443,7 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
             res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
             print(res)
@@ -1498,7 +1498,7 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number, offset_chisqr)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number, offset_chisqr)
         minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
         try:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
@@ -1604,7 +1604,7 @@ class Spectra:
         print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
             print(res)
@@ -1633,7 +1633,7 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number] - 5., self.line_ends_sorted[line_number] + 5., temp_directory, line_number)
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
         minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
@@ -1730,7 +1730,7 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     return np.abs(chi_square - offset_chisqr)
 
 
-def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int, offset_chisqr=0) -> float:
+def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int, offset_chisqr=0) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1739,6 +1739,8 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # new: now includes several elements
@@ -1794,7 +1796,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
@@ -1836,7 +1838,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     return chi_square
 
 
-def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
+def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
                           temp_directory: str, rv: float, vmac: float, rotation: float,
                           vmic: float, offset_chisqr: float) -> float:
     """
@@ -1847,6 +1849,8 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # new: now includes several elements
@@ -1865,7 +1869,7 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory, teff=teff)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory, teff=teff)     # generates spectra
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
@@ -1887,7 +1891,7 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     return chi_square - offset_chisqr
 
 
-def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float,
+def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
                           temp_directory: str, rv: float, vmac: float, rotation: float,
                           vmic: float, offset_chisqr: float) -> float:
     """
@@ -1898,6 +1902,8 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # new: now includes several elements
@@ -1926,7 +1932,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     # delete the temporary directory if it exists
     if os_path.exists(temp_spectra_location):
@@ -1938,7 +1944,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
 
 
-        dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax - 5.) & (spectra_to_fit.flux_ob >= lmin + 5.))]) - 1
+        dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax) & (spectra_to_fit.flux_ob >= lmin))]) - 1
         # TODO: proper calculation of DOF
         if dof <= 0:
             dof = 1
@@ -1959,7 +1965,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
 
     return chi_square - offset_chisqr / dof
 
-def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
+def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -1968,6 +1974,8 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # new: now includes several elements
@@ -1995,7 +2003,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
     spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
 
     param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
-    function_arguments = (ts, spectra_to_fit, lmin, lmax, temp_directory, line_number)
+    function_arguments = (ts, spectra_to_fit, lmin, lmax, lmin_segment, lmax_segment, temp_directory, line_number)
     minimization_options = {'maxfev': 50, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.05, 'fatol': 0.00001, 'adaptive': False}
     res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
 
@@ -2019,7 +2027,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
 
     return chi_square
 
-def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
+def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -2028,6 +2036,8 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # param[0] = vmicro
@@ -2050,7 +2060,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin, lmax, False, temp_dir=temp_directory)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location,
@@ -2089,7 +2099,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
 
     return chi_square
 
-def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
+def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: teff.
     Calls macro + doppler inside
@@ -2097,6 +2107,8 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # param[0] = teff
@@ -2114,7 +2126,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, teff=teff, temp_dir=temp_directory)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     rotation = 9999
@@ -2155,7 +2167,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     return chi_square
 
 
-def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, temp_directory: str, line_number: int) -> float:
+def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: logg.
     Calls macro + doppler inside
@@ -2163,6 +2175,8 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     :param spectra_to_fit: Spectra to fit
     :param lmin: Start of the line [AA]
     :param lmax: End of the line [AA]
+    :param lmin_segment: Start of the segment, where spectra is generated [AA]
+    :param lmax_segment: End of the segment, where spectra is generated [AA]
     :return: best fit chi squared
     """
     # param[0] = logg
@@ -2180,7 +2194,7 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin, lmax, False, logg=logg, temp_dir=temp_directory)     # generates spectra
+    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
 
     macroturb = 9999  # for printing if fails
     rotation = 9999
