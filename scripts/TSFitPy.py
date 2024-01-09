@@ -2323,6 +2323,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     #    tsfitpy_configuration = pickle.load(f)
 
     n_workers = tsfitpy_configuration.number_of_cpus
+    tsfitpy_compiler = tsfitpy_configuration.compiler.lower()
 
     if tsfitpy_configuration.number_of_cpus != 1:
         tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
@@ -2330,7 +2331,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
 
-    if tsfitpy_configuration.compiler.lower() == "m3dis":
+    if tsfitpy_compiler == "m3dis":
         spectra.precompute_departure()
         print("Precomputed departure coefficients")
 
