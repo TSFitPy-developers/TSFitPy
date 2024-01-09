@@ -174,7 +174,7 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         # loads fitted and observed wavelength and flux
         wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
         # check if file is located in the output folder, if not, load from the original folder
-        if not os.path.isfile(os.path.join(output_folder_location, filename_observed_spectra)):
+        if os.path.isfile(os.path.join(output_folder_location, filename_observed_spectra)):
             wavelength_observed, flux_observed = np.loadtxt(os.path.join(output_folder_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1))  # normalised flux observed
         else:
             wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
@@ -573,6 +573,9 @@ class Star:
     # this class will load abundances from several different files and load them into a class for later use
     # it will also load linelist such that we get atomic information about different lines
     def __init__(self, name, input_folders: list, linelist_folder):
+        # if input_folders is a string, then convert it to a list
+        if isinstance(input_folders, str):
+            input_folders = [input_folders]
         self.name = name
         self.linelist_folder = linelist_folder
         # get names of all files in the linelist folder
@@ -670,7 +673,7 @@ class Star:
         self.parsed_linelist = read_linelist(self.linelist_filenames)
 
         # load each element using dataframe:
-        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}, "chisqr": {}, "rv": {}, "vmic": {}, "vmac": {}, "rotation": {}}
+        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}, "chisqr": {}, "rv": {}, "vmic": {}, "vmac": {}, "rotation": {}, "flag_error": {}, "flag_warning": {}}
         for input_folder in input_folders:
             config_dict = load_output_data(input_folder)
             fitted_element = config_dict["fitted_element"]
@@ -680,31 +683,37 @@ class Star:
             df = df[mask]
             # get the line wavelength
             line_wavelengths = df["wave_center"].values
-            self.elemental_data["wavelength"][fitted_element] = line_wavelengths
+            self.elemental_data["wavelength"][fitted_element] = np.asarray(line_wavelengths)
             # get the line equivalent width
             line_ew = df["ew"].values
-            self.elemental_data["ew"][fitted_element] = line_ew
+            self.elemental_data["ew"][fitted_element] = np.asarray(line_ew)
             # get the line abundance
             if fitted_element == "Fe":
                 line_abund = df["Fe_H"].values
             else:
                 line_abund = df[f"{fitted_element}_Fe"].values
-            self.elemental_data["abund"][fitted_element] = line_abund
+            self.elemental_data["abund"][fitted_element] = np.asarray(line_abund)
             # get the line chi squared
             line_chisqr = df["chi_squared"].values
-            self.elemental_data["chisqr"][fitted_element] = line_chisqr
+            self.elemental_data["chisqr"][fitted_element] = np.asarray(line_chisqr)
             # get the line rv
             line_rv = df["Doppler_Shift_add_to_RV"].values
-            self.elemental_data["rv"][fitted_element] = line_rv
+            self.elemental_data["rv"][fitted_element] = np.asarray(line_rv)
             # get the line microturbulence
             line_microturbulence = df["Microturb"].values
-            self.elemental_data["vmic"][fitted_element] = line_microturbulence
+            self.elemental_data["vmic"][fitted_element] = np.asarray(line_microturbulence)
             # get the line macroturbulence
             line_macroturbulence = df["Macroturb"].values
-            self.elemental_data["vmac"][fitted_element] = line_macroturbulence
+            self.elemental_data["vmac"][fitted_element] = np.asarray(line_macroturbulence)
             # get the line rotation
             line_rotation = df["rotation"].values
-            self.elemental_data["rotation"][fitted_element] = line_rotation
+            self.elemental_data["rotation"][fitted_element] = np.asarray(line_rotation)
+            # get the line flag error
+            line_flag_error = df["flag_error"].values
+            self.elemental_data["flag_error"][fitted_element] = np.asarray(line_flag_error)
+            # get the line flag warning
+            line_flag_warning = df["flag_warning"].values
+            self.elemental_data["flag_warning"][fitted_element] = np.asarray(line_flag_warning)
 
     def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
         element_data = self.parsed_linelist[element]
@@ -738,7 +747,18 @@ class Star:
 
         return result, ionisation_stages
 
-    def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None):
+    def remove_data_bad_flags(self, data_list, element, flag_error, flag_warning):
+        if flag_error:
+            mask = self.elemental_data["flag_error"][element] == 0
+            for i in range(len(data_list)):
+                data_list[i] = data_list[i][mask]
+        if flag_warning:
+            mask = self.elemental_data["flag_warning"][element] == 0
+            for i in range(len(data_list)):
+                data_list[i] = data_list[i][mask]
+        return data_list
+
+    def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None, remove_flag_error=True, remove_flag_warning=False):
         allowed_params = ["wavelength", "ew"]
         if fit_parameter not in allowed_params:
             raise ValueError(f"Fit parameter must be {allowed_params}, not {fit_parameter}")
@@ -746,9 +766,8 @@ class Star:
         x_data = self.elemental_data[fit_parameter][element]
         y_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
+        x_data, y_data = self.remove_data_bad_flags([x_data, y_data], element, remove_flag_error, remove_flag_warning)
         if abund_limits is not None:
-            x_data = np.array(x_data)
-            y_data = np.array(y_data)
             mask = (y_data >= abund_limits[0]) & (y_data <= abund_limits[1])
             x_data = x_data[mask]
             y_data = y_data[mask]
@@ -864,7 +883,7 @@ class Star:
 
         plt.show()
 
-    def get_average_abundances(self, ew_limits=None, chi_sqr_limits=None):
+    def get_average_abundances(self, ew_limits=None, chi_sqr_limits=None, remove_flag_error=True, remove_flag_warning=False):
         # gets average abundances by element
         # get all elements
         elements = self.elemental_data["abund"].keys()
@@ -875,9 +894,25 @@ class Star:
             abundances_element = self.elemental_data["abund"][element]
             ews_element = self.elemental_data["ew"][element]
             chi_sqrs_element = self.elemental_data["chisqr"][element]
+            # if remove_flag_error is True, then remove the lines that have flag_error == 1
+            flag_error_element = self.elemental_data["flag_error"][element]
+            flag_warning_element = self.elemental_data["flag_warning"][element]
             abundances_element = np.array(abundances_element)
             ews_element = np.array(ews_element)
             chi_sqrs_element = np.array(chi_sqrs_element)
+            flag_error_element = np.array(flag_error_element)
+            flag_warning_element = np.array(flag_warning_element)
+            if remove_flag_error:
+                mask = flag_error_element == 0
+                abundances_element = abundances_element[mask]
+                ews_element = ews_element[mask]
+                chi_sqrs_element = chi_sqrs_element[mask]
+                flag_warning_element = flag_warning_element[mask]
+            if remove_flag_warning:
+                mask = flag_warning_element == 0
+                abundances_element = abundances_element[mask]
+                ews_element = ews_element[mask]
+                chi_sqrs_element = chi_sqrs_element[mask]
             # if ew_limits is not None, then remove the lines that are outside the limits
             if ew_limits is not None:
                 mask = (ews_element >= ew_limits[0]) & (ews_element <= ew_limits[1])
@@ -888,15 +923,15 @@ class Star:
                 mask = (chi_sqrs_element >= chi_sqr_limits[0]) & (chi_sqrs_element <= chi_sqr_limits[1])
                 abundances_element = abundances_element[mask]
             if len(abundances_element) > 1:
-                abundances_element = np.mean(abundances_element)
-                stdev_abundance_element = np.std(abundances_element)
+                mean_abundances_element = np.mean(abundances_element)
+                stdev_abundance_element = np.std(abundances_element) / np.sqrt(len(abundances_element))
             elif len(abundances_element) == 1:
-                abundances_element = abundances_element[0]
+                mean_abundances_element = abundances_element[0]
                 stdev_abundance_element = 0
             else:
-                abundances_element = None
+                mean_abundances_element = None
                 stdev_abundance_element = None
-            average_abundances[f"{element}_mean"] = abundances_element
+            average_abundances[f"{element}_mean"] = mean_abundances_element
             stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
 
         # Create an ordered dictionary
@@ -919,7 +954,10 @@ class Star:
         return df
 
 
-def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None, chi_sqr_limits=None):
+def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None, chi_sqr_limits=None, remove_flag_error=True, remove_flag_warning=False):
+    # if input_folders is a string, then convert it to a list
+    if isinstance(input_folders, str):
+        input_folders = [input_folders]
     config_dict = load_output_data(input_folders[0])
     # get all spectra names from the first folder
     spectra_names = config_dict["output_file_df"]["specname"].unique()
@@ -928,7 +966,7 @@ def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None
     for spectra_name in spectra_names:
         stars.append(Star(spectra_name, input_folders, linelist_path))
     # get all abundances for different spectra and combine into one dataframe
-    df = pd.concat([star.get_average_abundances(ew_limits=ew_limits, chi_sqr_limits=chi_sqr_limits) for star in stars], axis=0)
+    df = pd.concat([star.get_average_abundances(ew_limits=ew_limits, chi_sqr_limits=chi_sqr_limits, remove_flag_error=remove_flag_error, remove_flag_warning=remove_flag_warning) for star in stars], axis=0)
     return df
 
 
