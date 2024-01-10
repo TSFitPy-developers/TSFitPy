@@ -1836,8 +1836,13 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     output_print = ""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]:>7.4f}"
-    print(f"{output_print} rv={doppler_shift:>7.4f} vmic={microturb:>7.4f} vmac={macroturb:>7.4f} "
-          f"rotation={rotation:>7.4f} chisqr={chi_square:>14.8f}")
+
+    if spectra_to_fit.atmosphere_type == "1D":
+        print(f"{output_print} rv={doppler_shift:>7.4f} vmic={microturb:>7.4f} vmac={macroturb:>7.4f} "
+              f"rotation={rotation:>7.4f} chisqr={chi_square:>14.8f}")
+    else:
+        print(f"{output_print} rv={doppler_shift:>7.4f} vmac={macroturb:>7.4f} "
+              f"rotation={rotation:>7.4f} chisqr={chi_square:>14.8f}")
 
     return chi_square
 

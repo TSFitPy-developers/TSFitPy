@@ -179,6 +179,7 @@ class m3disCall(SyntheticSpectrumGenerator):
 
     def run_m3dis(self, input_in, stderr, stdout):
         # Write the input data to a temporary file
+        # TODO: check this solution because temp direction might mess up something
         with tempfile.NamedTemporaryFile(delete=False) as temp:
             temp.write(bytes(input_in, "utf-8"))
             temp_file_name = temp.name
@@ -318,6 +319,10 @@ class m3disCall(SyntheticSpectrumGenerator):
         elif self.atmosphere_dimension == "3D":
             raise ValueError("3D atmospheres not implemented yet")
             atmo_param = "atmos_format='MUST'"
+            atmo_param = "&atmos_params       dims=10 atmos_format='Multi' atmos_file='/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230'/"
+            atmo_param = f"atmos_format='Multi' dims={self.dims}"
+            atmos_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230"
+            # &atmos_params       dims=1 atmos_format='MUST' atmos_file='input_multi3d/atmos/m3dis_sun_magg22_10x10x280_1' /
         else:
             raise ValueError("Atmosphere dimension must be either 1D or 3D: m3dis_class.py")
 
@@ -351,11 +356,11 @@ class m3disCall(SyntheticSpectrumGenerator):
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
-&m3d_params         verbose=1 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
+&m3d_params         verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
 {linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
-        logging.debug(config_m3dis) # 6.13 min
+        logging.debug(config_m3dis)
 
         if self.verbose:
             stdout = None
@@ -479,6 +484,17 @@ class m3disCall(SyntheticSpectrumGenerator):
         return tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new
 
     def calculate_atmosphere(self):
+        if self.atmosphere_dimension == "1D":
+            self.calculate_atmosphere_1d()
+        elif self.atmosphere_dimension == "3D":
+            self.calculate_atmosphere_3d()
+        else:
+            raise ValueError("Atmosphere dimension must be either 1D or 3D: m3dis_class.py")
+
+    def calculate_atmosphere_3d(self):
+        return
+
+    def calculate_atmosphere_1d(self):
         possible_turbulence = [0.0, 1.0, 2.0, 5.0]
         flag_dont_interp_microturb = False
         for i in range(len(possible_turbulence)):
