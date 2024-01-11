@@ -965,7 +965,7 @@ class Spectra:
         return ts
 
     def precompute_departure(self):
-        if self.nlte_flag:
+        if self.nlte_flag and self.m3dis_iterations_max_precompute > 0:
             ts = self.create_ts_object(self._get_marcs_models())
             # need to run NLTE run once, so that can reuse precomputed departure coefficients
             if self.elem_to_fit[0] == "Fe":
