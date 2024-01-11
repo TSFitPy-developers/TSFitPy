@@ -237,6 +237,9 @@ class m3disCall(SyntheticSpectrumGenerator):
                             # If the element is not in the free abundances, we assume it has the solar scaled abundance
                             # A(X)_star = A(X)_solar + [Fe/H]
                             abundance_to_write = solar_abundances[element] + self.metallicity
+                        if self.atmosphere_dimension == "3D":
+                            # if 3D, we need to subtract the metallicity from the abundance, because it auto scales (adds it) in M3D with FeH already
+                            abundance_to_write = abundance_to_write - self.metallicity
                     file.write(f"{element:<4} {abundance_to_write:>6.3f}\n")
                     logging.debug(f"{element:<4} {abundance_to_write:>6.3f}")
         return file_path
