@@ -203,8 +203,8 @@ This is a short version of the installation + running the code just to test that
         - 1st bit: if the fitted parameters are at the edge of the bounds (abundance, vmic, vmac, rotation, teff, extra rv)
         - 2nd bit: if at least one flux point in the observed spectra is above 1.1 or below 0
         - 3rd bit:
-        - 4th bit:
-        - 5th bit:
+        - 4th bit: if the EW of the line is significantly different from the EW of the line in the model (within factor of 1.25). Perhaps a broken pixel might result in a trigger of this flag?
+        - 5th bit: number of iterations of the fit is <= 5. Normally it takes ~9 iterations for a lbl fit.
         - 6th bit:
         - 7th bit:
         - 8th bit:

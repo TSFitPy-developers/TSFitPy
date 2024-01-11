@@ -1041,9 +1041,9 @@ class Spectra:
         """
         1st bit: if the fitted parameters are at the edge of the bounds
         2nd bit: if at least one flux point is above 1.1 or below 0
-        3rd bit:
-        4th bit:
-        5th bit:
+        3rd bit: 
+        4th bit: if EW of the line is significantly different from the EW of the line in the model; perhaps within factor of 1.25
+        5th bit: if number of iterations of the line is <= 5
         6th bit:
         7th bit:
         8th bit:
@@ -1161,6 +1161,17 @@ class Spectra:
             # check if at least one flux point is above 1.1 or below 0
             if np.any(flux_ob_cut >= 1.1) or np.any(flux_ob_cut < 0):
                 flag_warning = flag_warning[:1] + "1" + flag_warning[2:]
+
+            # check if EW is significantly different from the EW of the line in the model
+            ratio_threshold = 1.25
+            # check if EW of the line in the spectra is within ratio_threshold of the EW of the line in the model
+            if equivalent_width_ob > equivalent_width * ratio_threshold or equivalent_width_ob < equivalent_width / ratio_threshold:
+                flag_warning = flag_warning[:3] + "1" + flag_warning[4:]
+
+            # check if number of fits of the line is <= 5, but also check that the dictionary exists
+            if "fit_iterations" in result[line_number]:
+                if result[line_number]["fit_iterations"] <= 5:
+                    flag_warning = flag_warning[:4] + "1" + flag_warning[5:]
 
         else:
             equivalent_width = 999999
