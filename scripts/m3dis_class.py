@@ -234,6 +234,7 @@ class m3disCall(SyntheticSpectrumGenerator):
                         else:
                             abundance_to_write = solar_abundances[element] + self.metallicity
                     file.write(f"{element:<4} {abundance_to_write:>6.3f}\n")
+                    logging.debug(f"{element:<4} {abundance_to_write:>6.3f}")
         return file_path
 
     def write_isotope_file(self):
