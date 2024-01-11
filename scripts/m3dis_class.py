@@ -323,12 +323,31 @@ class m3disCall(SyntheticSpectrumGenerator):
             # convert to m3dis format
             #atmos_path = self.convert_interpolated_atmo_to_m3dis(atmos_path)
         elif self.atmosphere_dimension == "3D":
-            raise ValueError("3D atmospheres not implemented yet")
-            atmo_param = "atmos_format='MUST'"
-            atmo_param = "&atmos_params       dims=10 atmos_format='Multi' atmos_file='/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230'/"
-            atmo_param = f"atmos_format='Multi' dims={self.dims}"
-            atmos_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230"
-            # &atmos_params       dims=1 atmos_format='MUST' atmos_file='input_multi3d/atmos/m3dis_sun_magg22_10x10x280_1' /
+            # check if teff is about 4600, logg is about 1.39 and feh is about -2.55, within tolerance of 0.01
+            # if so, use the 3D model
+            if np.isclose(self.t_eff, 4600, atol=0.1) and np.isclose(self.log_g, 1.39, atol=0.02) and np.isclose(self.metallicity, -2.55, atol=0.2):
+                atmo_param = f"atmos_format='Stagger' snap={self.snap} FeH={self.metallicity} dims={self.dims} nx={self.nx} ny={self.ny} nz={self.nz}"
+                atmos_path = "/mnt/beegfs/gemini/groups/bergemann/users/shared-storage/bergemann-data/Stagger_remo/hd1225623/2013-04-10_nlam48/t46g16m2503"
+            else:
+                raise ValueError("3D atmospheres not implemented yet")
+                atmo_param = "atmos_format='MUST'"
+                atmo_param = "&atmos_params       dims=10 atmos_format='Multi' atmos_file='/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230'/"
+                atmo_param = f"atmos_format='Multi' dims={self.dims}"
+                atmos_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230"
+                # &atmos_params       dims=1 atmos_format='MUST' atmos_file='input_multi3d/atmos/m3dis_sun_magg22_10x10x280_1' /
+
+                # multi:
+                #atmos_format='MUST' dims=23 atmos_file='/shared-storage/bergemann/m3dis/experiments/Multi3D/input_multi3d/atmos/299/magg2022_150x300/m3dis_sun_magg22_80x80x299_1'
+                # might need these two as well? use_density=T use_ne=F
+
+                # stagger:
+                # atmos_format="Stagger" snap=20 dims=23 FeH=0.0 nx=30 ny=30 nz=230 atmos_file='./input_multi3d/atmos/t5777g44m00/v05/t5777g44m0005'/
+
+                # muram:
+                # atmos_format='Multi' dims=23 atmos_file='./input_multi3d/atmos/muram/mDIS_MARCS_v0.5.1_box_MURaM_HDSun'  /
+
+
+
         else:
             raise ValueError("Atmosphere dimension must be either 1D or 3D: m3dis_class.py")
 

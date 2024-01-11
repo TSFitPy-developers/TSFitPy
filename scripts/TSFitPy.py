@@ -2341,7 +2341,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
 
     if tsfitpy_compiler == "m3dis":
         spectra.precompute_departure()
-        print("Precomputed departure coefficients")
+        logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
 
     spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
 
