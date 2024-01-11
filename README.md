@@ -1,6 +1,6 @@
 # Turbospectrum Spectral Fitting with Python (TSFitPy)
 
-TSFitPy is a pipeline designed to determine stellar abundances and atmospheric parameters through the use of Nelder-Mead (simplex algorithm) minimization. It calculates model spectra "on the fly" while fitting instead of using a more sophisticated method that relies on training neural networks such as the method used by the full SAPP used for much larger datasets. Using this method allows the pipeline to gain flexibility in the stellar physics used at the expense of computation time, which makes it useful for small datasets of ~100 stars and fewer.
+TSFitPy is a pipeline designed to determine stellar abundances and atmospheric parameters through the use of Nelder-Mead (simplex algorithm) minimization. It calculates model spectra "on the fly" while fitting instead of using a more sophisticated method that relies on training neural networks (such as the method used by the full SAPP used for much larger datasets). Using this method allows the pipeline to gain flexibility in the stellar physics used at the expense of computation time, which makes it useful for small datasets of ~100 stars and fewer.
 
 To use TSFitPy, you will need a working Turbospectrum (TS) installation of the latest version, which has the capability to compute NLTE line profiles as well as calculate specified spectral windows instead of a full spectrum for a given range. TSFitPy has not been tested on older versions of TS. The latest version of TS can be found here: https://github.com/bertrandplez/Turbospectrum_NLTE
 
@@ -14,6 +14,47 @@ The code requires at least version Python 3.7. It also makes use of fortran prog
 - Matplotlib (only for plotting)
 
 Also, Windows is not supported (?).
+
+## Quick start
+
+This is a short version of the installation + running the code just to test that it works (not all inputs are downloaded). Please read the full version when you actually want to use the code.
+
+- `git clone https://github.com/TSFitPy-developers/TSFitPy.git`
+- `cd TSFitPy/turbospectrum/`
+- `rm readme.txt`
+- `cd ..`
+- `git clone https://github.com/bertrandplez/Turbospectrum_NLTE.git turbospectrum`
+- `cd turbospectrum/exec/` (or `cd turbospectrum/exec-gf/` if using gnu compiler)
+- if linux: uncomment `mcmodel=medium` in the makefile on line 11
+- `make`
+- `cd ../../`
+- Download from [1D MARCS standard composition models](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) file `atmospheres/marcs_standard_comp.zip` and put the unzipped files in `TSFitPy/input_files/model_atmospheres/1D/`
+- Download from [NLTE Gaia-ESO linelist](https://keeper.mpdl.mpg.de/d/3a5749b0bb5d4e0d8f4f/) file `nlte_ges_linelist_jmgXX20XX_I_II` and put it in `TSFitPy/input_files/linelists/linelist_for_fitting/`
+- `pwd` -> `TSFitPy/`
+- `cp -r input_files/sample_spectrum/* input_files/observed_spectra/`
+- `cp -r turbospectrum/interpolator/* scripts/model_interpolators/`
+- `cd scripts/`
+- `python3 compile_fortran_codes.py` (choose `GNU` or `INTEL` compiler)
+- `cd ..`
+- `python3 main.py ./input_files/tsfitpy_input_configuration.cfg`
+- You should see something like this at the end of each line fit:
+  - [...]
+  - `[Fe/H]=-0.3180 rv= 0.3268 vmic= 1.0516 vmac= 2.4664 rotation= 0.0000 chisqr=    0.55214633`
+  - `Converged: Fe: -0.32 Number of iterations: 14`
+  - [...]
+  - `[Fe/H]= 0.0282 rv= 0.2282 vmic= 1.0679 vmac= 3.7423 rotation= 0.0000 chisqr=    0.33176552`
+  - `Converged: Fe: 0.03 Number of iterations: 10`
+  - `Total runtime was XXXX minutes.`
+  - `TSFitPy had normal termination`
+  - `Fitting completed`
+  - `End of the fitting: XXX-XX-20XX-XX-XX-XX`
+- `cd plotting_tools/`
+- `cp plot_output.ipynb plot_output_test.ipynb`
+- open `plot_output_test.ipynb` and run the first cell
+- change `output_folder_location` to the folder where the output is saved (e.g. you will find a folder `TSFitPy/output_files/XXX-XX-20XX-XX-XX-XX_0.XXXXXXXXXXXXXXXX_LTE_Fe_1D/`, so copy `XXX-XX-20XX-XX-XX-XX_0.XXXXXXXXXXXXXXXX_LTE_Fe_1D` and paste it instead of `OUTPUTCHANGEHERE`)
+- run the next 5 cells to plot the results
+  - ![Fitted image](./example_image_plot/fitted_star_example.png)
+
 
 ## Installation
 
