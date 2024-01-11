@@ -944,6 +944,8 @@ class Spectra:
                 ny=self.m3dis_ny,
                 nz=self.m3dis_nz
             )
+            if self.m3dis_iterations_max_precompute <= 0:
+                ts.use_precomputed_depart = False
         else:
             ts = TurboSpectrum(
                 turbospec_path=self.spectral_code_path,
@@ -981,6 +983,7 @@ class Spectra:
             ts.skip_linelist = True
             ts.save_spectra = False
             ts.iterations_max = self.m3dis_iterations_max_precompute
+            ts.use_precomputed_depart = False
             self.configure_and_run_ts(ts, met, input_abund, vmic, self.lmin, self.lmax, False, temp_dir=temp_dir)
             # delete ts
             del ts

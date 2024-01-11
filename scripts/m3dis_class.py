@@ -67,6 +67,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         self.nz = nz
         self.skip_linelist = False
         self.save_spectra = True
+        self.use_precomputed_depart = True
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -300,7 +301,7 @@ class m3disCall(SyntheticSpectrumGenerator):
         return file_path
 
 
-    def call_m3dis(self, skip_linelist=False):
+    def call_m3dis(self, skip_linelist=False, use_precomputed_depart=False):
         abund_file_path = self.write_abund_file()
         isotope_file_path = self.write_isotope_file()
 
@@ -332,7 +333,7 @@ class m3disCall(SyntheticSpectrumGenerator):
             atom_file_element = atom_files[0]
             if len(atom_files) > 1:
                 print(f"Only one atom file is allowed for NLTE: m3dis, using the first one {atom_file_element}")
-            if not skip_linelist:
+            if use_precomputed_depart:
                 precomputed_depart = f"precomputed_depart='{os.path.join(self.tmp_dir, '../precomputed_depart', '')}'"
             else:
                 precomputed_depart = ""
@@ -360,6 +361,7 @@ class m3disCall(SyntheticSpectrumGenerator):
 {linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
+        #TODO absmet files?
         logging.debug(config_m3dis)
 
         if self.verbose:
@@ -628,7 +630,7 @@ class m3disCall(SyntheticSpectrumGenerator):
             logging.debug("Running m3dis and atmosphere")
             self.calculate_atmosphere()
             logging.debug("Running m3dis")
-            output = self.call_m3dis(skip_linelist=skip_linelist)
+            output = self.call_m3dis(skip_linelist=skip_linelist, use_precomputed_depart=self.use_precomputed_depart)
             if "errors" in output:
                 print(output["errors"], "m3dis failed")
             else:
