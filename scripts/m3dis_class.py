@@ -230,8 +230,12 @@ class m3disCall(SyntheticSpectrumGenerator):
                         abundance_to_write = solar_abundances[element]
                     else:
                         if element in self.free_abundances:
-                            abundance_to_write = self.free_abundances[element] + solar_abundances[element] + self.metallicity
+                            # Here abundance is passed as [X/H], so we need to add the solar abundance to convert to A(X)
+                            # A(X)_star = A(X)_solar + [X/H]
+                            abundance_to_write = self.free_abundances[element] + solar_abundances[element]
                         else:
+                            # If the element is not in the free abundances, we assume it has the solar scaled abundance
+                            # A(X)_star = A(X)_solar + [Fe/H]
                             abundance_to_write = solar_abundances[element] + self.metallicity
                     file.write(f"{element:<4} {abundance_to_write:>6.3f}\n")
                     logging.debug(f"{element:<4} {abundance_to_write:>6.3f}")
