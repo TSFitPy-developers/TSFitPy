@@ -1046,12 +1046,13 @@ class Spectra:
                 np.savetxt(g, np.column_stack((result[line_number]['fit_wavelength'], result[line_number]['fit_flux_norm'], result[line_number]['fit_flux'])))
 
             line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
+            segment_left, segment_right = self.seg_begins[line_number], self.seg_ends[line_number]
 
             wavelength_fit_array = result[line_number]['fit_wavelength']
             norm_flux_fit_array = result[line_number]['fit_flux_norm']
 
             indices_to_use_cut = np.where(
-                (wavelength_fit_array <= line_right) & (wavelength_fit_array >= line_left))
+                (wavelength_fit_array <= segment_right) & (wavelength_fit_array >= segment_left))
             wavelength_fit_array_cut, norm_flux_fit_array_cut = wavelength_fit_array[indices_to_use_cut], \
             norm_flux_fit_array[indices_to_use_cut]
             wavelength_fit_conv, flux_fit_conv = get_convolved_spectra(wavelength_fit_array_cut,
