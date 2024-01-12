@@ -226,6 +226,178 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
         file.close()
 
+    def calculate_atmosphere(self):
+        # figure out if we need to interpolate the model atmosphere for microturbulence
+        possible_turbulence = [0.0, 1.0, 2.0, 5.0]
+        flag_dont_interp_microturb = False
+        for i in range(len(possible_turbulence)):
+            if self.turbulent_velocity == possible_turbulence[i]:
+                flag_dont_interp_microturb = True
+
+        if self.log_g < 3:
+            flag_dont_interp_microturb = True
+
+        logging.debug(f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
+
+        if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
+                self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
+            # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
+            turbulence_low = 0.0
+            microturbulence = self.turbulent_velocity
+            for i in range(len(possible_turbulence)):
+                if self.turbulent_velocity > possible_turbulence[i]:
+                    turbulence_low = possible_turbulence[i]
+                    place = i
+            turbulence_high = possible_turbulence[place + 1]
+            # print(turbulence_low,turbulence_high)
+
+            self.turbulent_velocity = turbulence_low
+            atmosphere_properties_low = self._generate_model_atmosphere()
+            # print(marcs_model_list_global)
+            low_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+            low_model_name += '.interpol'
+            if atmosphere_properties_low['errors']:
+                return atmosphere_properties_low
+            self.turbulent_velocity = turbulence_high
+            atmosphere_properties_high = self._generate_model_atmosphere()
+            high_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+            high_model_name += '.interpol'
+            if atmosphere_properties_high['errors']:
+                return atmosphere_properties_high
+
+            self.turbulent_velocity = microturbulence
+            # self.tmp_dir = temp_dir
+
+            # interpolate and find a model atmosphere for the microturbulence
+            self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                       self.metallicity,
+                                                                                       self.turbulent_velocity)
+            f_low = open(low_model_name, 'r')
+            lines_low = f_low.read().splitlines()
+            t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(
+                open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
+
+            f_high = open(high_model_name, 'r')
+            lines_high = f_high.read().splitlines()
+            t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(
+                open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
+
+            fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
+            fxlow = 1.0 - fxhigh
+
+            t_interp = t_low * fxlow + t_high * fxhigh
+            temp_interp = temp_low * fxlow + temp_high * fxhigh
+            pe_interp = pe_low * fxlow + pe_high * fxhigh
+            pt_interp = pt_low * fxlow + pt_high * fxhigh
+            lum_interp = lum_low * fxlow + lum_high * fxhigh
+            spud_interp = spud_low * fxlow + spud_high * fxhigh
+
+            interp_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+            interp_model_name += '.interpol'
+            # print(interp_model_name)
+            g = open(interp_model_name, 'w')
+            print(lines_low[0], file=g)
+            for i in range(len(t_interp)):
+                print(" {:.4f}  {:.2f}  {:.4f}   {:.4f}   {:.4f}    {:.6e}  {:.4f}".format(t_interp[i],
+                                                                                           temp_interp[i],
+                                                                                           pe_interp[i],
+                                                                                           pt_interp[i],
+                                                                                           microturbulence,
+                                                                                           lum_interp[i],
+                                                                                           spud_interp[i]), file=g)
+            print(lines_low[-8], file=g)
+            print(lines_low[-7], file=g)
+            print(lines_low[-6], file=g)
+            print(lines_low[-5], file=g)
+            print(lines_low[-4], file=g)
+            print(lines_low[-3], file=g)
+            print(lines_low[-2], file=g)
+            print(lines_low[-1], file=g)
+            g.close()
+
+            # generate models for low and high parts
+            if self.nlte_flag:
+                #  {self.model_atom_file}
+                logging.debug(f"self.model_atom_file inside ts_class_nlte.py: {self.model_atom_file}")
+                for element in self.model_atom_file:
+                    logging.debug(f"now low/high parts calling element: {element}")
+                    atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
+                                                                            element)
+                    low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    logging.debug(f"low_coef_dat_name: {low_coef_dat_name}")
+                    f_coef_low = open(low_coef_dat_name, 'r')
+                    lines_coef_low = f_coef_low.read().splitlines()
+                    f_coef_low.close()
+
+                    high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                    high_coef_dat_name += '_{}_coef.dat'.format(element)
+
+                    high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
+                    logging.debug(f"high_coef_dat_name: {high_coef_dat_name}")
+                    f_coef_high = open(high_coef_dat_name, 'r')
+                    lines_coef_high = f_coef_high.read().splitlines()
+                    f_coef_high.close()
+
+                    interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
+                    interp_coef_dat_name += '_{}_coef.dat'.format(element)
+
+                    #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
+
+                    g = open(interp_coef_dat_name, 'w')
+                    logging.debug(f"interp_coef_dat_name: {interp_coef_dat_name}")
+                    for i in range(11):
+                        print(lines_coef_low[i], file=g)
+                    for i in range(len(t_interp)):
+                        print(" {:7.4f}".format(t_interp[i]), file=g)
+                    for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
+                        fields_low = lines_coef_low[i].strip().split()
+                        fields_high = lines_coef_high[i].strip().split()
+                        fields_interp = []
+                        for j in range(len(fields_low)):
+                            fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
+                        fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
+                        # TODO check if any nans or negative values
+                        print(*fields_interp_print, file=g)
+                    for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
+                        print(lines_coef_low[i], file=g)
+                    g.close()
+            else:
+                # atmosphere_properties = atmosphere_properties_low
+                atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], 'Fe')
+
+        elif not flag_dont_interp_microturb and self.turbulent_velocity > 2.0:  # not enough models to interp if higher than 2
+            microturbulence = self.turbulent_velocity  # just use 2.0 for the model if between 2 and 3
+            self.turbulent_velocity = 2.0
+            atmosphere_properties = self._generate_model_atmosphere()
+            if atmosphere_properties['errors']:
+                return atmosphere_properties
+            self.turbulent_velocity = microturbulence
+
+        elif not flag_dont_interp_microturb and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.:  # not enough models to interp if lower than 1 and t_eff > 3900
+            microturbulence = self.turbulent_velocity
+            self.turbulent_velocity = 1.0
+            atmosphere_properties = self._generate_model_atmosphere()
+            if atmosphere_properties['errors']:
+                return atmosphere_properties
+            self.turbulent_velocity = microturbulence
+
+
+        elif flag_dont_interp_microturb:
+            if self.log_g < 3:
+                microturbulence = self.turbulent_velocity
+                self.turbulent_velocity = 2.0
+            atmosphere_properties = self._generate_model_atmosphere()
+            if self.log_g < 3:
+                self.turbulent_velocity = microturbulence
+            if atmosphere_properties['errors']:
+                # print('spud')
+                print(atmosphere_properties['errors'])
+                return atmosphere_properties
+        else:
+            print("Unexpected error?")
+        self.atmosphere_properties = atmosphere_properties
+        # print(self.atmosphere_properties)
+
     def make_babsma_bsyn_file(self, spherical):
         """
         Generate the configurations files for both the babsma and bsyn binaries in Turbospectrum.

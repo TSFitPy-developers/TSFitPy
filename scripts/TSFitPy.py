@@ -11,6 +11,7 @@ from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_e
 from scripts.solar_abundances import periodic_table
 from scripts.turbospectrum_class_nlte import TurboSpectrum
 from scripts.m3dis_class import m3disCall
+from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 from scripts.synthetic_code_class import fetch_marcs_grid
 import time
 import os
@@ -834,7 +835,7 @@ class Spectra:
         # save observed spectra using np.savetxt, with up to 5 decimals
         np.savetxt(path, np.transpose([self.wave_ob, self.flux_ob]), fmt='%.5f')
 
-    def configure_and_run_ts(self, ts:TurboSpectrum, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
+    def configure_and_run_ts(self, ts: SyntheticSpectrumGenerator, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
                              windows_flag: bool, temp_dir=None, teff=None, logg=None):
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
