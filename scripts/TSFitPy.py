@@ -148,10 +148,10 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
         out.close()
     elif os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(
             f'{temp_directory}/spectrum_00000000.spec').st_size == 0:
-        chi_square = 999.99
+        chi_square = 999999.99
         print("empty spectrum file.")
     else:
-        chi_square = 9999.9999
+        chi_square = 999999.9999
         print("didn't generate spectra")
     return chi_square
 
@@ -1202,7 +1202,7 @@ class Spectra:
                                                                              result[line_number][
                                                                                  "fitted_abund"] + 7)
         except ValueError:
-            result_upper_limit[line_number] = {"fitted_abund": 9999, "chi_sqr": 9999}
+            result_upper_limit[line_number] = {"fitted_abund": 999999, "chi_sqr": 999999}
 
         time_end = time.perf_counter()
         print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
@@ -1262,10 +1262,10 @@ class Spectra:
         except IndexError:
             print(f"Line {line_number} not fitted, is your line in the spectrum?")
             teff = 999999
-            doppler_fit = 9999
-            microturb = 9999
-            macroturb = 9999
-            rotation = 9999
+            doppler_fit = 999999
+            microturb = 999999
+            macroturb = 999999
+            rotation = 999999
             chi_squared = 999999
 
         if teff != 999999:
@@ -1307,7 +1307,7 @@ class Spectra:
                     print(err)
                     teff_error = 1000
         else:
-            teff_error = 9999
+            teff_error = 999999
 
         result_dict = {
             "specname": self.spec_name,
@@ -1377,13 +1377,13 @@ class Spectra:
         except IndexError:
             print(f"Line {line_number} not fitted, is your line in the spectrum?")
             logg = 999999
-            doppler_fit = 9999
-            microturb = 9999
-            macroturb = 9999
-            rotation = 9999
+            doppler_fit = 999999
+            microturb = 999999
+            macroturb = 999999
+            rotation = 999999
             chi_squared = 999999
 
-        if logg <= 999998:
+        if logg <= 99999:
             try:
                 wave_result, flux_norm_result, flux_result = np.loadtxt(
                     os.path.join(temp_directory, "spectrum_00000000.spec"),
@@ -1399,7 +1399,7 @@ class Spectra:
             flux_norm_result = np.array([])
             flux_result = np.array([])
 
-        if self.find_logg_errors and logg != 999999 and not True:
+        if self.find_logg_errors and logg <= 99999 and not True:
             # TODO: add ability to fit logg error
             print(f"Fitting {self.logg_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
@@ -1423,7 +1423,7 @@ class Spectra:
                     print(err)
                     logg_error = 1
         else:
-            logg_error = 9999
+            logg_error = 999999
 
         # Create a dictionary with column names as keys and corresponding values
         result_dict = {
@@ -1468,7 +1468,7 @@ class Spectra:
             fitted_teff = res.root
         except IndexError as error:
             print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
-            fitted_teff = -9999
+            fitted_teff = -999999
 
         shutil.rmtree(temp_directory)
         return fitted_teff
@@ -1629,7 +1629,7 @@ class Spectra:
             fitted_abund = res.root
         except IndexError as error:
             print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
-            fitted_abund = 9999
+            fitted_abund = 999999
 
         shutil.rmtree(temp_directory)
         return {"chi_sqr": offset_chisqr, "fitted_abund":fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
@@ -1800,9 +1800,9 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         else:
             microturb = 2.0
 
-    macroturb = 9999    # for printing only here, in case not fitted
-    rotation = 9999
-    doppler_shift = 9999
+    macroturb = 999999    # for printing only here, in case not fitted
+    rotation = 999999
+    doppler_shift = 999999
     spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
     spectra_to_fit.vmac_dict[line_number] = macroturb
     spectra_to_fit.rotation_dict[line_number] = rotation
@@ -1900,10 +1900,10 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
 
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999.99
+        chi_square = 999999.99
         print("empty spectrum file.")
     else:
-        chi_square = 9999.9999
+        chi_square = 999999.9999
         print("didn't generate spectra or atmosphere")
 
     output_print = f""
@@ -1973,11 +1973,11 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
             dof = 1
 
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999.99
+        chi_square = 999999.99
         dof = 1
         print("empty spectrum file.")
     else:
-        chi_square = 9999.9999
+        chi_square = 999999.9999
         dof = 1
         print("didn't generate spectra or atmosphere")
 
@@ -2067,9 +2067,9 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
 
     microturb = param[0]
 
-    macroturb = 9999    # for printing only here, in case not fitted
-    rotation = 9999
-    doppler_shift = 9999    # for printing only here, in case not fitted
+    macroturb = 999999    # for printing only here, in case not fitted
+    rotation = 999999
+    doppler_shift = 999999    # for printing only here, in case not fitted
     spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
     spectra_to_fit.vmac_dict[line_number] = macroturb
     spectra_to_fit.rotation_dict[line_number] = rotation
@@ -2108,10 +2108,10 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
     elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999.99
+        chi_square = 999999.99
         print("empty spectrum file.")
     else:
-        chi_square = 9999.9999
+        chi_square = 999999.9999
         print("didn't generate spectra or atmosphere")
 
     output_print = f""
@@ -2151,10 +2151,10 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
 
     spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
-    macroturb = 9999  # for printing if fails
-    rotation = 9999
-    chi_square = 9999
-    rv = 9999
+    macroturb = 999999  # for printing if fails
+    rotation = 999999
+    chi_square = 999999
+    rv = 999999
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
@@ -2219,10 +2219,10 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
 
     spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
 
-    macroturb = 9999  # for printing if fails
-    rotation = 9999
-    chi_square = 9999
-    rv = 9999
+    macroturb = 999999  # for printing if fails
+    rotation = 999999
+    chi_square = 999999
+    rv = 999999
 
     if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
         wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
