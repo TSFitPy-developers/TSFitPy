@@ -1816,7 +1816,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
     if spectra_generated:
@@ -1842,6 +1842,11 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         else:
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
+
+        #TODO: fix this for m3d so no need to do it
+        # check if temp_spectra_location exists, if not save spectra
+        if not os_path.exists(temp_spectra_location):
+            np.savetxt(temp_spectra_location, np.transpose([wave_mod_orig, flux_mod_orig, flux_orig]))
 
     output_print = ""
     for key in elem_abund_dict:
