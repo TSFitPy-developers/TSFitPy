@@ -1041,7 +1041,7 @@ class Spectra:
         8th bit:
         """
 
-        if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] < 99999:
+        if len(result[line_number]["fit_wavelength"]) > 0 and result[line_number]["chi_sqr"] <= 99999:
             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                 np.savetxt(g, np.column_stack((result[line_number]['fit_wavelength'], result[line_number]['fit_flux_norm'], result[line_number]['fit_flux'])))
 
@@ -2874,6 +2874,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
                                  slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb,
                                  time_limit_hours=tsfitpy_configuration.time_limit_hours,
                                  slurm_partition=tsfitpy_configuration.slurm_partition)
+
+        if tsfitpy_configuration.compiler.lower() == "m3dis":
+            module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
+            client.run(import_module_from_path, "m3dis", module_path)
 
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
