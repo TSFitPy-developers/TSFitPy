@@ -2408,6 +2408,17 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
         module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
         m3dis_python_module = import_module_from_path("m3dis", module_path)
 
+        if tsfitpy_configuration.cluster_type.lower() == 'slurm':
+            # create a symlink to the m3dis executable
+            m3dis_executable_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis", "")
+            m3dis_executable_path_symlink = "./m3dis/"
+            if os.path.exists(m3dis_executable_path_symlink):
+                if os.path.islink(m3dis_executable_path_symlink):
+                    os.remove(m3dis_executable_path_symlink)
+                else:
+                    raise ValueError(f"m3dis symlink {m3dis_executable_path_symlink} exists but is not a symlink! Stopped to prevent accidental deletion of files.")
+            os.symlink(m3dis_executable_path, m3dis_executable_path_symlink)
+
         # set molecules to False
         tsfitpy_configuration.include_molecules = False
         do_hydrogen_linelist = False
