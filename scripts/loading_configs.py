@@ -1024,7 +1024,16 @@ class TSFitPyConfig:
         self.departure_file_path = self._check_if_path_exists(self.departure_file_path, check_valid_path)
         self.old_output_folder_path_global = self._check_if_path_exists(self.output_folder_path, check_valid_path)
 
-        nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
+        if self.nlte_flag:
+            if self.compiler.lower() == "m3dis":
+                if self.iterations_max_precompute > 0 or self.iterations_max > 0:
+                    nlte_flag_to_save = "NLTE"
+                else:
+                    nlte_flag_to_save = "LTE"
+            else:
+                nlte_flag_to_save = "NLTE"
+        else:
+            nlte_flag_to_save = "LTE"
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self._convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
 
