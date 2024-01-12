@@ -3,16 +3,14 @@ from __future__ import annotations
 import subprocess
 import os
 from os import path as os_path
-import glob
 import re
 from operator import itemgetter
+from typing import Tuple
 import numpy as np
-import math
 import logging
 import abc
 from scripts.auxiliary_functions import closest_available_value
-from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
-from scripts.solar_isotopes import solar_isotopes
+from scripts.solar_abundances import solar_abundances, molecules_atomic_number
 
 class SyntheticSpectrumGenerator:
     """
@@ -490,7 +488,7 @@ class SyntheticSpectrumGenerator:
         pass
 
     @abc.abstractmethod
-    def synthesize_spectra(self):
+    def synthesize_spectra(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Abstract method that should be implemented by child classes."""
         pass
 

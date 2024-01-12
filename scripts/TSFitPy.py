@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pickle
 from configparser import ConfigParser
+from typing import Tuple
 from warnings import warn
 import numpy as np
 from distributed import get_worker
@@ -10,7 +11,7 @@ from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_e
     apply_doppler_correction, create_segment_file, import_module_from_path
 from scripts.solar_abundances import periodic_table
 from scripts.turbospectrum_class_nlte import TurboSpectrum
-from scripts.m3dis_class import m3disCall
+from scripts.m3dis_class import M3disCall
 from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 from scripts.synthetic_code_class import fetch_marcs_grid
 import time
@@ -101,7 +102,7 @@ def calculate_all_lines_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, 
     return chi_square
 
 
-def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: str, wave_obs: np.ndarray,
+def calc_ts_spectra_all_lines(obs_name: str, wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, temp_directory: str, output_dir: str, wave_obs: np.ndarray,
                               flux_obs: np.ndarray, macro: float, resolution: float, rot: float,
                               line_begins_sorted: np.ndarray, line_ends_sorted: np.ndarray,
                               seg_begins: np.ndarray, seg_ends: np.ndarray) -> float:
@@ -122,38 +123,28 @@ def calc_ts_spectra_all_lines(obs_name: str, temp_directory: str, output_dir: st
     :param seg_ends: Segment list where it ends, array
     :return: chi squared at line (between line start and end). Also creates convolved spectra.
     """
-    if os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(
-            f'{temp_directory}/spectrum_00000000.spec').st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(f'{temp_directory}/spectrum_00000000.spec', usecols=(0, 1),
-                                                  unpack=True)
-        wave_mod_filled = np.copy(wave_mod_orig)
-        flux_mod_filled = np.copy(flux_mod_orig)
+    wave_mod_filled = np.copy(wave_mod_orig)
+    flux_mod_filled = np.copy(flux_mod_orig)
 
-        for l in range(len(seg_begins) - 1):
-            flux_mod_filled[
-                np.logical_and.reduce((wave_mod_orig > seg_ends[l], wave_mod_orig <= seg_begins[l + 1]))] = 1.0
+    for l in range(len(seg_begins) - 1):
+        flux_mod_filled[
+            np.logical_and.reduce((wave_mod_orig > seg_ends[l], wave_mod_orig <= seg_begins[l + 1]))] = 1.0
 
-        wave_mod_filled = np.array(wave_mod_filled)
-        flux_mod_filled = np.array(flux_mod_filled)
+    wave_mod_filled = np.array(wave_mod_filled)
+    flux_mod_filled = np.array(flux_mod_filled)
 
-        wave_mod, flux_mod = get_convolved_spectra(wave_mod_filled, flux_mod_filled, resolution, macro, rot)
+    wave_mod, flux_mod = get_convolved_spectra(wave_mod_filled, flux_mod_filled, resolution, macro, rot)
 
-        chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
-                                                     line_ends_sorted, seg_begins, seg_ends)
+    chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
+                                                 line_ends_sorted, seg_begins, seg_ends)
 
-        os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, obs_name)}")
+    os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, obs_name)}")
 
-        out = open(f"{os.path.join(output_dir, f'spectrum_fit_convolved_{obs_name}')}",'w')
-        for l in range(len(wave_mod)):
-            print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
-        out.close()
-    elif os_path.exists(f'{temp_directory}/spectrum_00000000.spec') and os.stat(
-            f'{temp_directory}/spectrum_00000000.spec').st_size == 0:
-        chi_square = 999999.99
-        print("empty spectrum file.")
-    else:
-        chi_square = 999999.9999
-        print("didn't generate spectra")
+    out = open(f"{os.path.join(output_dir, f'spectrum_fit_convolved_{obs_name}')}",'w')
+    for l in range(len(wave_mod)):
+        print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
+    out.close()
+
     return chi_square
 
 
@@ -836,7 +827,7 @@ class Spectra:
         np.savetxt(path, np.transpose([self.wave_ob, self.flux_ob]), fmt='%.5f')
 
     def configure_and_run_ts(self, ts: SyntheticSpectrumGenerator, met: float, elem_abund: dict, vmicro: float, lmin: float, lmax: float,
-                             windows_flag: bool, temp_dir=None, teff=None, logg=None):
+                             windows_flag: bool, temp_dir=None, teff=None, logg=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Configures TurboSpectrum depending on input parameters and runs either NLTE or LTE
         :param met: metallicity of star
@@ -877,7 +868,7 @@ class Spectra:
                          verbose=self.turbospectrum_verbose,
                          atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
                          segment_file=self.segment_file, line_mask_file=self.linemask_file)
-        ts.synthesize_spectra()
+        return ts.synthesize_spectra()
 
     def fit_all(self) -> list:
         """
@@ -918,7 +909,7 @@ class Spectra:
         if marcs_models is None:
             marcs_models = self.marcs_models
         if self.compiler.lower() == "m3dis":
-            ts = m3disCall(
+            ts = M3disCall(
                 m3dis_path=self.spectral_code_path,
                 interpol_path=self.interpol_path,
                 line_list_paths=self.line_list_path_trimmed,
@@ -1749,6 +1740,16 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     return np.abs(chi_square - offset_chisqr)
 
 
+def check_if_spectra_generated(wave_mod_orig: np.ndarray) -> Tuple[bool, float]:
+    if wave_mod_orig is None:
+        print("didn't generate spectra or atmosphere")
+        return False, 999999.9999
+    elif np.size(wave_mod_orig) == 0:
+        print("empty spectrum file.")
+        return False, 999999.99
+    else:
+        return True, 0
+
 def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int, offset_chisqr=0) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
@@ -1815,10 +1816,10 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
-    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    if spectra_generated:
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus, macro should not be dependent on the abundance directly, hopefully
@@ -1841,12 +1842,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         else:
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
-    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999999.99
-        print("empty spectrum file.")
-    else:
-        chi_square = 999999.9999
-        print("didn't generate spectra or atmosphere")
 
     output_print = ""
     for key in elem_abund_dict:
@@ -1893,19 +1888,12 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory, teff=teff)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory, teff=teff)     # generates spectra
 
-    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    if spectra_generated:
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
         chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
-
-    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999999.99
-        print("empty spectrum file.")
-    else:
-        chi_square = 999999.9999
-        print("didn't generate spectra or atmosphere")
 
     output_print = f""
     for key in elem_abund_dict:
@@ -1956,31 +1944,21 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     # delete the temporary directory if it exists
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    dof = 1
+    if spectra_generated:
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
         chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
-
-
         dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax) & (spectra_to_fit.flux_ob >= lmin))]) - 1
         # TODO: proper calculation of DOF
         if dof <= 0:
             dof = 1
-
-    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999999.99
-        dof = 1
-        print("empty spectrum file.")
-    else:
-        chi_square = 999999.9999
-        dof = 1
-        print("didn't generate spectra or atmosphere")
 
     output_print = f""
     for key in elem_abund_dict:
@@ -2084,11 +2062,10 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
-    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location,
-                                                  usecols=(0, 1), unpack=True)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    if spectra_generated:
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
@@ -2108,12 +2085,6 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         else:
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
-    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        chi_square = 999999.99
-        print("empty spectrum file.")
-    else:
-        chi_square = 999999.9999
-        print("didn't generate spectra or atmosphere")
 
     output_print = f""
     for key in elem_abund_dict:
@@ -2146,19 +2117,18 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
 
     temp_spectra_location = os.path.join(temp_directory, 'spectrum_00000000.spec')
 
+    macroturb = 999999  # for printing if fails
+    rotation = 999999
+    rv = 999999
+
     # delete the temporary directory if it exists
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
-    macroturb = 999999  # for printing if fails
-    rotation = 999999
-    chi_square = 999999
-    rv = 999999
-
-    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    if spectra_generated:
         ndimen = 1
         if spectra_to_fit.fit_vmac:
             ndimen += 1
@@ -2181,10 +2151,6 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
             rotation = spectra_to_fit.rotation
 
         chi_square = res.fun
-    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        print("empty spectrum file.")
-    else:
-        print("didn't generate spectra or atmosphere")
 
     print(f"Teff={teff}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
@@ -2218,15 +2184,14 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
-
     macroturb = 999999  # for printing if fails
     rotation = 999999
-    chi_square = 999999
     rv = 999999
 
-    if os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size != 0:
-        wave_mod_orig, flux_mod_orig = np.loadtxt(temp_spectra_location, usecols=(0, 1), unpack=True)
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
+
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    if spectra_generated:
         ndimen = 1
         if spectra_to_fit.fit_vmac:
             ndimen += 1
@@ -2249,10 +2214,6 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
             rotation = spectra_to_fit.rotation
 
         chi_square = res.fun
-    elif os_path.exists(temp_spectra_location) and os.stat(temp_spectra_location).st_size == 0:
-        print("empty spectrum file.")
-    else:
-        print("didn't generate spectra or atmosphere")
 
     print(f"logg={logg}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
@@ -2304,14 +2265,16 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
         else:
             vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.met)
 
-    spectra_to_fit.configure_and_run_ts(ts, met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
-    chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_name, spectra_to_fit.temp_dir,
-                                           spectra_to_fit.output_folder,
-                                           wave_obs, spectra_to_fit.flux_ob,
-                                           macroturb, spectra_to_fit.resolution, spectra_to_fit.rotation,
-                                           spectra_to_fit.line_begins_sorted, spectra_to_fit.line_ends_sorted,
-                                           spectra_to_fit.seg_begins, spectra_to_fit.seg_ends)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    if spectra_generated:
+        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_name, wave_mod_orig, flux_mod_orig, spectra_to_fit.temp_dir,
+                                               spectra_to_fit.output_folder,
+                                               wave_obs, spectra_to_fit.flux_ob,
+                                               macroturb, spectra_to_fit.resolution, spectra_to_fit.rotation,
+                                               spectra_to_fit.line_begins_sorted, spectra_to_fit.line_ends_sorted,
+                                               spectra_to_fit.seg_begins, spectra_to_fit.seg_ends)
 
     #print(abund, doppler, chi_square, macroturb)
 

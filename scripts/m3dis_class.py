@@ -2,27 +2,17 @@ from __future__ import annotations
 
 import logging
 import subprocess
-
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-import matplotlib
-import time
 import tempfile
-import importlib.util
-import sys
-
 from scipy.interpolate import LinearNDInterpolator, interp1d
-
 from scripts import marcs_class
 from scripts.solar_abundances import periodic_table, solar_abundances
 from scripts.solar_isotopes import solar_isotopes
 from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 
 
-
-
-class m3disCall(SyntheticSpectrumGenerator):
+class M3disCall(SyntheticSpectrumGenerator):
     def __init__(self, m3dis_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
                  marcs_grid_list: str, model_atom_path: str, departure_file_path: str,
                  aux_file_length_dict: dict,
@@ -650,7 +640,7 @@ class m3disCall(SyntheticSpectrumGenerator):
                 file.write(
                     f"{depth_interp[i]:>13.6e} {temp_interp[i]:>8.1f} {pe_interp[i]:>12.4E} {density_interp[i]:>12.4E} {vmic_interp[i]:>5.3f}\n")
 
-    def synthesize_spectra(self):
+    def synthesize_spectra(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         skip_linelist = self.skip_linelist
         save_spectra = self.save_spectra
         try:
@@ -660,21 +650,20 @@ class m3disCall(SyntheticSpectrumGenerator):
             output = self.call_m3dis(skip_linelist=skip_linelist, use_precomputed_depart=self.use_precomputed_depart)
             if "errors" in output:
                 print(output["errors"], "m3dis failed")
+                return None, None, None
             else:
-                try:
-                    completed_run = self.m3dis_python_module.read(
-                        self.tmp_dir
-                    )
-                    if save_spectra:
+                if save_spectra:
+                    try:
+                        completed_run = self.m3dis_python_module.read(
+                            self.tmp_dir
+                        )
                         wavelength, _ = completed_run.get_xx(completed_run.lam)
                         flux, continuum = completed_run.get_yy(norm=False)
                         normalised_flux = flux / continuum
-                        # save to file as append
-                        file_to_save = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
-                        # save to file using numpy, wavelength, normalised_flux, flux
-                        np.savetxt(file_to_save, np.transpose([wavelength, normalised_flux, flux]), fmt='%10.5f %10.5f %10.5f')
-                except FileNotFoundError as e:
-                    print(f"m3dis, cannot find  {e}")
+                        return wavelength, normalised_flux, flux
+                    except FileNotFoundError as e:
+                        print(f"m3dis, cannot find  {e}")
         except (FileNotFoundError, ValueError, TypeError) as error:
             print(f"Interpolation failed? {error}")
+        return None, None, None
 

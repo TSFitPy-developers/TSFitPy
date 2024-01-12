@@ -5,6 +5,8 @@ import os
 from os import path as os_path
 import glob
 from operator import itemgetter
+from typing import Tuple
+
 import numpy as np
 import math
 import logging
@@ -472,11 +474,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 'PURE-LTE  :'  '.false.'
 'NLTE :'          '{nlte}'
 'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-#'MODELATOMFILE:'  '{this[model_atom_path]}{this[model_atom_file]}'
-#'DEPARTUREFILE:'  '{this[tmp_dir]}{this[marcs_model_name]}_coef.dat'
-#'DEPARTBINARY:'   '.false.'
-#'CONTMASKFILE:'     '{this[cont_mask_file]}'
-#'LINEMASKFILE:'     '{this[line_mask_file]}'
 'SEGMENTSFILE:'     '{this[segment_file]}'
 'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
@@ -537,12 +534,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 'PURE-LTE  :'  '.false.'
 'NLTE :'          '{nlte}'
 'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-#'MODELATOMFILE:'  '{this[model_atom_path]}{this[model_atom_file]}'
-#'DEPARTUREFILE:'  '{this[tmp_dir]}{this[marcs_model_name]}_coef.dat'
-#'DEPARTBINARY:'   '.false.'
-#'CONTMASKFILE:'     '/Users/gerber/gitprojects/SAPP/linemasks/ca-cmask.txt'
-#'LINEMASKFILE:'     '/Users/gerber/gitprojects/SAPP/linemasks/ca-lmask.txt'
-#'SEGMENTSFILE:'     '/Users/gerber/gitprojects/SAPP/linemasks/ca-seg.txt'
 'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
 'LAMBDA_STEP:'   '{this[lambda_delta]:.3f}'
@@ -733,42 +724,29 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 for j in range(len(wave)):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
                 f.close()
-            '''
-            if (lmax-lmin)/self.lambda_delta > self.lpoint:
-                print("Whoops! You went over the default maximum number of spectrum points. TSFitPy will break up the wavelength range and stitch together the smaller pieces, but a better solution is to increase the number of points in Turbospectrum in the file spectrum.inc to match what you need. Then adjust the same lpoint parameter next time you call TSFitPy.")
-                lmax = (self.lpoint*self.lambda_delta) + lmin
-                k = 0
-                while lmax < lmax_orig:
-                    self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
-                    self.synthesize()
-                    lmin = lmax
-                    lmax = (self.lpoint*self.lambda_delta) + lmin
-                    k+=1
-                lmax = lmag_orig
-                self.configure(lambda_min = lmin-30., lambda_max=lmax+30, counter_spectra=k)
-                self.synthesize()
-                for i in range(k-1):
-                    spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
-                    spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i+1))
-                    wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i+1)
-                    f = open(spectrum1, 'w')
-                    for j in range(len(wave)):
-                        print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
-                    f.close()'''
         else:
             self.synthesize()
 
-    def synthesize_spectra(self):
+    def synthesize_spectra(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         try:
             logging.debug("Running Turbospectrum and atmosphere")
             self.calculate_atmosphere()
             try:
                 logging.debug("Running Turbospectrum")
                 self.run_turbospectrum()
+                # NS 12.01.2024: now we return the fitted spectrum
+                temp_spectra_location = os.path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
+                if os_path.exists(temp_spectra_location):
+                    if os.stat(temp_spectra_location).st_size != 0:
+                        return np.loadtxt(temp_spectra_location, unpack=True, usecols=(0, 1, 2), dtype=float)
+                    else:
+                        # return 3 empty arrays, because the file exists but is empty
+                        return np.array([]), np.array([]), np.array([])
             except AttributeError:
                 print("No attribute, fail of generation?")
         except (FileNotFoundError, ValueError, TypeError) as error:
             print(f"Interpolation failed? {error}")
             print("ValueError can sometimes imply problem with the departure coefficients grid")
+        return None, None, None
 
 
