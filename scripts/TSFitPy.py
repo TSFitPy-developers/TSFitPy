@@ -2415,7 +2415,10 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
             if not os.path.exists(m3dis_executable_path):
                 raise ValueError(f"m3dis executable path {m3dis_executable_path} does not exist!")
 
-            m3dis_executable_path_symlink = "./m3dis/"
+            # get current working directory
+            cwd = os.getcwd()
+            # convert to absolute path
+            m3dis_executable_path_symlink = os.path.join(cwd, "m3dis", "")
             if os.path.exists(m3dis_executable_path_symlink):
                 if os.path.islink(m3dis_executable_path_symlink):
                     os.remove(m3dis_executable_path_symlink)
