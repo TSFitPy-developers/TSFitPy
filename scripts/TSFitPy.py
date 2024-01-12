@@ -2410,7 +2410,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
 
         if tsfitpy_configuration.cluster_type.lower() == 'slurm':
             # create a symlink to the m3dis executable
-            m3dis_executable_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis", "")
+            m3dis_executable_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis")
             # check if m3dis_executable_path exists
             if not os.path.exists(m3dis_executable_path):
                 raise ValueError(f"m3dis executable path {m3dis_executable_path} does not exist!")
@@ -2418,7 +2418,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
             # get current working directory
             cwd = os.getcwd()
             # convert to absolute path
-            m3dis_executable_path_symlink = os.path.join(cwd, "m3dis", "")
+            m3dis_executable_path_symlink = os.path.join(cwd, "m3dis")
             if os.path.exists(m3dis_executable_path_symlink):
                 if os.path.islink(m3dis_executable_path_symlink):
                     os.remove(m3dis_executable_path_symlink)
