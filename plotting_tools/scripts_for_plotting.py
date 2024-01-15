@@ -14,10 +14,12 @@ from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.m3dis_class import M3disCall
+from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 from scripts.synthetic_code_class import fetch_marcs_grid
 from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
                              output_default_linemask_name)
-from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
+from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction, import_module_from_path
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 from scripts.solar_abundances import periodic_table
 
@@ -408,7 +410,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                         elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False):
     for element in element_abundances:
         element_abundances[element] += met
-    temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
 
     for path in turbospectrum_paths:
         turbospectrum_paths[path] = check_if_path_exists(turbospectrum_paths[path])
@@ -426,25 +428,24 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
         model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
 
-    nlte_config = ConfigParser()
-    nlte_config.read(os.path.join(turbospectrum_paths["departure_file_path"], "nlte_filenames.cfg"))
-
     depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
-
-    for element in elements_in_nlte:
-        if atmosphere_type == "1D":
-            bin_config_name, aux_config_name = "1d_bin", "1d_aux"
-        else:
-            bin_config_name, aux_config_name = "3d_bin", "3d_aux"
-        depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
-        depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
-        model_atom_file_dict[element] = nlte_config[element]["atom_file"]
-
     aux_file_length_dict = {}
+
     if nlte_flag:
+        nlte_config = ConfigParser()
+        nlte_config.read(os.path.join(turbospectrum_paths["departure_file_path"], "nlte_filenames.cfg"))
+
+        for element in elements_in_nlte:
+            if atmosphere_type == "1D":
+                bin_config_name, aux_config_name = "1d_bin", "1d_aux"
+            else:
+                bin_config_name, aux_config_name = "3d_bin", "3d_aux"
+            depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
+            depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
+            model_atom_file_dict[element] = nlte_config[element]["atom_file"]
+
         for element in model_atom_file_dict:
-            aux_file_length_dict[element] = len(
-                np.loadtxt(os.path.join(turbospectrum_paths["departure_file_path"], depart_aux_file_dict[element]), dtype='str'))
+            aux_file_length_dict[element] = len(np.loadtxt(os.path.join(turbospectrum_paths["departure_file_path"], depart_aux_file_dict[element]), dtype='str'))
 
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     today = f"{today}_{np.random.random(1)[0]}"
@@ -480,43 +481,185 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
-    ts.synthesize_spectra()
+    wave_mod_orig, flux_norm_mod_orig, _ = ts.synthesize_spectra()
     print("TS completed")
-    try:
-        wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
-                                                                  usecols=(0, 1), unpack=True)
-        wave_mod_filled = wave_mod_orig
-        flux_norm_mod_filled = flux_norm_mod_orig
+    if wave_mod_orig is not None:
+        if np.size(wave_mod_orig) != 0.0:
+            try:
+                wave_mod_filled = wave_mod_orig
+                flux_norm_mod_filled = flux_norm_mod_orig
 
-        if len(wave_mod_orig) > 0:
-            if resolution != 0.0:
-                wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-            else:
-                wave_mod_conv = wave_mod_filled
-                flux_norm_mod_conv = flux_norm_mod_filled
+                if len(wave_mod_orig) > 0:
+                    if resolution != 0.0:
+                        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+                    else:
+                        wave_mod_conv = wave_mod_filled
+                        flux_norm_mod_conv = flux_norm_mod_filled
 
-            if macro != 0.0:
-                wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-            else:
-                wave_mod_macro = wave_mod_conv
-                flux_norm_mod_macro = flux_norm_mod_conv
+                    if macro != 0.0:
+                        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+                    else:
+                        wave_mod_macro = wave_mod_conv
+                        flux_norm_mod_macro = flux_norm_mod_conv
 
-            if rotation != 0.0:
-                wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-            else:
-                wave_mod = wave_mod_macro
-                flux_norm_mod = flux_norm_mod_macro
+                    if rotation != 0.0:
+                        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+                    else:
+                        wave_mod = wave_mod_macro
+                        flux_norm_mod = flux_norm_mod_macro
 
-            plt.plot(wave_mod, flux_norm_mod)
-            plt.xlim(lmin - 0.2, lmax + 0.2)
-            plt.ylim(0, 1.05)
-            plt.xlabel("Wavelength")
-            plt.ylabel("Normalised flux")
+                    plt.plot(wave_mod, flux_norm_mod)
+                    plt.xlim(lmin - 0.2, lmax + 0.2)
+                    plt.ylim(0, 1.05)
+                    plt.xlabel("Wavelength")
+                    plt.ylabel("Normalised flux")
+                else:
+                    print('TS failed')
+                    wave_mod, flux_norm_mod = np.array([]), np.array([])
+            except (FileNotFoundError, ValueError, IndexError) as e:
+                print(f"TS failed: {e}")
+                wave_mod, flux_norm_mod = np.array([]), np.array([])
         else:
             print('TS failed')
             wave_mod, flux_norm_mod = np.array([]), np.array([])
-    except (FileNotFoundError, ValueError, IndexError) as e:
-        print(f"TS failed: {e}")
+    else:
+        print('TS failed')
+        wave_mod, flux_norm_mod = np.array([]), np.array([])
+    shutil.rmtree(temp_directory)
+    #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+
+    return wave_mod, flux_norm_mod
+
+
+def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
+                              hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
+                              nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False):
+    for element in element_abundances:
+        element_abundances[element] += met
+    temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    # convert temp directory to absolute path
+    temp_directory = os.path.join(os.getcwd(), temp_directory, "")
+
+    for path in m3dis_paths:
+        if ((atmosphere_type != "3D" and path != "3D_atmosphere_path") or atmosphere_type == "3D") and not path == "nlte_config_path":
+            m3dis_paths[path] = check_if_path_exists(m3dis_paths[path])
+        #if path == "nlte_config_path" and nlte_flag:
+        #    m3dis_paths[path] = check_if_file_exists(m3dis_paths[path])
+
+    if not os.path.exists(temp_directory):
+        os.makedirs(temp_directory)
+
+    if atmosphere_type == "1D":
+        model_atmosphere_grid_path = os.path.join(m3dis_paths["model_atmosphere_grid_path"], "1D", "")
+        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
+
+        model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
+            model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+    elif atmosphere_type == "3D":
+        model_atmosphere_grid_path = None
+        model_atmosphere_list = None
+
+        model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = None, None, None, None, None, None
+
+    depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
+
+    if nlte_flag:
+        nlte_config = ConfigParser()
+        nlte_config.read(os.path.join(m3dis_paths["nlte_config_path"], "nlte_filenames.cfg"))
+
+        model_atom_file_dict[element_in_nlte] = nlte_config[element_in_nlte]["atom_file"]
+
+    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    today = f"{today}_{np.random.random(1)[0]}"
+    line_list_path_trimmed = os.path.join(f"{temp_directory}", "linelist_for_fitting_trimmed", "")
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
+
+    print("Trimming")
+    create_window_linelist([lmin - 4], [lmax + 4], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False)
+    print("Trimming done")
+
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
+
+    module_path = os.path.join(m3dis_paths["m3dis_path"], "m3dis/__init__.py")
+    m3dis_python_module = import_module_from_path("m3dis", module_path)
+
+    m3dis = M3disCall(
+        m3dis_path=m3dis_paths["m3dis_path"],
+        interpol_path=None,
+        line_list_paths=line_list_path_trimmed,
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=m3dis_paths["model_atom_path"],
+        departure_file_path=None,
+        aux_file_length_dict=None,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values,
+        m3dis_python_module=m3dis_python_module,
+        n_nu=n_nu,
+        hash_table_size=hash_table_size,
+        mpi_cores=mpi_cores,
+        iterations_max=nlte_iterations_max,
+        convlim=nlte_convergence_limit,
+        snap=snap,
+        dims=dims,
+        nx=nx,
+        ny=ny,
+        nz=nz
+    )
+
+    m3dis.configure(t_eff=teff, log_g=logg, metallicity=met,
+                 turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin - 3, lambda_max=lmax + 3,
+                 free_abundances=element_abundances, temp_directory=f"{temp_directory}", nlte_flag=nlte_flag, verbose=verbose,
+                 atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
+                 line_mask_file=None, model_atom_file=model_atom_file_dict, atmos_format_3d=atmos_format, atmosphere_path_3d_model=m3dis_paths["3D_atmosphere_path"])
+    print("Running m3dis")
+    wave_mod_orig, flux_norm_mod_orig, _ = m3dis.synthesize_spectra()
+    print("m3dis completed")
+    if wave_mod_orig is not None:
+        if np.size(wave_mod_orig) != 0.0:
+            try:
+                wave_mod_filled = wave_mod_orig
+                flux_norm_mod_filled = flux_norm_mod_orig
+
+                if len(wave_mod_orig) > 0:
+                    if resolution != 0.0:
+                        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+                    else:
+                        wave_mod_conv = wave_mod_filled
+                        flux_norm_mod_conv = flux_norm_mod_filled
+
+                    if macro != 0.0:
+                        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+                    else:
+                        wave_mod_macro = wave_mod_conv
+                        flux_norm_mod_macro = flux_norm_mod_conv
+
+                    if rotation != 0.0:
+                        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+                    else:
+                        wave_mod = wave_mod_macro
+                        flux_norm_mod = flux_norm_mod_macro
+
+                    plt.plot(wave_mod, flux_norm_mod)
+                    plt.xlim(lmin - 0.2, lmax + 0.2)
+                    plt.ylim(0, 1.05)
+                    plt.xlabel("Wavelength")
+                    plt.ylabel("Normalised flux")
+                else:
+                    print('m3dis failed')
+                    wave_mod, flux_norm_mod = np.array([]), np.array([])
+            except (FileNotFoundError, ValueError, IndexError) as e:
+                print(f"m3dis failed: {e}")
+                wave_mod, flux_norm_mod = np.array([]), np.array([])
+        else:
+            print('m3dis failed')
+            wave_mod, flux_norm_mod = np.array([]), np.array([])
+    else:
+        print('m3dis failed')
         wave_mod, flux_norm_mod = np.array([]), np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list

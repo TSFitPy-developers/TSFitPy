@@ -58,6 +58,8 @@ class M3disCall(SyntheticSpectrumGenerator):
         self.skip_linelist = False
         self.save_spectra = True
         self.use_precomputed_depart = True
+        self.atmosphere_path_3d_model = None
+        self.atmos_format_3d = None
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -67,7 +69,7 @@ class M3disCall(SyntheticSpectrumGenerator):
                   verbose=None, temp_directory=None, nlte_flag: bool = None, atmosphere_dimension=None,
                   mpi_cores:int=None,
                   windows_flag=None, segment_file=None, line_mask_file=None, depart_bin_file=None,
-                  depart_aux_file=None, model_atom_file=None):
+                  depart_aux_file=None, model_atom_file=None, atmosphere_path_3d_model=None, atmos_format_3d=None):
         """
         Set the stellar parameters of the synthetic spectra to generate. This can be called as often as needed
         to generate many synthetic spectra with one class instance. All arguments are optional; any which are not
@@ -167,6 +169,10 @@ class M3disCall(SyntheticSpectrumGenerator):
             self.model_atom_file = model_atom_file
         if segment_file is not None:
             self.segment_file = segment_file
+        if atmosphere_path_3d_model is not None:
+            self.atmosphere_path_3d_model = atmosphere_path_3d_model
+        if atmos_format_3d is not None:
+            self.atmos_format_3d = atmos_format_3d
 
     def run_m3dis(self, input_in, stderr, stdout):
         # Write the input data to a temporary file
@@ -247,8 +253,14 @@ class M3disCall(SyntheticSpectrumGenerator):
         elements_atomic_number_unique = set(elements_atomic_number)
         separator = "_"  # separator between sections in the file from NIST
 
+        atomic_weights_path = "scripts/atomicweights.dat"
+        # check if file exists
+        if not os.path.exists(atomic_weights_path):
+            # add ../ to the path
+            atomic_weights_path = os.path.join("../", atomic_weights_path)
+
         atomic_weights = {}
-        with open("scripts/atomicweights.dat", "r") as file:
+        with open(atomic_weights_path, "r") as file:
             skip_section = True
             current_element_atomic_number = 0
             for line in file:
@@ -322,11 +334,22 @@ class M3disCall(SyntheticSpectrumGenerator):
                 atmo_param = f"atmos_format='Stagger' snap={self.snap} FeH={self.metallicity} dims={self.dims} nx={self.nx} ny={self.ny} nz={self.nz}"
                 atmos_path = "/mnt/beegfs/gemini/groups/bergemann/users/shared-storage/bergemann-data/Stagger_remo/hd1225623/2013-04-10_nlam48/t46g16m2503"
             else:
-                raise ValueError("3D atmospheres not implemented yet")
-                atmo_param = "atmos_format='MUST'"
-                atmo_param = "&atmos_params       dims=10 atmos_format='Multi' atmos_file='/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230'/"
-                atmo_param = f"atmos_format='Multi' dims={self.dims}"
-                atmos_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230"
+                if self.atmosphere_path_3d_model is not None:
+                    atmos_path = self.atmosphere_path_3d_model
+                    if self.atmos_format_3d.lower == "multi" or self.atmos_format_3d.lower == "muram":
+                        atmo_param = f"atmos_format='Multi' dims={self.dims}"
+                    elif self.atmos_format_3d.lower == "stagger":
+                        atmo_param = f"atmos_format='Stagger' snap={self.snap} dims={self.dims} nx={self.nx} ny={self.ny} nz={self.nz}"
+                    elif self.atmos_format_3d.lower == "must":
+                        atmo_param = f"atmos_format='MUST' dims={self.dims}"
+                    else:
+                        raise ValueError(f"Atmosphere format {self.atmos_format_3d} not recognized")
+                else:
+                    raise ValueError("3D atmospheres not implemented yet")
+                    atmo_param = "atmos_format='MUST'"
+                    atmo_param = "&atmos_params       dims=10 atmos_format='Multi' atmos_file='/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230'/"
+                    atmo_param = f"atmos_format='Multi' dims={self.dims}"
+                    atmos_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230"
                 # &atmos_params       dims=1 atmos_format='MUST' atmos_file='input_multi3d/atmos/m3dis_sun_magg22_10x10x280_1' /
 
                 # multi:
