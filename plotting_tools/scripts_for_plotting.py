@@ -575,7 +575,20 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
-    create_window_linelist([lmin - 4], [lmax + 4], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False)
+    create_window_linelist([lmin - 4], [lmax + 4], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
+    # if m3dis, then combine all linelists into one
+    # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
+    for folder in os.listdir(line_list_path_trimmed):
+        if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
+            # go into each folder and combine all linelists into one
+            combined_linelist = os.path.join(line_list_path_trimmed, folder, "combined_linelist.bsyn")
+            with open(combined_linelist, "w") as combined_linelist_file:
+                for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
+                    if file.endswith(".bsyn") and not file == "combined_linelist.bsyn":
+                        with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
+                            combined_linelist_file.write(linelist_file.read())
+                        # delete the file
+                        os.remove(os.path.join(line_list_path_trimmed, folder, file))
     print("Trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
