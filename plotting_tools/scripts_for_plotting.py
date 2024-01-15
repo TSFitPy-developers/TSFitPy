@@ -565,7 +565,7 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
 
     if nlte_flag:
         nlte_config = ConfigParser()
-        nlte_config.read(os.path.join(m3dis_paths["nlte_config_path"], "nlte_filenames.cfg"))
+        nlte_config.read(m3dis_paths["nlte_config_path"])
 
         model_atom_file_dict[element_in_nlte] = nlte_config[element_in_nlte]["atom_file"]
 
@@ -629,6 +629,7 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
                  free_abundances=element_abundances, temp_directory=f"{temp_directory}", nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
                  line_mask_file=None, model_atom_file=model_atom_file_dict, atmos_format_3d=atmos_format, atmosphere_path_3d_model=m3dis_paths["3D_atmosphere_path"])
+    m3dis.use_precomputed_depart = False
     print("Running m3dis")
     wave_mod_orig, flux_norm_mod_orig, _ = m3dis.synthesize_spectra()
     print("m3dis completed")
