@@ -2409,6 +2409,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
         m3dis_python_module = import_module_from_path("m3dis", module_path)
 
         if tsfitpy_configuration.cluster_type.lower() == 'slurm':
+            #TODO what if i have several running in parallel, will they delete each other
             # create a symlink to the m3dis executable
             m3dis_executable_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis")
             # check if m3dis_executable_path exists
