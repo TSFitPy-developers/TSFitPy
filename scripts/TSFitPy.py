@@ -148,58 +148,47 @@ def calc_ts_spectra_all_lines(obs_name: str, wave_mod_orig: np.ndarray, flux_mod
     return chi_square
 
 
-def calculate_lbl_chi_squared(temp_directory: str, wave_obs: np.ndarray, flux_obs: np.ndarray, error_obs_variance: np.ndarray,
-                              wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, resolution: float, lmin: float,
-                              lmax: float, macro: float, rot: float, save_convolved=True) -> float:
+def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_obs_variance: np.ndarray,
+                              wave_synt_orig: np.ndarray, flux_synt_orig: np.ndarray, resolution: float, lmin: float,
+                              lmax: float, vmac: float, rotation: float) -> float:
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
     calculates chi squared. Used for line by line method, by only looking at a specific line.
-    :param temp_directory:
     :param wave_obs: Observed wavelength
     :param flux_obs: Observed normalised flux
     :param error_obs_variance: Observed error variance
-    :param wave_mod_orig: Synthetic wavelength
-    :param flux_mod_orig: Synthetic normalised flux
+    :param wave_synt_orig: Synthetic wavelength
+    :param flux_synt_orig: Synthetic normalised flux
     :param resolution: resolution, zero if not required
-    :param lmax: Wavelength, start of segment (will calculate at +5 AA to this)
-    :param lmin: Wavelength, end of segment  (will calculate at -5 AA to this)
-    :param macro: Macroturbulence in km/s, zero if not required
-    :param rot: Rotation in km/s, 0 if not required
-    :param save_convolved: whether to save convolved spectra or not (default True)
+    :param lmin: Wavelength, start of line
+    :param lmax: Wavelength, end of line
+    :param vmac: Macroturbulence in km/s, zero if not required
+    :param rotation: Rotation in km/s, 0 if not required
     :return: Calculated chi squared for a given line
     """
-    indices_to_use_mod = np.where((wave_mod_orig <= lmax) & (wave_mod_orig >= lmin))
+    indices_to_use_mod = np.where((wave_synt_orig <= lmax) & (wave_synt_orig >= lmin))
     indices_to_use_obs = np.where((wave_obs <= lmax) & (wave_obs >= lmin))
 
-    wave_mod_orig, flux_mod_orig = wave_mod_orig[indices_to_use_mod], flux_mod_orig[indices_to_use_mod]
+    wave_synt_orig, flux_synt_orig = wave_synt_orig[indices_to_use_mod], flux_synt_orig[indices_to_use_mod]
     wave_obs, flux_obs = wave_obs[indices_to_use_obs], flux_obs[indices_to_use_obs]
     error_obs_variance = error_obs_variance[indices_to_use_obs]
 
+    if np.size(flux_obs) == 0:
+        return 999999
+
     try:
-        wave_mod, flux_mod = get_convolved_spectra(wave_mod_orig, flux_mod_orig, resolution, macro, rot)
+        wave_synt, flux_synt = get_convolved_spectra(wave_synt_orig, flux_synt_orig, resolution, vmac, rotation)
     except ValueError:
         return 999999
 
-    flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-    wave_line = wave_obs[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
-    flux_line_obs = flux_obs[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
+    flux_synt_interp = np.interp(wave_obs, wave_synt, flux_synt)
 
-    if np.size(flux_line_obs) == 0:
-        return 999999
-
-    flux_line_mod = flux_mod_interp[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
-    error_obs_variance = error_obs_variance[np.where((wave_obs <= lmax) & (wave_obs >= lmin))]
     # TODO: proper calculation of DOF
-    dof = len(flux_line_obs) - 1
+    dof = len(flux_obs) - 1
     if dof <= 0:
         dof = 1
-    chi_square = np.sum(np.square(flux_line_obs - flux_line_mod) / error_obs_variance) / dof
+    chi_square = np.sum(np.square(flux_obs - flux_synt_interp) / error_obs_variance) / dof
 
-    if save_convolved:
-        out = open(os.path.join(temp_directory, "spectrum_00000000_convolved.spec"), 'w')
-        for i in range(len(wave_line)):
-            print(f"{wave_line[i]}  {flux_line_mod[i]}", file=out)
-        out.close()
     return chi_square
 
 
@@ -212,6 +201,16 @@ class Result:
         self.x: list = None
 
 def minimize_function(function_to_minimize, input_param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
+    """
+    Minimizes a function using specified method and options in the function
+    :param function_to_minimize: Function to minimize
+    :param input_param_guess: Initial guess for the parameters
+    :param function_arguments: Arguments for the function
+    :param bounds: Bounds for the parameters
+    :param method: Method to use for minimization
+    :param options: Options for the minimization
+    :return: Result of the minimization
+    """
     #res.x: list = [param1 best guess, param2 best guess etc]
     #res.fun: float = function value (chi squared) after the fit
 
@@ -416,6 +415,8 @@ class Spectra:
         self.m3dis_python_package_name = None
         # margin in AA, how much of the spectra is kept in the memory. less - less memory. more - bigger rv fits allowed
         self.margin: float = None
+        # adds this much randomness to the guess ratio wise to the guess for the parameters. 0 means guess is the same as the input
+        self.guess_ratio_to_add: float = None
 
         # Set values from config
         if n_workers != 1:
@@ -514,6 +515,10 @@ class Spectra:
         self.flux_orig = {}
 
     def load_spectra_config(self, tsfitpy_config):
+        """
+        Loads the config file and sets the values for the class
+        :param tsfitpy_config: Config file TSFitPyConfig
+        """
         self.atmosphere_type = tsfitpy_config.atmosphere_type
         self.fitting_mode = tsfitpy_config.fitting_mode
         self.include_molecules = tsfitpy_config.include_molecules
@@ -645,16 +650,20 @@ class Spectra:
         # m3dis parameters
         self.m3dis_python_package_name = tsfitpy_config.m3dis_python_package_name
         self.margin = tsfitpy_config.margin
+        self.guess_ratio_to_add = tsfitpy_config.guess_ratio_to_add
 
         self._load_marcs_grids()
 
     def _load_marcs_grids(self):
+        """
+        Loads the MARCS grids. More memory efficient than other solutions, only loads once.
+        """
         (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
          self.marcs_models_location, self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
 
     def get_all_guess(self):
         """
-        Converts init param guess list to the 2D list for the simplex calculation
+        Converts init param guess list to the 2D list for the simplex calculation for all method
         """
         minim_bounds: list = []
         # make an array for initial guess equal to n x ndimen+1
@@ -689,7 +698,17 @@ class Spectra:
         return initial_guess[0], initial_guess, minim_bounds
 
     def get_elem_micro_guess(self, min_guess_microturb: float, max_guess_microturb: float, min_guess_abundance: float,
-                             max_guess_abundance: float, bound_min_abund=None, bound_max_abund=None) -> tuple[np.ndarray, list[tuple]]:
+                             max_guess_abundance: float, bound_min_abund: float=None, bound_max_abund: float=None) -> tuple[np.ndarray, list[tuple]]:
+        """
+        Gets guess if fitting elements and microturbulence
+        :param min_guess_microturb: minimum guess for microturbulence
+        :param max_guess_microturb: maximum guess for microturbulence
+        :param min_guess_abundance: minimum guess for abundance
+        :param max_guess_abundance: maximum guess for abundance
+        :param bound_min_abund: minimum bound for abundance
+        :param bound_max_abund: maximum bound for abundance
+        :return: guesses and bounds
+        """
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
 
@@ -738,6 +757,12 @@ class Spectra:
         return guesses, bounds
 
     def get_elem_guess(self, min_abundance: float, max_abundance: float) -> tuple[np.ndarray, list[tuple]]:
+        """
+        Gets guess if fitting elements (can take several elements at once)
+        :param min_abundance: minimum guess for abundance
+        :param max_abundance: maximum guess for abundance
+        :return: guesses and bounds
+        """
         # param[0:nelements-1] = met or abund
         # param[-1] = micro turb
 
@@ -773,9 +798,15 @@ class Spectra:
 
         return guesses, bounds
 
-    def get_micro_guess(self, min_microturb: float, max_microturb: float) -> tuple[np.ndarray, list[tuple]]:
+    def get_vmic_guess(self, min_vmic_guess: float, max_vmic_guess: float) -> tuple[np.ndarray, list[tuple]]:
+        """
+        Gets guess if fitting microturbulence
+        :param min_vmic_guess: minimum guess for microturbulence
+        :param max_vmic_guess: maximum guess for microturbulence
+        :return: guesses and bounds
+        """
         # param[0:nelements-1] = met or abund
-        # param[-1] = micro turb
+        # param[-1] = vmic
 
         guess_length = 1
 
@@ -784,7 +815,7 @@ class Spectra:
         guesses = np.array([])
 
         if self.atmosphere_type != "3D":  # last is micro
-            micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_microturb, max_microturb, self.bound_min_vmic, self.bound_max_vmic)
+            micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_vmic_guess, max_vmic_guess, self.bound_min_vmic, self.bound_max_vmic)
             guesses = np.array([micro_guess])
             bounds.append(micro_bounds)
 
@@ -792,8 +823,7 @@ class Spectra:
 
         return guesses, bounds
 
-    @staticmethod
-    def get_simplex_guess(length: int, min_guess: float, max_guess: float, min_bound: float, max_bound: float) -> tuple[np.ndarray, tuple]:
+    def get_simplex_guess(self, length: int, min_guess: float, max_guess: float, min_bound: float, max_bound: float) -> tuple[np.ndarray, tuple]:
         """
         Gets guess if it is fitted for simplex guess
         :param length: number of dimensions (output length+1 array)
@@ -803,19 +833,19 @@ class Spectra:
         :param max_bound: maximum bound
         :return: Initial guess and minimum bound
         """
-        percentage_of_difference_to_add = 10  # basically adds a bit of randomness to the guess up to this % of the diff of guesses
-
         if min_guess < min_bound:
             min_guess = min_bound
         if max_guess > max_bound:
             max_guess = max_bound
 
         minim_bounds = (min_bound, max_bound)
-
-        guess_difference = np.abs(max_guess - min_guess) / percentage_of_difference_to_add
+        # basically adds a bit of randomness to the guess up to this % of the diff of guesses
+        guess_difference = np.abs(max_guess - min_guess) * self.guess_ratio_to_add
 
         initial_guess = np.linspace(min_guess + np.random.random() * guess_difference,
                                     max_guess - np.random.random() * guess_difference, length + 1)
+
+        #print(initial_guess, minim_bounds)
 
         return initial_guess, minim_bounds
 
@@ -1811,10 +1841,10 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
 
     wave_ob = apply_doppler_correction(spectra_to_fit.wave_ob, doppler)
 
-    chi_square = calculate_lbl_chi_squared(None, wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
-                                           spectra_to_fit.resolution, lmin, lmax, macroturb, rotation,
-                                           save_convolved=False)
+    chi_square = calculate_lbl_chi_squared(wave_ob, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
+                                           spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
     #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
+    #print(f"RV: {doppler:10.7f}, vmac: {macroturb:10.7f}, chi-sqr: {chi_square:11.7f}")
 
     return np.abs(chi_square - offset_chisqr)
 
@@ -1983,7 +2013,7 @@ def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
     if spectra_generated:
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
-        chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+        chi_square = calculate_lbl_chi_squared(wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
 
     output_print = f""
     for key in elem_abund_dict:
@@ -2045,7 +2075,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     dof = 1
     if spectra_generated:
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wave_ob, rv + spectra_to_fit.doppler_shift)
-        chi_square = calculate_lbl_chi_squared(None, wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation, False)
+        chi_square = calculate_lbl_chi_squared(wave_obs_shifted, spectra_to_fit.flux_ob, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
         dof = np.size(spectra_to_fit.flux_ob[np.where((spectra_to_fit.flux_ob <= lmax) & (spectra_to_fit.flux_ob >= lmin))]) - 1
         # TODO: proper calculation of DOF
         if dof <= 0:
@@ -2096,7 +2126,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
 
     spectra_to_fit.elem_abund_dict_fitting[line_number] = elem_abund_dict
 
-    param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
+    param_guess, min_bounds = spectra_to_fit.get_vmic_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
     function_arguments = (ts, spectra_to_fit, lmin, lmax, lmin_segment, lmax_segment, temp_directory, line_number)
     minimization_options = {'maxfev': maxfev, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': xatol, 'fatol': fatol, 'adaptive': False}
     res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
