@@ -410,6 +410,24 @@ class TSFitPyConfig:
         self.ny = 10
         self.nz = 230
 
+        # advanced options
+        # scipy xatol and fatol for the minimisation, different methods
+        self.xatol_all = 0.0001
+        self.fatol_all = 0.00001
+        self.xatol_lbl = 0.0001
+        self.fatol_lbl = 0.00001
+        self.xatol_teff = 0.0001
+        self.fatol_teff = 0.00001
+        self.xatol_logg = 0.0001
+        self.fatol_logg = 0.00001
+        self.xatol_vmic = 0.0001
+        self.fatol_vmic = 0.00001
+        self.maxfev = 50 # scipy maxfev for the minimisation
+        # Value of lpoint for turbospectrum in spectrum.inc file
+        self.lpoint_turbospectrum = 1000000
+        # m3dis parameters
+        self.m3dis_python_package_name = "m3dis"
+
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -645,7 +663,10 @@ class TSFitPyConfig:
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
         self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "m3dis"])
-        self.spectral_code_path = self.config_parser["MainPaths"]["turbospectrum_path"]
+        try:
+            self.spectral_code_path = self.config_parser["MainPaths"]["code_path"]
+        except KeyError:
+            self.spectral_code_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
         self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
@@ -789,6 +810,24 @@ class TSFitPyConfig:
             self.ny = 10
             self.nz = 230
 
+        # advanced options
+        try:
+            self.xatol_all = float(self.config_parser["AdvancedOptions"]["xatol_all"])
+            self.fatol_all = float(self.config_parser["AdvancedOptions"]["fatol_all"])
+            self.xatol_lbl = float(self.config_parser["AdvancedOptions"]["xatol_lbl"])
+            self.fatol_lbl = float(self.config_parser["AdvancedOptions"]["fatol_lbl"])
+            self.xatol_teff = float(self.config_parser["AdvancedOptions"]["xatol_teff"])
+            self.fatol_teff = float(self.config_parser["AdvancedOptions"]["fatol_teff"])
+            self.xatol_logg = float(self.config_parser["AdvancedOptions"]["xatol_logg"])
+            self.fatol_logg = float(self.config_parser["AdvancedOptions"]["fatol_logg"])
+            self.xatol_vmic = float(self.config_parser["AdvancedOptions"]["xatol_vmic"])
+            self.fatol_vmic = float(self.config_parser["AdvancedOptions"]["fatol_vmic"])
+            self.maxfev = int(self.config_parser["AdvancedOptions"]["maxfev"])
+            self.lpoint_turbospectrum = int(self.config_parser["AdvancedOptions"]["lpoint_turbospectrum"])
+            self.m3dis_python_package_name = self.config_parser["AdvancedOptions"]["m3dis_python_package_name"]
+        except KeyError:
+            pass
+
 
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
@@ -811,7 +850,7 @@ class TSFitPyConfig:
         self.config_parser["turbospectrum_compiler"]["compiler"] = self.compiler
 
         self.config_parser.add_section("MainPaths")
-        self.config_parser["MainPaths"]["turbospectrum_path"] = self.old_turbospectrum_global_path
+        self.config_parser["MainPaths"]["code_path"] = self.old_turbospectrum_global_path
         self.config_parser["MainPaths"]["interpolators_path"] = self.interpolators_path
         self.config_parser["MainPaths"]["line_list_path"] = self.line_list_path
         self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"] = self.model_atmosphere_grid_path_1d
@@ -1073,7 +1112,33 @@ class TSFitPyConfig:
         if self.nz <= 0:
             raise ValueError("nz must be greater than 0")
 
+        if self.xatol_all <= 0:
+            raise ValueError("xatol_all must be greater than 0")
+        if self.fatol_all <= 0:
+            raise ValueError("fatol_all must be greater than 0")
+        if self.xatol_lbl <= 0:
+            raise ValueError("xatol_lbl must be greater than 0")
+        if self.fatol_lbl <= 0:
+            raise ValueError("fatol_lbl must be greater than 0")
+        if self.xatol_teff <= 0:
+            raise ValueError("xatol_teff must be greater than 0")
+        if self.fatol_teff <= 0:
+            raise ValueError("fatol_teff must be greater than 0")
+        if self.xatol_logg <= 0:
+            raise ValueError("xatol_logg must be greater than 0")
+        if self.fatol_logg <= 0:
+            raise ValueError("fatol_logg must be greater than 0")
+        if self.xatol_vmic <= 0:
+            raise ValueError("xatol_vmic must be greater than 0")
+        if self.fatol_vmic <= 0:
+            raise ValueError("fatol_vmic must be greater than 0")
+        if self.maxfev <= 0:
+            raise ValueError("maxfev must be greater than 0")
+        if self.lpoint_turbospectrum <= 0:
+            raise ValueError("lpoint_turbospectrum must be greater than 0")
+
     def load_spectra_config(self, spectra_object):
+        # not used anymore
         spectra_object.atmosphere_type = self.atmosphere_type
         spectra_object.fitting_mode = self.fitting_mode
         spectra_object.include_molecules = self.include_molecules

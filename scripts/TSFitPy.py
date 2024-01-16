@@ -398,6 +398,23 @@ class Spectra:
         self.m3dis_ny: int = None
         self.m3dis_nz: int = None
 
+        self.xatol_all = None
+        self.fatol_all = None
+        self.xatol_lbl = None
+        self.fatol_lbl = None
+        self.xatol_teff = None
+        self.fatol_teff = None
+        self.xatol_logg = None
+        self.fatol_logg = None
+        self.xatol_vmic = None
+        self.fatol_vmic = None
+        # scipy maxfev for the minimisation
+        self.maxfev = None
+        # Value of lpoint for turbospectrum in spectrum.inc file
+        self.lpoint_turbospectrum = None
+        # m3dis parameters
+        self.m3dis_python_package_name = None
+
         # Set values from config
         if n_workers != 1:
             tsfitpy_config = tsfitpy_config.result()
@@ -596,6 +613,25 @@ class Spectra:
         self.m3dis_nx = tsfitpy_config.nx
         self.m3dis_ny = tsfitpy_config.ny
         self.m3dis_nz = tsfitpy_config.nz
+
+        # advanced options
+        # scipy xatol and fatol for the minimisation, different methods
+        self.xatol_all = tsfitpy_config.xatol_all
+        self.fatol_all = tsfitpy_config.fatol_all
+        self.xatol_lbl = tsfitpy_config.xatol_lbl
+        self.fatol_lbl = tsfitpy_config.fatol_lbl
+        self.xatol_teff = tsfitpy_config.xatol_teff
+        self.fatol_teff = tsfitpy_config.fatol_teff
+        self.xatol_logg = tsfitpy_config.xatol_logg
+        self.fatol_logg = tsfitpy_config.fatol_logg
+        self.xatol_vmic = tsfitpy_config.xatol_vmic
+        self.fatol_vmic = tsfitpy_config.fatol_vmic
+        # scipy maxfev for the minimisation
+        self.maxfev = tsfitpy_config.maxfev
+        # Value of lpoint for turbospectrum in spectrum.inc file
+        self.lpoint_turbospectrum = tsfitpy_config.lpoint_turbospectrum
+        # m3dis parameters
+        self.m3dis_python_package_name = tsfitpy_config.m3dis_python_package_name
 
         self._load_marcs_grids()
 
@@ -883,8 +919,8 @@ class Spectra:
         initial_simplex_guess, init_param_guess, minim_bounds = self.get_all_guess()
 
         function_arguments = (ts, self)
-        minimize_options = {'maxiter': self.ndimen * 50, 'disp': self.python_verbose,
-                            'initial_simplex': init_param_guess, 'xatol': 0.05, 'fatol': 0.05}
+        minimize_options = {'maxiter': self.ndimen * self.maxfev, 'disp': self.python_verbose,
+                            'initial_simplex': init_param_guess, 'xatol': self.xatol_all, 'fatol': self.fatol_all}
         res = minimize_function(all_abund_rv, initial_simplex_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
         # print final result from minimazation
         print(res.x)
@@ -954,6 +990,7 @@ class Spectra:
                 marcs_value_keys=self.marcs_value_keys,
                 marcs_models=marcs_models,
                 marcs_values=self.marcs_values)
+            ts.lpoint = self.lpoint_turbospectrum
         return ts
 
     def precompute_departure(self):
@@ -1233,7 +1270,7 @@ class Spectra:
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
-        minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.01, 'fatol': 0.01}
+        minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_teff, 'fatol': self.fatol_teff}
         try:
             res = minimize_function(lbl_teff, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
 
@@ -1348,7 +1385,7 @@ class Spectra:
         ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
-        minimize_options = {'maxfev': 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.00001, 'fatol': 0.00001}
+        minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_logg, 'fatol': self.fatol_logg}
         try:
             res = minimize_function(lbl_logg, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
 
@@ -1516,7 +1553,7 @@ class Spectra:
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number, offset_chisqr)
-        minimization_options = {'maxfev': self.nelement * 50, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.0001, 'fatol': 0.00001, 'adaptive': True}
+        minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_lbl, 'fatol': self.fatol_lbl, 'adaptive': True}
         try:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
             print_result = "Converged:"
@@ -1650,8 +1687,8 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
-        minimization_options = {'maxfev': self.nelement * 100, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.005, 'fatol': 0.000001, 'adaptive': False}
+        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[start], self.seg_ends[start], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
+        minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_vmic, 'fatol': self.fatol_vmic, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         print(res.x)
         if self.fit_feh:
@@ -1979,7 +2016,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
 
     return chi_square - offset_chisqr / dof
 
-def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
+def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int, maxfev: int, xatol: float, fatol: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
@@ -2018,7 +2055,7 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
 
     param_guess, min_bounds = spectra_to_fit.get_micro_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
     function_arguments = (ts, spectra_to_fit, lmin, lmax, lmin_segment, lmax_segment, temp_directory, line_number)
-    minimization_options = {'maxfev': 50, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': 0.05, 'fatol': 0.00001, 'adaptive': False}
+    minimization_options = {'maxfev': maxfev, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': xatol, 'fatol': fatol, 'adaptive': False}
     res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
 
     spectra_to_fit.vmic_dict[line_number] = res.x[0]
@@ -2411,7 +2448,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     do_hydrogen_linelist = True
 
     if tsfitpy_configuration.compiler.lower() == "m3dis":
-        module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
+        module_path = os.path.join(tsfitpy_configuration.spectral_code_path, f"{tsfitpy_configuration.m3dis_python_package_name}/__init__.py")
         m3dis_python_module = import_module_from_path("m3dis", module_path)
 
         if tsfitpy_configuration.cluster_type.lower() == 'slurm':
@@ -2901,7 +2938,7 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
                                  slurm_partition=tsfitpy_configuration.slurm_partition)
 
         if tsfitpy_configuration.compiler.lower() == "m3dis":
-            module_path = os.path.join(tsfitpy_configuration.spectral_code_path, "m3dis/__init__.py")
+            module_path = os.path.join(tsfitpy_configuration.spectral_code_path, f"{tsfitpy_configuration.m3dis_python_package_name}/__init__.py")
             client.run(import_module_from_path, "m3dis", module_path)
 
         futures = []
