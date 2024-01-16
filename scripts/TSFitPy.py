@@ -2412,6 +2412,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
 
     n_workers = tsfitpy_configuration.number_of_cpus
     tsfitpy_compiler = tsfitpy_configuration.compiler.lower()
+    debug_mode = tsfitpy_configuration.debug_mode
 
     if tsfitpy_configuration.number_of_cpus != 1:
         tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
@@ -2425,7 +2426,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
 
     spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
 
-    if tsfitpy_configuration.debug_mode >= 0:
+    if debug_mode >= 0:
         print(f"Fitting {spectra.spec_name}")
         print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
 
