@@ -500,6 +500,9 @@ class Spectra:
         self.doppler_shift_dict = {}
         self.elem_abund_dict_fitting = {}
         self.number_of_fits = {}
+        self.wave_mod_orig = {}
+        self.flux_mod_orig = {}
+        self.flux_orig = {}
 
     def load_spectra_config(self, tsfitpy_config):
         self.atmosphere_type = tsfitpy_config.atmosphere_type
@@ -1304,23 +1307,14 @@ class Spectra:
             rotation = 999999
             chi_squared = 999999
 
-        if teff != 999999:
-            try:
-                wave_result, flux_norm_result, flux_result = np.loadtxt(
-                    os.path.join(temp_directory, "spectrum_00000000.spec"),
-                    unpack=True)
-            except (OSError, ValueError) as error:
-                print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-                wave_result = np.array([])
-                flux_norm_result = np.array([])
-                flux_result = np.array([])
-        else:
-            print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-            wave_result = np.array([])
-            flux_norm_result = np.array([])
-            flux_result = np.array([])
+        wave_result = self.wave_mod_orig[line_number]
+        flux_norm_result = self.flux_mod_orig[line_number]
+        flux_result = self.flux_orig[line_number]
 
-        if self.find_teff_errors and teff != 999999:
+        if np.size(wave_result) == 0 or teff <= 999998:
+            print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+
+        if self.find_teff_errors and teff <= 999998:
             print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
                 teff_error = np.abs(self.find_teff_error_one_line(line_number, doppler_fit,
@@ -1362,6 +1356,7 @@ class Spectra:
         one_result = {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
                       "fit_flux_norm": flux_norm_result, "fit_flux": flux_result, "macroturb": macroturb,
                       "rotation": rotation, "chi_sqr": chi_squared}
+        shutil.rmtree(temp_directory)
 
         return one_result
 
@@ -1419,21 +1414,13 @@ class Spectra:
             rotation = 999999
             chi_squared = 999999
 
-        if logg <= 99999:
-            try:
-                wave_result, flux_norm_result, flux_result = np.loadtxt(
-                    os.path.join(temp_directory, "spectrum_00000000.spec"),
-                    unpack=True)
-            except (OSError, ValueError) as error:
-                print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-                wave_result = np.array([])
-                flux_norm_result = np.array([])
-                flux_result = np.array([])
-        else:
+
+        wave_result = self.wave_mod_orig[line_number]
+        flux_norm_result = self.flux_mod_orig[line_number]
+        flux_result = self.flux_orig[line_number]
+
+        if np.size(wave_result) == 0 or logg <= 999998:
             print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-            wave_result = np.array([])
-            flux_norm_result = np.array([])
-            flux_result = np.array([])
 
         if self.find_logg_errors and logg <= 99999 and not True:
             # TODO: add ability to fit logg error
@@ -1479,6 +1466,8 @@ class Spectra:
         one_result = {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result,
                       "fit_flux_norm": flux_norm_result, "fit_flux": flux_result, "macroturb": macroturb,
                       "rotation": rotation, "chi_sqr": chi_squared}
+
+        shutil.rmtree(temp_directory)
 
         return one_result
 
@@ -1558,6 +1547,7 @@ class Spectra:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
             print_result = "Converged:"
             for elem, value in zip(self.elem_to_fit, res.x):
+                # here element is [X/Fe], unless it's Fe, then it's [Fe/H]
                 print_result += f" {elem}: {value:.2f}"
 
             print_result += f" Number of iterations: {res.nit}"
@@ -1574,7 +1564,8 @@ class Spectra:
                 # param[1:nelement] = abundance of the element
                 elem_name = self.elem_to_fit[i]
                 if elem_name != "Fe":
-                    elem_abund_dict[elem_name] = res.x[i]  # + met
+                    # here element is [X/Fe], unless it's Fe, then it's [Fe/H]
+                    elem_abund_dict[elem_name] = res.x[i]
             doppler_fit = self.doppler_shift_dict[line_number]
             if self.vmic is not None:  # Input given
                 microturb = self.vmic
@@ -1631,14 +1622,13 @@ class Spectra:
         result_dict["rotation"] = rotation
         result_dict["chi_squared"] = chi_squared
 
-        try:
-            wave_result, flux_norm_result, flux_result = np.loadtxt(os.path.join(temp_directory, "spectrum_00000000.spec"),
-                                                                    unpack=True)
-        except (OSError, ValueError) as error:
-            print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-            wave_result = np.array([])
-            flux_norm_result = np.array([])
-            flux_result = np.array([])
+        wave_result = self.wave_mod_orig[line_number]
+        flux_norm_result = self.flux_mod_orig[line_number]
+        flux_result = self.flux_orig[line_number]
+
+        if np.size(wave_result) == 0:
+            print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+
         shutil.rmtree(temp_directory)
         return {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]], "fit_iterations": fit_iterations} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
@@ -1732,14 +1722,14 @@ class Spectra:
         result_dict["chi_squared"] = res.fun
 
         one_result = result_dict
-        try:
-            wave_result, flux_norm_result, flux_result = np.loadtxt(f"{temp_directory}spectrum_00000000.spec",
-                                                                    unpack=True)
-        except (OSError, ValueError) as error:
-            print(f"{error} Failed spectra generation completely, line is not fitted at all, not saving spectra then")
-            wave_result = np.array([])
-            flux_norm_result = np.array([])
-            flux_result = np.array([])
+
+        wave_result = self.wave_mod_orig[line_number]
+        flux_norm_result = self.flux_mod_orig[line_number]
+        flux_result = self.flux_orig[line_number]
+
+        if np.size(wave_result) == 0:
+            print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
+
         shutil.rmtree(temp_directory)
         return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
                 "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": res.fun, "rv": doppler_fit} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
@@ -1887,10 +1877,14 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
 
-        #TODO: fix this for m3d so no need to do it
-        # check if temp_spectra_location exists, if not save spectra
-        if not os_path.exists(temp_spectra_location):
-            np.savetxt(temp_spectra_location, np.transpose([wave_mod_orig, flux_mod_orig, flux_orig]))
+        spectra_to_fit.wave_mod_orig[line_number] = wave_mod_orig
+        spectra_to_fit.flux_mod_orig[line_number] = flux_mod_orig
+        spectra_to_fit.flux_orig[line_number] = flux_orig
+
+    else:
+        spectra_to_fit.wave_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_orig[line_number] = np.array([])
 
     output_print = ""
     for key in elem_abund_dict:
@@ -2174,7 +2168,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"H": 0, "Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
     if spectra_generated:
@@ -2200,6 +2194,14 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
             rotation = spectra_to_fit.rotation
 
         chi_square = res.fun
+        spectra_to_fit.wave_mod_orig[line_number] = wave_mod_orig
+        spectra_to_fit.flux_mod_orig[line_number] = flux_mod_orig
+        spectra_to_fit.flux_orig[line_number] = flux_orig
+
+    else:
+        spectra_to_fit.wave_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_orig[line_number] = np.array([])
 
     print(f"Teff={teff}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
@@ -2237,7 +2239,7 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     rotation = 999999
     rv = 999999
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_ts(ts, spectra_to_fit.met, {"Fe": spectra_to_fit.met}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
     if spectra_generated:
@@ -2263,6 +2265,15 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
             rotation = spectra_to_fit.rotation
 
         chi_square = res.fun
+
+        spectra_to_fit.wave_mod_orig[line_number] = wave_mod_orig
+        spectra_to_fit.flux_mod_orig[line_number] = flux_mod_orig
+        spectra_to_fit.flux_orig[line_number] = flux_orig
+
+    else:
+        spectra_to_fit.wave_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_orig[line_number] = np.array([])
 
     print(f"logg={logg}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
