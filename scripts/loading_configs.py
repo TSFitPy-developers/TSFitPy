@@ -427,6 +427,7 @@ class TSFitPyConfig:
         self.lpoint_turbospectrum = 1000000
         # m3dis parameters
         self.m3dis_python_package_name = "m3dis"
+        self.margin = 3.0
 
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -825,6 +826,7 @@ class TSFitPyConfig:
             self.maxfev = int(self.config_parser["AdvancedOptions"]["maxfev"])
             self.lpoint_turbospectrum = int(self.config_parser["AdvancedOptions"]["lpoint_turbospectrum"])
             self.m3dis_python_package_name = self.config_parser["AdvancedOptions"]["m3dis_python_package_name"]
+            self.margin = float(self.config_parser["AdvancedOptions"]["margin"])
         except KeyError:
             pass
 
