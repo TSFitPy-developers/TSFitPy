@@ -1328,11 +1328,11 @@ class Spectra:
         flux_norm_result = self.flux_mod_orig[line_number]
         flux_result = self.flux_orig[line_number]
 
-        if np.size(wave_result) == 0 or teff <= 999998:
+        if np.size(wave_result) == 0 or teff >= 999998:
             if not self.night_mode:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
-        if self.find_teff_errors and teff <= 999998:
+        if self.find_teff_errors and teff >= 999998:
             if not self.night_mode:
                 print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
@@ -1442,11 +1442,11 @@ class Spectra:
         flux_norm_result = self.flux_mod_orig[line_number]
         flux_result = self.flux_orig[line_number]
 
-        if np.size(wave_result) == 0 or logg <= 999998:
+        if np.size(wave_result) == 0 or logg >= 999998:
             if not self.night_mode:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
-        if self.find_logg_errors and logg <= 99999 and not True:
+        if self.find_logg_errors and logg >= 99999 and not True:
             # TODO: add ability to fit logg error
             if not self.night_mode:
                 print(f"Fitting {self.logg_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
@@ -2153,7 +2153,7 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     if os_path.exists(temp_spectra_location):
         os.remove(temp_spectra_location)
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_ts(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
     if spectra_generated:
@@ -2177,13 +2177,13 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
 
-        wave_result = spectra_to_fit.wave_mod_orig[line_number]
-        flux_norm_result = spectra_to_fit.flux_mod_orig[line_number]
-        flux_result = spectra_to_fit.flux_orig[line_number]
+        spectra_to_fit.wave_mod_orig[line_number] = wave_mod_orig
+        spectra_to_fit.flux_mod_orig[line_number] = flux_mod_orig
+        spectra_to_fit.flux_orig[line_number] = flux_orig
     else:
-        wave_result = np.array([])
-        flux_norm_result = np.array([])
-        flux_result = np.array([])
+        spectra_to_fit.wave_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_mod_orig[line_number] = np.array([])
+        spectra_to_fit.flux_orig[line_number] = np.array([])
 
     output_print = f""
     for key in elem_abund_dict:
