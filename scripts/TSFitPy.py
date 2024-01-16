@@ -989,32 +989,27 @@ class Spectra:
         """
         #self._load_marcs_grids()
         result = {}
-        result_upper_limit = {}
         result_list = []
         sigmas_upper_limit = self.sigmas_upper_limit
 
         for line_number in range(len(self.line_begins_sorted)):
             if self.dask_workers != 1:
                 result[line_number] = client.submit(fitting_function, line_number)
-                if find_upper_limit:
-                    _ = client.submit(self.calculate_and_save_upper_limit, result, result_upper_limit, sigmas_upper_limit, line_number)
-                final_result = client.submit(self.analyse_lbl_fit, result, line_number)
+                final_result = client.submit(self.analyse_lbl_fit, result, line_number, find_upper_limit, sigmas_upper_limit)
                 result_list.append(final_result)
             else:
                 time_start = time.perf_counter()
                 print(f"Fitting line at {self.line_centers_sorted[line_number]} angstroms")
 
                 result[line_number] = fitting_function(line_number)
-                if find_upper_limit:
-                    self.calculate_and_save_upper_limit(result, result_upper_limit, sigmas_upper_limit, line_number)
-                result_list.append(self.analyse_lbl_fit(result, line_number))
+                result_list.append(self.analyse_lbl_fit(result, line_number, find_upper_limit, sigmas_upper_limit))
 
                 time_end = time.perf_counter()
                 print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
 
         return result_list
 
-    def analyse_lbl_fit(self, result: dict, line_number: int) -> dict:
+    def analyse_lbl_fit(self, result: dict, line_number: int, find_upper_limit: bool, sigmas_upper_limit: float) -> dict:
         #result_list = []
         # {"result": , "fit_wavelength": , "fit_flux_norm": , "fit_flux": , "fit_wavelength_conv": , "fit_flux_norm_conv": }
 
@@ -1173,14 +1168,24 @@ class Spectra:
         result[line_number]["result"]['ew'] = equivalent_width * 1000
         result[line_number]["result"]["flag_error"] = flag_error
         result[line_number]["result"]["flag_warning"] = flag_warning
+
+        if find_upper_limit:
+            if flag_error == "00000000":
+                result_upper_limit = self.calculate_and_save_upper_limit(result, sigmas_upper_limit, line_number)
+                result[line_number]["result"][f"err_{int(sigmas_upper_limit)}_err"] = np.abs(result_upper_limit["fitted_abund"] - result[line_number]["fitted_abund"])
+                result[line_number]["result"]["err_chi_sqr_diff"] = result_upper_limit["chi_sqr"] - result[line_number]["chi_sqr"]
+            else:
+                result[line_number]["result"][f"err_{int(sigmas_upper_limit)}_err"] = 999999
+                result[line_number]["result"]["err_chi_sqr_diff"] = 999999
+
         return result[line_number]
 
-    def calculate_and_save_upper_limit(self, result, result_upper_limit, sigmas_upper_limit, line_number: int):
-        time_start = time.perf_counter()
-        print(f"Fitting {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
+    def calculate_and_save_upper_limit(self, result, sigmas_upper_limit, line_number: int):
+        #time_start = time.perf_counter()
+        print(f"Fitting error of {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
         try:
-            result_upper_limit[line_number] = self.find_upper_limit_one_line(line_number,
+            result_upper_limit = self.find_upper_limit_one_line(line_number,
                                                                              result[line_number]["rv"],
                                                                              result[line_number]["macroturb"],
                                                                              result[line_number]["rotation"],
@@ -1195,17 +1200,18 @@ class Spectra:
                                                                              result[line_number][
                                                                                  "fitted_abund"] + 7)
         except ValueError:
-            result_upper_limit[line_number] = {"fitted_abund": 999999, "chi_sqr": 999999}
+            result_upper_limit = {"fitted_abund": 999999, "chi_sqr": 999999}
 
-        time_end = time.perf_counter()
-        print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
+        #time_end = time.perf_counter()
+        #print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
+
+        return result_upper_limit
 
         # save 5 sigma results
-        with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
-            for line_number in range(len(self.line_begins_sorted)):
-                print(
-                    f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}",
-                    file=file_upper_limit)
+        #with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
+        #    print(
+        #        f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}",
+        #        file=file_upper_limit)
 
     def fit_teff_one_line(self, line_number: int) -> dict:
         """
@@ -1617,7 +1623,7 @@ class Spectra:
 
         function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
-            res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq')
+            res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq', options={'disp': self.python_verbose})
             print(res)
             fitted_abund = res.root
         except IndexError as error:
@@ -1625,7 +1631,7 @@ class Spectra:
             fitted_abund = 999999
 
         shutil.rmtree(temp_directory)
-        return {"chi_sqr": offset_chisqr, "fitted_abund":fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+        return {"chi_sqr": offset_chisqr, "fitted_abund": fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
 
     def fit_one_line_vmic(self, line_number: int) -> dict:
         """
