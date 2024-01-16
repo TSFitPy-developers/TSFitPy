@@ -6,11 +6,12 @@ import numpy as np
 import socket
 
 
-def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: int, nodes=1, slurm_script_commands=None,
+def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: int, night_mode=False, nodes=1, slurm_script_commands=None,
                     slurm_memory_per_core=3.6, time_limit_hours=72, slurm_partition="debug", **kwargs):
     if cluster_name is None:
         cluster_name = "unknown"
-    print("Preparing workers")
+    if not night_mode:
+        print("Preparing workers")
     if client_type == "local":
         client = get_local_client(workers_amount_cpus)
     elif client_type == "slurm":
@@ -19,17 +20,18 @@ def get_dask_client(client_type: str, cluster_name: str, workers_amount_cpus: in
                                    slurm_partition=slurm_partition, **kwargs)
     else:
         raise ValueError("client_type must be either local or slurm")
-
-    print(client)
+    if not night_mode:
+        print(client)
 
     host = client.run_on_scheduler(socket.gethostname)
     port = client.scheduler_info()['services']['dashboard']
-    print(f"Assuming that the cluster is ran at {cluster_name} (change in config if not the case)")
+    if not night_mode:
+        print(f"Assuming that the cluster is ran at {cluster_name} (change in config if not the case)")
 
-    print(f"ssh -N -L {port}:{host}:{port} {cluster_name}")
-    print(f"Then go to http://localhost:{port}/status to check the status of the workers")
+        print(f"ssh -N -L {port}:{host}:{port} {cluster_name}")
+        print(f"Then go to http://localhost:{port}/status to check the status of the workers")
 
-    print("Worker preparation complete")
+        print("Worker preparation complete")
 
     return client
 

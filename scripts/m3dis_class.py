@@ -17,16 +17,9 @@ class M3disCall(SyntheticSpectrumGenerator):
                  marcs_grid_list: str, model_atom_path: str, departure_file_path: str,
                  aux_file_length_dict: dict,
                  marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
-                 model_logs: np.ndarray, model_mets: np.ndarray, m3dis_python_module, n_nu=None,
-                hash_table_size=None,
-                mpi_cores=None,
-                iterations_max=None,
-                convlim=None,
-                snap=None,
-                dims=None,
-                nx=None,
-                ny=None,
-                nz=None):
+                 model_logs: np.ndarray, model_mets: np.ndarray, m3dis_python_module, night_mode: bool=False, n_nu=None,
+                hash_table_size=None, mpi_cores=None, iterations_max=None, convlim=None, snap=None,
+                dims=None, nx=None, ny=None, nz=None):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -40,7 +33,7 @@ class M3disCall(SyntheticSpectrumGenerator):
         super().__init__(m3dis_path, interpol_path, line_list_paths, marcs_grid_path,
                  marcs_grid_list, model_atom_path,
                  marcs_value_keys, marcs_values, marcs_models, model_temperatures,
-                 model_logs, model_mets)
+                 model_logs, model_mets, night_mode)
         self.m3dis_path = self.code_path
         self.mpi_cores: int = mpi_cores
         self.departure_file_path = departure_file_path
@@ -672,7 +665,8 @@ class M3disCall(SyntheticSpectrumGenerator):
             logging.debug("Running m3dis")
             output = self.call_m3dis(skip_linelist=skip_linelist, use_precomputed_depart=self.use_precomputed_depart)
             if "errors" in output:
-                print(output["errors"], "m3dis failed")
+                if not self.night_mode:
+                    print(output["errors"], "m3dis failed")
                 return None, None, None
             else:
                 if save_spectra:
@@ -685,8 +679,10 @@ class M3disCall(SyntheticSpectrumGenerator):
                         normalised_flux = flux / continuum
                         return wavelength, normalised_flux, flux
                     except FileNotFoundError as e:
-                        print(f"m3dis, cannot find  {e}")
+                        if not self.night_mode:
+                            print(f"m3dis, cannot find {e}")
         except (FileNotFoundError, ValueError, TypeError) as error:
-            print(f"Interpolation failed? {error}")
+            if not self.night_mode:
+                print(f"Interpolation failed? {error}")
         return None, None, None
 

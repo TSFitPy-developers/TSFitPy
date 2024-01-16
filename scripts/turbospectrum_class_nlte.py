@@ -40,7 +40,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
     def __init__(self, turbospec_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
                  marcs_grid_list: str, model_atom_path: str, departure_file_path: str, aux_file_length_dict: dict,
                  marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
-                 model_logs: np.ndarray, model_mets: np.ndarray):
+                 model_logs: np.ndarray, model_mets: np.ndarray, night_mode: bool=False):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -53,7 +53,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         """
         super().__init__(turbospec_path, interpol_path, line_list_paths, marcs_grid_path, marcs_grid_list,
                          model_atom_path, marcs_value_keys, marcs_values, marcs_models, model_temperatures,
-                         model_logs, model_mets)
+                         model_logs, model_mets, night_mode)
 
         self.departure_file_path = departure_file_path
         self.aux_file_length_dict = aux_file_length_dict
@@ -393,7 +393,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 self.turbulent_velocity = microturbulence
             if atmosphere_properties['errors']:
                 # print('spud')
-                print(atmosphere_properties['errors'])
+                if not self.night_mode:
+                    print(atmosphere_properties['errors'])
                 return atmosphere_properties
         else:
             print("Unexpected error?")
@@ -743,10 +744,12 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                         # return 3 empty arrays, because the file exists but is empty
                         return np.array([]), np.array([]), np.array([])
             except AttributeError:
-                print("No attribute, fail of generation?")
+                if not self.night_mode:
+                    print("No attribute, fail of generation?")
         except (FileNotFoundError, ValueError, TypeError) as error:
-            print(f"Interpolation failed? {error}")
-            print("ValueError can sometimes imply problem with the departure coefficients grid")
+            if not self.night_mode:
+                print(f"Interpolation failed? {error}")
+                print("ValueError can sometimes imply problem with the departure coefficients grid")
         return None, None, None
 
 

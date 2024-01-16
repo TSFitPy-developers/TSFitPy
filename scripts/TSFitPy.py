@@ -983,7 +983,8 @@ class Spectra:
                 dims=self.m3dis_dims,
                 nx=self.m3dis_nx,
                 ny=self.m3dis_ny,
-                nz=self.m3dis_nz
+                nz=self.m3dis_nz,
+                night_mode=self.night_mode
             )
             if self.m3dis_iterations_max_precompute <= 0:
                 ts.use_precomputed_depart = False
@@ -1002,7 +1003,8 @@ class Spectra:
                 model_mets=self.model_mets,
                 marcs_value_keys=self.marcs_value_keys,
                 marcs_models=marcs_models,
-                marcs_values=self.marcs_values)
+                marcs_values=self.marcs_values,
+                night_mode=self.night_mode)
             ts.lpoint = self.lpoint_turbospectrum
         return ts
 
@@ -1712,6 +1714,10 @@ class Spectra:
 
         param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
+        self.wave_mod_orig[line_number] = np.array([])
+        self.flux_mod_orig[line_number] = np.array([])
+        self.flux_orig[line_number] = np.array([])
+
         function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[start], self.seg_ends[start], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
         minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_vmic, 'fatol': self.fatol_vmic, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
@@ -2171,6 +2177,14 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
             rotation = spectra_to_fit.rotation
         chi_square = res.fun
 
+        wave_result = spectra_to_fit.wave_mod_orig[line_number]
+        flux_norm_result = spectra_to_fit.flux_mod_orig[line_number]
+        flux_result = spectra_to_fit.flux_orig[line_number]
+    else:
+        wave_result = np.array([])
+        flux_norm_result = np.array([])
+        flux_result = np.array([])
+
     output_print = f""
     for key in elem_abund_dict:
         output_print += f" [{key}/H]={elem_abund_dict[key]}"
@@ -2495,7 +2509,9 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     tsfitpy_configuration = TSFitPyConfig(config_location, output_folder_title, spectra_location)
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.validate_input()
+    launch_tsfitpy_with_config(tsfitpy_configuration, output_folder_title, config_location)
 
+def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_folder_title, config_location):
     if tsfitpy_configuration.debug_mode >= 0:
         print("\nIMPORTANT UPDATE:")
         print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma "
@@ -2996,12 +3012,16 @@ def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
     logging.debug("Finished preparing the configuration file")
 
     if tsfitpy_configuration.number_of_cpus != 1:
+        if tsfitpy_configuration.debug_mode >= 0:
+            night_mode = False
+        else:
+            night_mode = True
         client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name,
                                  tsfitpy_configuration.number_of_cpus, nodes=tsfitpy_configuration.number_of_nodes,
                                  slurm_script_commands=tsfitpy_configuration.script_commands,
                                  slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb,
                                  time_limit_hours=tsfitpy_configuration.time_limit_hours,
-                                 slurm_partition=tsfitpy_configuration.slurm_partition)
+                                 slurm_partition=tsfitpy_configuration.slurm_partition, night_mode=night_mode)
 
         if tsfitpy_configuration.compiler.lower() == "m3dis":
             module_path = os.path.join(tsfitpy_configuration.spectral_code_path, f"{tsfitpy_configuration.m3dis_python_package_name}/__init__.py")

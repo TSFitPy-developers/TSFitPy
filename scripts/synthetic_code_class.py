@@ -34,7 +34,7 @@ class SyntheticSpectrumGenerator:
     def __init__(self, code_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
                  marcs_grid_list: str, model_atom_path: str,
                  marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
-                 model_logs: np.ndarray, model_mets: np.ndarray):
+                 model_logs: np.ndarray, model_mets: np.ndarray, night_mode=False):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -104,6 +104,8 @@ class SyntheticSpectrumGenerator:
         self.model_logs = model_logs
         self.model_mets = model_mets
         self.marcs_model_list_global = []  # needed for microturbulence interpolation
+
+        self.night_mode = night_mode
 
     @abc.abstractmethod
     def configure(self):
