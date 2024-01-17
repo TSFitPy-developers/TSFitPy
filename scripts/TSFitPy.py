@@ -899,6 +899,27 @@ class Spectra:
 
         guesses = np.transpose(guesses)
 
+        # check if median of the guess is 0 for either of the parameters, if so, then add a value to the guess that is
+        # halfway between 0 and the max/min, depending whichever is not 0
+        # otherwise, if the median is 0, the L-BFGS-B minimisation will for some reason get stuck and not move much
+        if np.median(guesses[:, 0]) == 0:
+            if np.abs(min_rv) > np.abs(max_rv):
+                guesses[:, 0][int(np.size(guesses[:, 0]) / 2)] = np.abs(min_rv) / 2
+            else:
+                guesses[:, 0][int(np.size(guesses[:, 0]) / 2)] = np.abs(max_rv) / 2
+        if self.fit_vmac:
+            if np.median(guesses[:, 1]) <= 0.5:
+                if np.abs(min_macroturb) > np.abs(max_macroturb):
+                    guesses[:, 1][int(np.size(guesses[:, 1]) / 2)] = np.abs(min_macroturb) / 2
+                else:
+                    guesses[:, 1][int(np.size(guesses[:, 1]) / 2)] = np.abs(max_macroturb) / 2
+        if self.fit_rotation:
+            if np.median(guesses[:, 2]) <= 0.5:
+                if np.abs(min_rotation) > np.abs(max_rotation):
+                    guesses[:, 2][int(np.size(guesses[:, 2]) / 2)] = np.abs(min_rotation) / 2
+                else:
+                    guesses[:, 2][int(np.size(guesses[:, 2]) / 2)] = np.abs(max_rotation) / 2
+
         return guesses, bounds
 
     def save_observed_spectra(self, path: str):
@@ -2267,7 +2288,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, param_guess[0], function_args, min_bounds, 'L-BFGS-B', minimize_options)
+        res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0), function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.doppler_shift_dict[line_number] = res.x[0]
         rv = spectra_to_fit.doppler_shift_dict[line_number]
@@ -2339,7 +2360,7 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, param_guess[0], function_args, min_bounds, 'L-BFGS-B', minimize_options)
+        res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0), function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.doppler_shift_dict[line_number] = res.x[0]
         rv = spectra_to_fit.doppler_shift_dict[line_number]
