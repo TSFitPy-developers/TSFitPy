@@ -482,33 +482,10 @@ class Spectra:
 
         self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
 
-        self.wave_ob, self.flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True,
-                                                dtype=float)  # observed spectra
-        try:
-            # if error sigma is given, load it
-            self.error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
-        except (IndexError, ValueError) as e:
-            # if no error variance is given, set it to 1
-            self.error_obs_variance = np.ones(len(self.wave_ob)) * 0.0001
-            if not self.night_mode:
-                print("No error sigma given in 3rd column, setting to 0.01")
-
-        # sort the observed spectra according to wavelength using numpy argsort
-        sorted_obs_wavelength_index = np.argsort(self.wave_ob)
-        self.wave_ob, self.flux_ob = self.wave_ob[sorted_obs_wavelength_index], self.flux_ob[sorted_obs_wavelength_index]
-
-        result_indices = []
-
-        wave_ob_doppler_shifted = apply_doppler_correction(self.wave_ob, self.doppler_shift)
-        
-        for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
-            result_indices.extend(np.where((wave_ob_doppler_shifted >= l - self.margin) & (wave_ob_doppler_shifted <= r + self.margin))[0])
-
-        self.wave_ob = self.wave_ob[result_indices]
-        self.flux_ob = self.flux_ob[result_indices]
-        self.error_obs_variance = self.error_obs_variance[result_indices]
-
-
+        self.wave_ob = None
+        self.flux_ob = None
+        self.error_obs_variance = None
+        self.load_observed_spectra()
 
         # for experimental parallelisation need to have dictionary of fitted values so they dont interfere
         # each index is a different line
@@ -521,6 +498,28 @@ class Spectra:
         self.wave_mod_orig = {}
         self.flux_mod_orig = {}
         self.flux_orig = {}
+
+    def load_observed_spectra(self):
+        wave_ob, flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)  # observed spectra
+        try:
+            # if error sigma is given, load it
+            error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
+        except (IndexError, ValueError) as e:
+            # if no error variance is given, set it to 1
+            error_obs_variance = np.ones(len(wave_ob)) * 0.0001
+            if not self.night_mode:
+                print("No error sigma given in 3rd column, setting to 0.01")
+        # sort the observed spectra according to wavelength using numpy argsort
+        sorted_obs_wavelength_index = np.argsort(wave_ob)
+        wave_ob, flux_ob = wave_ob[sorted_obs_wavelength_index], flux_ob[sorted_obs_wavelength_index]
+        result_indices = []
+        wave_ob_doppler_shifted = apply_doppler_correction(wave_ob, self.doppler_shift)
+        for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
+            result_indices.extend(
+                np.where((wave_ob_doppler_shifted >= l - self.margin) & (wave_ob_doppler_shifted <= r + self.margin))[0])
+        self.wave_ob = wave_ob[result_indices]
+        self.flux_ob = flux_ob[result_indices]
+        self.error_obs_variance = error_obs_variance[result_indices]
 
     def load_spectra_config(self, tsfitpy_config):
         """
