@@ -133,6 +133,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["output_folder_location"] = output_folder_location
     config_dict["output_file_df"] = output_file_df
     config_dict["fitted_element"] = tsfitpy_config.elements_to_fit[0]
+    config_dict["fitting_method"] = tsfitpy_config.fitting_mode
 
     return config_dict
 
@@ -225,13 +226,21 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
             # other fitted values
             fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
             fitted_element = config_dict['fitted_element']
-            if fitted_element != "Fe":
-                abund_column_name = f"[{fitted_element}/Fe]"
-                column_name = f"{fitted_element}_Fe"
-            else:
-                abund_column_name = "[Fe/H]"
-                column_name = "Fe_H"
-            fitted_abund = output_file_df[df_correct_specname_indices][column_name].values[output_result_index_to_plot]
+            if config_dict["fitting_method"] == "lbl" or config_dict["fitting_method"] == "vmic":
+                if fitted_element != "Fe":
+                    abund_column_name = f"[{fitted_element}/Fe]"
+                    column_name = f"{fitted_element}_Fe"
+                else:
+                    abund_column_name = "[Fe/H]"
+                    column_name = "Fe_H"
+                fitted_abund = output_file_df[df_correct_specname_indices][column_name].values[output_result_index_to_plot]
+            elif config_dict["fitting_method"] == "teff":
+                abund_column_name = "teff"
+                fitted_abund = output_file_df[df_correct_specname_indices]["Teff"].values[output_result_index_to_plot]
+            elif config_dict["fitting_method"] == "logg":
+                abund_column_name = "logg"
+                fitted_abund = output_file_df[df_correct_specname_indices]["logg"].values[output_result_index_to_plot]
+
             fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
 
             # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it

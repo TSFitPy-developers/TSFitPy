@@ -1323,7 +1323,7 @@ class Spectra:
 
         if find_error_sigma:
             if flag_error == "00000000":
-                result_upper_limit = self.calculate_and_save_upper_limit(result_one_line, sigmas_error, line_number)
+                result_upper_limit = self.lbl_abund_find_sigma_error(result_one_line, sigmas_error, line_number)
                 result_one_line["result"][f"err_{int(sigmas_error)}_err"] = np.abs(result_upper_limit["fitted_abund"] - result_one_line["fitted_abund"])
                 result_one_line["result"]["err_chi_sqr_diff"] = result_upper_limit["chi_sqr"] - result_one_line["chi_sqr"]
             else:
@@ -1332,62 +1332,62 @@ class Spectra:
 
         return result_one_line
 
-    def calculate_and_save_upper_limit(self, result, sigmas_upper_limit, line_number: int):
-        #time_start = time.perf_counter()
+    def lbl_abund_find_sigma_error(self, result_one_line, sigmas_upper_limit, line_number: int):
+        """
+        Finds the sigma error for the abundance of the line, by fitting the line with the abundance offset by
+        sigmas_upper_limit ** 2. I.e. it increases the abundance and finds the value which results in chi_sqr
+        higher than the chi_sqr of the original fit by sigmas_upper_limit ** 2
+        It uses RV, broadening and vmic from the original fit. TODO: Is it really correct to use same broadening?
+        :param result_one_line: the result of the lbl fitting with the original abundance
+        :param sigmas_upper_limit: number of sigmas offset to find the abundance error
+        :param line_number: line's index to fit
+        :return: dictionary with the offset abundance and fitted chi_sqr
+        """
         if not self.night_mode:
             print(f"Fitting error of {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
         try:
-            result_upper_limit = self.find_upper_limit_one_line(line_number,
-                                                                             result[line_number]["rv"],
-                                                                             result[line_number]["macroturb"],
-                                                                             result[line_number]["rotation"],
-                                                                             result[line_number]["vmic"],
-                                                                             offset_chisqr=(result[line_number][
-                                                                                                "chi_sqr"] + np.square(
-                                                                                 sigmas_upper_limit)),
-                                                                             bound_min_abund=
-                                                                             result[line_number][
-                                                                                 "fitted_abund"],
-                                                                             bound_max_abund=
-                                                                             result[line_number][
-                                                                                 "fitted_abund"] + 7)
+            chi_sqr_to_fit = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit)
+            start_abundance = result_one_line["fitted_abund"]
+            # we are trying to find abundance which results in chi_sqr = chi_sqr_to_fit. so we need to add some constant
+            # that overshoots this chi_sqr_to_fit, so that we can find the abundance that results in chi_sqr_to_fit
+            # thus we add 3 + sigmas_upper_limit to the chi_sqr_to_fit
+            # Hopefully that will be enough to overshoot the chi_sqr_to_fit
+            end_abundance = start_abundance + sigmas_upper_limit + 3
+            result_error = self.find_upper_limit_one_line(line_number, result_one_line["rv"],
+                                                          result_one_line["macroturb"], result_one_line["rotation"],
+                                                          result_one_line["vmic"], offset_chisqr=chi_sqr_to_fit,
+                                                          bound_min_abund=start_abundance, bound_max_abund=end_abundance)
         except ValueError:
-            result_upper_limit = {"fitted_abund": 999999, "chi_sqr": 999999}
+            result_error = {"fitted_abund": 999999, "chi_sqr": 999999}
 
-        #time_end = time.perf_counter()
-        #print(f"Total runtime was {(time_end - time_start) / 60:.2f} minutes.")
+        return result_error
 
-        return result_upper_limit
-
-        # save 5 sigma results
-        #with open(os.path.join(self.output_folder, f"result_upper_limit"), 'a') as file_upper_limit:
-        #    print(
-        #        f"{self.spec_name} {self.line_centers_sorted[line_number]} {result_upper_limit[line_number]['fitted_abund']} {result_upper_limit[line_number]['chi_sqr']}",
-        #        file=file_upper_limit)
-
-    def fit_teff_one_line(self, line_number: int) -> dict:
+    def fit_lbl_teff(self, line_number: int) -> dict:
         """
-        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
+        Fits lbl by changing teff
         :param line_number: Which line number/index in line_center_sorted is being fitted
-        :return: best fit result string for that line
+        :return: best fit result dictionary
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+        # here we find which segment the line is in
+        segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
         if not self.night_mode:
-            print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
+            print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
 
         param_guess = np.array([[self.teff + self.guess_plus_minus_neg_teff], [self.teff + self.guess_plus_minus_pos_teff]])
         min_bounds = [(self.bound_min_teff, self.bound_max_teff)]
 
-        ts = self.create_scg_object(self._get_marcs_models())
+        scg = self.create_scg_object(self._get_marcs_models())
 
-        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
+        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
-        minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_teff, 'fatol': self.fatol_teff}
+        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+                              self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
+        minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess,
+                            'xatol': self.xatol_teff, 'fatol': self.fatol_teff}
         try:
             res = minimize_function(lbl_teff, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
             if not self.night_mode:
@@ -1396,12 +1396,12 @@ class Spectra:
             teff = res.x[0]
             chi_squared = res.fun
 
-            met = self.feh
+            feh = self.feh
             doppler_fit = self.doppler_shift_dict[line_number]
             if self.vmic is not None:  # Input given
                 microturb = self.vmic
             else:
-                microturb = calculate_vturb(teff, self.logg, met)
+                microturb = calculate_vturb(teff, self.logg, feh)
 
             if self.fit_vmac:
                 macroturb = self.vmac_dict[line_number]
@@ -1430,27 +1430,26 @@ class Spectra:
             if not self.night_mode:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
-        if self.find_teff_errors and teff >= 999998:
+        if self.find_teff_errors and teff <= 999998:
             if not self.night_mode:
                 print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
-                teff_error = np.abs(self.find_teff_error_one_line(line_number, doppler_fit,
-                                                           macroturb, rotation,
-                                                           microturb,
-                                                           offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
-                                                           bound_min_teff=teff,
-                                                           bound_max_teff=teff + 1000) - teff)
+                teff_error = np.abs(self.lbl_teff_find_sigma_error(line_number, doppler_fit,
+                                                                   macroturb, rotation,
+                                                                   microturb,
+                                                                   offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                                   bound_min_teff=teff,
+                                                                   bound_max_teff=teff + 1000) - teff)
             except ValueError as err:
                 if not self.night_mode:
                     print(err)
                 try:
-                    teff_error = np.abs(self.find_teff_error_one_line(line_number, doppler_fit,
-                                                               macroturb, rotation,
-                                                               microturb,
-                                                               offset_chisqr=(
-                                                                           res.fun + np.square(self.teff_error_sigma)),
-                                                               bound_min_teff=teff - 1000,
-                                                               bound_max_teff=teff) - teff)
+                    teff_error = np.abs(self.lbl_teff_find_sigma_error(line_number, doppler_fit,
+                                                                       macroturb, rotation,
+                                                                       microturb,
+                                                                       offset_chisqr=(chi_squared + np.square(self.teff_error_sigma)),
+                                                                       bound_min_teff=teff - 1000,
+                                                                       bound_max_teff=teff) - teff)
                 except ValueError as err:
                     if not self.night_mode:
                         print(err)
@@ -1479,28 +1478,71 @@ class Spectra:
 
         return one_result
 
-    def fit_logg_one_line(self, line_number: int) -> dict:
+
+    def lbl_teff_find_sigma_error(self, line_number: int, fitted_rv: float, fitted_vmac: float, fitted_rotation: float,
+                                  fitted_vmic: float, offset_chisqr: float, bound_min_teff: float,
+                                  bound_max_teff: float) -> float:
         """
-        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
-        :param line_number: Which line number/index in line_center_sorted is being fitted
-        :return: best fit result string for that line
+        Finds the sigma error for the teff of the line, by fitting the line with the teff offset by sigmas_upper_limit ** 2.
+        :param line_number: line's index to fit
+        :param fitted_rv: fitted rv
+        :param fitted_vmac: fitted vmac
+        :param fitted_rotation: fitted rotation
+        :param fitted_vmic: fitted vmic
+        :param offset_chisqr: chi_sqr to fit
+        :param bound_min_teff: minimum teff to fit
+        :param bound_max_teff: maximum teff to fit
+        :return: fitted teff with the offset chi_sqr
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+        scg = self.create_scg_object(self._get_marcs_models())
+
+        segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
         if not self.night_mode:
-            print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
+            print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
+        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+
+        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+                              self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
+        try:
+            res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
+            if not self.night_mode:
+                print(res)
+            fitted_teff = res.root
+        except IndexError as error:
+            if not self.night_mode:
+                print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
+            fitted_teff = -999999
+
+        shutil.rmtree(temp_directory)
+        return fitted_teff
+
+    def fit_lbl_logg(self, line_number: int) -> dict:
+        """
+        Fits lbl by changing logg
+        :param line_number: Which line number/index in line_center_sorted is being fitted
+        :return: best fit result dict for that line
+        """
+        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
+
+        segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+        if not self.night_mode:
+            print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
 
         param_guess = np.array([[self.logg + self.guess_plus_minus_neg_logg], [self.logg + self.guess_plus_minus_pos_logg]])
         min_bounds = [(self.bound_min_logg, self.bound_max_logg)]
 
-        ts = self.create_scg_object(self._get_marcs_models())
+        scg = self.create_scg_object(self._get_marcs_models())
 
-        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
+        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number)
-        minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_logg, 'fatol': self.fatol_logg}
+        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+                              self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
+        minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess,
+                            'xatol': self.xatol_logg, 'fatol': self.fatol_logg}
         try:
             res = minimize_function(lbl_logg, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
             if not self.night_mode:
@@ -1535,7 +1577,6 @@ class Spectra:
             rotation = 999999
             chi_squared = 999999
 
-
         wave_result = self.wave_mod_orig[line_number]
         flux_norm_result = self.flux_mod_orig[line_number]
         flux_result = self.flux_orig[line_number]
@@ -1544,7 +1585,7 @@ class Spectra:
             if not self.night_mode:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
-        if self.find_logg_errors and logg >= 99999 and not True:
+        if self.find_logg_errors and logg <= 99999 and not True:
             # TODO: add ability to fit logg error
             if not self.night_mode:
                 print(f"Fitting {self.logg_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
@@ -1571,6 +1612,7 @@ class Spectra:
                         print(err)
                     logg_error = 1
         else:
+            print("logg error not implemented yet")
             logg_error = 999999
 
         # Create a dictionary with column names as keys and corresponding values
@@ -1596,35 +1638,6 @@ class Spectra:
 
         return one_result
 
-    def find_teff_error_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_teff, bound_max_teff) -> float:
-        """
-        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
-        :param line_number: Which line number/index in line_center_sorted is being fitted
-        :return: best fit result string for that line
-        """
-        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
-
-        ts = self.create_scg_object(self._get_marcs_models())
-
-        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
-                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
-        if not self.night_mode:
-            print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
-        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
-
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
-        try:
-            res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
-            if not self.night_mode:
-                print(res)
-            fitted_teff = res.root
-        except IndexError as error:
-            if not self.night_mode:
-                print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
-            fitted_teff = -999999
-
-        shutil.rmtree(temp_directory)
-        return fitted_teff
 
     def _get_marcs_models(self) -> dict:
         """
@@ -2548,11 +2561,11 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         elif spectra.fitting_mode == "lbl":
             result = spectra.fit_lbl_function(None, spectra.fit_one_line, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
-            result = spectra.fit_lbl_function(None, spectra.fit_teff_one_line, False)
+            result = spectra.fit_lbl_function(None, spectra.fit_lbl_teff, False)
         elif spectra.fitting_mode == "vmic":
             result = spectra.fit_lbl_function(None, spectra.fit_one_line_vmic, False)
         elif spectra.fitting_mode == "logg":
-            result = spectra.fit_lbl_function(None, spectra.fit_logg_one_line, False)
+            result = spectra.fit_lbl_function(None, spectra.fit_lbl_logg, False)
         else:
             raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     else:
@@ -2561,11 +2574,11 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         elif spectra.fitting_mode == "lbl":
             result = spectra.fit_lbl_function(dask_client, spectra.fit_one_line, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
-            result = spectra.fit_lbl_function(dask_client, spectra.fit_teff_one_line, False)
+            result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_teff, False)
         elif spectra.fitting_mode == "vmic":
             result = spectra.fit_lbl_function(dask_client, spectra.fit_one_line_vmic, False)
         elif spectra.fitting_mode == "logg":
-            result = spectra.fit_lbl_function(dask_client, spectra.fit_logg_one_line, False)
+            result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_logg, False)
         else:
             raise ValueError(f"unknown fitting mode {spectra.fitting_mode}, need all or lbl or teff")
     del spectra

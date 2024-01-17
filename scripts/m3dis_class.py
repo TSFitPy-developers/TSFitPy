@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import shutil
 import subprocess
 import numpy as np
 import os
@@ -397,6 +398,12 @@ class M3disCall(SyntheticSpectrumGenerator):
         #TODO absmet files?
         logging.debug(config_m3dis)
 
+        # clean temp directory
+        save_file_dir = os.path.join(self.tmp_dir, "save")
+        if os.path.exists(save_file_dir):
+            # just in case it fails, so that it doesn't reuse the old files
+            shutil.rmtree(save_file_dir)
+
         if self.verbose:
             stdout = None
             stderr = subprocess.STDOUT
@@ -657,6 +664,7 @@ class M3disCall(SyntheticSpectrumGenerator):
                     f"{depth_interp[i]:>13.6e} {temp_interp[i]:>8.1f} {pe_interp[i]:>12.4E} {density_interp[i]:>12.4E} {vmic_interp[i]:>5.3f}\n")
 
     def synthesize_spectra(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        wavelength, normalised_flux, flux = None, None, None
         try:
             logging.debug("Running m3dis and atmosphere")
             self.calculate_atmosphere()
@@ -665,7 +673,6 @@ class M3disCall(SyntheticSpectrumGenerator):
             if "errors" in output:
                 if not self.night_mode:
                     print(output["errors"], "m3dis failed")
-                return None, None, None
             else:
                 if self.save_spectra:
                     try:
@@ -675,12 +682,11 @@ class M3disCall(SyntheticSpectrumGenerator):
                         wavelength, _ = completed_run.get_xx(completed_run.lam)
                         flux, continuum = completed_run.get_yy(norm=False)
                         normalised_flux = flux / continuum
-                        return wavelength, normalised_flux, flux
                     except FileNotFoundError as e:
                         if not self.night_mode:
                             print(f"m3dis, cannot find {e}")
         except (FileNotFoundError, ValueError, TypeError) as error:
             if not self.night_mode:
                 print(f"Interpolation failed? {error}")
-        return None, None, None
+        return wavelength, normalised_flux, flux
 
