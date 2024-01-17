@@ -429,6 +429,15 @@ class TSFitPyConfig:
         self.m3dis_python_package_name = "m3dis"
         self.margin = 3.0
         self.guess_ratio_to_add = 0.1
+        # whether to save different parameters
+        self.save_original_spectra = True
+        self.save_fitted_spectra = True
+        self.save_convolved_fitted_spectra = True
+        self.save_results = True
+        self.save_linemask = True
+        self.save_fitlist = True
+        self.save_config_file = True
+        self.make_output_directory = True
 
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -829,6 +838,13 @@ class TSFitPyConfig:
             self.m3dis_python_package_name = self.config_parser["AdvancedOptions"]["m3dis_python_package_name"]
             self.margin = float(self.config_parser["AdvancedOptions"]["margin"])
             self.guess_ratio_to_add = float(self.config_parser["AdvancedOptions"]["guess_ratio_to_add"])
+            self.save_original_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_original_spectra"])
+            self.save_fitted_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_fitted_spectra"])
+            self.save_convolved_fitted_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_convolved_fitted_spectra"])
+            self.save_results = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_results"])
+            self.save_linemask = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_linemask"])
+            self.save_fitlist = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_fitlist"])
+            self.save_config_file = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_config_file"])
         except KeyError:
             pass
 
@@ -1141,6 +1157,9 @@ class TSFitPyConfig:
         if self.lpoint_turbospectrum <= 0:
             raise ValueError("lpoint_turbospectrum must be greater than 0")
 
+        if not np.any(self.save_original_spectra + self.save_fitted_spectra + self.save_convolved_fitted_spectra + self.save_results + self.save_linemask + self.save_fitlist + self.save_config_file):
+            self.make_output_directory = False
+
     def load_spectra_config(self, spectra_object):
         # not used anymore
         spectra_object.atmosphere_type = self.atmosphere_type
@@ -1242,7 +1261,7 @@ class TSFitPyConfig:
         spectra_object.input_elem_abundance = self.input_elem_abundance_dict
 
         spectra_object.find_upper_limit = self.find_upper_limit
-        spectra_object.sigmas_upper_limit = self.sigmas_upper_limit
+        spectra_object.sigmas_error = self.sigmas_upper_limit
         spectra_object.find_teff_errors = self.find_teff_errors
         spectra_object.teff_error_sigma = self.teff_error_sigma
 

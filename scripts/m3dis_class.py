@@ -657,19 +657,17 @@ class M3disCall(SyntheticSpectrumGenerator):
                     f"{depth_interp[i]:>13.6e} {temp_interp[i]:>8.1f} {pe_interp[i]:>12.4E} {density_interp[i]:>12.4E} {vmic_interp[i]:>5.3f}\n")
 
     def synthesize_spectra(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        skip_linelist = self.skip_linelist
-        save_spectra = self.save_spectra
         try:
             logging.debug("Running m3dis and atmosphere")
             self.calculate_atmosphere()
             logging.debug("Running m3dis")
-            output = self.call_m3dis(skip_linelist=skip_linelist, use_precomputed_depart=self.use_precomputed_depart)
+            output = self.call_m3dis(skip_linelist=self.skip_linelist, use_precomputed_depart=self.use_precomputed_depart)
             if "errors" in output:
                 if not self.night_mode:
                     print(output["errors"], "m3dis failed")
                 return None, None, None
             else:
-                if save_spectra:
+                if self.save_spectra:
                     try:
                         completed_run = self.m3dis_python_module.read(
                             self.tmp_dir
