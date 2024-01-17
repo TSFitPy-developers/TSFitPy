@@ -946,7 +946,8 @@ class Spectra:
         :param path: path to save the spectra
         """
         if self.save_original_spectra:
-            np.savetxt(path, np.transpose([self.wave_ob, self.flux_ob]), fmt='%.5f')
+            np.savetxt(path, np.transpose([self.wave_ob, self.flux_ob, np.sqrt(self.error_obs_variance)]),
+                       fmt='%.5f', header="wavelength flux error_sigma")
 
     def configure_and_run_synthetic_code(self, spectrumclass: SyntheticSpectrumGenerator, feh: float, elem_abund: dict,
                                          vmic: float, lmin: float, lmax: float, windows_flag: bool=False, temp_dir: str=None,
