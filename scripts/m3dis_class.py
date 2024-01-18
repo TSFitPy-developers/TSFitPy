@@ -54,6 +54,8 @@ class M3disCall(SyntheticSpectrumGenerator):
         self.use_precomputed_depart = True
         self.atmosphere_path_3d_model = None
         self.atmos_format_3d = None
+        # if using just MARCS model instead of interpolating the same one 8 times
+        self.use_marcs_directly = False
 
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
@@ -227,7 +229,7 @@ class M3disCall(SyntheticSpectrumGenerator):
                             # If the element is not in the free abundances, we assume it has the solar scaled abundance
                             # A(X)_star = A(X)_solar + [Fe/H]
                             abundance_to_write = solar_abundances[element] + self.metallicity
-                        if self.atmosphere_dimension == "3D":
+                        if self.atmosphere_dimension == "3D" or self.use_marcs_directly:
                             # if 3D, we need to subtract the metallicity from the abundance, because it auto scales (adds it) in M3D with FeH already
                             abundance_to_write = abundance_to_write - self.metallicity
                     file.write(f"{element:<4} {abundance_to_write:>6.3f}\n")
@@ -301,7 +303,7 @@ class M3disCall(SyntheticSpectrumGenerator):
                         f"{periodic_table[element_atomic_number]:<5}{elements_count[element_atomic_number]:>2}\n")
 
                 file.write(
-                    f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>8.4f} {isotope:>8.4f}\n")
+                    f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>12.8f} {isotope:>12.8f}\n")
         return file_path
 
 
@@ -319,6 +321,9 @@ class M3disCall(SyntheticSpectrumGenerator):
 
             atmo_param = f"atmos_format='Text' vmic={round(self.turbulent_velocity, 5)}"
             atmos_path = f"{os.path.join(self.tmp_dir, self.marcs_model_name)}"
+            if self.use_marcs_directly:
+                atmo_param = f"atmos_format='Marcs' vmic={round(self.turbulent_velocity, 5)}"
+                atmos_path = os.path.join(self.marcs_grid_path, self.marcs_model_name)
             # convert to m3dis format
             #atmos_path = self.convert_interpolated_atmo_to_m3dis(atmos_path)
         elif self.atmosphere_dimension == "3D":
@@ -386,12 +391,14 @@ class M3disCall(SyntheticSpectrumGenerator):
             linelist_parameters = (f"&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' {linelist_param_extra}/\n\
                                      &spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n")
 
+        #0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000
+        # turbospectrum angles
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
-&m3d_params         verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='lobatto'/\n\
+&m3d_params         decouple_continuum=T verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='custom' custom_mu='0.010 0.052 0.124 0.223 0.340 0.468 0.598 0.722 0.831 0.917 0.975 1.000'/\n\
 {linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
@@ -512,18 +519,23 @@ class M3disCall(SyntheticSpectrumGenerator):
         if np.any(np.isnan(tau500_new)):
             print("NAN in model atmosphere")
 
-        # interpolate all variables to equidistant depth grid
-        depth_min = np.min(depth_new)
-        depth_max = np.max(depth_new)
-        depth_points = np.size(depth_new)
-        depth_new_equi = np.linspace(depth_min, depth_max, depth_points)
-        tau500_new = np.interp(depth_new_equi, depth_new, tau500_new)
-        temp_new = np.interp(depth_new_equi, depth_new, temp_new)
-        pe_new = np.interp(depth_new_equi, depth_new, pe_new)
-        vmic_new = np.interp(depth_new_equi, depth_new, vmic_new)
-        density_new = np.interp(depth_new_equi, depth_new, density_new)
-        depth_new = depth_new_equi
+        density_new, depth_new, pe_new, tau500_new, temp_new, vmic_new = self.convert_atmo_to_equidistant_one(
+            density_new, depth_new, pe_new, tau500_new, temp_new, vmic_new)
         return tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new
+
+    def convert_atmo_to_equidistant_one(self, density, depth, pe, tau500, temp, vmic):
+        # interpolate all variables to equidistant depth grid
+        depth_min = np.min(depth)
+        depth_max = np.max(depth)
+        depth_points = np.size(depth)
+        depth_new_equi = np.linspace(depth_min, depth_max, depth_points)
+        tau500 = np.interp(depth_new_equi, depth, tau500)
+        temp = np.interp(depth_new_equi, depth, temp)
+        pe = np.interp(depth_new_equi, depth, pe)
+        vmic = np.interp(depth_new_equi, depth, vmic)
+        density = np.interp(depth_new_equi, depth, density)
+        depth = depth_new_equi
+        return density, depth, pe, tau500, temp, vmic
 
     def calculate_atmosphere(self):
         if self.atmosphere_dimension == "1D":
@@ -549,7 +561,7 @@ class M3disCall(SyntheticSpectrumGenerator):
         logging.debug(
             f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
 
-
+        self.use_marcs_directly = False
         if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
                 self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
             # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
@@ -585,6 +597,9 @@ class M3disCall(SyntheticSpectrumGenerator):
             vmic_interp = vmic_low * fxlow + vmic_high * fxhigh
             density_interp = density_low * fxlow + density_high * fxhigh
             depth_interp = depth_low * fxlow + depth_high * fxhigh
+
+            density_interp, depth_interp, pe_interp, tau500_interp, temp_interp, vmic_interp = (
+                self.convert_atmo_to_equidistant_one(density_interp, depth_interp, pe_interp, tau500_interp, temp_interp, vmic_interp))
 
             # print(interp_model_name)
             self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
@@ -636,13 +651,20 @@ class M3disCall(SyntheticSpectrumGenerator):
             atmosphere_properties = marcs_model_list
             if marcs_model_list["errors"] is not None:
                 raise ValueError(f"{marcs_model_list['errors']}")
-            tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
-            self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
-                                                                                             self.metallicity,
-                                                                                             self.turbulent_velocity)
-            interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+            if np.size(np.unique(marcs_model_list["marcs_model_list"])) == 1:
+                # then can just use MARCS model directly
+                self.marcs_model_name = marcs_model_list["marcs_model_list"][0]
+                #interp_model_name = self.marcs_model_name
+                #self.marcs_model_name = interp_model_name
+                self.use_marcs_directly = True
+            else:
+                tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
+                self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
+                                                                                                 self.metallicity,
+                                                                                                 self.turbulent_velocity)
+                interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
 
-            self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+                self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
 
             if self.log_g < 3:
                 self.turbulent_velocity = microturbulence

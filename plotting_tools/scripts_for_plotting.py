@@ -416,7 +416,7 @@ def check_if_path_exists(path_to_check: str) -> str:
             raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
-                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False):
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -490,7 +490,7 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
-    wave_mod_orig, flux_norm_mod_orig, _ = ts.synthesize_spectra()
+    wave_mod_orig, flux_norm_mod_orig, flux_unnorm = ts.synthesize_spectra()
     print("TS completed")
     if wave_mod_orig is not None:
         if np.size(wave_mod_orig) != 0.0:
@@ -525,24 +525,30 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                 else:
                     print('TS failed')
                     wave_mod, flux_norm_mod = np.array([]), np.array([])
+                    flux_unnorm = np.array([])
             except (FileNotFoundError, ValueError, IndexError) as e:
                 print(f"TS failed: {e}")
                 wave_mod, flux_norm_mod = np.array([]), np.array([])
+                flux_unnorm = np.array([])
         else:
             print('TS failed')
             wave_mod, flux_norm_mod = np.array([]), np.array([])
+            flux_unnorm = np.array([])
     else:
         print('TS failed')
         wave_mod, flux_norm_mod = np.array([]), np.array([])
+        flux_unnorm = np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
-
-    return wave_mod, flux_norm_mod
+    if return_unnorm_flux:
+        return wave_mod, flux_norm_mod, flux_unnorm
+    else:
+        return wave_mod, flux_norm_mod
 
 
 def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
                               hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
-                              nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False):
+                              nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -640,7 +646,8 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
                  line_mask_file=None, model_atom_file=model_atom_file_dict, atmos_format_3d=atmos_format, atmosphere_path_3d_model=m3dis_paths["3D_atmosphere_path"])
     m3dis.use_precomputed_depart = False
     print("Running m3dis")
-    wave_mod_orig, flux_norm_mod_orig, _ = m3dis.synthesize_spectra()
+
+    wave_mod_orig, flux_norm_mod_orig, flux_unnorm = m3dis.synthesize_spectra()
     print("m3dis completed")
     if wave_mod_orig is not None:
         if np.size(wave_mod_orig) != 0.0:
@@ -675,19 +682,26 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
                 else:
                     print('m3dis failed')
                     wave_mod, flux_norm_mod = np.array([]), np.array([])
+                    flux_unnorm = np.array([])
             except (FileNotFoundError, ValueError, IndexError) as e:
                 print(f"m3dis failed: {e}")
                 wave_mod, flux_norm_mod = np.array([]), np.array([])
+                flux_unnorm = np.array([])
         else:
             print('m3dis failed')
             wave_mod, flux_norm_mod = np.array([]), np.array([])
+            flux_unnorm = np.array([])
     else:
         print('m3dis failed')
         wave_mod, flux_norm_mod = np.array([]), np.array([])
+        flux_unnorm = np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
 
-    return wave_mod, flux_norm_mod
+    if return_unnorm_flux:
+        return wave_mod, flux_norm_mod, flux_unnorm
+    else:
+        return wave_mod, flux_norm_mod
 
 
 def remove_bad_lines(output_data):
