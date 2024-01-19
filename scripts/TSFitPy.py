@@ -511,8 +511,9 @@ class Spectra:
         # sort the observed spectra according to wavelength using numpy argsort
         sorted_obs_wavelength_index = np.argsort(wave_ob)
         wave_ob, flux_ob = wave_ob[sorted_obs_wavelength_index], flux_ob[sorted_obs_wavelength_index]
+        error_obs_variance = error_obs_variance[sorted_obs_wavelength_index]
         result_indices = []
-        wave_ob_doppler_shifted = apply_doppler_correction(wave_ob, self.doppler_shift)
+        wave_ob_doppler_shifted = apply_doppler_correction(wave_ob, self.rv)
         for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
             result_indices.extend(
                 np.where((wave_ob_doppler_shifted >= l - self.margin) & (wave_ob_doppler_shifted <= r + self.margin))[0])
