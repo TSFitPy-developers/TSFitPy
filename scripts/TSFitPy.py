@@ -2546,7 +2546,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
             spectra.precompute_departure()
         else:
             future = dask_client.submit(spectra.precompute_departure)
-            #dask_client.gather(future)
+            dask_client.gather(future)
         logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
 
     spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
