@@ -494,7 +494,6 @@ class Spectra:
         self.rotation_dict = {}
         self.doppler_shift_dict = {}
         self.elem_abund_dict_fitting = {}
-        self.number_of_fits = {}
         self.wave_mod_orig = {}
         self.flux_mod_orig = {}
         self.flux_orig = {}
@@ -1346,20 +1345,47 @@ class Spectra:
         if not self.night_mode:
             print(f"Fitting error of {sigmas_upper_limit} sigma at {self.line_centers_sorted[line_number]} angstroms")
 
+        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
+
+        chi_sqr_to_fit = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit)
+        start_abundance = result_one_line["fitted_abund"]
+        # we are trying to find abundance which results in chi_sqr = chi_sqr_to_fit. so we need to add some constant
+        # that overshoots this chi_sqr_to_fit, so that we can find the abundance that results in chi_sqr_to_fit
+        # thus we add 3 + sigmas_upper_limit to the chi_sqr_to_fit
+        # Hopefully that will be enough to overshoot the chi_sqr_to_fit
+        end_abundance = start_abundance + sigmas_upper_limit + 3
+
+        scg = self.create_scg_object(self._get_marcs_models())
+
+        segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+        if not self.night_mode:
+            print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number],
+                  self.line_ends_sorted[line_number])
+
+        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+
+        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+                              self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory,
+                              result_one_line["rv"], result_one_line["macroturb"], result_one_line["rotation"],
+                              result_one_line["vmic"], chi_sqr_to_fit)
         try:
-            chi_sqr_to_fit = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit)
-            start_abundance = result_one_line["fitted_abund"]
-            # we are trying to find abundance which results in chi_sqr = chi_sqr_to_fit. so we need to add some constant
-            # that overshoots this chi_sqr_to_fit, so that we can find the abundance that results in chi_sqr_to_fit
-            # thus we add 3 + sigmas_upper_limit to the chi_sqr_to_fit
-            # Hopefully that will be enough to overshoot the chi_sqr_to_fit
-            end_abundance = start_abundance + sigmas_upper_limit + 3
-            result_error = self.find_upper_limit_one_line(line_number, result_one_line["rv"],
-                                                          result_one_line["macroturb"], result_one_line["rotation"],
-                                                          result_one_line["vmic"], offset_chisqr=chi_sqr_to_fit,
-                                                          bound_min_abund=start_abundance, bound_max_abund=end_abundance)
-        except ValueError:
+            res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[start_abundance, end_abundance],
+                              method='brentq', options={'disp': self.python_verbose})
+            if not self.night_mode:
+                print(res)
+            fitted_abund = res.root
+            result_error = {"chi_sqr": chi_sqr_to_fit, "fitted_abund": fitted_abund}
+        except IndexError as error:
+            if not self.night_mode:
+                print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
             result_error = {"fitted_abund": 999999, "chi_sqr": 999999}
+        except ValueError as error:
+            if not self.night_mode:
+                print(f"{error} in finding sigma error for the line {self.line_centers_sorted[line_number]}")
+            result_error = {"fitted_abund": 999999, "chi_sqr": 999999}
+
+        shutil.rmtree(temp_directory)
 
         return result_error
 
@@ -1638,7 +1664,6 @@ class Spectra:
 
         return one_result
 
-
     def _get_marcs_models(self) -> dict:
         """
         I hate this function, but it's the only way to get the marcs models to the workers with the least memory usage
@@ -1662,27 +1687,26 @@ class Spectra:
                 marcs_models = pickle.load(pickled_marcs_models)
         return marcs_models
 
-    def fit_one_line(self, line_number: int, offset_chisqr=0, bound_min_abund=None, bound_max_abund=None) -> dict:
+    def fit_lbl_abund(self, line_number: int) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
+        It can also technically fit vmic at the same time, but it's not recommended
         :param line_number: Which line number/index in line_center_sorted is being fitted
-        :return: best fit result string for that line
+        :return: result dictionary for that fit
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        self.number_of_fits[line_number] = 0
+        scg = self.create_scg_object(self._get_marcs_models())
 
-        ts = self.create_scg_object(self._get_marcs_models())
-
-        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+        segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
-        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
+        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund, bound_min_abund=bound_min_abund, bound_max_abund=bound_max_abund)
+        param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, line_number, offset_chisqr)
+        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
         minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_lbl, 'fatol': self.fatol_lbl, 'adaptive': True}
         try:
             res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
@@ -1697,10 +1721,10 @@ class Spectra:
                 print(print_result)
             if self.fit_feh:
                 met_index = np.where(self.elem_to_fit == "Fe")[0][0]
-                met = res.x[met_index]
+                feh = res.x[met_index]
             else:
-                met = self.feh
-            elem_abund_dict = {"Fe": met}
+                feh = self.feh
+            elem_abund_dict = {"Fe": feh}
             for i in range(self.nelement):
                 # self.elem_to_fit[i] = element name
                 # param[1:nelement] = abundance of the element
@@ -1710,22 +1734,22 @@ class Spectra:
                     elem_abund_dict[elem_name] = res.x[i]
             doppler_fit = self.doppler_shift_dict[line_number]
             if self.vmic is not None:  # Input given
-                microturb = self.vmic
+                vmic = self.vmic
             else:
                 if self.fit_vmic == "No" and self.atmosphere_type == "1D":
-                    microturb = calculate_vturb(self.teff, self.logg, met)
+                    vmic = calculate_vturb(self.teff, self.logg, feh)
                 elif self.fit_vmic == "Yes" and self.atmosphere_type == "1D":
-                    microturb = res.x[-1]  # last param is microturb
-                elif self.fit_vmic == "Input":  # just for safety's sake, normally should take in the input above anyway
+                    vmic = res.x[-1]  # last param is vmic
+                elif self.fit_vmic == "Input" and self.atmosphere_type == "1D":  # just for safety's sake, normally should take in the input above anyway
                     raise ValueError(
                         "Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
                         "a problem in the code?")
                 else:
-                    microturb = 2.0
+                    vmic = 2.0
             if self.fit_vmac:
-                macroturb = self.vmac_dict[line_number]
+                vmac = self.vmac_dict[line_number]
             else:
-                macroturb = self.vmac
+                vmac = self.vmac
             if self.fit_rotation:
                 rotation = self.rotation_dict[line_number]
             else:
@@ -1740,10 +1764,10 @@ class Spectra:
                 # param[1:nelement] = abundance of the element
                 elem_name = self.elem_to_fit[i]
                 if elem_name != "Fe":
-                    elem_abund_dict[elem_name] = 999999  # + met
+                    elem_abund_dict[elem_name] = 999999
             doppler_fit = 999999
-            microturb = 999999
-            macroturb = 999999
+            vmic = 999999
+            vmac = 999999
             rotation = 999999
             chi_squared = 999999
             fit_iterations = 0
@@ -1760,8 +1784,8 @@ class Spectra:
         for key in elem_abund_dict:
             result_dict[key] = elem_abund_dict[key]
 
-        result_dict["Microturb"] = microturb
-        result_dict["Macroturb"] = macroturb
+        result_dict["Microturb"] = vmic
+        result_dict["Macroturb"] = vmac
         result_dict["rotation"] = rotation
         result_dict["chi_squared"] = chi_squared
 
@@ -1774,40 +1798,12 @@ class Spectra:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
         shutil.rmtree(temp_directory)
-        return {"result": result_dict, "rv": doppler_fit, "vmic": microturb, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
-                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]], "fit_iterations": fit_iterations} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+        return {"result": result_dict, "rv": doppler_fit, "vmic": vmic, "fit_wavelength": wave_result,
+                "fit_flux_norm": flux_norm_result, "fit_flux": flux_result,  "macroturb": vmac,
+                "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]],
+                "fit_iterations": fit_iterations}
 
-    def find_upper_limit_one_line(self, line_number: int, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr, bound_min_abund=None, bound_max_abund=None) -> dict:
-        """
-        Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
-        :param line_number: Which line number/index in line_center_sorted is being fitted
-        :return: best fit result string for that line
-        """
-        temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
-
-        ts = self.create_scg_object(self._get_marcs_models())
-
-        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
-                                        self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
-        if not self.night_mode:
-            print(self.line_centers_sorted[line_number], self.line_begins_sorted[start], self.line_ends_sorted[start])
-        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
-
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[start], self.seg_ends[start], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
-        try:
-            res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[bound_min_abund, bound_max_abund], method='brentq', options={'disp': self.python_verbose})
-            if not self.night_mode:
-                print(res)
-            fitted_abund = res.root
-        except IndexError as error:
-            if not self.night_mode:
-                print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
-            fitted_abund = 999999
-
-        shutil.rmtree(temp_directory)
-        return {"chi_sqr": offset_chisqr, "fitted_abund": fitted_abund} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
-
-    def fit_one_line_vmic(self, line_number: int) -> dict:
+    def fit_lbl_vmic(self, line_number: int) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         :param line_number: Which line number/index in line_center_sorted is being fitted
@@ -1996,7 +1992,6 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     spectra_to_fit.doppler_shift_dict[line_number] = doppler_shift
     spectra_to_fit.vmac_dict[line_number] = macroturb
     spectra_to_fit.rotation_dict[line_number] = rotation
-    spectra_to_fit.number_of_fits[line_number] += 1
 
     temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
 
@@ -2546,7 +2541,10 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
 
     if tsfitpy_compiler == "m3dis":
-        spectra.precompute_departure()
+        if spectra.dask_workers == 1:
+            spectra.precompute_departure()
+        else:
+            dask_client.submit(spectra.precompute_departure)
         logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
 
     spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
@@ -2559,11 +2557,11 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         if spectra.fitting_mode == "all":
             result = spectra.fit_all()
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl_function(None, spectra.fit_one_line, spectra.find_upper_limit)
+            result = spectra.fit_lbl_function(None, spectra.fit_lbl_abund, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
             result = spectra.fit_lbl_function(None, spectra.fit_lbl_teff, False)
         elif spectra.fitting_mode == "vmic":
-            result = spectra.fit_lbl_function(None, spectra.fit_one_line_vmic, False)
+            result = spectra.fit_lbl_function(None, spectra.fit_lbl_vmic, False)
         elif spectra.fitting_mode == "logg":
             result = spectra.fit_lbl_function(None, spectra.fit_lbl_logg, False)
         else:
@@ -2572,11 +2570,11 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         if spectra.fitting_mode == "all":
             result = dask_client.submit(spectra.fit_all)
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl_function(dask_client, spectra.fit_one_line, spectra.find_upper_limit)
+            result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_abund, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
             result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_teff, False)
         elif spectra.fitting_mode == "vmic":
-            result = spectra.fit_lbl_function(dask_client, spectra.fit_one_line_vmic, False)
+            result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_vmic, False)
         elif spectra.fitting_mode == "logg":
             result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_logg, False)
         else:

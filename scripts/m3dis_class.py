@@ -211,7 +211,7 @@ class M3disCall(SyntheticSpectrumGenerator):
 
     def write_abund_file(self):
         # file path is temp_dir + abund
-        file_path = os.path.join(self.tmp_dir, "abund")
+        file_path = os.path.join(self.tmp_dir, "abund_to_use")
         # open file
         with open(file_path, "w") as file:
             # write the number of elements
