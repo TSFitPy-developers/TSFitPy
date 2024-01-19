@@ -1063,7 +1063,7 @@ class Spectra:
         Saves the departure coefficients in the temp directory. Calculates it for [X/Fe] = 0 or star's input [Fe/H] (0?)
         """
         if self.nlte_flag and self.m3dis_iterations_max_precompute > 0:
-            scg = self.create_scg_object(self._get_marcs_models())
+            scg = self.create_scg_object()
             # need to run NLTE run once, so that can reuse precomputed departure coefficients
             if self.elem_to_fit[0] == "Fe":
                 input_abund = {"Fe": self.feh}
@@ -2542,11 +2542,7 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
 
     if tsfitpy_compiler == "m3dis":
-        if spectra.dask_workers == 1:
-            spectra.precompute_departure()
-        else:
-            future = dask_client.submit(spectra.precompute_departure)
-            dask_client.gather(future)
+        spectra.precompute_departure()
         logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
 
     spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
