@@ -1064,7 +1064,7 @@ class Spectra:
         Saves the departure coefficients in the temp directory. Calculates it for [X/Fe] = 0 or star's input [Fe/H] (0?)
         """
         if self.nlte_flag and self.m3dis_iterations_max_precompute > 0:
-            scg = self.create_scg_object(self._get_marcs_models())
+            scg = self.create_scg_object(self._get_marcs_models(force_pickle_load=True))
             # need to run NLTE run once, so that can reuse precomputed departure coefficients
             if self.elem_to_fit[0] == "Fe":
                 input_abund = {"Fe": self.feh}
