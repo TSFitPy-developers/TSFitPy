@@ -1085,6 +1085,7 @@ class Spectra:
             self.configure_and_run_synthetic_code(scg, feh, input_abund, vmic, self.lmin, self.lmax, temp_dir=temp_dir)
             # delete scg
             del scg
+        return None
 
     def fit_all(self) -> list:
         """
@@ -2544,7 +2545,8 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
         if spectra.dask_workers == 1:
             spectra.precompute_departure()
         else:
-            dask_client.submit(spectra.precompute_departure)
+            future = dask_client.submit(spectra.precompute_departure)
+            #dask_client.gather(future)
         logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
 
     spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
