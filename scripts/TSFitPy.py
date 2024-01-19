@@ -1064,7 +1064,7 @@ class Spectra:
         Saves the departure coefficients in the temp directory. Calculates it for [X/Fe] = 0 or star's input [Fe/H] (0?)
         """
         if self.nlte_flag and self.m3dis_iterations_max_precompute > 0:
-            scg = self.create_scg_object()
+            scg = self.create_scg_object(self._get_marcs_models())
             # need to run NLTE run once, so that can reuse precomputed departure coefficients
             if self.elem_to_fit[0] == "Fe":
                 input_abund = {"Fe": self.feh}
@@ -1666,17 +1666,18 @@ class Spectra:
 
         return one_result
 
-    def _get_marcs_models(self) -> dict:
+    def _get_marcs_models(self, force_pickle_load=False) -> dict:
         """
         I hate this function, but it's the only way to get the marcs models to the workers with the least memory usage
         I wasted probably too long to count trying to get this to work with dask distributed
         But it returns the marcs models inside this class
         Please don't judge me
         Also please rewrite this if you know how to do it better
+        :param force_pickle_load: if True, then forces to load the pickle file
         :return: marcs models as a dictionary
         """
         # usually size of standard marcs models is 8 MB
-        if self.dask_workers != 1:
+        if self.dask_workers != 1 and not force_pickle_load:
             worker = get_worker()
             try:
                 marcs_models = worker.marcs_models
