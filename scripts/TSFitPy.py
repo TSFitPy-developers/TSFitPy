@@ -427,8 +427,8 @@ class Spectra:
         self.save_config_file = True
 
         # Set values from config
-        if n_workers != 1:
-            tsfitpy_config = tsfitpy_config.result()
+        #if n_workers != 1:
+        #    tsfitpy_config = tsfitpy_config.result()
         self.load_spectra_config(tsfitpy_config)
 
         if self.debug_mode >= 1:
@@ -666,14 +666,31 @@ class Spectra:
         self.save_fitlist = tsfitpy_config.save_fitlist
         self.save_config_file = tsfitpy_config.save_config_file
 
-        self._load_marcs_grids()
+        self.marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
+
+        #self._load_marcs_grids()
 
     def _load_marcs_grids(self):
         """
         Loads the MARCS grids. More memory efficient than other solutions, only loads once.
         """
-        (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
+        (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, _,
+         self.marcs_values) = fetch_marcs_grid(self.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+        self.marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
+        return
+
+        (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, _,
          self.marcs_models_location, self.marcs_values) = MarcsGridSingleton.get_marcs_grids()
+        return
+
+        (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
+         self.marcs_values) = fetch_marcs_grid(self.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+        self.marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
+        return
+        # model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
+        (self.model_temperatures, self.model_logs, self.model_mets, self.marcs_value_keys, self.marcs_models,
+         self.marcs_values) = fetch_marcs_grid(self.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+        self.marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
 
     def get_all_guess(self):
         """
@@ -999,12 +1016,13 @@ class Spectra:
                                     segment_file=self.segment_file, line_mask_file=self.linemask_file)
         return spectrumclass.synthesize_spectra()
 
-    def create_scg_object(self, marcs_models=None) -> SyntheticSpectrumGenerator:
+    def create_scg_object(self, marcs_values_tuple) -> SyntheticSpectrumGenerator:
         """
         Creates the synthetic spectrum generator object depending whether TS or M3DIS is used (or other in the future?)
         :param marcs_models: unpickled marcs models
         :return: SyntheticSpectrumGenerator object
         """
+        model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = marcs_values_tuple
         if marcs_models is None:
             marcs_models = self.marcs_models
         if self.compiler.lower() == "m3dis":
@@ -1017,12 +1035,12 @@ class Spectra:
                 model_atom_path=self.model_atom_path,
                 departure_file_path=self.departure_file_path,
                 aux_file_length_dict=self.aux_file_length_dict,
-                model_temperatures=self.model_temperatures,
-                model_logs=self.model_logs,
-                model_mets=self.model_mets,
-                marcs_value_keys=self.marcs_value_keys,
+                model_temperatures=model_temperatures,
+                model_logs=model_logs,
+                model_mets=model_mets,
+                marcs_value_keys=marcs_value_keys,
                 marcs_models=marcs_models,
-                marcs_values=self.marcs_values,
+                marcs_values=marcs_values,
                 m3dis_python_module=self.m3dis_python_module,
                 n_nu=self.m3dis_n_nu,
                 hash_table_size=self.m3dis_hash_table_size,
@@ -1048,12 +1066,12 @@ class Spectra:
                 model_atom_path=self.model_atom_path,
                 departure_file_path=self.departure_file_path,
                 aux_file_length_dict=self.aux_file_length_dict,
-                model_temperatures=self.model_temperatures,
-                model_logs=self.model_logs,
-                model_mets=self.model_mets,
-                marcs_value_keys=self.marcs_value_keys,
+                model_temperatures=model_temperatures,
+                model_logs=model_logs,
+                model_mets=model_mets,
+                marcs_value_keys=marcs_value_keys,
                 marcs_models=marcs_models,
-                marcs_values=self.marcs_values,
+                marcs_values=marcs_values,
                 night_mode=self.night_mode)
             scg.lpoint = self.lpoint_turbospectrum
         return scg
@@ -1064,7 +1082,7 @@ class Spectra:
         Saves the departure coefficients in the temp directory. Calculates it for [X/Fe] = 0 or star's input [Fe/H] (0?)
         """
         if self.nlte_flag and self.m3dis_iterations_max_precompute > 0:
-            scg = self.create_scg_object(self._get_marcs_models(force_pickle_load=True))
+            scg = self.create_scg_object(self._get_marcs_models())
             # need to run NLTE run once, so that can reuse precomputed departure coefficients
             if self.elem_to_fit[0] == "Fe":
                 input_abund = {"Fe": self.feh}
@@ -1666,7 +1684,7 @@ class Spectra:
 
         return one_result
 
-    def _get_marcs_models(self, force_pickle_load=False) -> dict:
+    def _get_marcs_models(self, force_pickle_load=False) -> Tuple[None, None, None, list, dict, dict]:
         """
         I hate this function, but it's the only way to get the marcs models to the workers with the least memory usage
         I wasted probably too long to count trying to get this to work with dask distributed
@@ -1680,15 +1698,15 @@ class Spectra:
         if self.dask_workers != 1 and not force_pickle_load:
             worker = get_worker()
             try:
-                marcs_models = worker.marcs_models
+                model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = worker.model_temperatures, worker.model_logs, worker.model_mets, worker.marcs_value_keys, worker.marcs_models, worker.marcs_values
             except AttributeError:
                 with open(os.path.join(self.marcs_models_location), 'rb') as pickled_marcs_models:
-                    worker.marcs_models = pickle.load(pickled_marcs_models)
-                    marcs_models = worker.marcs_models
+                    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = pickle.load(pickled_marcs_models)
+                    worker.marcs_models, worker.model_temperatures, worker.model_logs, worker.model_mets, worker.marcs_value_keys, worker.marcs_values = marcs_models, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_values
         else:
             with open(os.path.join(self.marcs_models_location), 'rb') as pickled_marcs_models:
-                marcs_models = pickle.load(pickled_marcs_models)
-        return marcs_models
+                model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = pickle.load(pickled_marcs_models)
+        return model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
 
     def fit_lbl_abund(self, line_number: int) -> dict:
         """
@@ -2509,9 +2527,22 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     return chi_square
 
 
-def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
+def load_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, rotation1: float, abundances_dict1: dict, resolution1: float, line_list_path_trimmed: str,
-                           index: float, tsfitpy_configuration, m3dis_python_module) -> list:
+                           index: float, tsfitpy_configuration, m3dis_python_module, debug_mode, tsfitpy_compiler, n_workers) -> list:
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
+                      line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers,
+                      m3dis_python_module=m3dis_python_module)
+
+    if tsfitpy_compiler == "m3dis":
+        spectra.precompute_departure()
+        logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
+
+    spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
+
+    return spectra
+
+def create_and_fit_spectra(dask_client, spectra) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
     :param resolution1: resolution
@@ -2533,25 +2564,27 @@ def create_and_fit_spectra(dask_client, specname: str, teff: float, logg: float,
     #with open(tsfitpy_pickled_configuration_path, 'rb') as f:
     #    tsfitpy_configuration = pickle.load(f)
 
-    n_workers = tsfitpy_configuration.number_of_cpus
-    tsfitpy_compiler = tsfitpy_configuration.compiler.lower()
-    debug_mode = tsfitpy_configuration.debug_mode
+    #n_workers = tsfitpy_configuration.number_of_cpus
+    #tsfitpy_compiler = tsfitpy_configuration.compiler.lower()
+    #debug_mode = tsfitpy_configuration.debug_mode
 
-    if tsfitpy_configuration.number_of_cpus != 1:
-        tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
+    #if tsfitpy_configuration.number_of_cpus != 1:
+    #    tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
 
-    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
-                      line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
+    #spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
+    #                  line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
 
-    if tsfitpy_compiler == "m3dis":
-        spectra.precompute_departure()
-        logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
+    #if tsfitpy_compiler == "m3dis":
+    #    spectra.precompute_departure()
+    #    logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
 
-    spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
+    #spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
 
-    if debug_mode >= 0:
+    if spectra.debug_mode >= 0:
         print(f"Fitting {spectra.spec_name}")
         print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
+    #print("here", spectra)
+    #spectra = spectra.result()
 
     if spectra.dask_workers == 1:
         if spectra.fitting_mode == "all":
@@ -2594,16 +2627,17 @@ class MarcsGridSingleton:
     @classmethod
     def set_marcs_grids(cls, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, _marcs_models_location, marcs_values):
         if cls._marcs_models_location is None:
-            cls._model_temperatures = model_temperatures
-            cls._model_logs = model_logs
-            cls._model_mets = model_mets
-            cls._marcs_value_keys = marcs_value_keys
+            #cls._model_temperatures = model_temperatures
+            #cls._model_logs = model_logs
+            #cls._model_mets = model_mets
+            #cls._marcs_value_keys = marcs_value_keys
             #cls._marcs_models = marcs_models
             # pickle marcs models to marcs_models_location
             with open(_marcs_models_location, 'wb') as f:
-                pickle.dump(marcs_models, f)
-            cls._marcs_models_location = _marcs_models_location
-            cls._marcs_values = marcs_values
+                # dump all the data into the file, including temperatures, logs, mets, value keys, models and values
+                pickle.dump([model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values], f)
+            #cls._marcs_models_location = _marcs_models_location
+            #cls._marcs_values = marcs_values
         else:
             raise ValueError("MarcsGridSingleton is already set!")
 
@@ -3140,13 +3174,26 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
             module_path = os.path.join(tsfitpy_configuration.spectral_code_path, f"{tsfitpy_configuration.m3dis_python_package_name}/__init__.py")
             client.run(import_module_from_path, "m3dis", module_path)
 
+        # make MarcsGridSingleton available to all workers
+        tsfitpy_configuration_scattered = client.scatter(tsfitpy_configuration)
+
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
-            logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
-            future = create_and_fit_spectra(client, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                   rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx, tsfitpy_configuration, m3dis_python_module)
+            logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, "
+                          f"microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, "
+                          f"abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
+            spectra_future = client.submit(load_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
+                                           rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx,
+                                           tsfitpy_configuration_scattered, m3dis_python_module,
+                                           tsfitpy_configuration.debug_mode, tsfitpy_configuration.compiler.lower(),
+                                           tsfitpy_configuration.number_of_cpus)
+            futures.append(spectra_future)  # prepares to get values
+        all_spectra_futures = client.gather(futures)
+        futures = []
+        for idx, spectra in enumerate(all_spectra_futures):
+            future = create_and_fit_spectra(client, spectra)
             futures.append(future)  # prepares to get values
 
         if tsfitpy_configuration.debug_mode >= 0:
@@ -3162,9 +3209,14 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
             specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
             logging.debug(
                 f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
-            results.append(create_and_fit_spectra(None, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                                  rotation1, abundances_dict1, resolution1,
-                                                  line_list_path_trimmed, idx, tsfitpy_configuration, m3dis_python_module))
+
+            one_spectra = load_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
+                                           rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx,
+                                           tsfitpy_configuration, m3dis_python_module, tsfitpy_configuration.debug_mode,
+                                           tsfitpy_configuration.compiler.lower(), tsfitpy_configuration.number_of_cpus)
+
+            results.append(create_and_fit_spectra(None, one_spectra))
+            del one_spectra
 
     logging.debug("Finished fitting, now saving results")
 
