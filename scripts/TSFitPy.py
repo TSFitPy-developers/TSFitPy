@@ -949,11 +949,11 @@ class Spectra:
                 else:
                     guesses[:, 1][int(np.size(guesses[:, 1]) / 2)] = np.abs(max_macroturb) / 2
         if self.fit_rotation:
-            if np.median(guesses[:, 2]) <= 0.5:
+            if np.median(guesses[:, -1]) <= 0.5:
                 if np.abs(min_rotation) > np.abs(max_rotation):
-                    guesses[:, 2][int(np.size(guesses[:, 2]) / 2)] = np.abs(min_rotation) / 2
+                    guesses[:, -1][int(np.size(guesses[:, -1]) / 2)] = np.abs(min_rotation) / 2
                 else:
-                    guesses[:, 2][int(np.size(guesses[:, 2]) / 2)] = np.abs(max_rotation) / 2
+                    guesses[:, -1][int(np.size(guesses[:, -1]) / 2)] = np.abs(max_rotation) / 2
 
         return guesses, bounds
 
