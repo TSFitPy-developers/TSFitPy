@@ -1458,6 +1458,9 @@ class Spectra:
             else:
                 rotation = self.rotation
 
+            wave_result = self.wave_mod_orig[line_number]
+            flux_norm_result = self.flux_mod_orig[line_number]
+            flux_result = self.flux_orig[line_number]
         except IndexError:
             if not self.night_mode:
                 print(f"Line {line_number} not fitted, is your line in the spectrum?")
@@ -1467,10 +1470,10 @@ class Spectra:
             macroturb = 999999
             rotation = 999999
             chi_squared = 999999
+            self.wave_mod_orig[line_number] = np.array([])
+            self.flux_mod_orig[line_number] = np.array([])
+            self.flux_orig[line_number] = np.array([])
 
-        wave_result = self.wave_mod_orig[line_number]
-        flux_norm_result = self.flux_mod_orig[line_number]
-        flux_result = self.flux_orig[line_number]
 
         if np.size(wave_result) == 0 or teff >= 999998:
             if not self.night_mode:
@@ -1613,6 +1616,9 @@ class Spectra:
             else:
                 rotation = self.rotation
 
+            wave_result = self.wave_mod_orig[line_number]
+            flux_norm_result = self.flux_mod_orig[line_number]
+            flux_result = self.flux_orig[line_number]
         except IndexError:
             if not self.night_mode:
                 print(f"Line {line_number} not fitted, is your line in the spectrum?")
@@ -1622,10 +1628,10 @@ class Spectra:
             macroturb = 999999
             rotation = 999999
             chi_squared = 999999
+            self.wave_mod_orig[line_number] = np.array([])
+            self.flux_mod_orig[line_number] = np.array([])
+            self.flux_orig[line_number] = np.array([])
 
-        wave_result = self.wave_mod_orig[line_number]
-        flux_norm_result = self.flux_mod_orig[line_number]
-        flux_result = self.flux_orig[line_number]
 
         if np.size(wave_result) == 0 or logg >= 999998:
             if not self.night_mode:
@@ -1776,6 +1782,10 @@ class Spectra:
             else:
                 rotation = self.rotation
             chi_squared = res.fun
+
+            wave_result = self.wave_mod_orig[line_number]
+            flux_norm_result = self.flux_mod_orig[line_number]
+            flux_result = self.flux_orig[line_number]
         except IndexError as error:
             if not self.night_mode:
                 print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
@@ -1792,6 +1802,9 @@ class Spectra:
             rotation = 999999
             chi_squared = 999999
             fit_iterations = 0
+            self.wave_mod_orig[line_number] = np.array([])
+            self.flux_mod_orig[line_number] = np.array([])
+            self.flux_orig[line_number] = np.array([])
             # Create a dictionary with column names as keys and corresponding values
         result_dict = {
             "specname": self.spec_name,
@@ -1810,9 +1823,6 @@ class Spectra:
         result_dict["rotation"] = rotation
         result_dict["chi_squared"] = chi_squared
 
-        wave_result = self.wave_mod_orig[line_number]
-        flux_norm_result = self.flux_mod_orig[line_number]
-        flux_result = self.flux_orig[line_number]
 
         if np.size(wave_result) == 0:
             if not self.night_mode:
