@@ -237,73 +237,78 @@ class M3disCall(SyntheticSpectrumGenerator):
         return file_path
 
     def write_isotope_file(self):
-        if self.free_isotopes is None:
-            self.free_isotopes = solar_isotopes
-        elements_atomic_mass_number = self.free_isotopes.keys()
-
-        # elements now consists of e.g. '3.006'. we want to convert 3
-        elements_atomic_number = [int(float(element.split(".")[0])) for element in elements_atomic_mass_number]
-        # count the number of each element, such that we have e.g. 3: 2, 4: 1, 5: 1
-        elements_count = {element: elements_atomic_number.count(element) for element in elements_atomic_number}
-        # remove duplicates
-        elements_atomic_number_unique = set(elements_atomic_number)
-        separator = "_"  # separator between sections in the file from NIST
-
         atomic_weights_path = "scripts/atomicweights.dat"
         # check if file exists
         if not os.path.exists(atomic_weights_path):
             # add ../ to the path
             atomic_weights_path = os.path.join("../", atomic_weights_path)
 
-        atomic_weights = {}
-        with open(atomic_weights_path, "r") as file:
-            skip_section = True
-            current_element_atomic_number = 0
-            for line in file:
-                if line[0] != separator and skip_section:
-                    continue
-                elif line[0] == separator and skip_section:
-                    skip_section = False
-                    continue
-                elif line[0] != separator and not skip_section and current_element_atomic_number == 0:
-                    current_element_atomic_number_to_test = int(line.split()[0])
-                    if current_element_atomic_number_to_test not in elements_atomic_number_unique:
-                        skip_section = True
+        # check if file exists
+        if not os.path.exists(atomic_weights_path):
+            if self.free_isotopes is None:
+                self.free_isotopes = solar_isotopes
+            elements_atomic_mass_number = self.free_isotopes.keys()
+
+            # elements now consists of e.g. '3.006'. we want to convert 3
+            elements_atomic_number = [int(float(element.split(".")[0])) for element in elements_atomic_mass_number]
+            # count the number of each element, such that we have e.g. 3: 2, 4: 1, 5: 1
+            elements_count = {element: elements_atomic_number.count(element) for element in elements_atomic_number}
+            # remove duplicates
+            elements_atomic_number_unique = set(elements_atomic_number)
+            separator = "_"  # separator between sections in the file from NIST
+
+
+
+
+            atomic_weights = {}
+            with open(atomic_weights_path, "r") as file:
+                skip_section = True
+                current_element_atomic_number = 0
+                for line in file:
+                    if line[0] != separator and skip_section:
                         continue
-                    current_element_atomic_number = current_element_atomic_number_to_test
-                    atomic_weights[current_element_atomic_number] = {}
-                    # remove any spaces and anything after (
-                    atomic_weights[current_element_atomic_number][int(line[8:12].replace(" ", ""))] = \
-                    line[13:32].replace(" ", "").split("(")[0]
-                elif line[0] != separator and not skip_section and current_element_atomic_number != 0:
-                    atomic_weights[current_element_atomic_number][int(line[8:12].replace(" ", ""))] = atomic_weight = \
-                    line[13:32].replace(" ", "").split("(")[0]
-                elif line[0] == separator and not skip_section and current_element_atomic_number != 0:
-                    current_element_atomic_number = 0
+                    elif line[0] == separator and skip_section:
+                        skip_section = False
+                        continue
+                    elif line[0] != separator and not skip_section and current_element_atomic_number == 0:
+                        current_element_atomic_number_to_test = int(line.split()[0])
+                        if current_element_atomic_number_to_test not in elements_atomic_number_unique:
+                            skip_section = True
+                            continue
+                        current_element_atomic_number = current_element_atomic_number_to_test
+                        atomic_weights[current_element_atomic_number] = {}
+                        # remove any spaces and anything after (
+                        atomic_weights[current_element_atomic_number][int(line[8:12].replace(" ", ""))] = \
+                        line[13:32].replace(" ", "").split("(")[0]
+                    elif line[0] != separator and not skip_section and current_element_atomic_number != 0:
+                        atomic_weights[current_element_atomic_number][int(line[8:12].replace(" ", ""))] = atomic_weight = \
+                        line[13:32].replace(" ", "").split("(")[0]
+                    elif line[0] == separator and not skip_section and current_element_atomic_number != 0:
+                        current_element_atomic_number = 0
 
-        """
-        format:
-        Li    2
-           6   6.0151   0.0759
-           7   7.0160   0.9241
-        """
+            """
+            format:
+            Li    2
+               6   6.0151   0.0759
+               7   7.0160   0.9241
+            """
 
-        # open file
-        file_path = os.path.join(self.tmp_dir, "isotopes")
-        with open(file_path, "w") as file:
-            # write element, then number of isotopes. next lines are isotope mass and abundance
-            current_element_atomic_number = 0
-            for element, isotope in self.free_isotopes.items():
-                element_atomic_number = int(float(element.split(".")[0]))
-                element_mass_number = int(float(element.split(".")[1]))
-                if current_element_atomic_number != element_atomic_number:
-                    # elements now consists of e.g. '3.006'. we want to convert 3 to and 6
-                    current_element_atomic_number = element_atomic_number
+            # open file
+            file_path = os.path.join(self.tmp_dir, "isotopes")
+            with open(file_path, "w") as file:
+                # write element, then number of isotopes. next lines are isotope mass and abundance
+                current_element_atomic_number = 0
+                for element, isotope in self.free_isotopes.items():
+                    element_atomic_number = int(float(element.split(".")[0]))
+                    element_mass_number = int(float(element.split(".")[1]))
+                    if current_element_atomic_number != element_atomic_number:
+                        # elements now consists of e.g. '3.006'. we want to convert 3 to and 6
+                        current_element_atomic_number = element_atomic_number
+                        file.write(
+                            f"{periodic_table[element_atomic_number]:<5}{elements_count[element_atomic_number]:>2}\n")
+
                     file.write(
-                        f"{periodic_table[element_atomic_number]:<5}{elements_count[element_atomic_number]:>2}\n")
-
-                file.write(
-                    f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>12.8f} {isotope:>12.8f}\n")
+                        f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>12.8f} {isotope:>12.8f}\n")
         return file_path
 
 
