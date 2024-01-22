@@ -562,86 +562,98 @@ class M3disCall(SyntheticSpectrumGenerator):
             f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
 
         self.use_marcs_directly = False
+        #TODO: when checking if model already exists, there is a certain precision loss
         if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
                 self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
-            # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
-            turbulence_low = 0.0
-            microturbulence = self.turbulent_velocity
-            for i in range(len(possible_turbulence)):
-                if self.turbulent_velocity > possible_turbulence[i]:
-                    turbulence_low = possible_turbulence[i]
-                    place = i
-            turbulence_high = possible_turbulence[place + 1]
-
-            self.turbulent_velocity = turbulence_low
-            marcs_model_list_low = self._generate_model_atmosphere(run_ts_interpolator=False)
-            if marcs_model_list_low["errors"] is not None:
-                raise ValueError(f"{marcs_model_list_low['errors']}")
-            tau500_low, temp_low, pe_low, vmic_low, density_low, depth_low = self.interpolate_m3dis_atmosphere(marcs_model_list_low["marcs_model_list"])
-            self.turbulent_velocity = turbulence_high
-
-            marcs_model_list_high = self._generate_model_atmosphere(run_ts_interpolator=False)
-            if marcs_model_list_high["errors"] is not None:
-                raise ValueError(f"{marcs_model_list_high['errors']}")
-            tau500_high, temp_high, pe_high, vmic_high, density_high, depth_high = self.interpolate_m3dis_atmosphere(marcs_model_list_high["marcs_model_list"])
-            atmosphere_properties = marcs_model_list_high
-            self.turbulent_velocity = microturbulence
-
-            # interpolate and find a model atmosphere for the microturbulence
-            fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
-            fxlow = 1.0 - fxhigh
-
-            tau500_interp = tau500_low * fxlow + tau500_high * fxhigh
-            temp_interp = temp_low * fxlow + temp_high * fxhigh
-            pe_interp = pe_low * fxlow + pe_high * fxhigh
-            vmic_interp = vmic_low * fxlow + vmic_high * fxhigh
-            density_interp = density_low * fxlow + density_high * fxhigh
-            depth_interp = depth_low * fxlow + depth_high * fxhigh
-
-            density_interp, depth_interp, pe_interp, tau500_interp, temp_interp, vmic_interp = (
-                self.convert_atmo_to_equidistant_one(density_interp, depth_interp, pe_interp, tau500_interp, temp_interp, vmic_interp))
-
-            # print(interp_model_name)
             self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
                                                                                              self.metallicity,
                                                                                              self.turbulent_velocity)
+            # check if the model exists
             interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+            if not os.path.exists(interp_model_name):
+                # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
+                turbulence_low = 0.0
+                microturbulence = self.turbulent_velocity
+                for i in range(len(possible_turbulence)):
+                    if self.turbulent_velocity > possible_turbulence[i]:
+                        turbulence_low = possible_turbulence[i]
+                        place = i
+                turbulence_high = possible_turbulence[place + 1]
 
-            self.save_m3dis_model(interp_model_name, depth_interp, temp_interp, pe_interp, density_interp, vmic_interp)
+                self.turbulent_velocity = turbulence_low
+                marcs_model_list_low = self._generate_model_atmosphere(run_ts_interpolator=False)
+                if marcs_model_list_low["errors"] is not None:
+                    raise ValueError(f"{marcs_model_list_low['errors']}")
+                tau500_low, temp_low, pe_low, vmic_low, density_low, depth_low = self.interpolate_m3dis_atmosphere(marcs_model_list_low["marcs_model_list"])
+                self.turbulent_velocity = turbulence_high
+
+                marcs_model_list_high = self._generate_model_atmosphere(run_ts_interpolator=False)
+                if marcs_model_list_high["errors"] is not None:
+                    raise ValueError(f"{marcs_model_list_high['errors']}")
+                tau500_high, temp_high, pe_high, vmic_high, density_high, depth_high = self.interpolate_m3dis_atmosphere(marcs_model_list_high["marcs_model_list"])
+                atmosphere_properties = marcs_model_list_high
+                self.turbulent_velocity = microturbulence
+
+                # interpolate and find a model atmosphere for the microturbulence
+                fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
+                fxlow = 1.0 - fxhigh
+
+                tau500_interp = tau500_low * fxlow + tau500_high * fxhigh
+                temp_interp = temp_low * fxlow + temp_high * fxhigh
+                pe_interp = pe_low * fxlow + pe_high * fxhigh
+                vmic_interp = vmic_low * fxlow + vmic_high * fxhigh
+                density_interp = density_low * fxlow + density_high * fxhigh
+                depth_interp = depth_low * fxlow + depth_high * fxhigh
+
+                density_interp, depth_interp, pe_interp, tau500_interp, temp_interp, vmic_interp = (
+                    self.convert_atmo_to_equidistant_one(density_interp, depth_interp, pe_interp, tau500_interp, temp_interp, vmic_interp))
+
+                # print(interp_model_name)
+
+                interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+                self.save_m3dis_model(interp_model_name, depth_interp, temp_interp, pe_interp, density_interp, vmic_interp)
 
 
         elif not flag_dont_interp_microturb and self.turbulent_velocity > 2.0:  # not enough models to interp if higher than 2
             microturbulence = self.turbulent_velocity  # just use 2.0 for the model if between 2 and 3
             self.turbulent_velocity = 2.0
-            marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
-            atmosphere_properties = marcs_model_list
-            if marcs_model_list["errors"] is not None:
-                raise ValueError(f"{marcs_model_list['errors']}")
-            tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
             self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
                                                                                              self.metallicity,
                                                                                              self.turbulent_velocity)
+            # check if the model exists
             interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+            if not os.path.exists(interp_model_name):
+                marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+                atmosphere_properties = marcs_model_list
+                if marcs_model_list["errors"] is not None:
+                    raise ValueError(f"{marcs_model_list['errors']}")
+                tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
 
-            self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+                interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+                self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
             self.turbulent_velocity = microturbulence
 
         elif not flag_dont_interp_microturb and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.:  # not enough models to interp if lower than 1 and t_eff > 3900
             microturbulence = self.turbulent_velocity
             self.turbulent_velocity = 1.0
-            marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
-            atmosphere_properties = marcs_model_list
-            if marcs_model_list["errors"] is not None:
-                raise ValueError(f"{marcs_model_list['errors']}")
-            tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
             self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
                                                                                              self.metallicity,
                                                                                              self.turbulent_velocity)
+            # check if the model exists
             interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+            if not os.path.exists(interp_model_name):
+                marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+                atmosphere_properties = marcs_model_list
+                if marcs_model_list["errors"] is not None:
+                    raise ValueError(f"{marcs_model_list['errors']}")
+                tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
 
-            self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+                interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+
+                self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
             self.turbulent_velocity = microturbulence
-
 
         elif flag_dont_interp_microturb:
             if self.log_g < 3:
@@ -658,14 +670,17 @@ class M3disCall(SyntheticSpectrumGenerator):
                 #self.marcs_model_name = interp_model_name
                 self.use_marcs_directly = True
             else:
-                tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
                 self.marcs_model_name = "atmos.marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
                                                                                                  self.metallicity,
                                                                                                  self.turbulent_velocity)
+                # check if the model exists
                 interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
+                if not os.path.exists(interp_model_name):
+                    tau500, temp, pe, vmic, density, depth = self.interpolate_m3dis_atmosphere(marcs_model_list["marcs_model_list"])
 
-                self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
+                    interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
 
+                    self.save_m3dis_model(interp_model_name, depth, temp, pe, density, vmic)
             if self.log_g < 3:
                 self.turbulent_velocity = microturbulence
         else:
