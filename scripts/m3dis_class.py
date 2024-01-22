@@ -242,9 +242,9 @@ class M3disCall(SyntheticSpectrumGenerator):
         if not os.path.exists(atomic_weights_path):
             # add ../ to the path
             atomic_weights_path = os.path.join("../", atomic_weights_path)
-
+        m3d_isotopes_file_path = os.path.join(self.tmp_dir, "isotopes")
         # check if file exists
-        if not os.path.exists(atomic_weights_path):
+        if not os.path.exists(m3d_isotopes_file_path):
             if self.free_isotopes is None:
                 self.free_isotopes = solar_isotopes
             elements_atomic_mass_number = self.free_isotopes.keys()
@@ -294,8 +294,8 @@ class M3disCall(SyntheticSpectrumGenerator):
             """
 
             # open file
-            file_path = os.path.join(self.tmp_dir, "isotopes")
-            with open(file_path, "w") as file:
+
+            with open(m3d_isotopes_file_path, "w") as file:
                 # write element, then number of isotopes. next lines are isotope mass and abundance
                 current_element_atomic_number = 0
                 for element, isotope in self.free_isotopes.items():
@@ -309,7 +309,7 @@ class M3disCall(SyntheticSpectrumGenerator):
 
                     file.write(
                         f"{int(element_mass_number):>4} {float(atomic_weights[element_atomic_number][element_mass_number]):>12.8f} {isotope:>12.8f}\n")
-        return file_path
+        return m3d_isotopes_file_path
 
 
     def call_m3dis(self, skip_linelist=False, use_precomputed_depart=False):
