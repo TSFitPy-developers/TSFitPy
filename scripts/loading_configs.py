@@ -47,7 +47,8 @@ class SpectraParameters:
                          'feh': ['met', 'metallicity', 'metallicityfeh', 'metallicityfeh', 'mh', 'mh', 'mh'],
                          'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini'],
                          'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrumname', 'spectrumname'],
-                         'resolution': ['res', 'resolution', 'resolvingpower', 'resolvingpower', 'r'],}
+                         'resolution': ['res', 'resolution', 'resolvingpower', 'resolvingpower', 'r'],
+                         'snr': ['snr', 'signaltonoiseratio'],}
 
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
@@ -180,11 +181,17 @@ class SpectraParameters:
             resolution_list = self.spectra_parameters_df['resolution'].values
         else:
             resolution_list = np.zeros(len(specname_list))
+        # if snr is in the columns, add it
+        if 'snr' in self.spectra_parameters_df.columns:
+            snr_list = self.spectra_parameters_df['snr'].values
+        else:
+            snr_list = np.zeros(len(specname_list))
+
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
         abundance_list = self._get_abundance_list()
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list, resolution_list), axis=1)
+        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list, resolution_list, snr_list), axis=1)
 
         return stacked_parameters
 

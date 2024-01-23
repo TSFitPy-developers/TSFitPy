@@ -188,6 +188,8 @@ This is a short version of the installation + running the code just to test that
       - Order doesn't matter, except for the first being a name of the spectra (the code reads the header and then matches the values)
       - Use `;` for comments
       - IMPORTANT!!! Just saying `Mg` would presume that you want `A(Mg)` and not `[Mg/Fe]`
+      - You can also add column `snr`, which will be used to estimate an error using formula `sigma = 1/snr`, if no error is provided in the spectra
+        - Pass `0` to use default error of `0.01`
 - Now you can run the fitting. To do so, you need to run the `main.py` script. You can do by running:
   - `python3 main.py ./input_files/tsfitpy_input_configuration.cfg` - this will run the fitting on your local computer
   - This will run the job and save output in its unique folder in `./output_files/`

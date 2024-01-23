@@ -272,7 +272,7 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
-                 rotation: float, abundances_dict: dict, resolution: float, line_list_path_trimmed: str, index_temp_dir: float,
+                 rotation: float, abundances_dict: dict, resolution: float, snr: float, line_list_path_trimmed: str, index_temp_dir: float,
                  tsfitpy_config, n_workers=1, m3dis_python_module=None):
         # Default values
         self.m3dis_python_module = m3dis_python_module  # python module for reading m3dis output
@@ -477,6 +477,7 @@ class Spectra:
             self.rotation: float = float(rotation)  # rotation km/s, constant for all stars if not fitted
         if resolution != 0.0 and resolution is not None and not np.isnan(resolution):
             self.resolution: float = float(resolution)  # resolution coming from resolution, if given input here:  central lambda / FWHM
+        self.snr: float = float(snr)  # SNR of the spectra, used for error sigma calculation
 
         self.temp_dir: str = os.path.join(self.global_temp_dir, self.spec_name + str(index_temp_dir),
                                           '')  # temp directory, including date and name of the star fitted
@@ -501,15 +502,24 @@ class Spectra:
         self.flux_fitted_dict = {}
 
     def load_observed_spectra(self):
+        """
+        Loads the observed spectra and sorts it according to the wavelength. Loads the error sigma if given, otherwise
+        sets it to 0.01. Error sigma is converted to variance. It is used in the chi squared calculation.
+        """
         wave_ob, flux_ob = np.loadtxt(self.spec_path, usecols=(0, 1), unpack=True, dtype=float)  # observed spectra
         try:
             # if error sigma is given, load it
             error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
         except (IndexError, ValueError) as e:
-            # if no error variance is given, set it to 1
-            error_obs_variance = np.ones(len(wave_ob)) * 0.0001
-            if not self.night_mode:
-                print("No error sigma given in 3rd column, setting to 0.01")
+            # check if we have SNR
+            if self.snr is not None and not np.isnan(self.snr) and self.snr >= 0:
+                # convert to sigma
+                error_obs_variance = np.full(len(wave_ob), np.square(1 / self.snr))
+            else:
+                # if no error variance is given, set it to 1
+                error_obs_variance = np.ones(len(wave_ob)) * 0.0001
+                if not self.night_mode:
+                    print("No error sigma given in 3rd column, setting to 0.01")
         # sort the observed spectra according to wavelength using numpy argsort
         sorted_obs_wavelength_index = np.argsort(wave_ob)
         wave_ob, flux_ob = wave_ob[sorted_obs_wavelength_index], flux_ob[sorted_obs_wavelength_index]
@@ -2525,9 +2535,9 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 
 def load_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
-                           macroturb: float, rotation1: float, abundances_dict1: dict, resolution1: float, line_list_path_trimmed: str,
+                           macroturb: float, rotation1: float, abundances_dict1: dict, resolution1: float, snr1: float, line_list_path_trimmed: str,
                            index: float, tsfitpy_configuration, m3dis_python_module, debug_mode, tsfitpy_compiler, n_workers) -> list:
-    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
+    spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1, snr1,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers,
                       m3dis_python_module=m3dis_python_module)
 
@@ -2612,46 +2622,14 @@ def create_and_fit_spectra(dask_client, spectra) -> list:
     del spectra
     return result
 
-class MarcsGridSingleton:
-    _model_temperatures = None
-    _model_logs =         None
-    _model_mets =         None
-    _marcs_value_keys =   None
-    _marcs_models =       None
-    _marcs_models_location =       None
-    _marcs_values =       None
-
-    @classmethod
-    def set_marcs_grids(cls, model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, _marcs_models_location, marcs_values):
-        if cls._marcs_models_location is None:
-            #cls._model_temperatures = model_temperatures
-            #cls._model_logs = model_logs
-            #cls._model_mets = model_mets
-            #cls._marcs_value_keys = marcs_value_keys
-            #cls._marcs_models = marcs_models
-            # pickle marcs models to marcs_models_location
-            with open(_marcs_models_location, 'wb') as f:
-                # dump all the data into the file, including temperatures, logs, mets, value keys, models and values
-                pickle.dump([model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values], f)
-            #cls._marcs_models_location = _marcs_models_location
-            #cls._marcs_values = marcs_values
-        else:
-            raise ValueError("MarcsGridSingleton is already set!")
-
-    @classmethod
-    def get_marcs_grids(cls):
-        if cls._marcs_models_location is None:
-            raise ValueError("big_data hasn't been set yet!")
-        return cls._model_temperatures, cls._model_logs, cls._model_mets, cls._marcs_value_keys, cls._marcs_models, cls._marcs_models_location, cls._marcs_values
-
-def run_tsfitpy(output_folder_title, config_location, spectra_location=None):
+def run_tsfitpy(output_folder_title: str, config_location: str, spectra_location=None):
     # read the configuration file
     tsfitpy_configuration = TSFitPyConfig(config_location, output_folder_title, spectra_location)
     tsfitpy_configuration.load_config()
     tsfitpy_configuration.validate_input()
     launch_tsfitpy_with_config(tsfitpy_configuration, output_folder_title, config_location)
 
-def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_folder_title, config_location):
+def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_folder_title: str, config_location: str):
     if tsfitpy_configuration.debug_mode >= 0:
         print("\nIMPORTANT UPDATE:")
         print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma "
@@ -3146,18 +3124,14 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
         print("Finished trimming linelist")
 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(tsfitpy_configuration.model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
-    #tsfitpy_configuration.model_temperatures = model_temperatures
-    #tsfitpy_configuration.model_logs = model_logs
-    #tsfitpy_configuration.model_mets = model_mets
-    #tsfitpy_configuration.marcs_value_keys = marcs_value_keys
-    #tsfitpy_configuration.marcs_models = marcs_models
-    #tsfitpy_configuration.marcs_values = marcs_values
+    pickled_marcs_models_location = os.path.join(tsfitpy_configuration.temporary_directory_path, "marcs_models.pkl")
 
-    marcs_models_location = os.path.join(tsfitpy_configuration.temporary_directory_path, "marcs_models.pkl")
+    with open(pickled_marcs_models_location, 'wb') as f:
+        # dump all the data into the file, including temperatures, logs, mets, value keys, models and values
+        pickle.dump([model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values], f)
+    # clear the variables
+    del model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
 
-    # create the big data object
-    MarcsGridSingleton.set_marcs_grids(model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models,
-                                       marcs_models_location, marcs_values)
     if tsfitpy_configuration.nlte_flag:
         tsfitpy_configuration.aux_file_length_dict = {}
 
@@ -3196,12 +3170,12 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
         futures = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
             # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
-            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
+            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1, snr1 = one_spectra_parameters
             logging.debug(f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, "
-                          f"microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, "
+                          f"microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, snr1: {snr1},"
                           f"abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
             spectra_future = client.submit(load_spectra, specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                           rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx,
+                                           rotation1, abundances_dict1, resolution1, snr1, line_list_path_trimmed, idx,
                                            tsfitpy_configuration_scattered, m3dis_python_module,
                                            tsfitpy_configuration.debug_mode, tsfitpy_configuration.compiler.lower(),
                                            tsfitpy_configuration.number_of_cpus)
@@ -3222,12 +3196,12 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
     else:
         results = []
         for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
-            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
+            specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1, snr1 = one_spectra_parameters
             logging.debug(
-                f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}")
+                f"specname1: {specname1}, rv1: {rv1}, teff1: {teff1}, logg1: {logg1}, met1: {met1}, microturb1: {microturb1}, macroturb1: {macroturb1}, rotation1: {rotation1}, abundances_dict1: {abundances_dict1}, resolution1: {resolution1}, snr1: {snr1},")
 
             one_spectra = load_spectra(specname1, teff1, logg1, rv1, met1, microturb1, macroturb1,
-                                           rotation1, abundances_dict1, resolution1, line_list_path_trimmed, idx,
+                                           rotation1, abundances_dict1, resolution1, snr1, line_list_path_trimmed, idx,
                                            tsfitpy_configuration, m3dis_python_module, tsfitpy_configuration.debug_mode,
                                            tsfitpy_configuration.compiler.lower(), tsfitpy_configuration.number_of_cpus)
 
