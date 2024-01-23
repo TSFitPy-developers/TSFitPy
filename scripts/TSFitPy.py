@@ -9,6 +9,7 @@ from distributed import get_worker
 from scipy.optimize import minimize, root_scalar
 from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
     apply_doppler_correction, create_segment_file, import_module_from_path
+from scripts.model_atom_class import ModelAtom
 from scripts.solar_abundances import periodic_table
 from scripts.turbospectrum_class_nlte import TurboSpectrum
 from scripts.m3dis_class import M3disCall
@@ -1016,7 +1017,7 @@ class Spectra:
                                     segment_file=self.segment_file, line_mask_file=self.linemask_file)
         return spectrumclass.synthesize_spectra()
 
-    def create_scg_object(self, marcs_values_tuple) -> SyntheticSpectrumGenerator:
+    def create_scg_object(self, marcs_values_tuple, segment_index=None) -> SyntheticSpectrumGenerator:
         """
         Creates the synthetic spectrum generator object depending whether TS or M3DIS is used (or other in the future?)
         :param marcs_models: unpickled marcs models
@@ -1026,13 +1027,18 @@ class Spectra:
         if marcs_models is None:
             marcs_models = self.marcs_models
         if self.compiler.lower() == "m3dis":
+            if self.nlte_flag and self.m3dis_iterations_max_precompute == 0 and self.m3dis_iterations_max == 0:
+                model_atom_path = os.path.join(self.model_atom_path, f"{segment_index}", "")
+            else:
+                model_atom_path = self.model_atom_path
+
             scg = M3disCall(
                 m3dis_path=self.spectral_code_path,
                 interpol_path=self.interpol_path,
                 line_list_paths=self.line_list_path_trimmed,
                 marcs_grid_path=self.model_atmosphere_grid_path,
                 marcs_grid_list=self.model_atmosphere_list,
-                model_atom_path=self.model_atom_path,
+                model_atom_path=model_atom_path,
                 departure_file_path=self.departure_file_path,
                 aux_file_length_dict=self.aux_file_length_dict,
                 model_temperatures=model_temperatures,
@@ -1375,10 +1381,11 @@ class Spectra:
         # Hopefully that will be enough to overshoot the chi_sqr_to_fit
         end_abundance = start_abundance + sigmas_upper_limit + 3
 
-        scg = self.create_scg_object(self._get_marcs_models())
-
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+
+        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number],
                   self.line_ends_sorted[line_number])
@@ -1426,7 +1433,7 @@ class Spectra:
         param_guess = np.array([[self.teff + self.guess_plus_minus_neg_teff], [self.teff + self.guess_plus_minus_pos_teff]])
         min_bounds = [(self.bound_min_teff, self.bound_max_teff)]
 
-        scg = self.create_scg_object(self._get_marcs_models())
+        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
 
         scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
@@ -1545,10 +1552,11 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        scg = self.create_scg_object(self._get_marcs_models())
-
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+
+        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
         scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
@@ -1584,7 +1592,7 @@ class Spectra:
         param_guess = np.array([[self.logg + self.guess_plus_minus_neg_logg], [self.logg + self.guess_plus_minus_pos_logg]])
         min_bounds = [(self.bound_min_logg, self.bound_max_logg)]
 
-        scg = self.create_scg_object(self._get_marcs_models())
+        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
 
         scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
@@ -1723,10 +1731,11 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        scg = self.create_scg_object(self._get_marcs_models())
-
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+
+        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
         scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
@@ -1842,13 +1851,14 @@ class Spectra:
         """
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        ts = self.create_scg_object(self._get_marcs_models())
-
-        start = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+        segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+
+        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+
         if not self.night_mode:
-            print(self.line_centers_sorted[line_number], self.seg_begins[start], self.seg_ends[start])
-        ts.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, start)]
+            print(self.line_centers_sorted[line_number], self.seg_begins[segment_index], self.seg_ends[segment_index])
+        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
         param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
@@ -1856,7 +1866,7 @@ class Spectra:
         self.flux_mod_orig[line_number] = np.array([])
         self.flux_orig[line_number] = np.array([])
 
-        function_arguments = (ts, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[start], self.seg_ends[start], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
+        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
         minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_vmic, 'fatol': self.fatol_vmic, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         if not self.night_mode:
@@ -3134,6 +3144,26 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
                             # delete the file
                             os.remove(os.path.join(line_list_path_trimmed, folder, file))
                             #print(os.path.join(line_list_path_trimmed, folder, file))
+        # also want to precut model atom if LTE, but using model atom
+        if tsfitpy_configuration.nlte_flag and tsfitpy_configuration.iterations_max_precompute == 0 and tsfitpy_configuration.iterations_max == 0:
+            # if NLTE, then do nothing
+            # if LTE, then precut model atom
+            # can only do 1 element for now
+            # go through all segments
+            for segment_index, (segment_begin, segment_end) in enumerate(zip(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)):
+                # load model atom
+                model_atom = ModelAtom(None, tsfitpy_configuration.model_atom_file_dict[tsfitpy_configuration.nlte_elements[0]])
+                model_atom.read_model_atom(tsfitpy_configuration.model_atoms_path)
+                # cut model atom
+                model_atom.leave_only_bb_transitions_between_wavelength(segment_begin, segment_end)
+                # lets create new temporary directory, where for each segment we will save model atom
+                temp_dir_model_atom = os.path.join(tsfitpy_configuration.temporary_directory_path, "model_atom", f"{segment_index}", "")
+                # create directory
+                create_dir(temp_dir_model_atom)
+                # save model atom
+                model_atom.write_model_atom(temp_dir_model_atom)
+            # change the path of config's model atom file to temporary
+            tsfitpy_configuration.model_atoms_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "model_atom", "")
 
     if tsfitpy_configuration.debug_mode >= 0:
         print("Finished trimming linelist")

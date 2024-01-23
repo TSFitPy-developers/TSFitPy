@@ -570,14 +570,14 @@ class ModelAtom:
                 collisional_transition.write_to_file(file)
             file.write(f"END\n")
 
-    def read_model_atom(self):
+    def read_model_atom(self, path):
         try:
-            self.read_model_atom_mb_version()
+            self.read_model_atom_mb_version(path)
         except ValueError:
-            self.read_model_atom_formato2_version()
+            self.read_model_atom_formato2_version(path)
 
-    def read_model_atom_mb_version(self):
-        with open(self.atom_filename, "r") as file:
+    def read_model_atom_mb_version(self, path):
+        with open(os.path.join(path, self.atom_filename), "r") as file:
             lines = file.readlines()
         # read lines skipping any comments (starting with *) until * EC
 
@@ -828,8 +828,8 @@ class ModelAtom:
             else:
                 line_index += 1
 
-    def read_model_atom_formato2_version(self):
-        with open(self.atom_filename, "r") as file:
+    def read_model_atom_formato2_version(self, path):
+        with open(os.path.join(path, self.atom_filename)) as file:
             lines = file.readlines()
         # read lines skipping any comments (starting with *) until * EC
         line_index = 0
