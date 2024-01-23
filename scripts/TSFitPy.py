@@ -864,8 +864,6 @@ class Spectra:
         initial_guess = np.linspace(min_guess + np.random.random() * guess_difference,
                                     max_guess - np.random.random() * guess_difference, length + 1)
 
-        #print(initial_guess, minim_bounds)
-
         return initial_guess, minim_bounds
 
     def get_rv_macro_rotation_guess(self, min_rv: float=None, max_rv: float=None, min_macroturb: float=None,
@@ -1007,7 +1005,7 @@ class Spectra:
     def create_scg_object(self, marcs_values_tuple, segment_index=None) -> SyntheticSpectrumGenerator:
         """
         Creates the synthetic spectrum generator object depending whether TS or M3DIS is used (or other in the future?)
-        :param marcs_models: unpickled marcs models
+        :param marcs_values_tuple: unpickled marcs models and other values
         :return: SyntheticSpectrumGenerator object
         """
         model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = marcs_values_tuple
@@ -1467,6 +1465,9 @@ class Spectra:
             self.wavelength_fitted_dict[line_number] = np.array([])
             self.flux_norm_fitted_dict[line_number] = np.array([])
             self.flux_fitted_dict[line_number] = np.array([])
+            wave_result = np.array([])
+            flux_norm_result = np.array([])
+            flux_result = np.array([])
 
 
         if np.size(wave_result) == 0 or teff >= 999998:
@@ -1480,7 +1481,7 @@ class Spectra:
                 teff_error = np.abs(self.lbl_teff_find_sigma_error(line_number, doppler_fit,
                                                                    macroturb, rotation,
                                                                    microturb,
-                                                                   offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                                   offset_chisqr=(chi_squared + np.square(self.teff_error_sigma)),
                                                                    bound_min_teff=teff,
                                                                    bound_max_teff=teff + 1000) - teff)
             except ValueError as err:
@@ -1626,6 +1627,9 @@ class Spectra:
             self.wavelength_fitted_dict[line_number] = np.array([])
             self.flux_norm_fitted_dict[line_number] = np.array([])
             self.flux_fitted_dict[line_number] = np.array([])
+            wave_result = np.array([])
+            flux_norm_result = np.array([])
+            flux_result = np.array([])
 
 
         if np.size(wave_result) == 0 or logg >= 999998:
@@ -1640,7 +1644,7 @@ class Spectra:
                 logg_error = np.abs(self.find_logg_error_one_line(line_number, doppler_fit,
                                                            macroturb, rotation,
                                                            microturb,
-                                                           offset_chisqr=(res.fun + np.square(self.teff_error_sigma)),
+                                                           offset_chisqr=(chi_squared + np.square(self.teff_error_sigma)),
                                                            bound_min_teff=logg,
                                                            bound_max_teff=logg + 1) - logg)
             except ValueError as err:
@@ -1651,7 +1655,7 @@ class Spectra:
                                                                macroturb, rotation,
                                                                microturb,
                                                                offset_chisqr=(
-                                                                           res.fun + np.square(self.teff_error_sigma)),
+                                                                           chi_squared + np.square(self.teff_error_sigma)),
                                                                bound_min_teff=logg - 1,
                                                                bound_max_teff=logg) - logg)
                 except ValueError as err:
@@ -1801,6 +1805,9 @@ class Spectra:
             self.wavelength_fitted_dict[line_number] = np.array([])
             self.flux_norm_fitted_dict[line_number] = np.array([])
             self.flux_fitted_dict[line_number] = np.array([])
+            wave_result = np.array([])
+            flux_norm_result = np.array([])
+            flux_result = np.array([])
             # Create a dictionary with column names as keys and corresponding values
         result_dict = {
             "specname": self.spec_name,
@@ -2079,7 +2086,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     return chi_square
 
 
-def lbl_teff_error(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
+def lbl_teff_error(param: float, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
                           temp_directory: str, rv: float, vmac: float, rotation: float,
                           vmic: float, offset_chisqr: float) -> float:
     """
@@ -2536,7 +2543,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
 def load_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
                            macroturb: float, rotation1: float, abundances_dict1: dict, resolution1: float, snr1: float, line_list_path_trimmed: str,
-                           index: float, tsfitpy_configuration, m3dis_python_module, debug_mode, tsfitpy_compiler, n_workers) -> list:
+                           index: float, tsfitpy_configuration, m3dis_python_module, debug_mode, tsfitpy_compiler, n_workers) -> Spectra:
     spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1, snr1,
                       line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers,
                       m3dis_python_module=m3dis_python_module)
@@ -2549,22 +2556,11 @@ def load_spectra(specname: str, teff: float, logg: float, rv: float, met: float,
 
     return spectra
 
-def create_and_fit_spectra(dask_client, spectra) -> list:
+def create_and_fit_spectra(dask_client: Client, spectra: Spectra) -> list:
     """
     Creates spectra object and fits based on requested fitting mode
-    :param resolution1: resolution
     :param dask_client: Dask client
-    :param specname: Name of the textfile
-    :param teff: Teff in K
-    :param logg: logg in dex
-    :param rv: radial velocity (km/s)
-    :param met: metallicity (doesn't matter what if fitting for Fe)
-    :param microturb: Microturbulence if given (None is not known or fitted)
-    :param macroturb: Macroturbulence if given (None is not known or fitted)
-    :param rotation1: Rotation if given (None is not known or fitted)
-    :param abundances_dict1: Abundances if given (None is not known or fitted)
-    :param line_list_path_trimmed: Path to the root of the trimmed line list
-    :param input_abundance: Input abundance for grid calculation for lbl quick (doesn't matter what for other stuff)
+    :param spectra: Spectra object
     :return: result of the fit with the best fit parameters and chi squared
     """
     # Load TS configuration
