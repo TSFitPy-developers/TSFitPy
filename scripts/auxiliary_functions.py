@@ -90,11 +90,11 @@ def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
 
 
-def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
+def create_segment_file(segment_size: float, line_begins_list: np.ndarray[float], line_ends_list: np.ndarray[float]) -> tuple[np.ndarray[float], np.ndarray[float]]:
     segments_left = []
     segments_right = []
-    start = line_begins_list[0] - segment_size
-    end = line_ends_list[0] + segment_size
+    start: float = line_begins_list[0] - segment_size
+    end: float = line_ends_list[0] + segment_size
 
     for (line_left, line_right) in zip(line_begins_list, line_ends_list):
         if line_left > end + segment_size:
