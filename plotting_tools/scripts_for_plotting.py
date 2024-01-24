@@ -548,7 +548,8 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
 
 def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
                               hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
-                              nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False):
+                              nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False,
+                              m3dis_package_name="m3dis"):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -608,7 +609,7 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
-    module_path = os.path.join(m3dis_paths["m3dis_path"], "m3dis/__init__.py")
+    module_path = os.path.join(m3dis_paths["m3dis_path"], f"{m3dis_package_name}/__init__.py")
     m3dis_python_module = import_module_from_path("m3dis", module_path)
 
     m3dis = M3disCall(
