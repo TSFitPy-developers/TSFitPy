@@ -512,7 +512,7 @@ class Spectra:
             error_obs_variance = np.square(np.loadtxt(self.spec_path, usecols=2, unpack=True, dtype=float))
         except (IndexError, ValueError) as e:
             # check if we have SNR
-            if self.snr is not None and not np.isnan(self.snr) and self.snr >= 0:
+            if self.snr is not None and not np.isnan(self.snr) and self.snr > 0:
                 # convert to sigma
                 error_obs_variance = np.full(len(wave_ob), np.square(1 / self.snr))
             else:
