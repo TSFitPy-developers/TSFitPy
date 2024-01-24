@@ -3,11 +3,10 @@ import os
 import glob
 import numpy as np
 
-def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
-                           molecules_flag: bool, lbl=False, do_hydrogen=True):
+def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[float], old_path_name: str,
+                           new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True):
     line_list_path: str = old_path_name
     line_list_files: list = [i for i in glob.glob(os.path.join(line_list_path, "*")) if os.path.isfile(i)]
-    # print(line_list_files)
 
     segment_to_use_begins: np.ndarray = np.asarray(seg_begins)
     segment_to_use_ends: np.ndarray = np.asarray(seg_ends)
@@ -29,8 +28,6 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
 
     for line_list_number, line_list_file in enumerate(line_list_files):
         new_linelist_name: str = f"{new_path_name}"  # f"linelist-{line_list_number}.bsyn"
-        # new_linelist: str = os_path.join(f"{new_path_name}", f"linelist-{i}.bsyn")
-        # with open(new_linelist, "w") as new_file_to_write:
         with open(line_list_file) as fp:
             # so that we dont read full file if we are not sure that we use it (if it is a molecule)
             first_line: str = fp.readline()
@@ -141,11 +138,6 @@ def create_window_linelist(seg_begins: list[float], seg_ends: list[float], old_p
                 if len(all_lines_to_write) > 0:
                     write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
                                 line_list_number)
-                """for i in range(len(seg_begins)):
-                    if i not in all_lines_to_write:
-                        new_linelist_name: str = os.path.join(f"{new_path_name}", f"{i}", f"linelist-{line_list_number}.bsyn")
-                        os.system(f"rm {new_linelist_name}")"""
-
 
 def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int,
                               element_to_search: float) -> tuple[int, dict]:

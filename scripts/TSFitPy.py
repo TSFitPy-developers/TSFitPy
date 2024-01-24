@@ -3002,70 +3002,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
     # check inputs
     if tsfitpy_configuration.debug_mode >= 0:
-        print("\n\nChecking inputs\n")
-
-        if np.size(tsfitpy_configuration.seg_begins) != np.size(tsfitpy_configuration.seg_ends):
-            print("Segment beginning and end are not the same length")
-        if np.size(tsfitpy_configuration.line_centers_sorted) != np.size(tsfitpy_configuration.line_begins_sorted) or np.size(tsfitpy_configuration.line_centers_sorted) != np.size(tsfitpy_configuration.line_ends_sorted):
-            print("Line center, beginning and end are not the same length")
-        """if workers < np.size(specname_fitlist.size):
-            print(f"You requested {workers}, but you only need to fit {specname_fitlist.size} stars. Requesting more CPUs "
-                  f"(=workers) than the spectra will just result in idle workers.")"""
-        if tsfitpy_configuration.guess_range_teff[0] > 0:
-            print(f"You requested your {tsfitpy_configuration.guess_range_teff[0]} to be positive. That will result in the lower "
-                  f"guess value to be bigger than the expected star temperature. Consider changing the number to negative.")
-        if tsfitpy_configuration.guess_range_teff[1] < 0:
-            print(f"You requested your {tsfitpy_configuration.guess_range_teff[1]} to be negative. That will result in the upper "
-                  f"guess value to be smaller than the expected star temperature. Consider changing the number to positive.")
-        if min(tsfitpy_configuration.guess_range_vmac) < min(tsfitpy_configuration.bounds_vmac) or max(tsfitpy_configuration.guess_range_vmac) > max(tsfitpy_configuration.bounds_vmac):
-            print(f"You requested your macro bounds as {tsfitpy_configuration.bounds_vmac}, but guesses"
-                  f"are {tsfitpy_configuration.guess_range_vmac}, which is outside hard bound range. Consider"
-                  f"changing bounds or guesses.")
-        if min(tsfitpy_configuration.guess_range_vmic) < min(tsfitpy_configuration.bounds_vmic) or max(tsfitpy_configuration.guess_range_vmic) > max(tsfitpy_configuration.bounds_vmic):
-            print(f"You requested your micro bounds as {tsfitpy_configuration.bounds_vmic}, but guesses"
-                  f"are {tsfitpy_configuration.guess_range_vmic}, which is outside hard bound range. Consider"
-                  f"changing bounds or guesses.")
-        if min(tsfitpy_configuration.guess_range_abundance) < min(tsfitpy_configuration.bounds_abundance) or max(tsfitpy_configuration.guess_range_abundance) > max(tsfitpy_configuration.bounds_abundance):
-            print(f"You requested your abundance bounds as {tsfitpy_configuration.bounds_abundance}, but guesses"
-                  f"are {tsfitpy_configuration.guess_range_abundance} , which is outside hard bound range. Consider"
-                  f"changing bounds or guesses if you fit elements except for Fe.")
-        if min(tsfitpy_configuration.guess_range_abundance) < min(tsfitpy_configuration.bounds_feh) or max(tsfitpy_configuration.guess_range_abundance) > max(tsfitpy_configuration.bounds_feh):
-            print(f"You requested your metallicity bounds as {tsfitpy_configuration.bounds_feh}, but guesses"
-                  f"are {tsfitpy_configuration.guess_range_abundance}, which is outside hard bound range. Consider"
-                  f"changing bounds or guesses IF YOU FIT METALLICITY.")
-        if min(tsfitpy_configuration.guess_range_doppler) < min(tsfitpy_configuration.bounds_doppler) or max(tsfitpy_configuration.guess_range_doppler) > max(tsfitpy_configuration.bounds_doppler):
-            print(f"You requested your RV bounds as {tsfitpy_configuration.bounds_doppler}, but guesses"
-                  f"are {tsfitpy_configuration.guess_range_doppler}, which is outside hard bound range. Consider"
-                  f"changing bounds or guesses.")
-        if tsfitpy_configuration.rotation < 0:
-            print(f"Requested rotation of {tsfitpy_configuration.rotation}, which is less than 0. Consider changing it.")
-        if tsfitpy_configuration.resolution < 0:
-            print(f"Requested resolution of {tsfitpy_configuration.resolution}, which is less than 0. Consider changing it.")
-        if tsfitpy_configuration.vmac < 0:
-            print(f"Requested macroturbulence input of {tsfitpy_configuration.vmac}, which is less than 0. Consider changing it if "
-                  f"you fit it.")
-        # check done in tsfitpyconfiguration
-        if tsfitpy_configuration.nlte_flag:
-            if tsfitpy_configuration.compiler.lower() != "m3dis":
-                for file in tsfitpy_configuration.depart_bin_file_dict:
-                    if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_bin_file_dict[file])):
-                        print(f"{tsfitpy_configuration.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
-                for file in tsfitpy_configuration.depart_aux_file_dict:
-                    if not os.path.isfile(os.path.join(tsfitpy_configuration.departure_file_path, tsfitpy_configuration.depart_aux_file_dict[file])):
-                        print(f"{tsfitpy_configuration.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
-            for file in tsfitpy_configuration.model_atom_file_dict:
-                if not os.path.isfile(os.path.join(tsfitpy_configuration.model_atoms_path, tsfitpy_configuration.model_atom_file_dict[file])):
-                    print(f"{tsfitpy_configuration.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
-
-        for line_start, line_end in zip(tsfitpy_configuration.line_begins_sorted, tsfitpy_configuration.line_ends_sorted):
-            index_location = np.where(np.logical_and(tsfitpy_configuration.seg_begins <= line_start, line_end <= tsfitpy_configuration.seg_ends))[0]
-            if np.size(index_location) > 1:
-                print(f"{line_start} {line_end} linemask has more than 1 segment!")
-            if np.size(index_location) == 0:
-                print(f"{line_start} {line_end} linemask does not have any corresponding segment")
-
-        print("\nDone doing some basic checks. Consider reading the messages above, if there are any. Can be useful if it "
-              "crashes.\n\n")
+        tsfitpy_configuration.warn_on_config_issues()
 
         print("Trimming down the linelist to only lines within segments for faster fitting")
     if tsfitpy_configuration.fitting_mode == "all":

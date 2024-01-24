@@ -358,12 +358,12 @@ class TSFitPyConfig:
         self.depart_aux_file_dict: dict = None
         self.model_atom_file_dict: dict = None
 
-        self.line_begins_sorted: list[float] = None
-        self.line_ends_sorted: list[float] = None
-        self.line_centers_sorted: list[float] = None
+        self.line_begins_sorted: np.ndarray[float] = None
+        self.line_ends_sorted: np.ndarray[float] = None
+        self.line_centers_sorted: np.ndarray[float] = None
 
-        self.seg_begins: list[float] = None
-        self.seg_ends: list[float] = None
+        self.seg_begins: np.ndarray[float] = None
+        self.seg_ends: np.ndarray[float] = None
 
         self.aux_file_length_dict: dict = None
         self.ndimen: int = None
@@ -855,6 +855,87 @@ class TSFitPyConfig:
         except KeyError:
             pass
 
+    def warn_on_config_issues(self):
+        print("\n\nChecking inputs\n")
+
+        if np.size(self.seg_begins) != np.size(self.seg_ends):
+            print("Segment beginning and end are not the same length")
+        if np.size(self.line_centers_sorted) != np.size(self.line_begins_sorted) or np.size(self.line_centers_sorted) != np.size(self.line_ends_sorted):
+            print("Line center, beginning and end are not the same length")
+        if self.guess_range_teff[0] > 0:
+            print(
+                f"You requested your {self.guess_range_teff[0]} to be positive. That will result in the lower "
+                f"guess value to be bigger than the expected star temperature. Consider changing the number to negative.")
+        if self.guess_range_teff[1] < 0:
+            print(
+                f"You requested your {self.guess_range_teff[1]} to be negative. That will result in the upper "
+                f"guess value to be smaller than the expected star temperature. Consider changing the number to positive.")
+        if min(self.guess_range_vmac) < min(self.bounds_vmac) or max(
+                self.guess_range_vmac) > max(self.bounds_vmac):
+            print(f"You requested your macro bounds as {self.bounds_vmac}, but guesses"
+                  f"are {self.guess_range_vmac}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses.")
+        if min(self.guess_range_vmic) < min(self.bounds_vmic) or max(
+                self.guess_range_vmic) > max(self.bounds_vmic):
+            print(f"You requested your micro bounds as {self.bounds_vmic}, but guesses"
+                  f"are {self.guess_range_vmic}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses.")
+        if min(self.guess_range_abundance) < min(self.bounds_abundance) or max(
+                self.guess_range_abundance) > max(self.bounds_abundance):
+            print(f"You requested your abundance bounds as {self.bounds_abundance}, but guesses"
+                  f"are {self.guess_range_abundance} , which is outside hard bound range. Consider"
+                  f"changing bounds or guesses if you fit elements except for Fe.")
+        if min(self.guess_range_abundance) < min(self.bounds_feh) or max(
+                self.guess_range_abundance) > max(self.bounds_feh):
+            print(f"You requested your metallicity bounds as {self.bounds_feh}, but guesses"
+                  f"are {self.guess_range_abundance}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses IF YOU FIT METALLICITY.")
+        if min(self.guess_range_doppler) < min(self.bounds_doppler) or max(
+                self.guess_range_doppler) > max(self.bounds_doppler):
+            print(f"You requested your RV bounds as {self.bounds_doppler}, but guesses"
+                  f"are {self.guess_range_doppler}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses.")
+        if self.rotation < 0:
+            print(
+                f"Requested rotation of {self.rotation}, which is less than 0. Consider changing it.")
+        if self.resolution < 0:
+            print(
+                f"Requested resolution of {self.resolution}, which is less than 0. Consider changing it.")
+        if self.vmac < 0:
+            print(
+                f"Requested macroturbulence input of {self.vmac}, which is less than 0. Consider changing it if "
+                f"you fit it.")
+        # check done in tsfitpyconfiguration
+        if self.nlte_flag:
+            if self.compiler.lower() != "m3dis":
+                for file in self.depart_bin_file_dict:
+                    if not os.path.isfile(os.path.join(self.departure_file_path,
+                                                       self.depart_bin_file_dict[file])):
+                        print(
+                            f"{self.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
+                for file in self.depart_aux_file_dict:
+                    if not os.path.isfile(os.path.join(self.departure_file_path,
+                                                       self.depart_aux_file_dict[file])):
+                        print(
+                            f"{self.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
+            for file in self.model_atom_file_dict:
+                if not os.path.isfile(os.path.join(self.model_atoms_path,
+                                                   self.model_atom_file_dict[file])):
+                    print(
+                        f"{self.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
+
+        for line_start, line_end in zip(self.line_begins_sorted,
+                                        self.line_ends_sorted):
+            index_location = np.where(np.logical_and(self.seg_begins <= line_start,
+                                                     line_end <= self.seg_ends))[0]
+            if np.size(index_location) > 1:
+                print(f"{line_start} {line_end} linemask has more than 1 segment!")
+            if np.size(index_location) == 0:
+                print(f"{line_start} {line_end} linemask does not have any corresponding segment")
+
+        print(
+            "\nDone doing some basic checks. Consider reading the messages above, if there are any. Can be useful if it "
+            "crashes.\n\n")
 
     @staticmethod
     def _get_fitting_mode(fitting_mode: str):
