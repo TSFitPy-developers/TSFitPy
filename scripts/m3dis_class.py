@@ -410,12 +410,6 @@ class M3disCall(SyntheticSpectrumGenerator):
         #TODO absmet files?
         logging.debug(config_m3dis)
 
-        # clean temp directory
-        save_file_dir = os.path.join(self.tmp_dir, "save")
-        if os.path.exists(save_file_dir):
-            # just in case it fails, so that it doesn't reuse the old files
-            shutil.rmtree(save_file_dir)
-
         if self.verbose:
             stdout = None
             stderr = subprocess.STDOUT
@@ -709,6 +703,12 @@ class M3disCall(SyntheticSpectrumGenerator):
         wavelength, normalised_flux, flux = None, None, None
         try:
             logging.debug("Running m3dis and atmosphere")
+            logging.debug("Cleaning temp directory")
+            # clean temp directory
+            save_file_dir = os.path.join(self.tmp_dir, "save")
+            if os.path.exists(save_file_dir):
+                # just in case it fails, so that it doesn't reuse the old files
+                shutil.rmtree(save_file_dir)
             self.calculate_atmosphere()
             logging.debug("Running m3dis")
             output = self.call_m3dis(skip_linelist=self.skip_linelist, use_precomputed_depart=self.use_precomputed_depart)

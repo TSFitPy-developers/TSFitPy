@@ -731,6 +731,12 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
     def synthesize_spectra(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         try:
             logging.debug("Running Turbospectrum and atmosphere")
+            logging.debug("Cleaning temp directory")
+            # clean temp directory
+            temp_spectra_location = os.path.join(self.tmp_dir, "spectrum_00000000.spec")
+            # delete the temporary directory if it exists
+            if os_path.exists(temp_spectra_location):
+                os.remove(temp_spectra_location)
             self.calculate_atmosphere()
             try:
                 logging.debug("Running Turbospectrum")

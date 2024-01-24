@@ -456,7 +456,7 @@ class Spectra:
         self.teff: float = float(teff)
         self.logg: float = float(logg)
         self.feh: float = float(met)
-        self.rv: float = float(rv)  # RV of star (given, but is fitted with extra doppler shift)
+        self.stellar_rv: float = float(rv)  # RV of star (given, but is fitted with extra doppler shift)
         self.doppler_shift_add_to_rv_fitted: float = 0.0  # doppler shift; added to RV (fitted)
         if self.input_elem_abundance is None:  # input abundance - NOT fitted, but just accepted as a constant abund for spectra
             self.input_abund: dict = abundances_dict
@@ -525,7 +525,7 @@ class Spectra:
         wave_ob, flux_ob = wave_ob[sorted_obs_wavelength_index], flux_ob[sorted_obs_wavelength_index]
         error_obs_variance = error_obs_variance[sorted_obs_wavelength_index]
         result_indices = []
-        wave_ob_doppler_shifted = apply_doppler_correction(wave_ob, self.rv)
+        wave_ob_doppler_shifted = apply_doppler_correction(wave_ob, self.stellar_rv)
         for l, r in zip(self.line_begins_sorted, self.line_ends_sorted):
             result_indices.extend(
                 np.where((wave_ob_doppler_shifted >= l - self.margin_obs_spectra_save) & (wave_ob_doppler_shifted <= r + self.margin_obs_spectra_save))[0])
@@ -1002,7 +1002,7 @@ class Spectra:
                                     segment_file=self.segment_file, line_mask_file=self.linemask_file)
         return spectrumclass.synthesize_spectra()
 
-    def create_scg_object(self, marcs_values_tuple, segment_index=None) -> SyntheticSpectrumGenerator:
+    def create_ssg_object(self, marcs_values_tuple, segment_index=None) -> SyntheticSpectrumGenerator:
         """
         Creates the synthetic spectrum generator object depending whether TS or M3DIS is used (or other in the future?)
         :param marcs_values_tuple: unpickled marcs models and other values
@@ -1017,7 +1017,7 @@ class Spectra:
             else:
                 model_atom_path = self.model_atom_path
 
-            scg = M3disCall(
+            ssg = M3disCall(
                 m3dis_path=self.spectral_code_path,
                 interpol_path=self.interpol_path,
                 line_list_paths=self.line_list_path_trimmed,
@@ -1046,9 +1046,9 @@ class Spectra:
                 night_mode=self.night_mode
             )
             if self.m3dis_iterations_max_precompute <= 0:
-                scg.use_precomputed_depart = False
+                ssg.use_precomputed_depart = False
         else:
-            scg = TurboSpectrum(
+            ssg = TurboSpectrum(
                 turbospec_path=self.spectral_code_path,
                 interpol_path=self.interpol_path,
                 line_list_paths=self.line_list_path_trimmed,
@@ -1064,8 +1064,8 @@ class Spectra:
                 marcs_models=marcs_models,
                 marcs_values=marcs_values,
                 night_mode=self.night_mode)
-            scg.lpoint = self.lpoint_turbospectrum
-        return scg
+            ssg.lpoint = self.lpoint_turbospectrum
+        return ssg
 
     def precompute_departure(self):
         """
@@ -1073,7 +1073,7 @@ class Spectra:
         Saves the departure coefficients in the temp directory. Calculates it for [X/Fe] = 0 or star's input [Fe/H] (0?)
         """
         if self.nlte_flag and self.m3dis_iterations_max_precompute > 0:
-            scg = self.create_scg_object(self._get_marcs_models())
+            ssg = self.create_ssg_object(self._get_marcs_models())
             # need to run NLTE run once, so that can reuse precomputed departure coefficients
             if self.elem_to_fit[0] == "Fe":
                 input_abund = {"Fe": self.feh}
@@ -1088,13 +1088,13 @@ class Spectra:
                 vmic = calculate_vturb(self.teff, self.logg, self.feh)
             temp_dir = os.path.join(self.temp_dir, "precomputed_depart")
             # skips lots of
-            scg.skip_linelist = True
-            scg.save_spectra = False
-            scg.iterations_max = self.m3dis_iterations_max_precompute
-            scg.use_precomputed_depart = False
-            self.configure_and_run_synthetic_code(scg, feh, input_abund, vmic, self.lmin, self.lmax, temp_dir=temp_dir)
-            # delete scg
-            del scg
+            ssg.skip_linelist = True
+            ssg.save_spectra = False
+            ssg.iterations_max = self.m3dis_iterations_max_precompute
+            ssg.use_precomputed_depart = False
+            self.configure_and_run_synthetic_code(ssg, feh, input_abund, vmic, self.lmin, self.lmax, temp_dir=temp_dir)
+            # delete ssg
+            del ssg
         return None
 
     def fit_all(self) -> list:
@@ -1106,11 +1106,11 @@ class Spectra:
         # timing how long it took
         time_start = time.perf_counter()
 
-        scg = self.create_scg_object(self._get_marcs_models())
+        ssg = self.create_ssg_object(self._get_marcs_models())
 
         initial_simplex_guess, init_param_guess, minim_bounds = self.get_all_guess()
 
-        function_arguments = (scg, self)
+        function_arguments = (ssg, self)
         minimize_options = {'maxiter': self.ndimen * self.maxfev, 'disp': self.python_verbose,
                             'initial_simplex': init_param_guess, 'xatol': self.xatol_all, 'fatol': self.fatol_all}
         res = minimize_function(all_abund_rv, initial_simplex_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
@@ -1247,7 +1247,7 @@ class Spectra:
                           'a') as h:
                     np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv], flux_fit_conv[indices_to_save_conv])), fmt='%f')
 
-            wave_ob = apply_doppler_correction(self.wavelength_obs, self.rv + result_one_line["rv"])
+            wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
             flux_ob = self.flux_norm_obs
 
             # cut to the line
@@ -1369,15 +1369,15 @@ class Spectra:
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
 
-        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+        ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
 
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number],
                   self.line_ends_sorted[line_number])
 
-        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+        ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+        function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
                               self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory,
                               result_one_line["rv"], result_one_line["macroturb"], result_one_line["rotation"],
                               result_one_line["vmic"], chi_sqr_to_fit)
@@ -1418,11 +1418,11 @@ class Spectra:
         param_guess = np.array([[self.teff + self.guess_plus_minus_neg_teff], [self.teff + self.guess_plus_minus_pos_teff]])
         min_bounds = [(self.bound_min_teff, self.bound_max_teff)]
 
-        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+        ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
 
-        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+        ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+        function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
                               self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
         minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess,
                             'xatol': self.xatol_teff, 'fatol': self.fatol_teff}
@@ -1543,13 +1543,13 @@ class Spectra:
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
 
-        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+        ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
 
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
-        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+        ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+        function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
                               self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
             res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
@@ -1580,11 +1580,11 @@ class Spectra:
         param_guess = np.array([[self.logg + self.guess_plus_minus_neg_logg], [self.logg + self.guess_plus_minus_pos_logg]])
         min_bounds = [(self.bound_min_logg, self.bound_max_logg)]
 
-        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+        ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
 
-        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+        ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
+        function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
                               self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
         minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess,
                             'xatol': self.xatol_logg, 'fatol': self.fatol_logg}
@@ -1725,18 +1725,18 @@ class Spectra:
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
 
-        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+        ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
 
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
-        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+        ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
 
-        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
+        function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],  self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number)
         minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_lbl, 'fatol': self.fatol_lbl, 'adaptive': True}
         try:
-            res = minimize_function(lbl_abund_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+            res = minimize_function(calc_chi_sqr_abund_and_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
             print_result = "Converged:"
             for elem, value in zip(self.elem_to_fit, res.x):
                 # here element is [X/Fe], unless it's Fe, then it's [Fe/H]
@@ -1848,11 +1848,11 @@ class Spectra:
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                         self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
 
-        scg = self.create_scg_object(self._get_marcs_models(), segment_index=segment_index)
+        ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
 
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.seg_begins[segment_index], self.seg_ends[segment_index])
-        scg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+        ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
         param_guess, min_bounds = self.get_elem_guess(self.guess_min_abund, self.guess_max_abund)
 
@@ -1860,7 +1860,7 @@ class Spectra:
         self.flux_norm_fitted_dict[line_number] = np.array([])
         self.flux_fitted_dict[line_number] = np.array([])
 
-        function_arguments = (scg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
+        function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
         minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_vmic, 'fatol': self.fatol_vmic, 'adaptive': False}
         res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         if not self.night_mode:
@@ -1917,27 +1917,45 @@ class Spectra:
 
         shutil.rmtree(temp_directory)
         return {"result": one_result, "fit_wavelength": wave_result, "fit_flux_norm": flux_norm_result,
-                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": res.fun, "rv": doppler_fit} #"fit_wavelength_conv": wave_result_conv, "fit_flux_norm_conv": flux_norm_result_conv,
+                "fit_flux": flux_result,  "macroturb": macroturb, "rotation": rotation, "chi_sqr": res.fun, "rv": doppler_fit}
 
 
-def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
-                    wave_mod_orig: np.ndarray, flux_mod_orig: np.ndarray, offset_chisqr=0) -> float:
+def check_if_spectra_generated(wavelength_fitted: np.ndarray, night_mode=False) -> Tuple[bool, float]:
     """
-    Line by line quick. Takes precalculated synthetic spectra (i.e. 1 grid) and finds chi-sqr for observed spectra.
-    Also fits doppler shift and can fit macroturbulence if needed.
+    Checks if the spectra was generated correctly, depending if it's None or empty
+    :param wavelength_fitted:  Wavelength of synthetic spectra
+    :param night_mode: if True, then doesn't print anything
+    :return: True and 0 if input array is not None or empty, False and 999999 otherwise
+    """
+    if wavelength_fitted is None:
+        if not night_mode:
+            print("didn't generate spectra or atmosphere")
+        return False, 999999.9999
+    elif np.size(wavelength_fitted) == 0:
+        if not night_mode:
+            print("empty spectrum file.")
+        return False, 999999.99
+    else:
+        return True, 0
+
+
+def calc_chi_sq_broadening(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
+                           wavelength_fitted: np.ndarray, flux_norm_fitted: np.ndarray) -> float:
+    """
+    Calculates the chi squared for the given broadening parameters and small doppler shift
     :param param: Parameters list with the current evaluation guess
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
-    :param wave_mod_orig: Wavelength of synthetic spectra
-    :param flux_mod_orig: Flux of synthetic spectra
+    :param lmin: Start of the line [AA] where to calculate chi squared
+    :param lmax: End of the line [AA] where to calculate chi squared
+    :param wavelength_fitted: Wavelength of synthetic spectra
+    :param flux_norm_fitted: Flux of synthetic spectra
     :return: Best fit chi squared
     """
     # param[0] = doppler
-    # param[1] = macro turb
+    # param[1] = vmac
     # param[-1] = rotation fit
 
-    doppler = spectra_to_fit.rv + param[0]
+    doppler = spectra_to_fit.stellar_rv + param[0]
 
     if spectra_to_fit.fit_vmac:
         macroturb = param[1]
@@ -1949,54 +1967,47 @@ def lbl_rv_vmac_rot(param: list, spectra_to_fit: Spectra, lmin: float, lmax: flo
     else:
         rotation = spectra_to_fit.rotation
 
-    wave_ob = apply_doppler_correction(spectra_to_fit.wavelength_obs, doppler)
+    wavelength_obs_rv = apply_doppler_correction(spectra_to_fit.wavelength_obs, doppler)
 
-    chi_square = calculate_lbl_chi_squared(wave_ob, spectra_to_fit.flux_norm_obs, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig,
+    chi_square = calculate_lbl_chi_squared(wavelength_obs_rv, spectra_to_fit.flux_norm_obs,
+                                           spectra_to_fit.error_obs_variance, wavelength_fitted, flux_norm_fitted,
                                            spectra_to_fit.resolution, lmin, lmax, macroturb, rotation)
-    #print(param[0], chi_square, macroturb)  # takes 50%!!!! extra time to run if using print statement here
-    #print(f"RV: {doppler:10.7f}, vmac: {macroturb:10.7f}, chi-sqr: {chi_square:11.7f}")
 
-    return np.abs(chi_square - offset_chisqr)
+    return chi_square
 
 
-def check_if_spectra_generated(wave_mod_orig: np.ndarray) -> Tuple[bool, float]:
-    if wave_mod_orig is None:
-        print("didn't generate spectra or atmosphere")
-        return False, 999999.9999
-    elif np.size(wave_mod_orig) == 0:
-        print("empty spectrum file.")
-        return False, 999999.99
-    else:
-        return True, 0
-
-def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int, offset_chisqr=0) -> float:
+def calc_chi_sqr_abund_and_vmic(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra, lmin: float,
+                                lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str,
+                                line_number: int) -> float:
     """
-    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
-    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
-    doppker inside
+    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, and if
+    needed micro. It also finds best broadening and rv by calling another minimisation inside
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA], where to calculate chi squared
+    :param lmax: End of the line [AA], where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param line_number: Which line number/index in line_center_sorted is being fitted
     :return: best fit chi squared
     """
     # new: now includes several elements
     # param[-1] = vmicro
-    # param[0:nelements - 1] = met or abund
+    # param[0:nelements - 1] = feh or abund
 
     if spectra_to_fit.fit_feh:
         met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
-        met = param[met_index]  # no offset, first is always element
+        feh = param[met_index]  # no offset, first is always element
     else:
-        met = spectra_to_fit.feh
-    elem_abund_dict = {"Fe": met}
+        feh = spectra_to_fit.feh
+    elem_abund_dict = {"Fe": feh}
 
     # first it takes the input abundances and then adds the fit abundances to it, so priority is given to fitted abundances
     for element in spectra_to_fit.input_abund:
         if element != "Fe":
-            elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
+            elem_abund_dict[element] = spectra_to_fit.input_abund[element] + feh    # add input abundances to dict [X/H]
         else:
             raise ValueError("Fe is not allowed as input abundance")
 
@@ -2005,21 +2016,22 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
         # param[0:nelement - 1] = abundance of the element
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
-            elem_abund_dict[elem_name] = param[i] + met     # convert [X/Fe] to [X/H]
+            elem_abund_dict[elem_name] = param[i] + feh     # convert [X/Fe] to [X/H]
 
 
     if spectra_to_fit.vmic is not None:  # Input given
-        microturb = spectra_to_fit.vmic
+        vmic = spectra_to_fit.vmic
     else:
         if spectra_to_fit.fit_vmic == "No" and spectra_to_fit.atmosphere_type == "1D":
-            microturb = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, met)
+            vmic = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, feh)
         elif spectra_to_fit.fit_vmic == "Yes" and spectra_to_fit.atmosphere_type == "1D":
-            microturb = param[-1]
-        elif spectra_to_fit.fit_vmic == "Input":  # just for safety's sake, normally should take in the input above anyway
+            vmic = param[-1]
+        elif spectra_to_fit.fit_vmic == "Input" and spectra_to_fit.atmosphere_type == "1D":
+            # just for safety's sake, normally should take in the input above anyway
             raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
                              "a problem in the code?")
         else:
-            microturb = 2.0
+            vmic = 2.0
 
     macroturb = 999999    # for printing only here, in case not fitted
     rotation = 999999
@@ -2028,23 +2040,17 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
     spectra_to_fit.vmac_fitted_dict[line_number] = macroturb
     spectra_to_fit.rotation_fitted_dict[line_number] = rotation
 
-    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
-    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
-
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
-        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig, offset_chisqr)
+        function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
+        res = minimize_function(calc_chi_sq_broadening, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.rv_extra_fitted_dict[line_number] = res.x[0]
@@ -2076,7 +2082,7 @@ def lbl_abund_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin
 
     if spectra_to_fit.atmosphere_type == "1D":
         if not spectra_to_fit.night_mode:
-            print(f"{output_print} rv={doppler_shift:>7.4f} vmic={microturb:>7.4f} vmac={macroturb:>7.4f} "
+            print(f"{output_print} rv={doppler_shift:>7.4f} vmic={vmic:>7.4f} vmac={macroturb:>7.4f} "
                   f"rotation={rotation:>7.4f} chisqr={chi_square:>14.8f}")
     else:
         if not spectra_to_fit.night_mode:
@@ -2111,15 +2117,9 @@ def lbl_teff_error(param: float, ts: TurboSpectrum, spectra_to_fit: Spectra, lmi
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
 
-    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
-
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
     wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory, teff=teff)     # generates spectra
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.doppler_shift_add_to_rv_fitted)
         chi_square = calculate_lbl_chi_squared(wave_obs_shifted, spectra_to_fit.flux_norm_obs, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
@@ -2169,18 +2169,9 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     for element in spectra_to_fit.input_abund:
         elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
 
-    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
-
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
     wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     dof = 1
     if spectra_generated:
         wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.doppler_shift_add_to_rv_fitted)
@@ -2288,20 +2279,14 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
     met = spectra_to_fit.elem_abund_fitted_dict[line_number]["Fe"]
     elem_abund_dict = spectra_to_fit.elem_abund_fitted_dict[line_number]
 
-    temp_spectra_location = os.path.join(temp_directory, "spectrum_00000000.spec")
-
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
     wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0),
+        res = minimize_function(calc_chi_sq_broadening, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.rv_extra_fitted_dict[line_number] = res.x[0]
@@ -2356,19 +2341,13 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     else:
         microturb = calculate_vturb(teff, spectra_to_fit.logg, spectra_to_fit.feh)
 
-    temp_spectra_location = os.path.join(temp_directory, 'spectrum_00000000.spec')
-
     macroturb = 999999  # for printing if fails
     rotation = 999999
     rv = 999999
 
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
     wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, spectra_to_fit.feh, {"H": 0, "Fe": spectra_to_fit.feh}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
         ndimen = 1
         if spectra_to_fit.fit_vmac:
@@ -2376,7 +2355,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0), function_args, min_bounds, 'L-BFGS-B', minimize_options)
+        res = minimize_function(calc_chi_sq_broadening, np.median(param_guess, axis=0), function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.rv_extra_fitted_dict[line_number] = res.x[0]
         rv = spectra_to_fit.rv_extra_fitted_dict[line_number]
@@ -2428,19 +2407,13 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     else:
         microturb = calculate_vturb(spectra_to_fit.teff, logg, spectra_to_fit.feh)
 
-    temp_spectra_location = os.path.join(temp_directory, 'spectrum_00000000.spec')
-
-    # delete the temporary directory if it exists
-    if os_path.exists(temp_spectra_location):
-        os.remove(temp_spectra_location)
-
     macroturb = 999999  # for printing if fails
     rotation = 999999
     rv = 999999
 
     wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, spectra_to_fit.feh, {"Fe": spectra_to_fit.feh}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
         ndimen = 1
         if spectra_to_fit.fit_vmac:
@@ -2448,7 +2421,7 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac, max_macroturb=spectra_to_fit.guess_max_vmac)
         function_args = (spectra_to_fit, lmin, lmax, wave_mod_orig, flux_mod_orig)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
-        res = minimize_function(lbl_rv_vmac_rot, np.median(param_guess, axis=0), function_args, min_bounds, 'L-BFGS-B', minimize_options)
+        res = minimize_function(calc_chi_sq_broadening, np.median(param_guess, axis=0), function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.rv_extra_fitted_dict[line_number] = res.x[0]
         rv = spectra_to_fit.rv_extra_fitted_dict[line_number]
@@ -2502,7 +2475,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
     # dopple = param[1]
     # macrorurb = param [2] (if needed)
     abund = param[0]
-    doppler = spectra_to_fit.rv + param[1]
+    doppler = spectra_to_fit.stellar_rv + param[1]
     if spectra_to_fit.fit_vmac:
         macroturb = param[2]
     else:
@@ -2527,7 +2500,7 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
     wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig)
+    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
         chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_name, wave_mod_orig, flux_mod_orig, spectra_to_fit.temp_dir,
                                                spectra_to_fit.output_folder,
@@ -2585,7 +2558,7 @@ def create_and_fit_spectra(dask_client: Client, spectra: Spectra) -> list:
 
     if spectra.debug_mode >= 0:
         print(f"Fitting {spectra.spec_name}")
-        print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.rv}")
+        print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.stellar_rv}")
     #print("here", spectra)
     #spectra = spectra.result()
 
