@@ -457,7 +457,6 @@ class Spectra:
         self.logg: float = float(logg)
         self.feh: float = float(met)
         self.stellar_rv: float = float(rv)  # RV of star (given, but is fitted with extra doppler shift)
-        self.doppler_shift_add_to_rv_fitted: float = 0.0  # doppler shift; added to RV (fitted)
         if self.input_elem_abundance is None:  # input abundance - NOT fitted, but just accepted as a constant abund for spectra
             self.input_abund: dict = abundances_dict
         else:
@@ -1358,12 +1357,12 @@ class Spectra:
 
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        chi_sqr_to_fit = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit)
+        offset_chi_sqr = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit) / calculate_dof(self.wavelength_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
         start_abundance = result_one_line["fitted_abund"]
-        # we are trying to find abundance which results in chi_sqr = chi_sqr_to_fit. so we need to add some constant
-        # that overshoots this chi_sqr_to_fit, so that we can find the abundance that results in chi_sqr_to_fit
-        # thus we add 3 + sigmas_upper_limit to the chi_sqr_to_fit
-        # Hopefully that will be enough to overshoot the chi_sqr_to_fit
+        # we are trying to find abundance which results in chi_sqr = offset_chi_sqr. so we need to add some constant
+        # that overshoots this offset_chi_sqr, so that we can find the abundance that results in offset_chi_sqr
+        # thus we add 3 + sigmas_upper_limit to the offset_chi_sqr
+        # Hopefully that will be enough to overshoot the offset_chi_sqr
         end_abundance = start_abundance + sigmas_upper_limit + 3
 
         segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
@@ -1380,14 +1379,14 @@ class Spectra:
         function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
                               self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory,
                               result_one_line["rv"], result_one_line["macroturb"], result_one_line["rotation"],
-                              result_one_line["vmic"], chi_sqr_to_fit)
+                              result_one_line["vmic"], offset_chi_sqr)
         try:
             res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[start_abundance, end_abundance],
-                              method='brentq', options={'disp': self.python_verbose})
+                              method='brentq', options={'disp': False}, xtol=0.0025)
             if not self.night_mode:
                 print(res)
             fitted_abund = res.root
-            result_error = {"chi_sqr": chi_sqr_to_fit, "fitted_abund": fitted_abund}
+            result_error = {"chi_sqr": offset_chi_sqr, "fitted_abund": fitted_abund}
         except IndexError as error:
             if not self.night_mode:
                 print(f"{error} is line in the spectrum? {self.line_centers_sorted[line_number]}")
@@ -1475,13 +1474,14 @@ class Spectra:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
         if self.find_teff_errors and teff <= 999998:
+            dof = calculate_dof(self.wavelength_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
             if not self.night_mode:
                 print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
                 teff_error = np.abs(self.lbl_teff_find_sigma_error(line_number, doppler_fit,
                                                                    macroturb, rotation,
                                                                    microturb,
-                                                                   offset_chisqr=(chi_squared + np.square(self.teff_error_sigma)),
+                                                                   offset_chisqr=(chi_squared + np.square(self.teff_error_sigma) / dof),
                                                                    bound_min_teff=teff,
                                                                    bound_max_teff=teff + 1000) - teff)
             except ValueError as err:
@@ -1491,7 +1491,7 @@ class Spectra:
                     teff_error = np.abs(self.lbl_teff_find_sigma_error(line_number, doppler_fit,
                                                                        macroturb, rotation,
                                                                        microturb,
-                                                                       offset_chisqr=(chi_squared + np.square(self.teff_error_sigma)),
+                                                                       offset_chisqr=(chi_squared + np.square(self.teff_error_sigma) / dof),
                                                                        bound_min_teff=teff - 1000,
                                                                        bound_max_teff=teff) - teff)
                 except ValueError as err:
@@ -1552,7 +1552,7 @@ class Spectra:
         function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number],
                               self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, fitted_rv, fitted_vmac, fitted_rotation, fitted_vmic, offset_chisqr)
         try:
-            res = root_scalar(lbl_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
+            res = root_scalar(calc_chi_sqr_teff_error, args=function_arguments, bracket=[bound_min_teff, bound_max_teff], method='brentq')
             if not self.night_mode:
                 print(res)
             fitted_teff = res.root
@@ -1638,13 +1638,15 @@ class Spectra:
 
         if self.find_logg_errors and logg <= 99999 and not True:
             # TODO: add ability to fit logg error
+            dof = calculate_dof(self.wavelength_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
+
             if not self.night_mode:
                 print(f"Fitting {self.logg_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
                 logg_error = np.abs(self.find_logg_error_one_line(line_number, doppler_fit,
                                                            macroturb, rotation,
                                                            microturb,
-                                                           offset_chisqr=(chi_squared + np.square(self.teff_error_sigma)),
+                                                           offset_chisqr=(chi_squared + np.square(self.teff_error_sigma) / dof),
                                                            bound_min_teff=logg,
                                                            bound_max_teff=logg + 1) - logg)
             except ValueError as err:
@@ -1654,8 +1656,7 @@ class Spectra:
                     logg_error = np.abs(self.find_logg_error_one_line(line_number, doppler_fit,
                                                                macroturb, rotation,
                                                                microturb,
-                                                               offset_chisqr=(
-                                                                           chi_squared + np.square(self.teff_error_sigma)),
+                                                               offset_chisqr=(chi_squared + np.square(self.teff_error_sigma) / dof),
                                                                bound_min_teff=logg - 1,
                                                                bound_max_teff=logg) - logg)
                 except ValueError as err:
@@ -1939,6 +1940,54 @@ def check_if_spectra_generated(wavelength_fitted: np.ndarray, night_mode=False) 
         return True, 0
 
 
+def print_intermediate_results(intermediate_results: dict, atmosphere_type: str, night_mode: bool) -> None:
+    """
+    Prints intermediate results for the line
+    :param intermediate_results: Dictionary with the results for the line
+    :param atmosphere_type: 1D or 3D, depending on it vmic is printed or not
+    :param night_mode: if True, then doesn't print anything
+    :return: None
+    """
+    vmic_possible_columns = ["vmic", "microturb"]
+    chi_sqr_possible_columns = ["chi_squared", "chi_sqr", "chisqr", "chisquared"]
+    abundances_possible_columns = ["abundances", "abund", "abundance", "abundances", "elem_abund_dict", "abund_dict", "elem"]
+    if not night_mode:
+        # we want to print it, by going through each key. each key is a column name
+        # 4 for everything with 7 characters total and 8 decimals for chi squared
+        string_to_print = ""
+        for key in intermediate_results:
+            if key in chi_sqr_possible_columns:
+                string_to_print += f"chi_sqr= {intermediate_results[key]:>14.8f} "
+            else:
+                if key.lower() in vmic_possible_columns and atmosphere_type == "3D":
+                    # don't print vmic for 3D
+                    pass
+                else:
+                    if key in abundances_possible_columns:
+                        for element in intermediate_results[key]:
+                            string_to_print += f"[{element}/H]= {intermediate_results[key][element]:>7.4f} "
+                    else:
+                        string_to_print += f"{key}= {intermediate_results[key]:>.4f} "
+        print(string_to_print)
+
+
+def calculate_dof(wavelength: np.ndarray, lmin: float=None, lmax: float=None, parameters_count: int=1) -> int:
+    """
+    Calculates the degrees of freedom for the chi squared calculation
+    :param wavelength: Wavelength of spectra
+    :param lmin: Start of the line [AA] where to calculate chi squared
+    :param lmax: End of the line [AA] where to calculate chi squared
+    :param parameters_count: Number of parameters to fit, default is 1
+    :return: Degrees of freedom
+    """
+    if lmin is not None and lmax is not None:
+        wavelength = wavelength[np.logical_and(lmin <= wavelength, wavelength <= lmax)]
+    dof = np.size(wavelength) - parameters_count
+    if dof <= 0:
+        dof = 1
+    return dof
+
+
 def calc_chi_sq_broadening(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
                            wavelength_fitted: np.ndarray, flux_norm_fitted: np.ndarray) -> float:
     """
@@ -2035,8 +2084,8 @@ def calc_chi_sqr_abund_and_vmic(param: list, ssg: SyntheticSpectrumGenerator, sp
 
     macroturb = 999999    # for printing only here, in case not fitted
     rotation = 999999
-    doppler_shift = 999999
-    spectra_to_fit.rv_extra_fitted_dict[line_number] = doppler_shift
+    rv = 999999
+    spectra_to_fit.rv_extra_fitted_dict[line_number] = rv
     spectra_to_fit.vmac_fitted_dict[line_number] = macroturb
     spectra_to_fit.rotation_fitted_dict[line_number] = rotation
 
@@ -2054,7 +2103,7 @@ def calc_chi_sqr_abund_and_vmic(param: list, ssg: SyntheticSpectrumGenerator, sp
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
 
         spectra_to_fit.rv_extra_fitted_dict[line_number] = res.x[0]
-        doppler_shift = spectra_to_fit.rv_extra_fitted_dict[line_number]
+        rv = spectra_to_fit.rv_extra_fitted_dict[line_number]
         if spectra_to_fit.fit_vmac:
             spectra_to_fit.vmac_fitted_dict[line_number] = res.x[1]
             macroturb = spectra_to_fit.vmac_fitted_dict[line_number]
@@ -2076,61 +2125,63 @@ def calc_chi_sqr_abund_and_vmic(param: list, ssg: SyntheticSpectrumGenerator, sp
         spectra_to_fit.flux_norm_fitted_dict[line_number] = np.array([])
         spectra_to_fit.flux_fitted_dict[line_number] = np.array([])
 
-    output_print = ""
-    for key in elem_abund_dict:
-        output_print += f" [{key}/H]={elem_abund_dict[key]:>7.4f}"
+    intermediate_results = {"abundances": elem_abund_dict, "rv": rv, "vmic": vmic, "vmac": macroturb,
+                            "rotation": rotation, "chi_sqr": chi_square}
 
-    if spectra_to_fit.atmosphere_type == "1D":
-        if not spectra_to_fit.night_mode:
-            print(f"{output_print} rv={doppler_shift:>7.4f} vmic={vmic:>7.4f} vmac={macroturb:>7.4f} "
-                  f"rotation={rotation:>7.4f} chisqr={chi_square:>14.8f}")
-    else:
-        if not spectra_to_fit.night_mode:
-            print(f"{output_print} rv={doppler_shift:>7.4f} vmac={macroturb:>7.4f} "
-                  f"rotation={rotation:>7.4f} chisqr={chi_square:>14.8f}")
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
 
     return chi_square
 
 
-def lbl_teff_error(param: float, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
-                          temp_directory: str, rv: float, vmac: float, rotation: float,
-                          vmic: float, offset_chisqr: float) -> float:
+def calc_chi_sqr_teff_error(param: float, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra, lmin: float,
+                            lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, rv: float,
+                            vmac: float, rotation: float, vmic: float, offset_chisqr: float) -> float:
     """
-    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
-    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
-    doppker inside
+    Calculates the chi squared subtracted with offset one for the given broadening parameters and small doppler shift.
+    Varies teff only.
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA] where to calculate chi squared
+    :param lmax: End of the line [AA] where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param rv: Doppler shift, fitted to add to the stellar rv
+    :param vmac: Fitted macroturbulence
+    :param rotation: Fitted rotation
+    :param vmic: Fitted microturbulence
+    :param offset_chisqr: Offset chi squared, to subtract from the chi squared. This is the fitted chi squared + sigma^2
     :return: best fit chi squared
     """
     # new: now includes several elements
-    # param[0:nelements - 1] = met or abund
+    # param[0:nelements - 1] = feh or abund
 
-    met = spectra_to_fit.feh
-    elem_abund_dict = {"Fe": met}
+    feh = spectra_to_fit.feh
+    elem_abund_dict = {"Fe": feh}
     teff = param
 
     for element in spectra_to_fit.input_abund:
-        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + feh    # add input abundances to dict [X/H]
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory, teff=teff)     # generates spectra
+    wavelength_fitted, flux_norm_fitted, _ = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict,
+                                                                                             vmic, lmin_segment,
+                                                                                             lmax_segment, False,
+                                                                                             temp_dir=temp_directory, teff=teff)     # generates spectra
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
+    spectra_generated, chi_squared = check_if_spectra_generated(wavelength_fitted, spectra_to_fit.night_mode)
     if spectra_generated:
-        wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.doppler_shift_add_to_rv_fitted)
-        chi_square = calculate_lbl_chi_squared(wave_obs_shifted, spectra_to_fit.flux_norm_obs, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
+        wavelength_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.stellar_rv)
+        chi_squared = calculate_lbl_chi_squared(wavelength_obs_shifted, spectra_to_fit.flux_norm_obs,
+                                               spectra_to_fit.error_obs_variance, wavelength_fitted, flux_norm_fitted,
+                                               spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
 
-    output_print = f""
-    for key in elem_abund_dict:
-        output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    if not spectra_to_fit.night_mode:
-        print(f"{output_print} teff={teff} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr} chisqr={(chi_square - offset_chisqr)}")
+    intermediate_results = {"abundances": elem_abund_dict, "teff": teff, "rv": rv, "vmic": vmic, "vmac": vmac, "rotation": rotation,
+                            "fitted_chisqr": chi_squared, "offset": offset_chisqr, "chi_sqr": chi_squared - offset_chisqr}
 
-    return chi_square - offset_chisqr
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
+
+    return chi_squared - offset_chisqr
 
 
 def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
@@ -2149,45 +2200,37 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
     :return: best fit chi squared
     """
     # new: now includes several elements
-    # param[0:nelements - 1] = met or abund
+    # param[0:nelements - 1] = feh or abund
 
     if spectra_to_fit.fit_feh:
-        met = param
+        feh = param
     else:
-        met = spectra_to_fit.feh
-    elem_abund_dict = {"Fe": met}
+        feh = spectra_to_fit.feh
+    elem_abund_dict = {"Fe": feh}
 
-    #abundances = [met]
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + feh    # add input abundances to dict [X/H]
 
     for i in range(spectra_to_fit.nelement):
         # spectra_to_fit.elem_to_fit[i] = element name
         # param[0:nelement - 1] = abundance of the element
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
-            elem_abund_dict[elem_name] = param + met     # convert [X/Fe] to [X/H]
+            elem_abund_dict[elem_name] = param + feh     # convert [X/Fe] to [X/H]
 
-    for element in spectra_to_fit.input_abund:
-        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met    # add input abundances to dict [X/H]
-
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
-    dof = 1
     if spectra_generated:
-        wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.doppler_shift_add_to_rv_fitted)
+        wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.stellar_rv)
         chi_square = calculate_lbl_chi_squared(wave_obs_shifted, spectra_to_fit.flux_norm_obs, spectra_to_fit.error_obs_variance, wave_mod_orig, flux_mod_orig, spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
-        dof = np.size(spectra_to_fit.flux_norm_obs[np.where((spectra_to_fit.flux_norm_obs <= lmax) & (spectra_to_fit.flux_norm_obs >= lmin))]) - 1
-        # TODO: proper calculation of DOF
-        if dof <= 0:
-            dof = 1
 
-    output_print = f""
-    for key in elem_abund_dict:
-        output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    if not spectra_to_fit.night_mode:
-        print(f"{output_print} rv={rv} vmic={vmic} vmac={vmac} rotation={rotation} fitted_chisqr={chi_square} offset={offset_chisqr / dof} chisqr={(chi_square - offset_chisqr / dof)}")
+    intermediate_results = {"abundances": elem_abund_dict, "rv": rv, "vmic": vmic, "vmac": vmac, "rotation": rotation,
+                            "fitted_chisqr": chi_square, "offset": offset_chisqr, "chi_sqr": chi_square - offset_chisqr}
 
-    return chi_square - offset_chisqr / dof
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
+
+    return chi_square - offset_chisqr
 
 def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int, maxfev: int, xatol: float, fatol: float) -> float:
     """
