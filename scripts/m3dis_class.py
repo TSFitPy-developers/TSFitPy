@@ -334,25 +334,25 @@ class M3disCall(SyntheticSpectrumGenerator):
         elif self.atmosphere_dimension == "3D":
             # check if teff is about 4600, logg is about 1.39 and feh is about -2.55, within tolerance of 0.01
             # if so, use the 3D model
-            if np.isclose(self.t_eff, 4600, atol=0.1) and np.isclose(self.log_g, 1.39, atol=0.02) and np.isclose(self.metallicity, -2.55, atol=0.2):
+            if np.isclose(self.t_eff, 4665, atol=100) and np.isclose(self.log_g, 1.64, atol=0.25) and np.isclose(self.metallicity, -2.51, atol=0.3):
                 atmo_param = f"atmos_format='Stagger' snap={self.snap} FeH={self.metallicity} dims={self.dims} nx={self.nx} ny={self.ny} nz={self.nz}"
                 atmos_path = "/mnt/beegfs/gemini/groups/bergemann/users/shared-storage/bergemann-data/Stagger_remo/hd1225623/2013-04-10_nlam48/t46g16m2503"
             else:
                 if self.atmosphere_path_3d_model is not None:
                     atmos_path = self.atmosphere_path_3d_model
                     if self.atmos_format_3d.lower == "multi" or self.atmos_format_3d.lower == "muram":
-                        atmo_param = f"atmos_format='Multi' dims={self.dims}"
+                        atmo_param = f"atmos_format='Multi'"
                     elif self.atmos_format_3d.lower == "stagger":
-                        atmo_param = f"atmos_format='Stagger' snap={self.snap} dims={self.dims} nx={self.nx} ny={self.ny} nz={self.nz}"
+                        atmo_param = f"atmos_format='Stagger' snap={self.snap} nx={self.nx} ny={self.ny} nz={self.nz}"
                     elif self.atmos_format_3d.lower == "must":
-                        atmo_param = f"atmos_format='MUST' dims={self.dims}"
+                        atmo_param = f"atmos_format='MUST'"
                     else:
                         raise ValueError(f"Atmosphere format {self.atmos_format_3d} not recognized")
                 else:
                     raise ValueError("3D atmospheres not implemented yet")
                     atmo_param = "atmos_format='MUST'"
                     atmo_param = "&atmos_params       dims=10 atmos_format='Multi' atmos_file='/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230'/"
-                    atmo_param = f"atmos_format='Multi' dims={self.dims}"
+                    atmo_param = f"atmos_format='Multi'"
                     atmos_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/m3dis_l/m3dis/experiments/Multi3D/input_multi3d/atmos/t5777g44m0005_20.5x5x230"
                 # &atmos_params       dims=1 atmos_format='MUST' atmos_file='input_multi3d/atmos/m3dis_sun_magg22_10x10x280_1' /
 
