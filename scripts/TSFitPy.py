@@ -1701,7 +1701,7 @@ class Spectra:
                 model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = pickle.load(pickled_marcs_models)
         return model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values
 
-    def fit_lbl_abund(self, line_number: int) -> dict:
+    def fit_lbl_abund_vmic(self, line_number: int) -> dict:
         """
         Fits a single line by first calling abundance calculation and inside it fitting macro + doppler shift
         It can also technically fit vmic at the same time, but it's not recommended
@@ -2530,7 +2530,7 @@ def create_and_fit_spectra(dask_client: Client, spectra: Spectra) -> list:
         if spectra.fitting_mode == "all":
             result = spectra.fit_all()
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl_function(None, spectra.fit_lbl_abund, spectra.find_upper_limit)
+            result = spectra.fit_lbl_function(None, spectra.fit_lbl_abund_vmic, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
             result = spectra.fit_lbl_function(None, spectra.fit_lbl_teff, False)
         elif spectra.fitting_mode == "vmic":
@@ -2543,7 +2543,7 @@ def create_and_fit_spectra(dask_client: Client, spectra: Spectra) -> list:
         if spectra.fitting_mode == "all":
             result = dask_client.submit(spectra.fit_all)
         elif spectra.fitting_mode == "lbl":
-            result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_abund, spectra.find_upper_limit)
+            result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_abund_vmic, spectra.find_upper_limit)
         elif spectra.fitting_mode == "teff":
             result = spectra.fit_lbl_function(dask_client, spectra.fit_lbl_teff, False)
         elif spectra.fitting_mode == "vmic":
