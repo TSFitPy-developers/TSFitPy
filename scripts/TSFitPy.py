@@ -184,11 +184,7 @@ def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_
 
     flux_synt_interp = np.interp(wave_obs, wave_synt, flux_synt)
 
-    # TODO: proper calculation of DOF
-    dof = len(flux_obs) - 1
-    if dof <= 0:
-        dof = 1
-    chi_square = np.sum(np.square(flux_obs - flux_synt_interp) / error_obs_variance) / dof
+    chi_square = np.sum(np.square(flux_obs - flux_synt_interp) / error_obs_variance) / calculate_dof(wave_obs)
 
     return chi_square
 
@@ -1381,7 +1377,7 @@ class Spectra:
                               result_one_line["rv"], result_one_line["macroturb"], result_one_line["rotation"],
                               result_one_line["vmic"], offset_chi_sqr)
         try:
-            res = root_scalar(lbl_abund_upper_limit, args=function_arguments, bracket=[start_abundance, end_abundance],
+            res = root_scalar(calc_chi_sqr_abund_error, args=function_arguments, bracket=[start_abundance, end_abundance],
                               method='brentq', options={'disp': False}, xtol=0.0025)
             if not self.night_mode:
                 print(res)
@@ -1426,7 +1422,7 @@ class Spectra:
         minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess,
                             'xatol': self.xatol_teff, 'fatol': self.fatol_teff}
         try:
-            res = minimize_function(lbl_teff, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
+            res = minimize_function(calc_chi_sqr_teff, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
             if not self.night_mode:
                 print(res.x)
 
@@ -1863,7 +1859,7 @@ class Spectra:
 
         function_arguments = (ssg, self, self.line_begins_sorted[line_number], self.line_ends_sorted[line_number], self.seg_begins[segment_index], self.seg_ends[segment_index], temp_directory, line_number, self.maxfev, self.xatol_lbl, self.fatol_lbl)
         minimization_options = {'maxfev': self.nelement * self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess, 'xatol': self.xatol_vmic, 'fatol': self.fatol_vmic, 'adaptive': False}
-        res = minimize_function(lbl_abund, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+        res = minimize_function(calc_chi_sqr_abund_with_vmic_inside, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
         if not self.night_mode:
             print(res.x)
         if self.fit_feh:
@@ -2151,7 +2147,7 @@ def calc_chi_sqr_teff_error(param: float, ssg: SyntheticSpectrumGenerator, spect
     :param vmac: Fitted macroturbulence
     :param rotation: Fitted rotation
     :param vmic: Fitted microturbulence
-    :param offset_chisqr: Offset chi squared, to subtract from the chi squared. This is the fitted chi squared + sigma^2
+    :param offset_chisqr: Offset chi squared, to subtract from the chi squared. This is the fitted chi squared + sigma^2 / dof
     :return: best fit chi squared
     """
     # new: now includes several elements
@@ -2184,19 +2180,26 @@ def calc_chi_sqr_teff_error(param: float, ssg: SyntheticSpectrumGenerator, spect
     return chi_squared - offset_chisqr
 
 
-def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
-                          temp_directory: str, rv: float, vmac: float, rotation: float,
-                          vmic: float, offset_chisqr: float) -> float:
+def calc_chi_sqr_abund_error(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra, lmin: float,
+                             lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, rv: float,
+                             vmac: float, rotation: float, vmic: float, offset_chisqr: float) -> float:
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
     doppker inside
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA] where to calculate chi squared
+    :param lmax: End of the line [AA] where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param rv: Doppler shift, fitted to add to the stellar rv
+    :param vmac: Fitted macroturbulence
+    :param rotation: Fitted rotation
+    :param vmic: Fitted microturbulence
+    :param offset_chisqr: Offset chi squared, to subtract from the chi squared. This is the fitted chi squared + sigma^2 / dof
     :return: best fit chi squared
     """
     # new: now includes several elements
@@ -2218,7 +2221,7 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
         if elem_name != "Fe":
             elem_abund_dict[elem_name] = param + feh     # convert [X/Fe] to [X/H]
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
@@ -2232,50 +2235,55 @@ def lbl_abund_upper_limit(param: list, ts: TurboSpectrum, spectra_to_fit: Spectr
 
     return chi_square - offset_chisqr
 
-def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int, maxfev: int, xatol: float, fatol: float) -> float:
+def calc_chi_sqr_abund_with_vmic_inside(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra,
+                                        lmin: float, lmax: float, lmin_segment: float, lmax_segment: float,
+                                        temp_directory: str, line_number: int, maxfev_vmic: int, xatol_vmic: float,
+                                        fatol_vmic: float) -> float:
     """
-    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
-    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
-    doppker inside
+    Calculates the chi squared for the given broadening parameters and small doppler shift. Varies abundance and vmic.
+    Here it changes the abundance, but for each abundance it calls another minimisation to find best fit vmic
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA], where to calculate chi squared
+    :param lmax: End of the line [AA], where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param line_number: Which line number/index in line_center_sorted is being fitted
+    :param maxfev_vmic: Maximum number of iterations for vmic minimisation
+    :param xatol_vmic: Absolute error in vmic for convergence
+    :param fatol_vmic: Absolute error in chi squared for convergence
     :return: best fit chi squared
     """
-    # new: now includes several elements
-    # param[0:nelements - 1] = met or abund
+    # param[0:nelements - 1] = feh or abund
 
     if spectra_to_fit.fit_feh:
         met_index = np.where(spectra_to_fit.elem_to_fit == "Fe")[0][0]
-        met = param[met_index]  # no offset, first is always element
+        feh = param[met_index]  # no offset, first is always element
     else:
-        met = spectra_to_fit.feh
-    elem_abund_dict = {"Fe": met}
+        feh = spectra_to_fit.feh
+    elem_abund_dict = {"Fe": feh}
 
-    #abundances = [met]
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + feh
 
     for i in range(spectra_to_fit.nelement):
         # spectra_to_fit.elem_to_fit[i] = element name
         # param[0:nelement - 1] = abundance of the element
         elem_name = spectra_to_fit.elem_to_fit[i]
         if elem_name != "Fe":
-            elem_abund_dict[elem_name] = param[i] + met  # convert [X/Fe] to [X/H]
-
-    for element in spectra_to_fit.input_abund:
-        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + met
+            elem_abund_dict[elem_name] = param[i] + feh  # convert [X/Fe] to [X/H]
 
     spectra_to_fit.elem_abund_fitted_dict[line_number] = elem_abund_dict
 
     param_guess, min_bounds = spectra_to_fit.get_vmic_guess(spectra_to_fit.guess_min_vmic, spectra_to_fit.guess_max_vmic)
-    function_arguments = (ts, spectra_to_fit, lmin, lmax, lmin_segment, lmax_segment, temp_directory, line_number)
-    minimization_options = {'maxfev': maxfev, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': xatol, 'fatol': fatol, 'adaptive': False}
-    res = minimize_function(lbl_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
+    function_arguments = (ssg, spectra_to_fit, lmin, lmax, lmin_segment, lmax_segment, temp_directory, line_number)
+    minimization_options = {'maxfev': maxfev_vmic, 'disp': spectra_to_fit.python_verbose, 'initial_simplex': param_guess, 'xatol': xatol_vmic, 'fatol': fatol_vmic, 'adaptive': False}
+    res = minimize_function(calc_chi_sqr_vmic, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimization_options)
 
     spectra_to_fit.vmic_fitted_dict[line_number] = res.x[0]
-    microturb = spectra_to_fit.vmic_fitted_dict[line_number]
+    vmic = spectra_to_fit.vmic_fitted_dict[line_number]
     doppler_shift = spectra_to_fit.rv_extra_fitted_dict[line_number]
     if spectra_to_fit.fit_vmac:
         macroturb = spectra_to_fit.vmac_fitted_dict[line_number]
@@ -2287,42 +2295,43 @@ def lbl_abund(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: flo
         rotation = spectra_to_fit.rotation
     chi_square = res.fun
 
-    output_print = f""
-    for key in elem_abund_dict:
-        output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    if not spectra_to_fit.night_mode:
-        print(f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
+    intermediate_results = {"abundances": elem_abund_dict, "rv": doppler_shift, "vmic": vmic, "vmac": macroturb,
+                            "rotation": rotation, "chisqr": chi_square}
+
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
 
     return chi_square
 
-def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
+def calc_chi_sqr_vmic(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra, lmin: float, lmax: float,
+                      lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
-    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
-    shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
-    doppker inside
+    Calculates the chi squared by varying vmic and fitting broadening inside
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA], where to calculate chi squared
+    :param lmax: End of the line [AA], where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param line_number: Which line number/index in line_center_sorted is being fitted
     :return: best fit chi squared
     """
-    # param[0] = vmicro
+    # param[0] = vmic
 
-    microturb = param[0]
+    vmic = param[0]
 
     macroturb = 999999    # for printing only here, in case not fitted
     rotation = 999999
-    doppler_shift = 999999    # for printing only here, in case not fitted
+    doppler_shift = 999999
     spectra_to_fit.rv_extra_fitted_dict[line_number] = doppler_shift
     spectra_to_fit.vmac_fitted_dict[line_number] = macroturb
     spectra_to_fit.rotation_fitted_dict[line_number] = rotation
 
-    met = spectra_to_fit.elem_abund_fitted_dict[line_number]["Fe"]
+    feh = spectra_to_fit.elem_abund_fitted_dict[line_number]["Fe"]
     elem_abund_dict = spectra_to_fit.elem_abund_fitted_dict[line_number]
 
-    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, met, elem_abund_dict, microturb, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
@@ -2354,25 +2363,26 @@ def lbl_vmic(param: list, ts: TurboSpectrum, spectra_to_fit: Spectra, lmin: floa
         spectra_to_fit.flux_norm_fitted_dict[line_number] = np.array([])
         spectra_to_fit.flux_fitted_dict[line_number] = np.array([])
 
-    output_print = f""
-    for key in elem_abund_dict:
-        output_print += f" [{key}/H]={elem_abund_dict[key]}"
-    if not spectra_to_fit.night_mode:
-        print(
-            f"{output_print} rv={doppler_shift} vmic={microturb} vmac={macroturb} rotation={rotation} chisqr={chi_square}")
+    intermediate_results = {"abundances": elem_abund_dict, "rv": doppler_shift, "vmic": vmic, "vmac": macroturb,
+                            "rotation": rotation, "chisqr": chi_square}
+
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
 
     return chi_square
 
-def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
+def calc_chi_sqr_teff(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra, lmin: float, lmax: float,
+                      lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
-    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: teff.
-    Calls macro + doppler inside
+    Calculates the chi squared by varying teff and fitting broadening inside
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA], where to calculate chi squared
+    :param lmax: End of the line [AA], where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param line_number: Which line number/index in line_center_sorted is being fitted
     :return: best fit chi squared
     """
     # param[0] = teff
@@ -2380,15 +2390,15 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     teff = param[0]
 
     if spectra_to_fit.vmic is not None:  # Input given
-        microturb = spectra_to_fit.vmic
+        vmic = spectra_to_fit.vmic
     else:
-        microturb = calculate_vturb(teff, spectra_to_fit.logg, spectra_to_fit.feh)
+        vmic = calculate_vturb(teff, spectra_to_fit.logg, spectra_to_fit.feh)
 
     macroturb = 999999  # for printing if fails
     rotation = 999999
     rv = 999999
 
-    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, spectra_to_fit.feh, {"H": 0, "Fe": spectra_to_fit.feh}, microturb, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ssg, spectra_to_fit.feh, {"Fe": spectra_to_fit.feh}, vmic, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
@@ -2424,7 +2434,7 @@ def lbl_teff(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         spectra_to_fit.flux_fitted_dict[line_number] = np.array([])
 
     if not spectra_to_fit.night_mode:
-        print(f"Teff={teff}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
+        print(f"Teff={teff}, RV={rv}, micro={vmic}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
 
     return chi_square
 
@@ -2929,7 +2939,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
     tsfitpy_configuration.ndimen = 1  # first dimension is RV fit
     if not tsfitpy_configuration.fit_teff:
-        if tsfitpy_configuration.fit_vmic == "Yes" and tsfitpy_configuration.fitting_mode == "lbl" and not tsfitpy_configuration.atmosphere_type == "3D":
+        if tsfitpy_configuration.fit_vmic and tsfitpy_configuration.fitting_mode == "lbl" and not tsfitpy_configuration.atmosphere_type == "3D":
             tsfitpy_configuration.ndimen += 1  # if fitting micro for lbl, not 3D
         if tsfitpy_configuration.fitting_mode == "lbl" or tsfitpy_configuration.fitting_mode == "vmic":  # TODO: if several elements fitted for other modes, change here
             tsfitpy_configuration.ndimen += tsfitpy_configuration.nelement

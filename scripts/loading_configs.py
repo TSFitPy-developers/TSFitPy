@@ -938,7 +938,7 @@ class TSFitPyConfig:
             "crashes.\n\n")
 
     @staticmethod
-    def _get_fitting_mode(fitting_mode: str):
+    def _get_fitting_mode(fitting_mode: str) -> (bool, bool):
         fit_variable, input_variable = None, None  # both booleans
         if fitting_mode == "Yes" or fitting_mode == "True":
             fit_variable = True
