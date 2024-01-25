@@ -1255,14 +1255,7 @@ class TSFitPyConfig:
         spectra_object.include_molecules = self.include_molecules
         spectra_object.nlte_flag = self.nlte_flag
 
-        # TODO: redo as booleans instead of strings
-        if self.fit_vmic:
-            spectra_object.fit_vmic = "Yes"
-        elif self.vmic_input:
-            spectra_object.fit_vmic = "Input"
-        else:
-            spectra_object.fit_vmic = "No"
-
+        spectra_object.fit_vmic = self.fit_vmic
         spectra_object.fit_vmac = self.fit_vmac
         spectra_object.fit_rotation = self.fit_rotation
         spectra_object.input_vmic = self.vmic_input

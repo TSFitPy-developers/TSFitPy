@@ -284,7 +284,7 @@ class Spectra:
         self.atmosphere_type: str = None  # "1D" or "3D", string
         self.include_molecules: bool = None  # "True" or "False", bool
         self.nlte_flag: bool = None
-        self.fit_vmic: str = "No"  # TODO: redo as bool. It expects, "Yes", "No" or "Input". Add extra variable if input?
+        self.fit_vmic: bool = False
         self.input_vmic: bool = None
         self.fit_vmac: bool = False
         self.input_vmac: bool = None
@@ -462,7 +462,7 @@ class Spectra:
                 self.input_abund: dict = abundances_dict
 
         # if Input, then takes it from the fitlist. Otherwise takes it from the constant in the config (vmac + rot)
-        if self.fit_vmic == "Input":
+        if self.input_vmic:
             self.vmic: float = float(micro)  # microturbulence. Set if it is given in input
         else:
             self.vmic = None
@@ -538,14 +538,7 @@ class Spectra:
         self.include_molecules = tsfitpy_config.include_molecules
         self.nlte_flag = tsfitpy_config.nlte_flag
 
-        # TODO: redo as booleans instead of strings
-        if tsfitpy_config.fit_vmic:
-            self.fit_vmic = "Yes"
-        elif tsfitpy_config.vmic_input:
-            self.fit_vmic = "Input"
-        else:
-            self.fit_vmic = "No"
-
+        self.fit_vmic = tsfitpy_config.fit_vmic
         self.fit_vmac = tsfitpy_config.fit_vmac
         self.fit_rotation = tsfitpy_config.fit_rotation
         self.input_vmic = tsfitpy_config.vmic_input
@@ -727,7 +720,7 @@ class Spectra:
         # param[-1] = micro turb
 
         guess_length = self.nelement
-        if self.fit_vmic == "Yes" and self.atmosphere_type != "3D":
+        if self.fit_vmic and self.atmosphere_type != "3D":
             guess_length += 1
 
         bounds = []
@@ -761,7 +754,7 @@ class Spectra:
                 else:
                     guesses = np.append(guesses, [guess_elem], axis=0)
             bounds.append(bound_elem)
-        if self.fit_vmic == "Yes" and self.atmosphere_type != "3D":  # last is micro
+        if self.fit_vmic and self.atmosphere_type != "3D":  # last is micro
             micro_guess, micro_bounds = self.get_simplex_guess(guess_length, min_guess_microturb, max_guess_microturb, self.bound_min_vmic, self.bound_max_vmic)
             guesses = np.append(guesses, [micro_guess], axis=0)
             bounds.append(micro_bounds)
@@ -1300,7 +1293,7 @@ class Spectra:
                 if result_one_line["result"]["Teff"] == self.bound_min_teff or result_one_line["result"]["Teff"] == self.bound_max_teff:
                     flag_warning = "1" + flag_warning[1:]
 
-            if self.fit_vmic == "Yes":
+            if self.fit_vmic:
                 if result_one_line["result"]["Microturb"] == self.bound_min_vmic or result_one_line["result"]["Microturb"] == self.bound_max_vmic:
                     flag_warning = "1" + flag_warning[1:]
 
@@ -1757,19 +1750,17 @@ class Spectra:
                     # here element is [X/Fe], unless it's Fe, then it's [Fe/H]
                     elem_abund_dict[elem_name] = res.x[i]
             doppler_fit = self.rv_extra_fitted_dict[line_number]
-            if self.vmic is not None:  # Input given
-                vmic = self.vmic
+            if self.atmosphere_type == "3D":
+                vmic = 2.0
             else:
-                if self.fit_vmic == "No" and self.atmosphere_type == "1D":
+                if self.input_vmic:  # Input given
+                    vmic = self.vmic
+                elif not self.fit_vmic:
                     vmic = calculate_vturb(self.teff, self.logg, feh)
-                elif self.fit_vmic == "Yes" and self.atmosphere_type == "1D":
+                elif self.fit_vmic:
                     vmic = res.x[-1]  # last param is vmic
-                elif self.fit_vmic == "Input" and self.atmosphere_type == "1D":  # just for safety's sake, normally should take in the input above anyway
-                    raise ValueError(
-                        "Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
-                        "a problem in the code?")
                 else:
-                    vmic = 2.0
+                    raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
             if self.fit_vmac:
                 vmac = self.vmac_fitted_dict[line_number]
             else:
@@ -2064,19 +2055,17 @@ def calc_chi_sqr_abund_and_vmic(param: list, ssg: SyntheticSpectrumGenerator, sp
             elem_abund_dict[elem_name] = param[i] + feh     # convert [X/Fe] to [X/H]
 
 
-    if spectra_to_fit.vmic is not None:  # Input given
-        vmic = spectra_to_fit.vmic
+    if spectra_to_fit.atmosphere_type == "3D":
+        vmic = 2.0
     else:
-        if spectra_to_fit.fit_vmic == "No" and spectra_to_fit.atmosphere_type == "1D":
+        if spectra_to_fit.input_vmic:  # Input given
+            vmic = spectra_to_fit.vmic
+        elif not spectra_to_fit.fit_vmic:
             vmic = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, feh)
-        elif spectra_to_fit.fit_vmic == "Yes" and spectra_to_fit.atmosphere_type == "1D":
-            vmic = param[-1]
-        elif spectra_to_fit.fit_vmic == "Input" and spectra_to_fit.atmosphere_type == "1D":
-            # just for safety's sake, normally should take in the input above anyway
-            raise ValueError("Microturb not given? Did you remember to set microturbulence in parameters? Or is there "
-                             "a problem in the code?")
+        elif spectra_to_fit.fit_vmic:
+            vmic = param[-1]  # last param is vmic
         else:
-            vmic = 2.0
+            raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
 
     macroturb = 999999    # for printing only here, in case not fitted
     rotation = 999999
