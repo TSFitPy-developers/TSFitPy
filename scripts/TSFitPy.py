@@ -194,8 +194,8 @@ class Result:
     def __init__(self):
         # res.x: list = [param1 best guess, param2 best guess etc]
         # res.fun: float = function value (chi squared) after the fit
-        self.fun: float = None
-        self.x: list = None
+        self.fun: float = 0
+        self.x: list = []
 
 def minimize_function(function_to_minimize, input_param_guess: np.ndarray, function_arguments: tuple, bounds: list[tuple], method: str, options: dict):
     """
@@ -272,156 +272,155 @@ class Spectra:
                  tsfitpy_config, n_workers=1, m3dis_python_module=None):
         # Default values
         self.m3dis_python_module = m3dis_python_module  # python module for reading m3dis output
-        self.compiler: str = None  # intel, gfotran, m3dis
-        self.spectral_code_path: str = None  # path to the /exec/ file
-        self.interpol_path: str = None  # path to the model_interpolators folder with fortran code
-        self.model_atmosphere_grid_path: str = None
-        self.model_atmosphere_list: str = None
-        self.model_atom_path: str = None
-        self.departure_file_path: str = None
-        self.linemask_file: str = None
-        self.segment_file: str = None
-        self.atmosphere_type: str = None  # "1D" or "3D", string
-        self.include_molecules: bool = None  # "True" or "False", bool
-        self.nlte_flag: bool = None
+        self.compiler: str = "None"  # intel, gfotran, m3dis
+        self.spectral_code_path: str = "None"  # path to the /exec/ file
+        self.interpol_path: str = "None"  # path to the model_interpolators folder with fortran code
+        self.model_atmosphere_grid_path: str = "None"
+        self.model_atmosphere_list: str = "None"
+        self.model_atom_path: str = "None"
+        self.departure_file_path: str = "None"
+        self.linemask_file: str = "None"
+        self.segment_file: str = "None"
+        self.atmosphere_type: str = "None"  # "1D" or "3D", string
+        self.include_molecules: bool = False  # "True" or "False", bool
+        self.nlte_flag: bool = False
         self.fit_vmic: bool = False
-        self.input_vmic: bool = None
+        self.input_vmic: bool = False
         self.fit_vmac: bool = False
-        self.input_vmac: bool = None
+        self.input_vmac: bool = False
         self.fit_rotation: bool = False
-        self.input_rotation: bool = None
-        self.fit_teff: bool = None  # seems like not used anymore atm
+        self.input_rotation: bool = False
+        self.fit_teff: bool = False  # seems like not used anymore atm
         #self.fit_logg: str = None  # does not work atm
-        self.nelement: int = None  # how many elements to fit (1 to whatever)
-        self.fit_feh: bool = None
-        self.elem_to_fit: np.ndarray = None  # only 1 element at a time is support atm, a list otherwise
-        self.lmin: float = None
-        self.lmax: float = None
-        self.ldelta: float = None
-        self.resolution: float = None  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
-        # macroturb: float = None  # macroturbulence km/s, constant for all stars if not fitted
+        self.nelement: int = 0  # how many elements to fit (1 to whatever)
+        self.fit_feh: bool = False
+        self.elem_to_fit: np.ndarray = np.array([])  # only 1 element at a time is support atm, a list otherwise
+        self.lmin: float = 0
+        self.lmax: float = 0
+        self.ldelta: float = 0
+        self.resolution: float = 0  # resolution coming from resolution, constant for all stars:  central lambda / FWHM
         self.rotation: float = 0  # rotation km/s, constant for all stars
-        self.fitting_mode: str = None  # "lbl" = line by line or "all"
-        self.output_folder: str = None
+        self.fitting_mode: str = "None"  # "lbl" = line by line or "all"
+        self.output_folder: str = "None"
 
-        self.dask_workers: int = None  # workers, i.e. CPUs for multiprocessing
+        self.dask_workers: int = 1  # workers, i.e. CPUs for multiprocessing
 
-        self.global_temp_dir: str = None
-        self.line_begins_sorted: np.ndarray = None
-        self.line_ends_sorted: np.ndarray = None
-        self.line_centers_sorted: np.ndarray = None
+        self.global_temp_dir: str = "None"
+        self.line_begins_sorted: np.ndarray = np.array([])
+        self.line_ends_sorted: np.ndarray = np.array([])
+        self.line_centers_sorted: np.ndarray = np.array([])
 
-        self.seg_begins: np.ndarray = None
-        self.seg_ends: np.ndarray = None
+        self.seg_begins: np.ndarray = np.array([])
+        self.seg_ends: np.ndarray = np.array([])
 
-        self.depart_bin_file_dict: dict = None
-        self.depart_aux_file_dict: dict = None
-        self.model_atom_file_dict: dict = None
-        self.aux_file_length_dict: dict = None  # loads the length of aux file to not do it everytime later
-        self.ndimen: int = None
-        self.spec_input_path: str = None
+        self.depart_bin_file_dict: dict = {}
+        self.depart_aux_file_dict: dict = {}
+        self.model_atom_file_dict: dict = {}
+        self.aux_file_length_dict: dict = {}  # loads the length of aux file to not do it everytime later
+        self.ndimen: int = 0
+        self.spec_input_path: str = "None"
 
-        self.init_guess_dict: dict = None  # initial guess for elements, if given
-        self.input_elem_abundance: dict = None  # input elemental abundance for a spectra, not fitted, just used for TS
+        self.init_guess_dict: dict = {}  # initial guess for elements, if given
+        self.input_elem_abundance: dict = {}  # input elemental abundance for a spectra, not fitted, just used for TS
 
         # bounds for the minimization
-        self.bound_min_vmac = 0  # km/s
-        self.bound_max_vmac = 30
-        self.bound_min_rotation = 0  # km/s
-        self.bound_max_rotation = 30
-        self.bound_min_vmic = 0.01  # km/s
-        self.bound_max_vmic = 5
-        self.bound_min_abund = -40  # [X/Fe]
-        self.bound_max_abund = 100
-        self.bound_min_feh = -4  # [Fe/H]
-        self.bound_max_feh = 0.5
-        self.bound_min_doppler = -1  # km/s
-        self.bound_max_doppler = 1
+        self.bound_min_vmac: float = 0  # km/s
+        self.bound_max_vmac: float = 30
+        self.bound_min_rotation: float = 0  # km/s
+        self.bound_max_rotation: float = 30
+        self.bound_min_vmic: float = 0.01  # km/s
+        self.bound_max_vmic: float = 5
+        self.bound_min_abund: float = -40  # [X/Fe]
+        self.bound_max_abund: float = 100
+        self.bound_min_feh: float = -4  # [Fe/H]
+        self.bound_max_feh: float = 0.5
+        self.bound_min_doppler: float = -1  # km/s
+        self.bound_max_doppler: float = 1
 
         # guess bounds for the minimization
-        self.guess_min_vmac = 0.2  # km/s
-        self.guess_max_vmac = 8
-        self.guess_min_rotation = 0.2  # km/s
-        self.guess_max_rotation = 2
-        self.guess_min_vmic = 0.8  # km/s
-        self.guess_max_vmic = 1.5
-        self.guess_min_abund = -1  # [X/Fe] or [Fe/H]
-        self.guess_max_abund = 0.4
-        self.guess_min_doppler = -1  # km/s
-        self.guess_max_doppler = 1
+        self.guess_min_vmac: float = 0.2  # km/s
+        self.guess_max_vmac: float = 8
+        self.guess_min_rotation: float = 0.2  # km/s
+        self.guess_max_rotation: float = 2
+        self.guess_min_vmic: float = 0.8  # km/s
+        self.guess_max_vmic: float = 1.5
+        self.guess_min_abund: float = -1  # [X/Fe] or [Fe/H]
+        self.guess_max_abund: float = 0.4
+        self.guess_min_doppler: float = -1  # km/s
+        self.guess_max_doppler: float = 1
 
-        self.bound_min_teff = 2500
-        self.bound_max_teff = 8000
+        self.bound_min_teff: float = 2500
+        self.bound_max_teff: float = 8000
 
-        self.bound_min_logg = -0.5
-        self.bound_max_logg = 5.0
+        self.bound_min_logg: float = -0.5
+        self.bound_max_logg: float = 5.0
 
-        self.guess_plus_minus_neg_teff = -1000
-        self.guess_plus_minus_pos_teff = 1000
+        self.guess_plus_minus_neg_teff: float = -1000
+        self.guess_plus_minus_pos_teff: float = 1000
 
-        self.guess_plus_minus_neg_logg = -0.5
-        self.guess_plus_minus_pos_logg = 0.5
+        self.guess_plus_minus_neg_logg: float = -0.5
+        self.guess_plus_minus_pos_logg: float = 0.5
 
-        self.find_upper_limit = False
-        self.sigmas_error = 5.0
+        self.find_upper_limit: bool = False
+        self.sigmas_error: float = 5.0
 
-        self.find_teff_errors = False
-        self.teff_error_sigma = 5.0
+        self.find_teff_errors: bool = False
+        self.teff_error_sigma: float = 5.0
 
-        self.find_logg_errors = False
-        self.logg_error_sigma = 5.0
+        self.find_logg_errors: bool = False
+        self.logg_error_sigma: float = 5.0
 
-        self.model_temperatures: np.ndarray = None
-        self.model_logs: np.ndarray = None
-        self.model_mets: np.ndarray = None
-        self.marcs_value_keys: list = None
-        self.marcs_models: dict = None
-        self.pickled_marcs_models_location: str = None  # location of the MARCS models pickled file
-        self.marcs_values: dict = None
+        self.model_temperatures: np.ndarray = np.array([])
+        self.model_logs: np.ndarray = np.array([])
+        self.model_mets: np.ndarray = np.array([])
+        self.marcs_value_keys: list = []
+        self.marcs_models: dict = {}
+        self.pickled_marcs_models_location: str = "None"  # location of the MARCS models pickled file
+        self.marcs_values: dict = {}
 
-        self.debug_mode = 0  # 0: no debug, 1: show Python warnings, 2: turn Fortran TS verbose setting on
-        self.experimental_parallelisation = False  # experimental parallelisation of the TS code
+        self.debug_mode: int = 0  # 0: no debug, 1: show Python warnings, 2: turn Fortran TS verbose setting on
+        self.experimental_parallelisation: bool = False  # experimental parallelisation of the TS code
 
-        self.m3dis_n_nu: int = None
-        self.m3dis_hash_table_size: int = None
-        self.m3dis_mpi_cores: int = None
-        self.m3dis_iterations_max: int = None
-        self.m3dis_iterations_max_precompute: int = None
-        self.m3dis_convlim: float = None
-        self.m3dis_snap: int = None
-        self.m3dis_dims: int = None
-        self.m3dis_nx: int = None
-        self.m3dis_ny: int = None
-        self.m3dis_nz: int = None
+        self.m3dis_n_nu: int = 0
+        self.m3dis_hash_table_size: int = 0
+        self.m3dis_mpi_cores: int = 0
+        self.m3dis_iterations_max: int = 0
+        self.m3dis_iterations_max_precompute: int = 0
+        self.m3dis_convlim: float = 0
+        self.m3dis_snap: int = 0
+        self.m3dis_dims: int = 0
+        self.m3dis_nx: int = 0
+        self.m3dis_ny: int = 0
+        self.m3dis_nz: int = 0
 
-        self.xatol_all = None
-        self.fatol_all = None
-        self.xatol_lbl = None
-        self.fatol_lbl = None
-        self.xatol_teff = None
-        self.fatol_teff = None
-        self.xatol_logg = None
-        self.fatol_logg = None
-        self.xatol_vmic = None
-        self.fatol_vmic = None
+        self.xatol_all: float = 0
+        self.fatol_all: float = 0
+        self.xatol_lbl: float = 0
+        self.fatol_lbl: float = 0
+        self.xatol_teff: float = 0
+        self.fatol_teff: float = 0
+        self.xatol_logg: float = 0
+        self.fatol_logg: float = 0
+        self.xatol_vmic: float = 0
+        self.fatol_vmic: float = 0
         # scipy maxfev for the minimisation
-        self.maxfev = None
+        self.maxfev: int = 0
         # Value of lpoint for turbospectrum in spectrum.inc file
-        self.lpoint_turbospectrum = None
+        self.lpoint_turbospectrum: int = 0
         # m3dis parameters
-        self.m3dis_python_package_name = None
+        self.m3dis_python_package_name: str = "None"
         # margin in AA, how much of the spectra is kept in the memory. less - less memory. more - bigger rv fits allowed
-        self.margin_obs_spectra_save: float = None
+        self.margin_obs_spectra_save: float = 0
         # adds this much randomness to the guess ratio wise to the guess for the parameters. 0 means guess is the same as the input
-        self.guess_random_ratio_to_add: float = None
+        self.guess_random_ratio_to_add: float = 0
         # whether to save different results
-        self.save_original_spectra = True
-        self.save_fitted_spectra = True
-        self.save_convolved_fitted_spectra = True
-        self.save_results = True
-        self.save_linemask = True
-        self.save_fitlist = True
-        self.save_config_file = True
+        self.save_original_spectra: bool = True
+        self.save_fitted_spectra: bool = True
+        self.save_convolved_fitted_spectra: bool = True
+        self.save_results: bool = True
+        self.save_linemask: bool = True
+        self.save_fitlist: bool = True
+        self.save_config_file: bool = True
 
         # Set values from config
         if n_workers != 1:
@@ -432,18 +431,18 @@ class Spectra:
         self.load_spectra_config(tsfitpy_config)
 
         if self.debug_mode >= 1:
-            self.python_verbose = True
+            self.python_verbose: bool = True
         else:
-            self.python_verbose = False
+            self.python_verbose: bool = False
         if self.debug_mode >= 2:
-            self.turbospectrum_verbose = True
+            self.ssg_verbose: bool = True
         else:
-            self.turbospectrum_verbose = False
+            self.ssg_verbose: bool = False
         if self.debug_mode <= -1:
             # night mode is super quiet
-            self.night_mode = True
+            self.night_mode: bool = True
         else:
-            self.night_mode = False
+            self.night_mode: bool = False
 
         self.spec_name: str = str(specname)
         self.spec_path: str = os.path.join(self.spec_input_path, str(specname))
@@ -457,7 +456,7 @@ class Spectra:
             self.input_abund: dict = abundances_dict
         else:
             try:
-                self.input_abund = {**abundances_dict, **self.input_elem_abundance[self.spec_name]}
+                self.input_abund: dict = {**abundances_dict, **self.input_elem_abundance[self.spec_name]}
             except KeyError: # if no spec_name in self.input_elem_abundance
                 self.input_abund: dict = abundances_dict
 
@@ -478,23 +477,23 @@ class Spectra:
                                           '')  # temp directory, including date and name of the star fitted
         create_dir(self.temp_dir)  # create temp directory
 
-        self.line_list_path_trimmed = line_list_path_trimmed  # location of trimmed files
+        self.line_list_path_trimmed: str = line_list_path_trimmed  # location of trimmed files
 
-        self.wavelength_obs = None
-        self.flux_norm_obs = None
-        self.error_obs_variance = None
+        self.wavelength_obs: np.ndarray = np.array([])
+        self.flux_norm_obs: np.ndarray = np.array([])
+        self.error_obs_variance: np.ndarray = np.array([])
         self.load_observed_spectra()
 
         # for experimental parallelisation need to have dictionary of fitted values so they dont interfere
         # each index is a different line
-        self.vmac_fitted_dict = {}
-        self.vmic_fitted_dict = {}
-        self.rotation_fitted_dict = {}
-        self.rv_extra_fitted_dict = {}
-        self.elem_abund_fitted_dict = {}
-        self.wavelength_fitted_dict = {}
-        self.flux_norm_fitted_dict = {}
-        self.flux_fitted_dict = {}
+        self.vmac_fitted_dict: dict = {}
+        self.vmic_fitted_dict: dict = {}
+        self.rotation_fitted_dict: dict = {}
+        self.rv_extra_fitted_dict: dict = {}
+        self.elem_abund_fitted_dict: dict = {}
+        self.wavelength_fitted_dict: dict = {}
+        self.flux_norm_fitted_dict: dict = {}
+        self.flux_fitted_dict: dict = {}
 
     def load_observed_spectra(self):
         """
@@ -976,7 +975,7 @@ class Spectra:
             spectrumclass.configure(t_eff=teff, log_g=logg, metallicity=feh, turbulent_velocity=vmic,
                                     lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                                     free_abundances=elem_abund, temp_directory=temp_dir, nlte_flag=True,
-                                    verbose=self.turbospectrum_verbose,
+                                    verbose=self.ssg_verbose,
                                     atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
                                     segment_file=self.segment_file, line_mask_file=self.linemask_file,
                                     depart_bin_file=self.depart_bin_file_dict, depart_aux_file=self.depart_aux_file_dict,
@@ -985,7 +984,7 @@ class Spectra:
             spectrumclass.configure(t_eff=teff, log_g=logg, metallicity=feh, turbulent_velocity=vmic,
                                     lambda_delta=self.ldelta, lambda_min=lmin, lambda_max=lmax,
                                     free_abundances=elem_abund, temp_directory=temp_dir, nlte_flag=False,
-                                    verbose=self.turbospectrum_verbose,
+                                    verbose=self.ssg_verbose,
                                     atmosphere_dimension=self.atmosphere_type, windows_flag=windows_flag,
                                     segment_file=self.segment_file, line_mask_file=self.linemask_file)
         return spectrumclass.synthesize_spectra()
