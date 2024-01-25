@@ -2948,18 +2948,8 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
     fitlist_data = SpectraParameters(fitlist, True)
 
     logging.debug(f"{fitlist_data}")
-
-    if tsfitpy_configuration.vmic_input:
-        output_vmic: bool = True
-    else:
-        output_vmic: bool = False
-
-    if tsfitpy_configuration.rotation_input:
-        output_rotation: bool = True
-    else:
-        output_rotation: bool = False
-    logging.debug(f"Input vmic: {output_vmic}, input rotation: {output_rotation}, input vmac: {tsfitpy_configuration.vmac_input}")
-    fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(output_vmic, tsfitpy_configuration.vmac_input, output_rotation)
+    logging.debug(f"Input vmic: {tsfitpy_configuration.vmic_input}, input vmac: {tsfitpy_configuration.vmac_input}, input rotation: {tsfitpy_configuration.rotation_input}")
+    fitlist_spectra_parameters = fitlist_data.get_spectra_parameters_for_fit(tsfitpy_configuration.vmic_input, tsfitpy_configuration.vmac_input, tsfitpy_configuration.rotation_input)
 
     if np.size(tsfitpy_configuration.init_guess_elements) > 0:
         init_guess_spectra_dict = collections.defaultdict(dict)
