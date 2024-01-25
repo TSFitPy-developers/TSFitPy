@@ -1100,7 +1100,7 @@ class Spectra:
         function_arguments = (ssg, self)
         minimize_options = {'maxiter': self.ndimen * self.maxfev, 'disp': self.python_verbose,
                             'initial_simplex': init_param_guess, 'xatol': self.xatol_all, 'fatol': self.fatol_all}
-        res = minimize_function(all_abund_rv, initial_simplex_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
+        res = minimize_function(calc_chi_sqr_all_mode, initial_simplex_guess, function_arguments, minim_bounds, 'Nelder-Mead', minimize_options)
         # print final result from minimazation
         if not self.night_mode:
             print(res.x)
@@ -1577,7 +1577,7 @@ class Spectra:
         minimize_options = {'maxfev': self.maxfev, 'disp': self.python_verbose, 'initial_simplex': param_guess,
                             'xatol': self.xatol_logg, 'fatol': self.fatol_logg}
         try:
-            res = minimize_function(lbl_logg, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
+            res = minimize_function(calc_chi_sqr_logg, param_guess[0], function_arguments, min_bounds, 'Nelder-Mead', minimize_options)
             if not self.night_mode:
                 print(res.x)
 
@@ -2386,7 +2386,12 @@ def calc_chi_sqr_teff(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_f
     rotation = 999999
     rv = 999999
 
-    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ssg, spectra_to_fit.feh, {"Fe": spectra_to_fit.feh}, vmic, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
+    elem_abund_dict = {"Fe": spectra_to_fit.feh}
+
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + spectra_to_fit.feh    # add input abundances to dict [X/H]
+
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ssg, spectra_to_fit.feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, teff=teff, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
@@ -2427,16 +2432,19 @@ def calc_chi_sqr_teff(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_f
     return chi_square
 
 
-def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float, lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
+def calc_chi_sqr_logg(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra, lmin: float, lmax: float,
+                      lmin_segment: float, lmax_segment: float, temp_directory: str, line_number: int) -> float:
     """
-    Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: logg.
-    Calls macro + doppler inside
+    Calculates the chi squared by varying logg and fitting broadening inside
     :param param: Parameters list with the current evaluation guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
-    :param lmin: Start of the line [AA]
-    :param lmax: End of the line [AA]
+    :param lmin: Start of the line [AA], where to calculate chi squared
+    :param lmax: End of the line [AA], where to calculate chi squared
     :param lmin_segment: Start of the segment, where spectra is generated [AA]
     :param lmax_segment: End of the segment, where spectra is generated [AA]
+    :param temp_directory: Temporary directory where code is being run
+    :param line_number: Which line number/index in line_center_sorted is being fitted
     :return: best fit chi squared
     """
     # param[0] = logg
@@ -2444,15 +2452,20 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
     logg = param[0]
 
     if spectra_to_fit.vmic is not None:  # Input given
-        microturb = spectra_to_fit.vmic
+        vmic = spectra_to_fit.vmic
     else:
-        microturb = calculate_vturb(spectra_to_fit.teff, logg, spectra_to_fit.feh)
+        vmic = calculate_vturb(spectra_to_fit.teff, logg, spectra_to_fit.feh)
 
     macroturb = 999999  # for printing if fails
     rotation = 999999
     rv = 999999
 
-    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ts, spectra_to_fit.feh, {"Fe": spectra_to_fit.feh}, microturb, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
+    elem_abund_dict = {"Fe": spectra_to_fit.feh}
+
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + spectra_to_fit.feh  # add input abundances to dict [X/H]
+
+    wave_mod_orig, flux_mod_orig, flux_orig = spectra_to_fit.configure_and_run_synthetic_code(ssg, spectra_to_fit.feh, elem_abund_dict, vmic, lmin_segment, lmax_segment, False, logg=logg, temp_dir=temp_directory)     # generates spectra
 
     spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
     if spectra_generated:
@@ -2488,27 +2501,20 @@ def lbl_logg(param: list, ts, spectra_to_fit: Spectra, lmin: float, lmax: float,
         spectra_to_fit.flux_norm_fitted_dict[line_number] = np.array([])
         spectra_to_fit.flux_fitted_dict[line_number] = np.array([])
 
-    if not spectra_to_fit.night_mode:
-        print(f"logg={logg}, RV={rv}, micro={microturb}, macro={macroturb}, rotation={rotation}, chisqr={chi_square}")
+    intermediate_results = {"abundances": {"Fe": spectra_to_fit.feh}, "rv": rv, "vmic": vmic, "vmac": macroturb,
+                            "rotation": rotation, "chisqr": chi_square}
+
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
 
     return chi_square
 
 
-def get_trimmed_lbl_path_name(line_list_path_trimmed: str, segment_index: float) -> os.path:
-    """
-    Gets the name for the lbl trimmed path. Consistent algorithm to always get the same folder name.
-    :param line_list_path_trimmed: Path to the trimmed line list
-    :param segment_index: Segment's numbering
-    :return: path to the folder where to save/already saved trimmed files can exist.
-    """
-    return os.path.join(line_list_path_trimmed, f"{segment_index}", '')
 
-
-def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
+def calc_chi_sqr_all_mode(param, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra) -> float:
     """
-    Calculates best fit parameters for all lines at once by calling TS and varying abundance/met and doppler shift.
-    Can also vary macroturbulence if needed
+    Calculates best fit parameters for all lines at once. Changes RV, vmac and abundance
     :param param: Parameter guess
+    :param ssg: Synthetic spectrum generator object
     :param spectra_to_fit: Spectra to fit
     :return: Best fit chi squared
     """
@@ -2524,35 +2530,51 @@ def all_abund_rv(param, ts, spectra_to_fit: Spectra) -> float:
 
     wave_obs = apply_doppler_correction(spectra_to_fit.wavelength_obs, doppler)
 
+    elem_abund_dict = {}
+
+    for element in spectra_to_fit.input_abund:
+        elem_abund_dict[element] = spectra_to_fit.input_abund[element] + spectra_to_fit.feh  # add input abundances to dict [X/H]
+
     if spectra_to_fit.fit_feh:
-        item_abund = {"Fe": abund}
-        met = abund
-        if spectra_to_fit.vmic is not None:
-            vmicro = spectra_to_fit.vmic
-        else:
-            vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.feh)
+        feh = abund
+        elem_abund_dict = {"Fe": feh}
     else:   # Fe: [Fe/H]. X: [X/Fe]. But TS takes [X/H]. Thus convert [X/H] = [X/Fe] + [Fe/H]
-        item_abund = {"Fe": spectra_to_fit.feh, spectra_to_fit.elem_to_fit[0]: abund + spectra_to_fit.feh}
-        met = spectra_to_fit.feh
-        if spectra_to_fit.vmic is not None:
-            vmicro = spectra_to_fit.vmic
-        else:
-            vmicro = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, spectra_to_fit.feh)
+        feh = spectra_to_fit.feh
+        elem_abund_dict[spectra_to_fit.elem_to_fit[0]] = abund + feh
+    if spectra_to_fit.input_vmic:  # Input given
+        vmic = spectra_to_fit.vmic
+    else:
+        vmic = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, feh)
 
-    wave_mod_orig, flux_mod_orig, _ = spectra_to_fit.configure_and_run_synthetic_code(ts, met, item_abund, vmicro, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
+    elem_abund_dict["Fe"] = feh
 
-    spectra_generated, chi_square = check_if_spectra_generated(wave_mod_orig, spectra_to_fit.night_mode)
+    wavelength_fitted, flux_norm_fitted, _ = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict, vmic, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
+
+    spectra_generated, chi_square = check_if_spectra_generated(wavelength_fitted, spectra_to_fit.night_mode)
     if spectra_generated:
-        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_name, wave_mod_orig, flux_mod_orig, spectra_to_fit.temp_dir,
+        chi_square = calc_ts_spectra_all_lines(spectra_to_fit.spec_name, wavelength_fitted, flux_norm_fitted, spectra_to_fit.temp_dir,
                                                spectra_to_fit.output_folder,
                                                wave_obs, spectra_to_fit.flux_norm_obs,
                                                macroturb, spectra_to_fit.resolution, spectra_to_fit.rotation,
                                                spectra_to_fit.line_begins_sorted, spectra_to_fit.line_ends_sorted,
                                                spectra_to_fit.seg_begins, spectra_to_fit.seg_ends)
 
-    #print(abund, doppler, chi_square, macroturb)
+    intermediate_results = {"abundances": elem_abund_dict, "rv": doppler, "vmic": vmic, "vmac": macroturb,
+                            "rotation": spectra_to_fit.rotation, "chisqr": chi_square}
+
+    print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
 
     return chi_square
+
+def get_trimmed_lbl_path_name(line_list_path_trimmed: str, segment_index: float) -> os.path:
+    """
+    Gets the name for the lbl trimmed path. Consistent algorithm to always get the same folder name.
+    :param line_list_path_trimmed: Path to the trimmed line list
+    :param segment_index: Segment's numbering
+    :return: path to the folder where to save/already saved trimmed files can exist.
+    """
+    return os.path.join(line_list_path_trimmed, f"{segment_index}", '')
+
 
 
 def load_spectra(specname: str, teff: float, logg: float, rv: float, met: float, microturb: float,
@@ -2577,31 +2599,10 @@ def create_and_fit_spectra(dask_client: Client, spectra: Spectra) -> list:
     :param spectra: Spectra object
     :return: result of the fit with the best fit parameters and chi squared
     """
-    # Load TS configuration
-    #with open(tsfitpy_pickled_configuration_path, 'rb') as f:
-    #    tsfitpy_configuration = pickle.load(f)
-
-    #n_workers = tsfitpy_configuration.number_of_cpus
-    #tsfitpy_compiler = tsfitpy_configuration.compiler.lower()
-    #debug_mode = tsfitpy_configuration.debug_mode
-
-    #if tsfitpy_configuration.number_of_cpus != 1:
-    #    tsfitpy_configuration = dask_client.scatter(tsfitpy_configuration)
-
-    #spectra = Spectra(specname, teff, logg, rv, met, microturb, macroturb, rotation1, abundances_dict1, resolution1,
-    #                  line_list_path_trimmed, index, tsfitpy_configuration, n_workers=n_workers, m3dis_python_module=m3dis_python_module)
-
-    #if tsfitpy_compiler == "m3dis":
-    #    spectra.precompute_departure()
-    #    logging.debug(f"Precomputed departure coefficients {spectra.m3dis_iterations_max_precompute}")
-
-    #spectra.save_observed_spectra(os.path.join(spectra.output_folder, spectra.spec_name))
 
     if spectra.debug_mode >= 0:
         print(f"Fitting {spectra.spec_name}")
         print(f"Teff = {spectra.teff}; logg = {spectra.logg}; RV = {spectra.stellar_rv}")
-    #print("here", spectra)
-    #spectra = spectra.result()
 
     if spectra.dask_workers == 1:
         if spectra.fitting_mode == "all":
@@ -2639,7 +2640,7 @@ def run_tsfitpy(output_folder_title: str, config_location: str, spectra_location
     tsfitpy_configuration.validate_input()
     launch_tsfitpy_with_config(tsfitpy_configuration, output_folder_title, config_location)
 
-def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_folder_title: str, config_location: str):
+def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_folder_title: str, config_location: str) -> pd.DataFrame:
     if tsfitpy_configuration.debug_mode >= 0:
         print("\nIMPORTANT UPDATE:")
         print("Update 24.05.2023. Currently the assumption is that the third column in the observed spectra is sigma "
