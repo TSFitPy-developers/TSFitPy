@@ -17,7 +17,6 @@ from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 from scripts.synthetic_code_class import fetch_marcs_grid
 import time
 import os
-from os import path as os_path
 try:
     from dask.distributed import Client, get_client, secede, rejoin
 except (ModuleNotFoundError, ImportError):
@@ -3085,7 +3084,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
         if not tsfitpy_configuration.compiler.lower() == "m3dis":
             for element in model_atom_file_dict:
-                tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os_path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+                tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os.path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
         else:
             for element in model_atom_file_dict:
                 tsfitpy_configuration.aux_file_length_dict[element] = 0
