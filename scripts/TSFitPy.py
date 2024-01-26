@@ -1190,8 +1190,8 @@ class Spectra:
         if len(result_one_line["fit_wavelength"]) > 0 and result_one_line["chi_sqr"] <= 99999:
             if self.save_fitted_spectra:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                    indices_to_save_conv = np.argsort(result_one_line['fit_wavelength'])
-                    np.savetxt(g, np.column_stack((result_one_line['fit_wavelength'][indices_to_save_conv], result_one_line['fit_flux_norm'][indices_to_save_conv], result_one_line['fit_flux'][indices_to_save_conv])), fmt=('%.5f', '%.5f', '%.10f'))
+                    indices_argsorted = np.argsort(result_one_line['fit_wavelength'])
+                    np.savetxt(g, np.column_stack((result_one_line['fit_wavelength'][indices_argsorted], result_one_line['fit_flux_norm'][indices_argsorted], result_one_line['fit_flux'][indices_argsorted])), fmt=('%.5f', '%.5f', '%.10f'))
             line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
             segment_left, segment_right = self.seg_begins[line_number], self.seg_ends[line_number]
 
@@ -1232,8 +1232,8 @@ class Spectra:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"),
                           'a') as h:
                     # first sort the arrays by wavelength
-                    indices_to_save_conv = np.argsort(wavelength_fit_conv[indices_to_save_conv])
-                    np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv], flux_fit_conv[indices_to_save_conv])), fmt='%.5f')
+                    indices_argsorted = np.argsort(wavelength_fit_conv[indices_to_save_conv])
+                    np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv][indices_argsorted], flux_fit_conv[indices_to_save_conv][indices_argsorted])), fmt='%.5f')
 
             wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
             flux_ob = self.flux_norm_obs
