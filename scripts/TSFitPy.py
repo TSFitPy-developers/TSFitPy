@@ -1233,7 +1233,7 @@ class Spectra:
                           'a') as h:
                     # first sort the arrays by wavelength
                     indices_to_save_conv = np.argsort(wavelength_fit_conv[indices_to_save_conv])
-                    np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv][indices_to_save_conv], flux_fit_conv[indices_to_save_conv][indices_to_save_conv])), fmt='%.5f')
+                    np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv], flux_fit_conv[indices_to_save_conv])), fmt='%.5f')
 
             wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
             flux_ob = self.flux_norm_obs
