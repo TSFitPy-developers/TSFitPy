@@ -1190,8 +1190,7 @@ class Spectra:
         if len(result_one_line["fit_wavelength"]) > 0 and result_one_line["chi_sqr"] <= 99999:
             if self.save_fitted_spectra:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
-                    np.savetxt(g, np.column_stack((result_one_line['fit_wavelength'], result_one_line['fit_flux_norm'], result_one_line['fit_flux'])))
-
+                    np.savetxt(g, np.column_stack((result_one_line['fit_wavelength'], result_one_line['fit_flux_norm'], result_one_line['fit_flux'])), fmt=('%.5f', '%.5f', '%.10f'))
             line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
             segment_left, segment_right = self.seg_begins[line_number], self.seg_ends[line_number]
 
@@ -1231,7 +1230,7 @@ class Spectra:
             if self.save_convolved_fitted_spectra:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved.spec"),
                           'a') as h:
-                    np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv], flux_fit_conv[indices_to_save_conv])), fmt='%f')
+                    np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv], flux_fit_conv[indices_to_save_conv])), fmt='%.5f')
 
             wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
             flux_ob = self.flux_norm_obs
@@ -1325,6 +1324,12 @@ class Spectra:
             else:
                 result_one_line["result"][f"err_{int(sigmas_error)}_err"] = 999999
                 result_one_line["result"]["err_chi_sqr_diff"] = 999999
+
+        # let's only keep 4 decimals for most of the results in result_one_line["result"]
+        for key, value in result_one_line["result"].items():
+            keys_to_skip = ["chi_sqr", "err_chi_sqr_diff", "flag_error", "flag_warning", "chi_squared"]
+            if isinstance(value, float) and key not in keys_to_skip:
+                result_one_line["result"][key] = round(value, 4)
 
         return result_one_line
 
