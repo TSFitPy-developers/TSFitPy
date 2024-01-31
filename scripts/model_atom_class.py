@@ -56,23 +56,23 @@ class ECLevel:
 
 class BBTransition:
     def __init__(
-        self, wavelength, ion_transition, loggf, lower_level_ec, upper_level_ec, bb_id
+        self, wavelength, ion_transition, loggf, lower_level_ec=0.0, upper_level_ec=0.0, bb_id=0
     ):
-        self.wavelength_aa = wavelength
-        self.ion_transition = ion_transition
+        self.wavelength_aa: float = wavelength
+        self.ion_transition: int = ion_transition
 
-        self.loggf = loggf
-        self.f_value = -1
-        self.lower_level_ec = lower_level_ec
-        self.upper_level_ec = upper_level_ec
+        self.loggf: float = loggf
+        self.f_value: float = -1
+        self.lower_level_ec: float = lower_level_ec
+        self.upper_level_ec: float = upper_level_ec
 
-        self.lower_level_id = 1
-        self.upper_level_id = 1
-        self.lower_level_label = ""
-        self.upper_level_label = ""
+        self.lower_level_id: int = 1
+        self.upper_level_id: int = 1
+        self.lower_level_label: str = ""
+        self.upper_level_label: str = ""
         # self.
 
-        self.bb_id = bb_id
+        self.bb_id: int = bb_id
 
         # f"* UP LOW      F        NQ  QMAX   Q0    IW    GA            GV   GQ\n"
 
@@ -124,7 +124,7 @@ class BBTransition:
             self.lower_level_id = lower_levels_within_tolerance[0].level_id
             self.lower_level_label = lower_levels_within_tolerance[0].label_name
             lower_g_value = lower_levels_within_tolerance[0].g_value
-            self.f_value = 10**self.loggf / lower_g_value
+            self.calculate_f_value(lower_g_value)
         else:
             print(f"Found {len(lower_levels_within_tolerance)} lower levels for {self}")
             self.lower_level_id = -2
@@ -155,6 +155,7 @@ class BBTransition:
             )
 
             self.ga = einstein_coefficient
+            self.ga = 0
         else:
             self.ga = 0
 
@@ -202,6 +203,9 @@ class BBTransition:
                 return False
         else:
             return False
+
+    def calculate_f_value(self, lower_g_value: float):
+        self.f_value = 10**self.loggf / lower_g_value
 
 
 class BFTransition:
@@ -315,26 +319,24 @@ def is_number(a):
 
 
 class ModelAtom:
-    def __init__(self, atom_element, atom_filename):
-        self.atom_element = atom_element
-        # atom_filename is the full path to the file. we will only use the filename
-        atom_filename = os.path.basename(atom_filename)
-        self.atom_filename = atom_filename
+    def __init__(self, atom_element="", atom_filename=""):
+        self.atom_element: str = atom_element
+        self.atom_filename: str = atom_filename
 
-        self.atom_abundance = 0.0
-        self.atom_mass = 0.0
+        self.atom_abundance: float = 0.0
+        self.atom_mass: float = 0.0
 
         self.ec_levels: list[ECLevel] = []
-        self.ec_length = 0
-        self.max_ion = 0
+        self.ec_length: int = 0
+        self.max_ion: int = 0
 
         self.bb_transitions: list[BBTransition] = []
-        self.bb_length = 0
+        self.bb_length: int = 0
 
         self.bf_transitions: list[BFTransition] = []
-        self.bf_length = 0
+        self.bf_length: int = 0
 
-        self.nrfix = 0
+        self.nrfix: int = 0
 
         self.collisional_transitions: list[CollisionalTransition] = []
 
@@ -343,6 +345,11 @@ class ModelAtom:
         # set the ids according to the order
         for i, bb_transition in enumerate(self.bb_transitions):
             bb_transition.bb_id = i + 1
+
+    def add_bb_transition(self, bb_transition: BBTransition):
+        self.bb_transitions.append(bb_transition)
+        self.bb_length = len(self.bb_transitions)
+        self.sort_bb_transitions()
 
     def leave_only_bb_transitions_between_wavelength(
         self, min_wavelength: float, max_wavelength: float
@@ -525,7 +532,7 @@ class ModelAtom:
     def write_model_atom(
         self, path, label_length=10, remove_unmatched_transitions=True
     ):
-        with open(os.path.join(path, self.atom_filename), "w") as file:
+        with open(path, "w") as file:
             file.write(f"{self.atom_element}\n")
             file.write(f"{self.atom_abundance:>8.2f}  {self.atom_mass:>7.3f}\n")
             file.write(
@@ -577,7 +584,7 @@ class ModelAtom:
             self.read_model_atom_formato2_version(path)
 
     def read_model_atom_mb_version(self, path):
-        with open(os.path.join(path, self.atom_filename), "r") as file:
+        with open(path, "r") as file:
             lines = file.readlines()
         # read lines skipping any comments (starting with *) until * EC
 
@@ -829,7 +836,7 @@ class ModelAtom:
                 line_index += 1
 
     def read_model_atom_formato2_version(self, path):
-        with open(os.path.join(path, self.atom_filename)) as file:
+        with open(path) as file:
             lines = file.readlines()
         # read lines skipping any comments (starting with *) until * EC
         line_index = 0
