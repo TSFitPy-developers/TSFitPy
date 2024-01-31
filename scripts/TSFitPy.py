@@ -2975,8 +2975,8 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
             # go through all segments
             for segment_index, (segment_begin, segment_end) in enumerate(zip(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)):
                 # load model atom
-                model_atom = ModelAtom(None, tsfitpy_configuration.model_atom_file_dict[tsfitpy_configuration.nlte_elements[0]])
-                model_atom.read_model_atom(tsfitpy_configuration.model_atoms_path)
+                model_atom = ModelAtom()
+                model_atom.read_model_atom(os.path.join(tsfitpy_configuration.model_atoms_path, tsfitpy_configuration.model_atom_file_dict[tsfitpy_configuration.nlte_elements[0]]))
                 # cut model atom
                 model_atom.leave_only_bb_transitions_between_wavelength(segment_begin, segment_end)
                 # lets create new temporary directory, where for each segment we will save model atom
@@ -2984,7 +2984,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
                 # create directory
                 create_dir(temp_dir_model_atom)
                 # save model atom
-                model_atom.write_model_atom(temp_dir_model_atom)
+                model_atom.write_model_atom(os.path.join(temp_dir_model_atom, model_atom.atom_filename))
             # change the path of config's model atom file to temporary
             tsfitpy_configuration.model_atoms_path = os.path.join(tsfitpy_configuration.temporary_directory_path, "model_atom", "")
 

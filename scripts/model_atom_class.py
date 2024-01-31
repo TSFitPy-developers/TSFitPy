@@ -578,6 +578,9 @@ class ModelAtom:
             file.write(f"END\n")
 
     def read_model_atom(self, path):
+        # get basename of the path
+        basename = os.path.basename(path)
+        self.atom_filename = basename
         try:
             self.read_model_atom_mb_version(path)
         except ValueError:
@@ -1124,3 +1127,21 @@ class ModelAtom:
         while lines[line_index].startswith("*"):
             line_index += 1
         return lines[line_index], line_index + 1
+
+
+
+if __name__ == '__main__':
+    atom = ModelAtom()
+    atom.read_model_atom("/Users/storm/docker_common_folder/TSFitPy/input_files/nlte_data/model_atoms/atom.mg86b")
+
+    wavelength, ion_transition, loggf = 5528.411, 1, -0.498
+    lower_level_ec, upper_level_ec = 35051.36, 53134.70
+    ga = 0
+    gv = 0
+
+    new_line = BBTransition(wavelength, ion_transition, loggf, lower_level_ec, upper_level_ec)
+    new_line.find_level_id(atom.ec_levels)
+    new_line.ga = ga
+    new_line.gv = gv
+    atom.add_bb_transition(new_line)
+    atom.write_model_atom("atom.mg2")
