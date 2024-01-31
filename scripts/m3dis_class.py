@@ -408,7 +408,8 @@ class M3disCall(SyntheticSpectrumGenerator):
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
         #TODO absmet files?
-        logging.debug(config_m3dis)
+        if self.verbose:
+            print(config_m3dis)
 
         if self.verbose:
             stdout = None
@@ -724,6 +725,7 @@ class M3disCall(SyntheticSpectrumGenerator):
                         wavelength, _ = completed_run.get_xx(completed_run.lam)
                         flux, continuum = completed_run.get_yy(norm=False)
                         normalised_flux = flux / continuum
+                        flux = flux * 2.99792458e10 / (wavelength**2) * 1e8
                     except FileNotFoundError as e:
                         if not self.night_mode:
                             print(f"m3dis, cannot find {e}")
