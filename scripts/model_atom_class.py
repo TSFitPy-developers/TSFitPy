@@ -70,7 +70,7 @@ class BBTransition:
         self.upper_level_id: int = 1
         self.lower_level_label: str = ""
         self.upper_level_label: str = ""
-        # self.
+        self.lower_level_g_value: float = 0.0
 
         self.bb_id: int = bb_id
 
@@ -124,6 +124,7 @@ class BBTransition:
             self.lower_level_id = lower_levels_within_tolerance[0].level_id
             self.lower_level_label = lower_levels_within_tolerance[0].label_name
             lower_g_value = lower_levels_within_tolerance[0].g_value
+            self.lower_level_g_value = lower_g_value
             self.calculate_f_value(lower_g_value)
         else:
             print(f"Found {len(lower_levels_within_tolerance)} lower levels for {self}")
@@ -177,7 +178,7 @@ class BBTransition:
             )
         file.write(
             f"{self.upper_level_id:>4} {self.lower_level_id:>4}{self.f_value:>12.3E}{self.nq:>6}{self.qmax:>6.1f}{self.q0:>6.1f}"
-            f"{self.iw:>5}{self.ga:>11.3E}{self.gv:>10.3f}{self.gq:>10.2e}{self.line_profile:>12}\n"
+            f"{self.iw:>5}{self.ga:>11.3E}{self.gv:>10.1f}{self.gq:>10.2e}{self.line_profile:>12}\n"
         )
         if self.hyperfine:
             for i in range(len(self.hyperfine_delta_ec)):
@@ -724,6 +725,7 @@ class ModelAtom:
                     bb_transition.line_profile = line_profile
                     bb_transition.lower_level_label = lower_level_label
                     bb_transition.upper_level_label = upper_level_label
+                    bb_transition.lower_level_g_value = self.ec_levels[lower_level_id - 1].g_value
 
                     # check if there is hyperfine structure
                     if bb_transition.iw > 1:
@@ -974,6 +976,7 @@ class ModelAtom:
                 bb_transition.upper_level_label = self.ec_levels[
                     upper_level_id - 1
                 ].label_name
+                bb_transition.lower_level_g_value = self.ec_levels[lower_level_id - 1].g_value
 
                 # check if there is hyperfine structure
                 if bb_transition.iw > 1:
@@ -1131,17 +1134,65 @@ class ModelAtom:
 
 
 if __name__ == '__main__':
-    atom = ModelAtom()
-    atom.read_model_atom("/Users/storm/docker_common_folder/TSFitPy/input_files/nlte_data/model_atoms/atom.mg86b")
+    fe_atom = ModelAtom()
+    fe_atom.read_model_atom("atom.fe607a")
 
-    wavelength, ion_transition, loggf = 5528.411, 1, -0.498
-    lower_level_ec, upper_level_ec = 35051.36, 53134.70
-    ga = 0
-    gv = 0
+    # change nq value for lines with following bb_ids
+    wavelengths = np.loadtxt("fee", usecols=(0,), unpack=True, dtype=float, comments=";")
+    # find ids in the wavelengths
+    for wavelength in wavelengths:
+        for bb_transition in fe_atom.bb_transitions:
+            if abs(bb_transition.wavelength_aa - wavelength) <= 0.01:
+                # change nq value
+                bb_transition.nq = 121
+                print(f"Changed nq for {bb_transition.wavelength_aa} {wavelength} to 121")
 
-    new_line = BBTransition(wavelength, ion_transition, loggf, lower_level_ec, upper_level_ec)
-    new_line.find_level_id(atom.ec_levels)
-    new_line.ga = ga
-    new_line.gv = gv
-    atom.add_bb_transition(new_line)
-    atom.write_model_atom("atom.mg2")
+    fe_atom.write_model_atom("atom.fe607a_nq")
+
+
+
+    #atom = ModelAtom()
+    #atom.read_model_atom("/Users/storm/docker_common_folder/TSFitPy/input_files/nlte_data/model_atoms/atom.mg86b")
+
+    #wavelength, ion_transition, loggf = 5528.411, 1, -0.498
+    #lower_level_ec, upper_level_ec = 35051.36, 53134.70
+    #ga = 0
+    #gv = 0
+
+    #new_line = BBTransition(wavelength, ion_transition, loggf, lower_level_ec, upper_level_ec)
+    #new_line.find_level_id(atom.ec_levels)
+    #new_line.ga = ga
+    #new_line.gv = gv
+    #atom.add_bb_transition(new_line)
+    #atom.write_model_atom("atom.mg2")
+    exit()
+    # load Y loggf
+    with open("/Users/storm/docker_common_folder/TSFitPy/scripts/y_loggf.txt") as file:
+        lines = file.readlines()
+    y_loggf = {}
+    for line in lines:
+        fields = line.strip().split()
+        wavelength = float(fields[0]) * 10
+        loggf_uncorr = float(fields[7])
+        loggf_corr = float(fields[10])
+        reference = fields[-1]
+        y_loggf[wavelength] = {"reference": reference, "loggf_uncorr": loggf_uncorr, "loggf_corr": loggf_corr}
+
+    atom_y = ModelAtom()
+    atom_y.read_model_atom("/Users/storm/docker_common_folder/TSFitPy/input_files/nlte_data/model_atoms/atom.y423qm")
+    # change loggf for several lines. go through all BB transitions and check if the wavelength is in the dictionary within 0.1 AA
+    for bb_transition in atom_y.bb_transitions:
+        for wavelength in y_loggf:
+            if abs(bb_transition.wavelength_aa - wavelength) <= 0.001:
+                # if reference is T, then take the corrected loggf, otherwise take the uncorrected loggf
+                if y_loggf[wavelength]["reference"] == "T" or y_loggf[wavelength]["reference"] == "B":
+                    bb_transition.loggf = y_loggf[wavelength]["loggf_corr"]
+                else:
+                    bb_transition.loggf = y_loggf[wavelength]["loggf_uncorr"]
+                # recalculate f_value
+                bb_transition.calculate_f_value(bb_transition.lower_level_g_value)
+                # remove the wavelength from the dictionary
+                del y_loggf[wavelength]
+                break
+
+    atom_y.write_model_atom("./atom.y423qmh_pf")

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pickle
-from scripts.turbospectrum_class_nlte import TurboSpectrum
-from scripts.convolve import *
+from .turbospectrum_class_nlte import TurboSpectrum
+from .convolve import *
 import datetime
 import shutil
 import os
-from scripts.solar_abundances import solar_abundances
-from scripts.auxiliary_functions import calculate_vturb
+from .solar_abundances import solar_abundances
+from .auxiliary_functions import calculate_vturb
 
 
 def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vmic=None, verbose=False, **kwargs):

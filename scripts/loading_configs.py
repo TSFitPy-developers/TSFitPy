@@ -6,7 +6,7 @@ from _warnings import warn
 from configparser import ConfigParser
 import pandas as pd
 import numpy as np
-from scripts.solar_abundances import periodic_table, solar_abundances
+from .solar_abundances import periodic_table, solar_abundances
 
 class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):

@@ -7,14 +7,14 @@ from warnings import warn
 import numpy as np
 from distributed import get_worker
 from scipy.optimize import minimize, root_scalar
-from scripts.auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
+from .auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
     apply_doppler_correction, create_segment_file, import_module_from_path
-from scripts.model_atom_class import ModelAtom
-from scripts.solar_abundances import periodic_table
-from scripts.turbospectrum_class_nlte import TurboSpectrum
-from scripts.m3dis_class import M3disCall
-from scripts.synthetic_code_class import SyntheticSpectrumGenerator
-from scripts.synthetic_code_class import fetch_marcs_grid
+from .model_atom_class import ModelAtom
+from .solar_abundances import periodic_table
+from .turbospectrum_class_nlte import TurboSpectrum
+from .m3dis_class import M3disCall
+from .synthetic_code_class import SyntheticSpectrumGenerator
+from .synthetic_code_class import fetch_marcs_grid
 import time
 import os
 try:
@@ -23,11 +23,11 @@ except (ModuleNotFoundError, ImportError):
     raise ModuleNotFoundError("Dask not installed. It is required for multiprocessing. Install using pip install dask[complete]")
 import shutil
 import collections
-from scripts.convolve import conv_rotation, conv_macroturbulence, conv_res
-from scripts.create_window_linelist_function import create_window_linelist
-from scripts.loading_configs import SpectraParameters, TSFitPyConfig
+from .convolve import conv_rotation, conv_macroturbulence, conv_res
+from .create_window_linelist_function import create_window_linelist
+from .loading_configs import SpectraParameters, TSFitPyConfig
 import logging
-from scripts.dask_client import get_dask_client
+from .dask_client import get_dask_client
 import pandas as pd
 
 output_default_configuration_name: str = "configuration.cfg"

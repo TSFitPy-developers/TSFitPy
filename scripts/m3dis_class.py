@@ -7,10 +7,10 @@ import numpy as np
 import os
 import tempfile
 from scipy.interpolate import LinearNDInterpolator, interp1d
-from scripts import marcs_class
-from scripts.solar_abundances import periodic_table, solar_abundances
-from scripts.solar_isotopes import solar_isotopes
-from scripts.synthetic_code_class import SyntheticSpectrumGenerator
+from . import marcs_class
+from .solar_abundances import periodic_table, solar_abundances
+from .solar_isotopes import solar_isotopes
+from .synthetic_code_class import SyntheticSpectrumGenerator
 
 
 class M3disCall(SyntheticSpectrumGenerator):

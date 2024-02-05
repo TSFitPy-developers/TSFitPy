@@ -11,10 +11,10 @@ import numpy as np
 import math
 import logging
 
-from scripts.auxiliary_functions import closest_available_value
-from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
-from scripts.solar_isotopes import solar_isotopes
-from scripts.synthetic_code_class import SyntheticSpectrumGenerator
+from .auxiliary_functions import closest_available_value
+from .solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
+from .solar_isotopes import solar_isotopes
+from .synthetic_code_class import SyntheticSpectrumGenerator
 
 
 class TurboSpectrum(SyntheticSpectrumGenerator):

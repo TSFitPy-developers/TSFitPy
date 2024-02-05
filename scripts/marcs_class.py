@@ -5,7 +5,7 @@ from typing import Union
 # class for MARCS model atmospheres
 import numpy as np
 import matplotlib.pyplot as plt
-from scripts.solar_abundances import  periodic_table
+from .solar_abundances import  periodic_table
 import matplotlib
 from scipy.interpolate import interp1d
 

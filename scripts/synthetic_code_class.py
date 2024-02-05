@@ -9,8 +9,8 @@ from typing import Tuple
 import numpy as np
 import logging
 import abc
-from scripts.auxiliary_functions import closest_available_value
-from scripts.solar_abundances import solar_abundances, molecules_atomic_number
+from .auxiliary_functions import closest_available_value
+from .solar_abundances import solar_abundances, molecules_atomic_number
 
 class SyntheticSpectrumGenerator:
     """
