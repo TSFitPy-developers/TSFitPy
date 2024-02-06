@@ -1732,26 +1732,33 @@ class Spectra:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
         ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
-        elem_abund_dict_xh = get_input_xh_abund(self.feh, self)
+        if self.lightweight_ts_run:
+            elem_abund_dict_xh = get_input_xh_abund(self.feh, self)
 
-        for i in range(self.nelement):
-            # spectra_to_fit.elem_to_fit[i] = element name
-            # param[0:nelement - 1] = abundance of the element
-            elem_name = self.elem_to_fit[i]
-            if elem_name != "Fe":
-                elem_abund_dict_xh[elem_name] = 0 + self.feh  # convert [X/Fe] to [X/H]
+            for i in range(self.nelement):
+                # spectra_to_fit.elem_to_fit[i] = element name
+                # param[0:nelement - 1] = abundance of the element
+                elem_name = self.elem_to_fit[i]
+                if elem_name != "Fe":
+                    elem_abund_dict_xh[elem_name] = 0 + self.feh  # convert [X/Fe] to [X/H]
 
-        if self.atmosphere_type == "3D":
-            vmic = 2.0
-        else:
-            if self.input_vmic:  # Input given
-                vmic = self.vmic
-            elif not self.fit_vmic:
-                vmic = calculate_vturb(self.teff, self.logg, self.feh)
+            if self.atmosphere_type == "3D":
+                vmic = 2.0
             else:
-                raise ValueError("Cannot fit vmic if precomputing babsma")
+                if self.input_vmic:  # Input given
+                    vmic = self.vmic
+                elif not self.fit_vmic:
+                    vmic = calculate_vturb(self.teff, self.logg, self.feh)
+                else:
+                    raise ValueError("Cannot fit vmic if precomputing babsma")
 
-        self.configure_and_run_synthetic_code(ssg, self.feh, elem_abund_dict_xh, vmic, self.seg_begins[segment_index], self.seg_ends[segment_index], False, temp_directory)
+            ssg.run_babsma_flag = True
+            ssg.run_bsyn_flag = False
+
+            self.configure_and_run_synthetic_code(ssg, self.feh, elem_abund_dict_xh, vmic, self.seg_begins[segment_index], self.seg_ends[segment_index], False, temp_directory)
+
+            ssg.run_babsma_flag = False
+            ssg.run_bsyn_flag = True
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
 

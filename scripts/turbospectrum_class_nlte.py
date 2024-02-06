@@ -70,6 +70,9 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         self.cont_mask_file = None
         self.line_mask_file = None
 
+        self.run_babsma_flag: bool = True
+        self.run_bsyn_flag: bool = True
+
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
                   turbulent_velocity: float=None, free_abundances=None, free_isotopes=None,
@@ -228,7 +231,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
         file.close()
 
-    def _interpolate_departure_coefficients(self, marcs_model_list: list):
+    def _interpolate_atmosphere(self, marcs_model_list: list):
         if self.nlte_flag:
             for element in self.model_atom_file:
                 element_abundance = self._get_element_abundance(element)
@@ -493,8 +496,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         else:
             print("Unexpected error?")
         self.atmosphere_properties = atmosphere_properties
-        self._interpolate_departure_coefficients(atmosphere_properties['marcs_model_list'])
-        # print(self.atmosphere_properties)
 
     def make_babsma_bsyn_file(self, spherical):
         """
@@ -651,7 +652,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         return wave, flux_norm, flux
 
-    def synthesize(self, run_babsma=True, run_bsyn=True):
+    def synthesize(self, run_babsma_flag=True, run_bsyn_flag=True):
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
 
         logging.debug("babsma input:\n{}".format(babsma_in))
@@ -676,7 +677,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             stdout = open('/dev/null', 'w')
             stderr = subprocess.STDOUT
 
-        if run_babsma:
+        if run_babsma_flag:
             logging.debug("Running babsma")
 
             # Generate configuration files to pass to babsma and bsyn
@@ -701,7 +702,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 return output
             output["return_code"] = pr1.returncode
 
-        if run_bsyn:
+        if run_bsyn_flag:
             logging.debug("Running bsyn")
 
             # Run bsyn. This synthesizes the spectrum
@@ -740,7 +741,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         stdout_bytes, stderr_bytes = pr1.communicate()
         return pr1, stderr_bytes
 
-    def run_turbospectrum(self, run_babsma=True, run_bsyn=True):
+    def run_turbospectrum(self, run_babsma_flag=True, run_bsyn_flag=True):
         lmin_orig = self.lambda_min
         lmax_orig = self.lambda_max
         lmin = self.lambda_min
@@ -759,7 +760,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             for i in range(number):
                 self.configure(lambda_min=lmin - extra_wavelength_for_stitch,
                                lambda_max=lmin + new_range + extra_wavelength_for_stitch, counter_spectra=i)
-                self.synthesize(run_babsma=run_babsma, run_bsyn=run_bsyn)
+                self.synthesize(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
                 lmin = lmin + new_range
             for i in range(number - 1):
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
@@ -770,9 +771,11 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
                 f.close()
         else:
-            self.synthesize(run_babsma=run_babsma, run_bsyn=run_bsyn)
+            self.synthesize(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
 
-    def synthesize_spectra(self, run_babsma=True, run_bsyn=True) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def synthesize_spectra(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        run_babsma_flag = self.run_babsma_flag
+        run_bsyn_flag = self.run_bsyn_flag
         try:
             logging.debug("Running Turbospectrum and atmosphere")
             logging.debug("Cleaning temp directory")
@@ -781,10 +784,14 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             # delete the temporary directory if it exists
             if os_path.exists(temp_spectra_location):
                 os.remove(temp_spectra_location)
-            self.calculate_atmosphere()
+            if run_babsma_flag:
+                # generate the model atmosphere
+                self.calculate_atmosphere()
+            if (run_bsyn_flag and self.nlte_flag) or run_babsma_flag:
+                self._interpolate_atmosphere(self.atmosphere_properties['marcs_model_list'])
             try:
                 logging.debug("Running Turbospectrum")
-                self.run_turbospectrum(run_babsma=run_babsma, run_bsyn=run_bsyn)
+                self.run_turbospectrum(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
                 # NS 12.01.2024: now we return the fitted spectrum
                 temp_spectra_location = os.path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 if os_path.exists(temp_spectra_location):
@@ -796,7 +803,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             except AttributeError:
                 if not self.night_mode:
                     print("No attribute, fail of generation?")
-        except (FileNotFoundError, ValueError, TypeError) as error:
+        except (ModuleNotFoundError) as error:
             if not self.night_mode:
                 print(f"Interpolation failed? {error}")
                 print("ValueError can sometimes imply problem with the departure coefficients grid")
