@@ -146,7 +146,7 @@ class SyntheticSpectrumGenerator:
         return element_abundance
 
 
-    def _generate_model_atmosphere(self, run_ts_interpolator: bool = True):
+    def _generate_model_atmosphere(self):
         """
         Generates an interpolated model atmosphere from the MARCS grid using the interpol.f routine developed by
         T. Masseron (Masseron, PhD Thesis, 2006). This is a python wrapper for that fortran code.
@@ -334,112 +334,11 @@ class SyntheticSpectrumGenerator:
                     parameter_descriptor[1] = options[parameter_descriptor[3]]
 
         logging.debug(marcs_model_list)
-        if not run_ts_interpolator:
-            return {"errors": None, "marcs_model_list": marcs_model_list, "spherical": spherical}
 
-        if self.nlte_flag:
-            for element in self.model_atom_file:
-                element_abundance = self._get_element_abundance(element)
+        if spherical:
+            self.turbulent_velocity = microturbulence
 
-                if self.verbose:
-                    stdout = None
-                    stderr = subprocess.STDOUT
-                else:
-                    stdout = open('/dev/null', 'w')
-                    stderr = subprocess.STDOUT
-                # Write configuration input for interpolator
-                output = os_path.join(self.tmp_dir, self.marcs_model_name)
-                model_test = "{}.test".format(output)
-                interpol_config = ""
-                self.marcs_model_list_global = marcs_model_list
-                for line in marcs_model_list:
-                    interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-                interpol_config += "'{}.interpol'\n".format(output)
-                interpol_config += "'{}.alt'\n".format(output)
-                interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
-                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
-                    element]))  # needed for nlte interpolator
-                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
-                    element]))  # needed for nlte interpolator
-                interpol_config += "{}\n".format(self.aux_file_length_dict[element])
-                interpol_config += "{}\n".format(self.t_eff)
-                interpol_config += "{}\n".format(self.log_g)
-                interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-                interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
-                interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-                interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-                interpol_config += "'{}'\n".format(model_test)
-
-                # Now we run the FORTRAN model interpolator
-                try:
-                    if self.atmosphere_dimension == "1D":
-                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
-                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                        p.stdin.write(bytes(interpol_config, 'utf-8'))
-                        stdout, stderr = p.communicate()
-                    elif self.atmosphere_dimension == "3D":
-                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
-                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                        p.stdin.write(bytes(interpol_config, 'utf-8'))
-                        stdout, stderr = p.communicate()
-                except subprocess.CalledProcessError:
-                    return {
-                        "interpol_config": interpol_config,
-                        "errors": "MARCS model atmosphere interpolation failed."
-                    }
-                if spherical:
-                    self.turbulent_velocity = microturbulence
-        else:
-            if self.verbose:
-                stdout = None
-                stderr = subprocess.STDOUT
-            else:
-                stdout = open('/dev/null', 'w')
-                stderr = subprocess.STDOUT
-            # Write configuration input for interpolator
-            output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            # output = os_path.join('Testout/', self.marcs_model_name)
-            # print(output)
-            model_test = "{}.test".format(output)
-            interpol_config = ""
-            self.marcs_model_list_global = marcs_model_list
-            # print(marcs_model_list)
-            for line in marcs_model_list:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-            interpol_config += "'{}.interpol'\n".format(output)
-            interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "{}\n".format(self.t_eff)
-            interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{}\n".format(self.metallicity)
-            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-            interpol_config += "'{}'\n".format(model_test)
-
-            # Now we run the FORTRAN model interpolator
-            try:
-                if self.atmosphere_dimension == "1D":
-                    p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles')],
-                                         stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                    p.stdin.write(bytes(interpol_config, 'utf-8'))
-                    stdout, stderr = p.communicate()
-                elif self.atmosphere_dimension == "3D":
-                    p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi')],
-                                         stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                    p.stdin.write(bytes(interpol_config, 'utf-8'))
-                    stdout, stderr = p.communicate()
-            except subprocess.CalledProcessError:
-                return {
-                    "interpol_config": interpol_config,
-                    "errors": "MARCS model atmosphere interpolation failed."
-                }
-            if spherical:
-                self.turbulent_velocity = microturbulence
-
-        return {
-            "interpol_config": interpol_config,
-            "spherical": spherical,
-            "errors": None
-        }
+        return {"errors": None, "marcs_model_list": marcs_model_list, "spherical": spherical}
 
 
     def make_atmosphere_properties(self, spherical, element):

@@ -70,6 +70,9 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         self.cont_mask_file = None
         self.line_mask_file = None
 
+        self.run_babsma_flag: bool = True
+        self.run_bsyn_flag: bool = True
+
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
                   turbulent_velocity: float=None, free_abundances=None, free_isotopes=None,
@@ -227,6 +230,100 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 atomic_number = periodic_table.index(element)
                 file.write(f"{atomic_number}  '{element}'  'lte'  ''   '' 'ascii'\n")
         file.close()
+
+    def _interpolate_atmosphere(self, marcs_model_list: list):
+        if self.nlte_flag:
+            for element in self.model_atom_file:
+                element_abundance = self._get_element_abundance(element)
+
+                if self.verbose:
+                    stdout = None
+                    stderr = subprocess.STDOUT
+                else:
+                    stdout = open('/dev/null', 'w')
+                    stderr = subprocess.STDOUT
+                # Write configuration input for interpolator
+                output = os_path.join(self.tmp_dir, self.marcs_model_name)
+                model_test = "{}.test".format(output)
+                interpol_config = ""
+                self.marcs_model_list_global = marcs_model_list
+                for line in marcs_model_list:
+                    interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
+                interpol_config += "'{}.interpol'\n".format(output)
+                interpol_config += "'{}.alt'\n".format(output)
+                interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
+                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
+                    element]))  # needed for nlte interpolator
+                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
+                    element]))  # needed for nlte interpolator
+                interpol_config += "{}\n".format(self.aux_file_length_dict[element])
+                interpol_config += "{}\n".format(self.t_eff)
+                interpol_config += "{}\n".format(self.log_g)
+                interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
+                interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
+                interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
+                interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
+                interpol_config += "'{}'\n".format(model_test)
+
+                # Now we run the FORTRAN model interpolator
+                try:
+                    if self.atmosphere_dimension == "1D":
+                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                        p.stdin.write(bytes(interpol_config, 'utf-8'))
+                        stdout, stderr = p.communicate()
+                    elif self.atmosphere_dimension == "3D":
+                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
+                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                        p.stdin.write(bytes(interpol_config, 'utf-8'))
+                        stdout, stderr = p.communicate()
+                except subprocess.CalledProcessError:
+                    return {
+                        "interpol_config": interpol_config,
+                        "errors": "MARCS model atmosphere interpolation failed."
+                    }
+        else:
+            if self.verbose:
+                stdout = None
+                stderr = subprocess.STDOUT
+            else:
+                stdout = open('/dev/null', 'w')
+                stderr = subprocess.STDOUT
+            # Write configuration input for interpolator
+            output = os_path.join(self.tmp_dir, self.marcs_model_name)
+            model_test = "{}.test".format(output)
+            interpol_config = ""
+            self.marcs_model_list_global = marcs_model_list
+            # print(marcs_model_list)
+            for line in marcs_model_list:
+                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
+            interpol_config += "'{}.interpol'\n".format(output)
+            interpol_config += "'{}.alt'\n".format(output)
+            interpol_config += "{}\n".format(self.t_eff)
+            interpol_config += "{}\n".format(self.log_g)
+            interpol_config += "{}\n".format(self.metallicity)
+            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
+            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
+            interpol_config += "'{}'\n".format(model_test)
+
+            # Now we run the FORTRAN model interpolator
+            try:
+                if self.atmosphere_dimension == "1D":
+                    p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles')],
+                                         stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                    p.stdin.write(bytes(interpol_config, 'utf-8'))
+                    stdout, stderr = p.communicate()
+                elif self.atmosphere_dimension == "3D":
+                    p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi')],
+                                         stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
+                    p.stdin.write(bytes(interpol_config, 'utf-8'))
+                    stdout, stderr = p.communicate()
+            except subprocess.CalledProcessError:
+                return {
+                    "interpol_config": interpol_config,
+                    "errors": "MARCS model atmosphere interpolation failed."
+                }
+
 
     def calculate_atmosphere(self):
         # figure out if we need to interpolate the model atmosphere for microturbulence
@@ -399,7 +496,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         else:
             print("Unexpected error?")
         self.atmosphere_properties = atmosphere_properties
-        # print(self.atmosphere_properties)
 
     def make_babsma_bsyn_file(self, spherical):
         """
@@ -420,9 +516,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
         
-        item_abund = {}
-        item_abund['H'] = 12.00
-        item_abund[periodic_table[2]] = float(solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+        item_abund = {'H': 12.00, periodic_table[2]: float(solar_abundances[periodic_table[2]])}
         for i in range(3, len(periodic_table)):
             # first take solar scaled abundances as A(X)
             item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 6)
@@ -470,13 +564,40 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         nlte_boolean_code = ".true." if self.nlte_flag == True else ".false."
         pure_lte_boolean_code = ".false." if self.nlte_flag == True else ".true."
 
-        if self.windows_flag == True:
-            bsyn_config = """\
-'PURE-LTE  :'  '.false.'
+        if self.windows_flag:
+            segment_file_string = f"'SEGMENTSFILE:'     '{self.segment_file}'\n"
+        else:
+            segment_file_string = ""
+
+        # Build babsma configuration file
+        babsma_config = """\
+'PURE-LTE  :'  '{pure_lte}'
+'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
+'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
+'LAMBDA_STEP:'    '{this[lambda_delta]:.3f}'
+'MODELINPUT:' '{this[tmp_dir]}{this[marcs_model_name]}.interpol'
+'MARCS-FILE:' '.false.'
+'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
+'METALLICITY:'    '{this[metallicity]:.2f}'
+'ALPHA/Fe   :'    '{alpha:.2f}'
+'HELIUM     :'    '0.00'
+'R-PROCESS  :'    '{this[r_process]:.2f}'
+'S-PROCESS  :'    '{this[s_process]:.2f}'
+{individual_abundances}
+'XIFIX:' '{xifix}'
+{this[turbulent_velocity]:.2f}
+""".format(this=self.__dict__,
+           alpha=alpha,
+           individual_abundances=individual_abundances.strip(),
+           pure_lte=pure_lte_boolean_code,
+           xifix=xifix_boolean_code
+           )
+        # Build bsyn configuration file
+        bsyn_config = """\
+'PURE-LTE  :'  '{pure_lte}'
 'NLTE :'          '{nlte}'
 'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-'SEGMENTSFILE:'     '{this[segment_file]}'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
+{segment_file_string}'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
 'LAMBDA_STEP:'   '{this[lambda_delta]:.3f}'
 'INTENSITY/FLUX:' 'Flux'
@@ -498,6 +619,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
   15
   1.30
 """.format(this=self.__dict__,
+           segment_file_string=segment_file_string,
            alpha=alpha,
            spherical=spherical_boolean_code,
            individual_abundances=individual_abundances.strip(),
@@ -505,89 +627,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
            line_lists=line_lists.strip(),
            pure_lte=pure_lte_boolean_code,
            nlte=nlte_boolean_code
-           )
-
-            # Build babsma configuration file
-            babsma_config = """\
-'PURE-LTE  :'  '.false.'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
-'LAMBDA_STEP:'    '{this[lambda_delta]:.3f}'
-'MODELINPUT:' '{this[tmp_dir]}{this[marcs_model_name]}.interpol'
-'MARCS-FILE:' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'METALLICITY:'    '{this[metallicity]:.2f}'
-'ALPHA/Fe   :'    '{alpha:.2f}'
-'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-'XIFIX:' '{xifix}'
-{this[turbulent_velocity]:.2f}
-""".format(this=self.__dict__,
-           alpha=alpha,
-           individual_abundances=individual_abundances.strip(),
-           pure_lte=pure_lte_boolean_code,
-           xifix=xifix_boolean_code
-           )
-        elif self.windows_flag == False:
-            bsyn_config = """\
-'PURE-LTE  :'  '.false.'
-'NLTE :'          '{nlte}'
-'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
-'LAMBDA_STEP:'   '{this[lambda_delta]:.3f}'
-'INTENSITY/FLUX:' 'Flux'
-'COS(THETA)    :' '1.00'
-'ABFIND        :' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'RESULTFILE :' '{this[tmp_dir]}/spectrum_{this[counter_spectra]:08d}.spec'
-'METALLICITY:'    '{this[metallicity]:.2f}'
-'ALPHA/Fe   :'    '{alpha:.2f}'
-'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-{individual_isotopes}
-{line_lists}
-'SPHERICAL:'  '{spherical}'
-  30
-  300.00
-  15
-  1.30
-""".format(this=self.__dict__,
-           alpha=alpha,
-           spherical=spherical_boolean_code,
-           individual_abundances=individual_abundances.strip(),
-           individual_isotopes=individual_isotopes.strip(),
-           line_lists=line_lists.strip(),
-           pure_lte=pure_lte_boolean_code,
-           nlte=nlte_boolean_code
-           )
-
-            # Build babsma configuration file
-            babsma_config = """\
-'PURE-LTE  :'  '.false.'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
-'LAMBDA_STEP:'    '{this[lambda_delta]:.3f}'
-'MODELINPUT:' '{this[tmp_dir]}{this[marcs_model_name]}.interpol'
-'MARCS-FILE:' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'METALLICITY:'    '{this[metallicity]:.2f}'
-'ALPHA/Fe   :'    '{alpha:.2f}'
-'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-'XIFIX:' '{xifix}'
-{this[turbulent_velocity]:.2f}
-""".format(this=self.__dict__,
-           alpha=alpha,
-           individual_abundances=individual_abundances.strip(),
-           pure_lte=pure_lte_boolean_code,
-           xifix=xifix_boolean_code
            )
 
         # print(babsma_config)
@@ -613,22 +652,22 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         return wave, flux_norm, flux
 
-    def synthesize(self):
-        # Generate configuation files to pass to babsma and bsyn
-        self.make_species_lte_nlte_file()  # TODO: not create this file every time (same one for each run anyway)
+    def synthesize(self, run_babsma_flag=True, run_bsyn_flag=True):
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
 
         logging.debug("babsma input:\n{}".format(babsma_in))
         logging.debug("bsyn input:\n{}".format(bsyn_in))
-
-        # print(babsma_in)
-        # print(bsyn_in)
 
         # Start making dictionary of output data
         output = self.atmosphere_properties
         output["errors"] = None
         output["babsma_config"] = babsma_in
         output["bsyn_config"] = bsyn_in
+
+        # We need to run babsma and bsyn with working directory set to root of Turbospectrum install. Otherwise
+        # it cannot find its data files.
+        cwd = os.getcwd()
+        turbospec_root = os_path.join(self.code_path, "..")
 
         # Select whether we want to see all the output that babsma and bsyn send to the terminal
         if self.verbose:
@@ -638,51 +677,57 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             stdout = open('/dev/null', 'w')
             stderr = subprocess.STDOUT
 
-        # We need to run babsma and bsyn with working directory set to root of Turbospectrum install. Otherwise
-        # it cannot find its data files.
-        cwd = os.getcwd()
-        turbospec_root = os_path.join(self.code_path, "..")
+        if run_babsma_flag:
+            logging.debug("Running babsma")
 
-        # Run babsma. This creates an opacity file .opac from the MARCS atmospheric model
-        try:  # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
-            os.chdir(turbospec_root)
-            pr1, stderr_bytes = self.run_babsma(babsma_in, stderr, stdout)
-        except subprocess.CalledProcessError:
-            output["errors"] = "babsma failed with CalledProcessError"
-            return output
-        finally:
-            os.chdir(cwd)
-        if stderr_bytes is None:
-            stderr_bytes = b''
-        if pr1.returncode != 0:
-            output["errors"] = "babsma failed"
-            # logging.info("Babsma failed. Return code {}. Error text <{}>".
-            #             format(pr1.returncode, stderr_bytes.decode('utf-8')))
-            return output
+            # Generate configuration files to pass to babsma and bsyn
+            if self.nlte_flag:
+                self.make_species_lte_nlte_file()
 
-        # Run bsyn. This synthesizes the spectrum
-        try:
-            pr, stderr_bytes = self.run_bsyn(bsyn_in, stderr, stderr_bytes, stdout, turbospec_root)
-        except subprocess.CalledProcessError:
-            output["errors"] = "bsyn failed with CalledProcessError"
-            return output
-        finally:
-            os.chdir(cwd)
-        if stderr_bytes is None:
-            stderr_bytes = b''
-        if pr.returncode != 0:
-            output["errors"] = "bsyn failed"
-            # logging.info("Bsyn failed. Return code {}. Error text <{}>".
-            #             format(pr.returncode, stderr_bytes.decode('utf-8')))
-            return output
+            # Run babsma. This creates an opacity file .opac from the MARCS atmospheric model
+            try:  # chdir is NECESSARY, turbospectrum cannot run from other directories sadly
+                os.chdir(turbospec_root)
+                pr1, stderr_bytes = self.run_babsma(babsma_in, stderr, stdout)
+            except subprocess.CalledProcessError:
+                output["errors"] = "babsma failed with CalledProcessError"
+                return output
+            finally:
+                os.chdir(cwd)
+            if stderr_bytes is None:
+                stderr_bytes = b''
+            if pr1.returncode != 0:
+                output["errors"] = "babsma failed"
+                # logging.info("Babsma failed. Return code {}. Error text <{}>".
+                #             format(pr1.returncode, stderr_bytes.decode('utf-8')))
+                return output
+            output["return_code"] = pr1.returncode
 
-        # Return output
-        output["return_code"] = pr.returncode
+        if run_bsyn_flag:
+            logging.debug("Running bsyn")
+
+            # Run bsyn. This synthesizes the spectrum
+            try:
+                os.chdir(turbospec_root)
+                pr, stderr_bytes = self.run_bsyn(bsyn_in, stderr, stdout)
+            except subprocess.CalledProcessError:
+                output["errors"] = "bsyn failed with CalledProcessError"
+                return output
+            finally:
+                os.chdir(cwd)
+            if stderr_bytes is None:
+                stderr_bytes = b''
+            if pr.returncode != 0:
+                output["errors"] = "bsyn failed"
+                # logging.info("Bsyn failed. Return code {}. Error text <{}>".
+                #             format(pr.returncode, stderr_bytes.decode('utf-8')))
+                return output
+
+            # Return output
+            output["return_code"] = pr.returncode
         output["output_file"] = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(self.counter_spectra))
         return output
 
-    def run_bsyn(self, bsyn_in, stderr, stderr_bytes, stdout, turbospec_root):
-        os.chdir(turbospec_root)
+    def run_bsyn(self, bsyn_in, stderr, stdout):
         pr = subprocess.Popen([os_path.join(self.code_path, 'bsyn_lu')],
                               stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
         pr.stdin.write(bytes(bsyn_in, 'utf-8'))
@@ -696,7 +741,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         stdout_bytes, stderr_bytes = pr1.communicate()
         return pr1, stderr_bytes
 
-    def run_turbospectrum(self):
+    def run_turbospectrum(self, run_babsma_flag=True, run_bsyn_flag=True):
         lmin_orig = self.lambda_min
         lmax_orig = self.lambda_max
         lmin = self.lambda_min
@@ -715,7 +760,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             for i in range(number):
                 self.configure(lambda_min=lmin - extra_wavelength_for_stitch,
                                lambda_max=lmin + new_range + extra_wavelength_for_stitch, counter_spectra=i)
-                self.synthesize()
+                self.synthesize(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
                 lmin = lmin + new_range
             for i in range(number - 1):
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
@@ -726,9 +771,11 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
                 f.close()
         else:
-            self.synthesize()
+            self.synthesize(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
 
     def synthesize_spectra(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        run_babsma_flag = self.run_babsma_flag
+        run_bsyn_flag = self.run_bsyn_flag
         try:
             logging.debug("Running Turbospectrum and atmosphere")
             logging.debug("Cleaning temp directory")
@@ -737,10 +784,14 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             # delete the temporary directory if it exists
             if os_path.exists(temp_spectra_location):
                 os.remove(temp_spectra_location)
-            self.calculate_atmosphere()
+            if run_babsma_flag:
+                # generate the model atmosphere
+                self.calculate_atmosphere()
+            if (run_bsyn_flag and self.nlte_flag) or run_babsma_flag:
+                self._interpolate_atmosphere(self.atmosphere_properties['marcs_model_list'])
             try:
                 logging.debug("Running Turbospectrum")
-                self.run_turbospectrum()
+                self.run_turbospectrum(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
                 # NS 12.01.2024: now we return the fitted spectrum
                 temp_spectra_location = os.path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 if os_path.exists(temp_spectra_location):
@@ -752,7 +803,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             except AttributeError:
                 if not self.night_mode:
                     print("No attribute, fail of generation?")
-        except (FileNotFoundError, ValueError, TypeError) as error:
+        except (ModuleNotFoundError) as error:
             if not self.night_mode:
                 print(f"Interpolation failed? {error}")
                 print("ValueError can sometimes imply problem with the departure coefficients grid")

@@ -445,6 +445,8 @@ class TSFitPyConfig:
         self.save_fitlist = True
         self.save_config_file = True
         self.make_output_directory = True
+        self.pretrim_linelist = True
+        self.lightweight_ts_run = False
 
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -852,6 +854,8 @@ class TSFitPyConfig:
             self.save_linemask = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_linemask"])
             self.save_fitlist = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_fitlist"])
             self.save_config_file = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_config_file"])
+            self.pretrim_linelist = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["pretrim_linelist"])
+            self.lightweight_ts_run = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["lightweight_ts_run"])
         except KeyError:
             pass
 
