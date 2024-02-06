@@ -996,6 +996,7 @@ class Spectra:
         """
         Creates the synthetic spectrum generator object depending whether TS or M3DIS is used (or other in the future?)
         :param marcs_values_tuple: unpickled marcs models and other values
+        :param segment_index: index of the segment to use for M3D model atom trimming (if M3D is used)
         :return: SyntheticSpectrumGenerator object
         """
         model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = marcs_values_tuple
@@ -1730,6 +1731,27 @@ class Spectra:
         if not self.night_mode:
             print(self.line_centers_sorted[line_number], self.line_begins_sorted[line_number], self.line_ends_sorted[line_number])
         ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+
+        elem_abund_dict_xh = get_input_xh_abund(self.feh, self)
+
+        for i in range(self.nelement):
+            # spectra_to_fit.elem_to_fit[i] = element name
+            # param[0:nelement - 1] = abundance of the element
+            elem_name = self.elem_to_fit[i]
+            if elem_name != "Fe":
+                elem_abund_dict_xh[elem_name] = 0 + self.feh  # convert [X/Fe] to [X/H]
+
+        if self.atmosphere_type == "3D":
+            vmic = 2.0
+        else:
+            if self.input_vmic:  # Input given
+                vmic = self.vmic
+            elif not self.fit_vmic:
+                vmic = calculate_vturb(self.teff, self.logg, self.feh)
+            else:
+                raise ValueError("Cannot fit vmic if precomputing babsma")
+
+        self.configure_and_run_synthetic_code(ssg, self.feh, elem_abund_dict_xh, vmic, self.seg_begins[segment_index], self.seg_ends[segment_index], False, temp_directory)
 
         param_guess, min_bounds = self.get_elem_micro_guess(self.guess_min_vmic, self.guess_max_vmic, self.guess_min_abund, self.guess_max_abund)
 

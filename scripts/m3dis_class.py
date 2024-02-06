@@ -581,13 +581,13 @@ class M3disCall(SyntheticSpectrumGenerator):
                 turbulence_high = possible_turbulence[place + 1]
 
                 self.turbulent_velocity = turbulence_low
-                marcs_model_list_low = self._generate_model_atmosphere(run_ts_interpolator=False)
+                marcs_model_list_low = self._generate_model_atmosphere()
                 if marcs_model_list_low["errors"] is not None:
                     raise ValueError(f"{marcs_model_list_low['errors']}")
                 tau500_low, temp_low, pe_low, vmic_low, density_low, depth_low = self.interpolate_m3dis_atmosphere(marcs_model_list_low["marcs_model_list"])
                 self.turbulent_velocity = turbulence_high
 
-                marcs_model_list_high = self._generate_model_atmosphere(run_ts_interpolator=False)
+                marcs_model_list_high = self._generate_model_atmosphere()
                 if marcs_model_list_high["errors"] is not None:
                     raise ValueError(f"{marcs_model_list_high['errors']}")
                 tau500_high, temp_high, pe_high, vmic_high, density_high, depth_high = self.interpolate_m3dis_atmosphere(marcs_model_list_high["marcs_model_list"])
@@ -624,7 +624,7 @@ class M3disCall(SyntheticSpectrumGenerator):
             # check if the model exists
             interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
             if not os.path.exists(interp_model_name):
-                marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+                marcs_model_list = self._generate_model_atmosphere()
                 atmosphere_properties = marcs_model_list
                 if marcs_model_list["errors"] is not None:
                     raise ValueError(f"{marcs_model_list['errors']}")
@@ -644,7 +644,7 @@ class M3disCall(SyntheticSpectrumGenerator):
             # check if the model exists
             interp_model_name = os.path.join(self.tmp_dir, self.marcs_model_name)
             if not os.path.exists(interp_model_name):
-                marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+                marcs_model_list = self._generate_model_atmosphere()
                 atmosphere_properties = marcs_model_list
                 if marcs_model_list["errors"] is not None:
                     raise ValueError(f"{marcs_model_list['errors']}")
@@ -659,7 +659,7 @@ class M3disCall(SyntheticSpectrumGenerator):
             if self.log_g < 3:
                 microturbulence = self.turbulent_velocity
                 self.turbulent_velocity = 2.0
-            marcs_model_list = self._generate_model_atmosphere(run_ts_interpolator=False)
+            marcs_model_list = self._generate_model_atmosphere()
             atmosphere_properties = marcs_model_list
             if marcs_model_list["errors"] is not None:
                 raise ValueError(f"{marcs_model_list['errors']}")
