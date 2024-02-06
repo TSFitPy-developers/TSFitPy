@@ -420,6 +420,8 @@ class Spectra:
         self.save_linemask: bool = True
         self.save_fitlist: bool = True
         self.save_config_file: bool = True
+        self.pretrim_linelist: bool = True
+        self.lightweight_ts_run: bool = False
 
         # Set values from config
         if n_workers != 1:
@@ -663,6 +665,8 @@ class Spectra:
         self.save_linemask = tsfitpy_config.save_linemask
         self.save_fitlist = tsfitpy_config.save_fitlist
         self.save_config_file = tsfitpy_config.save_config_file
+        self.pretrim_linelist = tsfitpy_config.pretrim_linelist
+        self.lightweight_ts_run = tsfitpy_config.lightweight_ts_run
 
         self.pickled_marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
 
