@@ -470,45 +470,13 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         nlte_boolean_code = ".true." if self.nlte_flag == True else ".false."
         pure_lte_boolean_code = ".false." if self.nlte_flag == True else ".true."
 
-        if self.windows_flag == True:
-            bsyn_config = """\
-'PURE-LTE  :'  '.false.'
-'NLTE :'          '{nlte}'
-'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-'SEGMENTSFILE:'     '{this[segment_file]}'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
-'LAMBDA_STEP:'   '{this[lambda_delta]:.3f}'
-'INTENSITY/FLUX:' 'Flux'
-'COS(THETA)    :' '1.00'
-'ABFIND        :' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'RESULTFILE :' '{this[tmp_dir]}/spectrum_{this[counter_spectra]:08d}.spec'
-'METALLICITY:'    '{this[metallicity]:.2f}'
-'ALPHA/Fe   :'    '{alpha:.2f}'
-'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-{individual_isotopes}
-{line_lists}
-'SPHERICAL:'  '{spherical}'
-  30
-  300.00
-  15
-  1.30
-""".format(this=self.__dict__,
-           alpha=alpha,
-           spherical=spherical_boolean_code,
-           individual_abundances=individual_abundances.strip(),
-           individual_isotopes=individual_isotopes.strip(),
-           line_lists=line_lists.strip(),
-           pure_lte=pure_lte_boolean_code,
-           nlte=nlte_boolean_code
-           )
+        if self.windows_flag:
+            segment_file_string = f"'SEGMENTSFILE:'     '{self.segment_file}'\n"
+        else:
+            segment_file_string = ""
 
-            # Build babsma configuration file
-            babsma_config = """\
+        # Build babsma configuration file
+        babsma_config = """\
 'PURE-LTE  :'  '.false.'
 'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
@@ -530,12 +498,12 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
            pure_lte=pure_lte_boolean_code,
            xifix=xifix_boolean_code
            )
-        elif self.windows_flag == False:
-            bsyn_config = """\
+        # Build bsyn configuration file
+        bsyn_config = """\
 'PURE-LTE  :'  '.false.'
 'NLTE :'          '{nlte}'
 'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
+{segment_file_string}'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
 'LAMBDA_STEP:'   '{this[lambda_delta]:.3f}'
 'INTENSITY/FLUX:' 'Flux'
@@ -557,6 +525,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
   15
   1.30
 """.format(this=self.__dict__,
+           segment_file_string=segment_file_string,
            alpha=alpha,
            spherical=spherical_boolean_code,
            individual_abundances=individual_abundances.strip(),
@@ -564,30 +533,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
            line_lists=line_lists.strip(),
            pure_lte=pure_lte_boolean_code,
            nlte=nlte_boolean_code
-           )
-
-            # Build babsma configuration file
-            babsma_config = """\
-'PURE-LTE  :'  '.false.'
-'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
-'LAMBDA_STEP:'    '{this[lambda_delta]:.3f}'
-'MODELINPUT:' '{this[tmp_dir]}{this[marcs_model_name]}.interpol'
-'MARCS-FILE:' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'METALLICITY:'    '{this[metallicity]:.2f}'
-'ALPHA/Fe   :'    '{alpha:.2f}'
-'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-'XIFIX:' '{xifix}'
-{this[turbulent_velocity]:.2f}
-""".format(this=self.__dict__,
-           alpha=alpha,
-           individual_abundances=individual_abundances.strip(),
-           pure_lte=pure_lte_boolean_code,
-           xifix=xifix_boolean_code
            )
 
         # print(babsma_config)
