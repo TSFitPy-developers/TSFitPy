@@ -558,7 +558,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
     def synthesize(self):
         # Generate configuation files to pass to babsma and bsyn
-        self.make_species_lte_nlte_file()  # TODO: not create this file every time (same one for each run anyway)
+        if self.nlte_flag:
+            self.make_species_lte_nlte_file()  # TODO: not create this file every time (same one for each run anyway)
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
 
         logging.debug("babsma input:\n{}".format(babsma_in))
