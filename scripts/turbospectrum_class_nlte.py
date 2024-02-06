@@ -420,9 +420,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         individual_abundances = "'INDIVIDUAL ABUNDANCES:'   '{:d}'\n".format(len(periodic_table) - 1)
         
-        item_abund = {}
-        item_abund['H'] = 12.00
-        item_abund[periodic_table[2]] = float(solar_abundances[periodic_table[2]])  # Helium is always constant, no matter the metallicity
+        item_abund = {'H': 12.00, periodic_table[2]: float(solar_abundances[periodic_table[2]])}
         for i in range(3, len(periodic_table)):
             # first take solar scaled abundances as A(X)
             item_abund[periodic_table[i]] = float(solar_abundances[periodic_table[i]]) + round(float(self.metallicity), 6)
@@ -477,7 +475,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         # Build babsma configuration file
         babsma_config = """\
-'PURE-LTE  :'  '.false.'
+'PURE-LTE  :'  '{pure_lte}'
 'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.3f}'
 'LAMBDA_STEP:'    '{this[lambda_delta]:.3f}'
@@ -500,7 +498,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
            )
         # Build bsyn configuration file
         bsyn_config = """\
-'PURE-LTE  :'  '.false.'
+'PURE-LTE  :'  '{pure_lte}'
 'NLTE :'          '{nlte}'
 'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
 {segment_file_string}'LAMBDA_MIN:'    '{this[lambda_min]:.3f}'
