@@ -134,6 +134,10 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["output_file_df"] = output_file_df
     config_dict["fitted_element"] = tsfitpy_config.elements_to_fit[0]
     config_dict["fitting_method"] = tsfitpy_config.fitting_mode
+    config_dict["parsed_fitlist"] = fitlist
+    config_dict["vmac_input_bool"] = tsfitpy_config.vmac_input
+    config_dict["vmic_input_bool"] = tsfitpy_config.vmic_input
+    config_dict["rotation_input_bool"] = tsfitpy_config.rotation_input
 
     return config_dict
 
