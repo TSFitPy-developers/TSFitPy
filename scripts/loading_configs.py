@@ -682,7 +682,10 @@ class TSFitPyConfig:
         # read the configuration file
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
-        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "m3dis"])
+        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "m3dis", "ifort", "ifx"])
+        # 08.02.2024: ifx is the new intel compiler. So replacing intel with ifort
+        if self.compiler == "intel":
+            self.compiler = "ifort"
         try:
             self.spectral_code_path = self.config_parser["MainPaths"]["code_path"]
         except KeyError:
@@ -1141,9 +1144,12 @@ class TSFitPyConfig:
         if self.spectral_code_path is None:
             self.spectral_code_path = "../turbospectrum/"
         self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path))
-        if self.compiler.lower() == "intel":
+        if self.compiler.lower() == "ifort" or self.compiler.lower() == "intel":
             self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec", "")
+        elif self.compiler.lower() == "ifx":
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
+                                                   "exec-ifx", "")
         elif self.compiler.lower() == "gnu":
             self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec-gf", "")
