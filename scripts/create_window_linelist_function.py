@@ -108,7 +108,9 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                         seg_current_index = seg_index
                                     else:
                                         seg_current_index = 0
-                                    all_lines_to_write[seg_current_index] = (index_seg_start + line_number_read_file, index_seg_end + line_number_read_file + 1)
+                                    if seg_current_index not in all_lines_to_write:
+                                        all_lines_to_write[seg_current_index] = []
+                                    all_lines_to_write[seg_current_index].append((index_seg_start + line_number_read_file, index_seg_end + line_number_read_file + 1))
 
                         line_number_read_file: int = number_of_lines_element + line_number_read_file
 
@@ -228,10 +230,14 @@ def write_lines(all_lines_to_write: dict, lines_file: list[str], elem_line_1_to_
     for key in all_lines_to_write:
         new_linelist_name: str = os.path.join(f"{new_path_name}", f"{key}", f"linelist-{line_list_number}.bsyn")
         with open(new_linelist_name, "a") as new_file_to_write:
-            index_start, index_end = all_lines_to_write[key]
-            new_file_to_write.write(f"{elem_line_1_to_save}	{index_end - index_start}\n")
+            line_length = 0
+            lines_to_write = ""
+            for index_pairs in all_lines_to_write[key]:
+                index_start, index_end = index_pairs
+                line_length += index_end - index_start
+                lines_to_write += "".join(lines_file[index_start:index_end])
+            new_file_to_write.write(f"{elem_line_1_to_save}	{line_length}\n")
             new_file_to_write.write(f"{elem_line_2_to_save}")
-            lines_to_write = "".join(lines_file[index_start:index_end])
             new_file_to_write.write(lines_to_write)
 
 
@@ -247,12 +253,12 @@ if __name__ == '__main__':
     if test:
         seg_begins = 4885
         seg_ends = 4886
-        #create_window_linelist([4883, 4900, 5300], [4885, 4920, 8000],
-        #                       "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
-        #                       temp_dir, True, True, True)
-        create_window_linelist([4948], [4949],
+        create_window_linelist([4883, 4900, 5300], [4885, 4920, 8000],
                                "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
                                temp_dir, True, False, True)
+        #create_window_linelist([4948], [4949],
+        #                       "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
+        #                       temp_dir, True, False, True)
     else:
         for i in tqdm(range(3)):
             create_window_linelist([4850], [4865], "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
