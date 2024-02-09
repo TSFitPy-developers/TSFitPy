@@ -1,12 +1,12 @@
 from __future__ import annotations
 import os
-import glob
 import numpy as np
 
+#@profile
 def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[float], old_path_name: str,
                            new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True):
     line_list_path: str = old_path_name
-    line_list_files: list = [i for i in glob.glob(os.path.join(line_list_path, "*")) if os.path.isfile(i)]
+    line_list_files: list = [entry.path for entry in os.scandir(line_list_path) if entry.is_file()]
 
     segment_to_use_begins: np.ndarray = np.asarray(seg_begins)
     segment_to_use_ends: np.ndarray = np.asarray(seg_ends)
@@ -43,13 +43,19 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                 # now read the whole file
                 lines_file: list[str] = fp.readlines()
                 # append the first line to the lines_file
-                lines_file.insert(0, first_line)
+                #lines_file.insert(0, first_line)
                 all_lines_to_write: dict = {}
                 line_number_read_for_element: int = 0
                 line_number_read_file: int = 0
-                total_lines_in_file: int = len(lines_file)
-                while line_number_read_file < total_lines_in_file:  # go through all line
-                    line: str = lines_file[line_number_read_file]
+                total_lines_in_file: int = len(lines_file) + 1
+                line: str = first_line
+                first_line_read: bool = True
+                while line_number_read_file + 1 < total_lines_in_file:  # go through all line
+                    if not first_line_read:
+                        line: str = lines_file[line_number_read_file]
+                        line_number_read_file += 1
+                    else:
+                        first_line_read: bool = False
                     fields: list[str] = line.strip().split()
 
                     # it means this is an element
@@ -69,7 +75,7 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                     else:
                         elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
                         number_of_lines_element: int = int(fields[4])
-                    line_number_read_file += 1
+
                     line: str = lines_file[line_number_read_file]
                     elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
 
@@ -83,38 +89,28 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
 
                         # wavelength minimum and maximum for the element (assume sorted)
                         wavelength_minimum_element: float = float(lines_file[line_number_read_file].strip().split()[0])
-                        wavelength_maximum_element: float = float(
-                            lines_file[number_of_lines_element + line_number_read_file - 1].strip().split()[0])
+                        wavelength_maximum_element: float = float(lines_file[number_of_lines_element + line_number_read_file - 1].strip().split()[0])
 
                         element_wavelength_dictionary[0] = wavelength_minimum_element
                         element_wavelength_dictionary[number_of_lines_element - 1] = wavelength_maximum_element
 
                         # check that ANY wavelengths are within the range at all
-                        if not (
-                                wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
-                            for seg_index, (seg_begin, seg_end) in enumerate(
-                                    zip(segment_to_use_begins, segment_to_use_ends)):  # wavelength lines write here
-                                index_seg_start, element_wavelength_dictionary = binary_search_lower_bound(
-                                    lines_file[line_number_read_file:number_of_lines_element + line_number_read_file],
-                                    element_wavelength_dictionary, 0, number_of_lines_element - 1, seg_begin)
+                        if not (wavelength_maximum_element < segment_min_wavelength or wavelength_minimum_element > segment_max_wavelength):
+                            for seg_index, (seg_begin, seg_end) in enumerate(zip(segment_to_use_begins, segment_to_use_ends)):  # wavelength lines write here
+                                index_seg_start = binary_find_left_segment_index(lines_file, element_wavelength_dictionary,
+                                                                                 0, number_of_lines_element,
+                                                                                 line_number_read_file, seg_begin)
                                 wavelength_current_line: float = element_wavelength_dictionary[index_seg_start]
-                                line_stripped: str = lines_file[line_number_read_file + index_seg_start].strip()
-                                line_number_read_for_element: int = index_seg_start + line_number_read_file
-                                while wavelength_current_line <= seg_end and line_number_read_for_element < number_of_lines_element + line_number_read_file:
+                                if seg_begin <= wavelength_current_line <= seg_end:
+                                    index_seg_end = binary_find_right_segment_index(lines_file, element_wavelength_dictionary,
+                                                                                    index_seg_start, number_of_lines_element,
+                                                                                    line_number_read_file, seg_end)
+
                                     if lbl:
                                         seg_current_index = seg_index
                                     else:
                                         seg_current_index = 0
-                                    if seg_current_index not in all_lines_to_write:
-                                        all_lines_to_write[seg_current_index] = [f"{line_stripped} \n"]
-                                    else:
-                                        all_lines_to_write[seg_current_index].append(f"{line_stripped} \n")
-                                    line_number_read_for_element += 1
-                                    try:
-                                        line_stripped: str = lines_file[line_number_read_for_element].strip()
-                                        wavelength_current_line: float = float(line_stripped.split()[0])
-                                    except (ValueError, IndexError):
-                                        pass
+                                    all_lines_to_write[seg_current_index] = lines_file[index_seg_start + line_number_read_file:index_seg_end + line_number_read_file + 1]
                     else:
                         while line_number_read_for_element < number_of_lines_element:
                             if do_hydrogen:
@@ -140,9 +136,9 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                 line_list_number)
 
 def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int,
-                              element_to_search: float) -> tuple[int, dict]:
+                              element_to_search: float) -> int:
     """
-	Gives out the lower index where the value is located between the ranges. For example, given array [12, 20, 32, 40, 52]
+	Gives out the upper index where the value is located between the ranges. For example, given array [12, 20, 32, 40, 52]
 	Value search: 5, result: 0
 	Value search: 13, result: 1
 	Value search: 20, result: 1
@@ -155,6 +151,8 @@ def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dic
 	:param element_to_search:
 	:return:
 	"""
+    if element_to_search >= float(array_to_search[-1].strip().split()[0]):
+        return min(high, len(array_to_search) - 1)
     while low < high:
         middle: int = low + (high - low) // 2
 
@@ -166,9 +164,84 @@ def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dic
             low: int = middle + 1
         else:
             high: int = middle
-    return low, dict_array_values
+    return low
 
+def binary_find_left_segment_index(array_to_search: list[str], dict_array_values: dict, low: int, high: int, offset_array: int,
+                                   element_to_search: float):
+    """actually new?  For example, given array [12, 20, 32, 40, 52]
+	Value search: 5, result: 0
+	Value search: 13, result: 1
+	Value search: 20, result: 1
+	Value search: 21, result: 2
+	Value search: 51 or 52 result: 4
+	Value search: 53, result: 5
+	"""
+    # if value to search is less than the first element, return 0
+    if element_to_search < float(array_to_search[low + offset_array].strip().split()[0]):
+        return low
+    # if value to search is greater than the last element, return high
+    if element_to_search > float(array_to_search[high + offset_array - 1].strip().split()[0]):
+        return high
 
+    left, right = 0, high
+
+    while left <= right:
+        mid = (left + right) // 2
+        if mid + low not in dict_array_values:
+            dict_array_values[mid + low] = float(array_to_search[mid + low + offset_array].strip().split()[0])
+        mid_value: float = dict_array_values[mid + low]
+
+        if mid_value < element_to_search:
+            left = mid + 1
+        elif mid_value > element_to_search:
+            right = mid - 1
+        else:
+            # If the exact value is found, check if it is the first occurrence.
+            while mid > 0:
+                if mid - 1 not in dict_array_values:
+                    dict_array_values[mid + low - 1] = float(
+                        array_to_search[mid - 1 + low + offset_array].strip().split()[0])
+                if dict_array_values[mid + low - 1] == element_to_search:
+                    mid -= 1
+                else:
+                    break
+            return mid + low
+    return left + low
+
+#@profile
+def binary_find_right_segment_index(array_to_search: list[str], dict_array_values: dict, low: int, high: int, offset_array: int,
+                                   element_to_search: float):
+    """ For example, given array [12, 20, 32, 40, 52]
+	Value search: 5, result: 0
+	Value search: 13, result: 0
+	Value search: 20, result: 1
+	Value search: 21, result: 1
+	Value search: 51 or 52 result: 3
+	Value search: 53, result: 4"""
+    high -= 1
+    if element_to_search <= float(array_to_search[low + offset_array].strip().split()[0]):
+        dict_array_values[0] = float(array_to_search[low + offset_array].strip().split()[0])
+        return 0
+    if element_to_search >= float(array_to_search[high + offset_array].strip().split()[0]):
+        dict_array_values[high] = float(array_to_search[high + offset_array].strip().split()[0])
+        return high
+
+    left, right = 0, high - low
+
+    while left < right:
+        mid = (left + right) // 2
+        if mid + low not in dict_array_values:
+            dict_array_values[mid + low] = float(array_to_search[mid + low + offset_array].strip().split()[0])
+        mid_value: float = dict_array_values[mid + low]
+
+        if mid_value <= element_to_search:
+            left = mid + 1
+        else:
+            right = mid
+    # If not found, left will be the insertion point.
+    return left + low - 1
+
+#@profile
 def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, elem_line_2_to_save: str,
                 new_path_name: str, line_list_number: float):
     for key in all_lines_to_write:
@@ -176,6 +249,30 @@ def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, e
         with open(new_linelist_name, "a") as new_file_to_write:
             new_file_to_write.write(f"{elem_line_1_to_save}	{len(all_lines_to_write[key])}\n")
             new_file_to_write.write(f"{elem_line_2_to_save}")
+            lines_to_write = ""
             for line_to_write in all_lines_to_write[key]:
                 # pass
-                new_file_to_write.write(line_to_write)
+                lines_to_write += line_to_write
+            new_file_to_write.write(lines_to_write)
+
+
+if __name__ == '__main__':
+    import shutil
+    from tqdm import tqdm
+    temp_dir = "./test_test_test/"
+
+    test = False
+
+    if os.path.exists(temp_dir):
+        shutil.rmtree(temp_dir)
+
+    if test:
+        create_window_linelist([4850], [4870],
+                               "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
+                               temp_dir, True, False, True)
+    else:
+        for i in tqdm(range(3)):
+            create_window_linelist([4850], [4865], "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
+                                   temp_dir, True, False, True)
+            # delete the created folder
+            shutil.rmtree(temp_dir)
