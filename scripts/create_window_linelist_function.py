@@ -1,15 +1,10 @@
 from __future__ import annotations
 import os
 import numpy as np
-import time
 import shutil
-global time_spent_reading
-global time_spent_writing
 
-#@profile
 def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[float], old_path_name: str,
                            new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True):
-    global time_spent_reading
     line_list_path: str = old_path_name
     line_list_files: list = [entry.path for entry in os.scandir(line_list_path) if entry.is_file()]
 
@@ -35,10 +30,7 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
         new_linelist_name: str = f"{new_path_name}"  # f"linelist-{line_list_number}.bsyn"
         with open(line_list_file) as fp:
             # so that we dont read full file if we are not sure that we use it (if it is a molecule)
-            time_start1 = time.perf_counter()
             first_line: str = fp.readline()
-            time_end1 = time.perf_counter()
-            time_spent_reading += time_end1 - time_start1
             fields = first_line.strip().split()
             sep = '.'
             element = fields[0] + fields[1]
@@ -62,10 +54,7 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
 
                 else:
                     # now read the whole file
-                    time_start1 = time.perf_counter()
                     lines_file: list[str] = fp.readlines()
-                    time_end1 = time.perf_counter()
-                    time_spent_reading += time_end1 - time_start1
 
                     line_number_read_file: int = 0
                     # append the first line to the lines_file
@@ -119,12 +108,12 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                         seg_current_index = seg_index
                                     else:
                                         seg_current_index = 0
-                                    all_lines_to_write[seg_current_index] = lines_file[index_seg_start + line_number_read_file:index_seg_end + line_number_read_file + 1]
+                                    all_lines_to_write[seg_current_index] = (index_seg_start + line_number_read_file, index_seg_end + line_number_read_file + 1)
 
                         line_number_read_file: int = number_of_lines_element + line_number_read_file
 
                         if all_lines_to_write:
-                            write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
+                            write_lines(all_lines_to_write, lines_file, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
                                         line_list_number)
                             all_lines_to_write.clear()
 
@@ -159,6 +148,11 @@ def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dic
             high: int = middle
     return low
 
+def get_wavelength_from_array(array_to_search, dict_array_values, index_to_search, offset_array):
+    if index_to_search not in dict_array_values:
+        dict_array_values[index_to_search] = float(array_to_search[index_to_search + offset_array].strip().split()[0])
+    return dict_array_values[index_to_search]
+
 def binary_find_left_segment_index(array_to_search: list[str], dict_array_values: dict, low: int, high: int, offset_array: int,
                                    element_to_search: float):
     """actually new?  For example, given array [12, 20, 32, 40, 52]
@@ -170,19 +164,17 @@ def binary_find_left_segment_index(array_to_search: list[str], dict_array_values
 	Value search: 53, result: 5
 	"""
     # if value to search is less than the first element, return 0
-    if element_to_search < float(array_to_search[low + offset_array].strip().split()[0]):
+    if element_to_search <= get_wavelength_from_array(array_to_search, dict_array_values, low, offset_array):
         return low
     # if value to search is greater than the last element, return high
-    if element_to_search > float(array_to_search[high + offset_array - 1].strip().split()[0]):
+    if element_to_search >= get_wavelength_from_array(array_to_search, dict_array_values, high - 1, offset_array):
         return high
 
     left, right = 0, high
 
     while left <= right:
         mid = (left + right) // 2
-        if mid + low not in dict_array_values:
-            dict_array_values[mid + low] = float(array_to_search[mid + low + offset_array].strip().split()[0])
-        mid_value: float = dict_array_values[mid + low]
+        mid_value: float = get_wavelength_from_array(array_to_search, dict_array_values, mid + low, offset_array)
 
         if mid_value < element_to_search:
             left = mid + 1
@@ -191,17 +183,14 @@ def binary_find_left_segment_index(array_to_search: list[str], dict_array_values
         else:
             # If the exact value is found, check if it is the first occurrence.
             while mid > 0:
-                if mid - 1 not in dict_array_values:
-                    dict_array_values[mid + low - 1] = float(
-                        array_to_search[mid - 1 + low + offset_array].strip().split()[0])
-                if dict_array_values[mid + low - 1] == element_to_search:
+                if get_wavelength_from_array(array_to_search, dict_array_values, mid + low - 1, offset_array) == element_to_search:
                     mid -= 1
                 else:
                     break
             return mid + low
     return left + low
 
-#@profile
+
 def binary_find_right_segment_index(array_to_search: list[str], dict_array_values: dict, low: int, high: int, offset_array: int,
                                    element_to_search: float):
     """ For example, given array [12, 20, 32, 40, 52]
@@ -212,11 +201,9 @@ def binary_find_right_segment_index(array_to_search: list[str], dict_array_value
 	Value search: 51 or 52 result: 3
 	Value search: 53, result: 4"""
     high -= 1
-    if element_to_search <= float(array_to_search[low + offset_array].strip().split()[0]):
-        dict_array_values[0] = float(array_to_search[low + offset_array].strip().split()[0])
-        return 0
-    if element_to_search >= float(array_to_search[high + offset_array].strip().split()[0]):
-        dict_array_values[high] = float(array_to_search[high + offset_array].strip().split()[0])
+    if element_to_search >= get_wavelength_from_array(array_to_search, dict_array_values, low, offset_array):
+        return low
+    if element_to_search >= get_wavelength_from_array(array_to_search, dict_array_values, high, offset_array):
         return high
 
     left, right = 0, high - low
@@ -234,25 +221,20 @@ def binary_find_right_segment_index(array_to_search: list[str], dict_array_value
     # If not found, left will be the insertion point.
     return left + low - 1
 
-#@profile
-def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, elem_line_2_to_save: str,
+def write_lines(all_lines_to_write: dict, lines_file: list[str], elem_line_1_to_save: str, elem_line_2_to_save: str,
                 new_path_name: str, line_list_number: float):
     global time_spent_writing
     for key in all_lines_to_write:
         new_linelist_name: str = os.path.join(f"{new_path_name}", f"{key}", f"linelist-{line_list_number}.bsyn")
         with open(new_linelist_name, "a") as new_file_to_write:
-            new_file_to_write.write(f"{elem_line_1_to_save}	{len(all_lines_to_write[key])}\n")
+            index_start, index_end = all_lines_to_write[key]
+            new_file_to_write.write(f"{elem_line_1_to_save}	{index_end - index_start + 1}\n")
             new_file_to_write.write(f"{elem_line_2_to_save}")
-            time_start1 = time.perf_counter()
-            lines_to_write = "".join(all_lines_to_write[key])
-
+            lines_to_write = "".join(lines_file[index_start:index_end])
             new_file_to_write.write(lines_to_write)
-            time_end1 = time.perf_counter()
-            time_spent_writing += time_end1 - time_start1
 
 
 if __name__ == '__main__':
-    import shutil
     from tqdm import tqdm
     temp_dir = "./test_test_test/"
 
@@ -262,19 +244,13 @@ if __name__ == '__main__':
         shutil.rmtree(temp_dir)
 
     if test:
-        time_spent_reading = 0
-        time_spent_writing = 0
-        time_start = time.perf_counter()
-        create_window_linelist([4000], [8000],
+        seg_begins = 4000
+        seg_ends = 8000
+        #seg_begins = 4850
+        #seg_ends = 4865
+        create_window_linelist([seg_begins], [seg_ends],
                                "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
                                temp_dir, True, False, True)
-        time_end = time.perf_counter()
-        total_time_spent = time_end - time_start
-        print(f"Total time taken: {total_time_spent}")
-        print(f"Time spent reading: {time_spent_reading}")
-        print(f"Time spent writing: {time_spent_writing}")
-        print(f"Percentage of time spent reading: {time_spent_reading / total_time_spent * 100}%")
-        print(f"Percentage of time spent writing: {time_spent_writing / total_time_spent * 100}%")
     else:
         for i in tqdm(range(3)):
             create_window_linelist([4850], [4865], "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
