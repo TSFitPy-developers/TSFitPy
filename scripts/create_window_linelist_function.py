@@ -39,7 +39,7 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
             # keep it, otherwise ignore molecules
             all_lines_to_write: dict = {}
             if len(elements) > 3 and molecules_flag or len(elements) <= 3:
-                if elements == '01.000000' and do_hydrogen:
+                if element == "'01.000000'" and do_hydrogen:
                     # instead we just copy the file
                     # use shutil.copyfile instead of open and write
                     if not lbl:
@@ -52,7 +52,7 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                                                   f"linelist-{line_list_number}.bsyn")
                             shutil.copyfile(line_list_file, new_linelist_name)
 
-                else:
+                elif element != '01.000000':
                     # now read the whole file
                     lines_file: list[str] = fp.readlines()
 
@@ -163,6 +163,7 @@ def binary_find_left_segment_index(array_to_search: list[str], dict_array_values
 	Value search: 51 or 52 result: 4
 	Value search: 53, result: 5
 	"""
+    high -= 1
     # if value to search is less than the first element, return 0
     if element_to_search <= get_wavelength_from_array(array_to_search, dict_array_values, low, offset_array):
         return low
@@ -201,7 +202,7 @@ def binary_find_right_segment_index(array_to_search: list[str], dict_array_value
 	Value search: 51 or 52 result: 3
 	Value search: 53, result: 4"""
     high -= 1
-    if element_to_search >= get_wavelength_from_array(array_to_search, dict_array_values, low, offset_array):
+    if element_to_search <= get_wavelength_from_array(array_to_search, dict_array_values, low, offset_array):
         return low
     if element_to_search >= get_wavelength_from_array(array_to_search, dict_array_values, high, offset_array):
         return high
@@ -228,7 +229,7 @@ def write_lines(all_lines_to_write: dict, lines_file: list[str], elem_line_1_to_
         new_linelist_name: str = os.path.join(f"{new_path_name}", f"{key}", f"linelist-{line_list_number}.bsyn")
         with open(new_linelist_name, "a") as new_file_to_write:
             index_start, index_end = all_lines_to_write[key]
-            new_file_to_write.write(f"{elem_line_1_to_save}	{index_end - index_start + 1}\n")
+            new_file_to_write.write(f"{elem_line_1_to_save}	{index_end - index_start}\n")
             new_file_to_write.write(f"{elem_line_2_to_save}")
             lines_to_write = "".join(lines_file[index_start:index_end])
             new_file_to_write.write(lines_to_write)
@@ -244,11 +245,12 @@ if __name__ == '__main__':
         shutil.rmtree(temp_dir)
 
     if test:
-        seg_begins = 4000
-        seg_ends = 8000
-        #seg_begins = 4850
-        #seg_ends = 4865
-        create_window_linelist([seg_begins], [seg_ends],
+        seg_begins = 4885
+        seg_ends = 4886
+        #create_window_linelist([4883, 4900, 5300], [4885, 4920, 8000],
+        #                       "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
+        #                       temp_dir, True, True, True)
+        create_window_linelist([4948], [4949],
                                "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
                                temp_dir, True, False, True)
     else:
