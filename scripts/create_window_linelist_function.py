@@ -1,10 +1,15 @@
 from __future__ import annotations
 import os
 import numpy as np
+import time
+import shutil
+global time_spent_reading
+global time_spent_writing
 
 #@profile
 def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[float], old_path_name: str,
                            new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True):
+    global time_spent_reading
     line_list_path: str = old_path_name
     line_list_files: list = [entry.path for entry in os.scandir(line_list_path) if entry.is_file()]
 
@@ -30,60 +35,64 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
         new_linelist_name: str = f"{new_path_name}"  # f"linelist-{line_list_number}.bsyn"
         with open(line_list_file) as fp:
             # so that we dont read full file if we are not sure that we use it (if it is a molecule)
+            time_start1 = time.perf_counter()
             first_line: str = fp.readline()
-
+            time_end1 = time.perf_counter()
+            time_spent_reading += time_end1 - time_start1
             fields = first_line.strip().split()
             sep = '.'
             element = fields[0] + fields[1]
             elements = element.split(sep, 1)[0]
             # opens each file, reads first row, if it is long enough then it is molecule. If fitting molecules, then
             # keep it, otherwise ignore molecules
-
+            all_lines_to_write: dict = {}
             if len(elements) > 3 and molecules_flag or len(elements) <= 3:
-                # now read the whole file
-                lines_file: list[str] = fp.readlines()
-                # append the first line to the lines_file
-                #lines_file.insert(0, first_line)
-                all_lines_to_write: dict = {}
-                line_number_read_for_element: int = 0
-                line_number_read_file: int = 0
-                total_lines_in_file: int = len(lines_file) + 1
-                line: str = first_line
-                first_line_read: bool = True
-                while line_number_read_file + 1 < total_lines_in_file:  # go through all line
-                    if not first_line_read:
+                if elements == '01.000000' and do_hydrogen:
+                    # instead we just copy the file
+                    # use shutil.copyfile instead of open and write
+                    if not lbl:
+                        new_linelist_name: str = os.path.join(f"{new_path_name}", "0",
+                                                              f"linelist-{line_list_number}.bsyn")
+                        shutil.copyfile(line_list_file, new_linelist_name)
+                    else:
+                        for seg_index in range(len(seg_begins)):
+                            new_linelist_name: str = os.path.join(f"{new_path_name}", f"{seg_index}",
+                                                                  f"linelist-{line_list_number}.bsyn")
+                            shutil.copyfile(line_list_file, new_linelist_name)
+
+                else:
+                    # now read the whole file
+                    time_start1 = time.perf_counter()
+                    lines_file: list[str] = fp.readlines()
+                    time_end1 = time.perf_counter()
+                    time_spent_reading += time_end1 - time_start1
+
+                    line_number_read_file: int = 0
+                    # append the first line to the lines_file
+                    total_lines_in_file: int = len(lines_file) + 1
+                    line: str = first_line
+                    first_line_read: bool = True
+                    while line_number_read_file + 1 < total_lines_in_file:  # go through all line
+                        if not first_line_read:
+                            line: str = lines_file[line_number_read_file]
+                            line_number_read_file += 1
+                        else:
+                            first_line_read: bool = False
+                        fields: list[str] = line.strip().split()
+
+                        if len(fields[0]) > 1:  # save the first two lines of an element for the future
+                            elem_line_1_to_save: str = f"{fields[0]} {fields[1]}  {fields[2]}"  # first line of the element
+                            number_of_lines_element: int = int(fields[3])
+                        else:
+                            elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
+                            number_of_lines_element: int = int(fields[4])
+
                         line: str = lines_file[line_number_read_file]
+                        elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
+
+                        # now we are reading the element's wavelength and stuff
                         line_number_read_file += 1
-                    else:
-                        first_line_read: bool = False
-                    fields: list[str] = line.strip().split()
 
-                    # it means this is an element
-                    if all_lines_to_write:  # if there was an element before with segments, then write them first
-                        write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
-                                    line_list_number)
-                        all_lines_to_write: dict = {}
-                    element_name = f"{fields[0]}{fields[1]}"
-
-                    if element_name == "'01.000000'":  # find out whether it is hydrogen
-                        hydrogen_element: bool = True
-                    else:
-                        hydrogen_element: bool = False
-                    if len(fields[0]) > 1:  # save the first two lines of an element for the future
-                        elem_line_1_to_save: str = f"{fields[0]} {fields[1]}  {fields[2]}"  # first line of the element
-                        number_of_lines_element: int = int(fields[3])
-                    else:
-                        elem_line_1_to_save: str = f"{fields[0]}   {fields[1]}            {fields[2]}    {fields[3]}"
-                        number_of_lines_element: int = int(fields[4])
-
-                    line: str = lines_file[line_number_read_file]
-                    elem_line_2_to_save: str = f"{line.strip()}\n"  # second line of the element
-
-                    # now we are reading the element's wavelength and stuff
-                    line_number_read_file += 1
-                    # lines_for_element = lines_file[line_number_read_file:number_of_lines_element+line_number_read_file]
-
-                    if not hydrogen_element:
                         # to not redo strip/split every time, save wavelength for the future here
                         element_wavelength_dictionary = {}
 
@@ -111,29 +120,13 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                     else:
                                         seg_current_index = 0
                                     all_lines_to_write[seg_current_index] = lines_file[index_seg_start + line_number_read_file:index_seg_end + line_number_read_file + 1]
-                    else:
-                        while line_number_read_for_element < number_of_lines_element:
-                            if do_hydrogen:
-                                line_stripped: str = lines_file[line_number_read_for_element + line_number_read_file].strip()
-                                if 0 not in all_lines_to_write:
-                                    if not lbl:
-                                        all_lines_to_write[0] = [f"{line_stripped} \n"]
-                                    else:
-                                        for seg_index in range(len(seg_begins)):
-                                            all_lines_to_write[seg_index] = [f"{line_stripped} \n"]
-                                else:
-                                    if not lbl:
-                                        all_lines_to_write[0].append(f"{line_stripped} \n")
-                                    else:
-                                        for seg_index in range(len(seg_begins)):
-                                            all_lines_to_write[seg_index].append(f"{line_stripped} \n")
-                            line_number_read_for_element += 1
 
-                    line_number_read_file: int = number_of_lines_element + line_number_read_file
+                        line_number_read_file: int = number_of_lines_element + line_number_read_file
 
-                if len(all_lines_to_write) > 0:
-                    write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
-                                line_list_number)
+                        if all_lines_to_write:
+                            write_lines(all_lines_to_write, elem_line_1_to_save, elem_line_2_to_save, new_linelist_name,
+                                        line_list_number)
+                            all_lines_to_write.clear()
 
 def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int,
                               element_to_search: float) -> int:
@@ -244,16 +237,18 @@ def binary_find_right_segment_index(array_to_search: list[str], dict_array_value
 #@profile
 def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, elem_line_2_to_save: str,
                 new_path_name: str, line_list_number: float):
+    global time_spent_writing
     for key in all_lines_to_write:
         new_linelist_name: str = os.path.join(f"{new_path_name}", f"{key}", f"linelist-{line_list_number}.bsyn")
         with open(new_linelist_name, "a") as new_file_to_write:
             new_file_to_write.write(f"{elem_line_1_to_save}	{len(all_lines_to_write[key])}\n")
             new_file_to_write.write(f"{elem_line_2_to_save}")
-            lines_to_write = ""
-            for line_to_write in all_lines_to_write[key]:
-                # pass
-                lines_to_write += line_to_write
+            time_start1 = time.perf_counter()
+            lines_to_write = "".join(all_lines_to_write[key])
+
             new_file_to_write.write(lines_to_write)
+            time_end1 = time.perf_counter()
+            time_spent_writing += time_end1 - time_start1
 
 
 if __name__ == '__main__':
@@ -261,15 +256,25 @@ if __name__ == '__main__':
     from tqdm import tqdm
     temp_dir = "./test_test_test/"
 
-    test = False
+    test = True
 
     if os.path.exists(temp_dir):
         shutil.rmtree(temp_dir)
 
     if test:
-        create_window_linelist([4850], [4870],
+        time_spent_reading = 0
+        time_spent_writing = 0
+        time_start = time.perf_counter()
+        create_window_linelist([4000], [8000],
                                "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
                                temp_dir, True, False, True)
+        time_end = time.perf_counter()
+        total_time_spent = time_end - time_start
+        print(f"Total time taken: {total_time_spent}")
+        print(f"Time spent reading: {time_spent_reading}")
+        print(f"Time spent writing: {time_spent_writing}")
+        print(f"Percentage of time spent reading: {time_spent_reading / total_time_spent * 100}%")
+        print(f"Percentage of time spent writing: {time_spent_writing / total_time_spent * 100}%")
     else:
         for i in tqdm(range(3)):
             create_window_linelist([4850], [4865], "/Users/storm/docker_common_folder/TSFitPy/input_files/linelists/linelist_for_fitting/",
