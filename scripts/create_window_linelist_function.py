@@ -46,6 +46,10 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
         with open(line_list_file) as fp:
             # so that we dont read full file if we are not sure that we use it (if it is a molecule)
             first_line: str = fp.readline()
+            # check if line is empty
+            if not first_line:
+                print(f"LINELIST WARNING! File {line_list_file} is empty")
+                continue
             fields = first_line.strip().split()
             sep = '.'
             element = fields[0] + fields[1]
