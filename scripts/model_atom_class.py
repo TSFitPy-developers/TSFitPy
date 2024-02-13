@@ -560,7 +560,7 @@ class ModelAtom:
         with open(path, "w") as file:
             # write the header comments
             for header_comment in self.header_comments:
-                file.write(f"* {header_comment}\n")
+                file.write(f"{header_comment}")
             # write top lines
             file.write(f"{self.atom_element}\n")
             file.write(f"{self.atom_abundance:>8.2f}  {self.atom_mass:>7.3f}\n")
@@ -603,7 +603,7 @@ class ModelAtom:
                 collisional_transition.write_to_file(file)
             file.write(f"END\n")
 
-    def read_model_atom(self, path, atom_version=None, read_collisions=True):
+    def read_model_atom(self, path, atom_version=None, read_collisions=True, sort_bb_transitions=True):
         # possible atom versions are MB and FORMATO2
         potential_atom_versions = ["MB", "FORMATO2"]
         if atom_version is not None and atom_version not in potential_atom_versions:
@@ -614,20 +614,29 @@ class ModelAtom:
         self.atom_filename = basename
         if atom_version is None:
             try:
-                self.read_model_atom_version(path, "MB", read_collisions)
+                self.read_model_atom_version(path, "MB", read_collisions, sort_bb_transitions)
             except ValueError:
-                self.read_model_atom_version(path, "FORMATO2", read_collisions)
+                self.read_model_atom_version(path, "FORMATO2", read_collisions, sort_bb_transitions)
         else:
-            self.read_model_atom_version(path, atom_version, read_collisions)
+            self.read_model_atom_version(path, atom_version, read_collisions, sort_bb_transitions)
 
     def _read_top_lines_atom(self, lines):
+        headers = []
         # read lines skipping any comments (starting with *) until * EC
         line_index = 0
+        line_index_old = 0
         # first line is the element
         line, line_index = self._read_atom_skip_comments(lines, line_index)
+        # append lines[line_index_old:lind_index+1] to headers
+        if line_index_old < line_index:
+            headers.extend(lines[line_index_old:line_index - 1])
+        line_index_old = line_index
         self.atom_element = line.strip().split()[0]
         # second line is the abundance and mass
         line, line_index = self._read_atom_skip_comments(lines, line_index)
+        if line_index_old < line_index:
+            headers.extend(lines[line_index_old:line_index - 1])
+        line_index_old = line_index
         # convert to float
         try:
             self.atom_abundance, self.atom_mass = [float(x) for x in line.split()]
@@ -635,9 +644,13 @@ class ModelAtom:
             line_strip = line.strip().split()
             # just take random abundance because none is given
             self.atom_abundance = 5.0
+            print(f"Warning! Abundance is not given in {self.atom_filename}, using 5.0")
             self.atom_mass = float(line_strip[1])
         # third line is the number of energy levels, number of transitions, number of radiative fixations and number of collisional fixations
         line, line_index = self._read_atom_skip_comments(lines, line_index)
+        if line_index_old < line_index:
+            headers.extend(lines[line_index_old:line_index - 1])
+        line_index_old = line_index
         ec_length, bb_length, bf_length, self.nrfix = [
             int(x) for x in line.split()
         ]
@@ -647,14 +660,19 @@ class ModelAtom:
             "e[cm⁻¹]",
             "energy",
             "ecm",
+            "e[cm]"
         ]
-        while not any(
-                [
-                    lines[line_index].split()[1].lower().startswith(x)
-                    for x in potential_header_ec
-                ]
-        ):
-            line_index += 1
+        while True:
+            if len(lines[line_index].split()) > 1:
+                if not any([lines[line_index].split()[1].lower().startswith(x) for x in potential_header_ec]):
+                    line_index += 1
+                else:
+                    break
+            else:
+                line_index += 1
+        if line_index_old < line_index:
+            headers.extend(lines[line_index_old:line_index])
+        self.header_comments = headers
         return bb_length, bf_length, ec_length, line_index
 
     def _read_ec_levels(self, ec_length, line_index, lines, atom_version:str):
@@ -680,10 +698,10 @@ class ModelAtom:
                 # MB version: level ID is inside the string
                 try:
                     atom_level = int(fields[3])
-                    atom_label = fields[5].replace("'", "")
+                    atom_label = "".join(fields[5:-1]).replace("'", "")
                 except ValueError:
                     atom_level = int(fields[4])
-                    atom_label = fields[6].replace("'", "")
+                    atom_label = "".join(fields[6:-1]).replace("'", "")
                 ion = int(fields[-1])
             elif atom_version == "FORMATO2":
                 # FORMATO2 version: level ID is the last field
@@ -699,7 +717,7 @@ class ModelAtom:
             ec_levels.append(ec_level)
         return current_ionisation_level, ec_levels, line_index
 
-    def _read_bb_transitions(self, bb_length, line_index, lines, atom_version:str):
+    def _read_bb_transitions(self, bb_length, line_index, lines, atom_version:str, sort_bb_transitions=True):
         current_bb_index = 0
         # first check if there is a comment
         while current_bb_index < bb_length:
@@ -712,20 +730,21 @@ class ModelAtom:
                         # replace ";" with nothing in line_split
                         line_split = [x.replace(";", "") for x in line_split]
                         try:
-                            bb_id, bb_wavelength, bb_loggf = [
-                                                                 float(s) for s in line_split if is_number(s)
-                                                             ][:3]
+                            bb_id, bb_wavelength, bb_loggf = [float(s) for s in line_split if is_number(s)][:3]
                         except ValueError:
                             # replace = with space
                             line_split = (
                                 lines[line_index].replace("=", "= ", 1).strip().split()
                             )
-                            bb_id, bb_wavelength, bb_loggf = [
-                                                                 float(s) for s in line_split if is_number(s)
-                                                             ][:3]
+                            bb_id, bb_wavelength, bb_loggf = [float(s) for s in line_split if is_number(s)][:3]
 
-                        lower_level_label = line_split[-2]
-                        upper_level_label = line_split[-1]
+                        # if line_split[-1] ends with "AXR" kinda stuff, then it is a lower level label
+                        if len(line_split[-1]) == 3 and line_split[-1][1] == "X":
+                            lower_level_label = line_split[-3]
+                            upper_level_label = f"{line_split[-2]} {line_split[-1]}"
+                        else:
+                            lower_level_label = line_split[-2]
+                            upper_level_label = line_split[-1]
 
                         line_index += 1
                         break
@@ -831,7 +850,8 @@ class ModelAtom:
             self.bb_transitions.append(bb_transition)
             current_bb_index += 1
 
-        self.sort_bb_transitions()
+        if sort_bb_transitions or atom_version == "FORMATO2":
+            self.sort_bb_transitions()
         return line_index
 
     def _read_bf_transitions(self, bf_length, line_index, lines, atom_version:str):
@@ -899,10 +919,17 @@ class ModelAtom:
                         current_temperature_values.append(temperature_value)
                 else:
                     # first line is the label
-                    label = lines[line_index].strip().split()[0]
+                    split_line = lines[line_index].strip().split()
+                    label = split_line[0]
                     if label == "CH_CE":
                         label = "CH0"
-                    if label != "CI":
+                    skip_line = False
+                    if label == "CI" and len(split_line) != 1:
+                        if split_line[1] == "SEATON":
+                            # skip CI if Seaton is used, so we delete these lines apparently
+                            # Source: MB
+                            skip_line = True
+                    if not skip_line:
                         line_index += 1
                         # next line is the upper level and lower level
                         line_split = lines[line_index].strip().split()
@@ -924,12 +951,11 @@ class ModelAtom:
                         )
                         self.collisional_transitions.append(collisional_transition)
                     else:
-                        # skip those lines if Seaton is used, so we delete these lines apparently
                         line_index += 2
             else:
                 line_index += 1
 
-    def read_model_atom_version(self, path, atom_version:str, read_collisions=True):
+    def read_model_atom_version(self, path, atom_version:str, read_collisions=True, sort_bb_transitions=True):
         with open(path, "r") as file:
             lines = file.readlines()
 
@@ -937,9 +963,9 @@ class ModelAtom:
 
         self.max_ion, self.ec_levels, line_index = self._read_ec_levels(ec_length, line_index, lines, atom_version)
 
-        line_index = self._read_atom_skip_comments(lines, line_index)[1] - 1
+        line_index = self._read_atom_skip_comments(lines, line_index)[1] - 2
 
-        line_index = self._read_bb_transitions(bb_length, line_index, lines, atom_version)
+        line_index = self._read_bb_transitions(bb_length, line_index, lines, atom_version, sort_bb_transitions=sort_bb_transitions)
 
         line_index = self._read_bf_transitions(bf_length, line_index, lines, atom_version)
 
@@ -954,7 +980,7 @@ class ModelAtom:
         if not check_length:
             return False
         # check if the first element is id or i, meaning that it is a comment relevant to the transition
-        check_id = line_split[1] in possible_names_for_id
+        check_id = line_split[1] in possible_names_for_id or line_split[0].replace("*", "") in possible_names_for_id
         # check that it is not double comment, because that usually implies that this line was commented out completely
         check_double_comment = lines[line_index][1] != "*"
         # check that the next line is not a comment with a transition
