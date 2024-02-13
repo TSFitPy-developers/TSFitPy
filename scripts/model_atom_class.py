@@ -14,19 +14,26 @@ epsilon_0 = 8.8541878128e-12
 
 
 class ECLevel:
-    def __init__(self, level_id, ec, g, term, ion, config, ionisation_ec):
+    def __init__(self, level_id: int, ec: float, g: float, term: str, ion: int, config: str, ionisation_ec: float):
+        # level ID stars from 1
         self.level_id: int = level_id
         if self.level_id <= 0:
             raise ValueError("Level ID must be greater than 0")
+        # EC is energy in cm^-1
         self.ec_value: float = ec
+        # g is the statistical weight
         self.g_value: float = g
-        self.term_name: str = term
+        # ionisation stage is the ionisation stage of the level, e.g Fe I is 1, Fe II is 2
         self.ionisation_stage: int = ion
+        # label name is config + term
         self.config_name: str = config
+        self.term_name: str = term
         self.label_name: str = (
             self.config_name.replace(" ", "") + "" + self.term_name.replace(" ", "")
         )
         # ionisation_ec is the energy of the ionisation level below this level
+        # so for Fe I, ionisation_ec is 0
+        # for Fe II, ionisation_ec is the energy of lower level of Fe II
         self.ionisation_ec = ionisation_ec
 
     def __str__(self):
@@ -206,6 +213,10 @@ class BBTransition:
             return False
 
     def calculate_f_value(self, lower_g_value: float):
+        """
+        Calculates the f value from loggf and lower g value
+        :param lower_g_value:  Lower g value
+        """
         self.f_value = 10**self.loggf / lower_g_value
 
 
