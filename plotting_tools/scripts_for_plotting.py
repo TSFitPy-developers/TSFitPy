@@ -550,10 +550,53 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         return wave_mod, flux_norm_mod
 
 
+def read_element_data(lines):
+    i = 0
+    elements_data = []
+    while i < len(lines):
+        line_parts = lines[i].split()
+        if len(line_parts) == 0:
+            i += 1
+            continue
+        if line_parts[0] == "'":
+            atomic_num = (line_parts[1])
+        else:
+            atomic_num = (line_parts[0])
+        ionization = int(line_parts[-2])
+        num_lines = int(line_parts[-1])
+
+        element_name = lines[i + 1].strip().replace("'", "").replace("NLTE", "").replace("LTE", "")
+
+        for _ in range(num_lines):
+            i += 1
+            data_line = lines[i + 1]
+            wavelength, loggf = float(data_line.split()[0]), float(data_line.split()[2])
+            #elements_data.append((element_name, atomic_num, ionization, wavelength, loggf))
+            elements_data.append((wavelength, f"{element_name}", loggf))
+
+        i += 2
+
+    return elements_data
+
+def find_elements(elements_data, left_wavelength, right_wavelength, loggf_threshold):
+    filtered_elements = []
+    for element_data in elements_data:
+        wavelength, element_name, loggf = element_data
+        if left_wavelength <= wavelength <= right_wavelength and loggf >= loggf_threshold:
+            filtered_elements.append(element_data)
+
+    sorted_elements = sorted(filtered_elements, key=lambda x: x[0])  # Sort by wavelength
+
+    return sorted_elements
+
+    #for element_data in sorted_elements:
+    #    element_name, atomic_num, ionization, wavelength, loggf = element_data
+    #    print(element_name.replace("'", "").replace("NLTE", "").replace("LTE", ""), atomic_num, wavelength, loggf)
+
 def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
                               hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
                               nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False,
-                              m3dis_package_name="m3dis"):
+                              m3dis_package_name="m3dis", return_parsed_linelist=False, loggf_limit_parsed_linelist=-5.0):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -598,6 +641,7 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     create_window_linelist([lmin - 4], [lmax + 4], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
     # if m3dis, then combine all linelists into one
     # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
+    parsed_linelist_data = []
     for folder in os.listdir(line_list_path_trimmed):
         if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
             # go into each folder and combine all linelists into one
@@ -606,9 +650,24 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
                 for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
                     if file.endswith(".bsyn") and not file == "combined_linelist.bsyn":
                         with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
-                            combined_linelist_file.write(linelist_file.read())
+                            read_file = linelist_file.read()
+                            combined_linelist_file.write(read_file)
+                            if return_parsed_linelist:
+                                parsed_linelist_data.append(read_file)
                         # delete the file
                         os.remove(os.path.join(line_list_path_trimmed, folder, file))
+    parsed_elements_sorted_info = None
+    if return_parsed_linelist:
+        parsed_model_atom_data = []
+        for i in range(len(parsed_linelist_data)):
+            parsed_model_atom_data.extend(parsed_linelist_data[i].split("\n"))
+
+        left_wavelength = lmin  # change this to change the range of wavelengths to print
+        right_wavelength = lmax
+        loggf_threshold = loggf_limit_parsed_linelist           # change this to change the threshold for loggf
+        elements_data = read_element_data(parsed_model_atom_data)
+        parsed_elements_sorted_info = find_elements(elements_data, left_wavelength, right_wavelength, loggf_threshold)
+
     print("Trimming done")
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
@@ -703,10 +762,14 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
 
+    result = [wave_mod, flux_norm_mod]
+
     if return_unnorm_flux:
-        return wave_mod, flux_norm_mod, flux_unnorm
-    else:
-        return wave_mod, flux_norm_mod
+        result.append(flux_unnorm)
+    if return_parsed_linelist:
+        result.append(parsed_elements_sorted_info)
+
+    return tuple(result)
 
 
 def remove_bad_lines(output_data):
