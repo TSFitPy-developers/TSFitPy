@@ -62,27 +62,31 @@ class ECLevel:
 
 
 class BBTransition:
-    def __init__(
-        self, wavelength, ion_transition, loggf, lower_level_ec=0.0, upper_level_ec=0.0, bb_id=0
-    ):
+    def __init__(self, wavelength: float, ion_transition: int, loggf: float, lower_level_ec=0.0, upper_level_ec=0.0,
+                 bb_id=0):
+        # wavelength in angstroms
         self.wavelength_aa: float = wavelength
+        # ion transition is the ionisation stage of the levels, mostly used for Kurucz data
         self.ion_transition: int = ion_transition
 
+        # loggf and f_value should normally be the "same", but usually loggf is given and f value calculated based
+        # on the g values of the levels, which we might not have
         self.loggf: float = loggf
         self.f_value: float = -1
+
+        # information about the lower and upper levels
         self.lower_level_ec: float = lower_level_ec
         self.upper_level_ec: float = upper_level_ec
-
         self.lower_level_id: int = 1
         self.upper_level_id: int = 1
+        # label is only for a comment
         self.lower_level_label: str = ""
         self.upper_level_label: str = ""
-        self.lower_level_g_value: float = 0.0
 
         self.bb_id: int = bb_id
 
         # f"* UP LOW      F        NQ  QMAX   Q0    IW    GA            GV   GQ\n"
-
+        # exactly how it is named in model atom
         self.nq = 9
         self.qmax = 4.0
         self.q0 = 0.0
@@ -102,9 +106,9 @@ class BBTransition:
         self.hyperfine_gq = []
         self.hyperfine_line_profile = []
 
-    def find_level_id(self, ec_levels, tolerance=0.1):
-        lower_levels_within_tolerance: list[ec_levels] = []
-        upper_levels_within_tolerance: list[ec_levels] = []
+    def find_level_id(self, ec_levels: list[ECLevel], tolerance=0.1):
+        lower_levels_within_tolerance: list[ECLevel] = []
+        upper_levels_within_tolerance: list[ECLevel] = []
 
         for ec_level in ec_levels:
             if (
@@ -218,6 +222,13 @@ class BBTransition:
         :param lower_g_value:  Lower g value
         """
         self.f_value = 10**self.loggf / lower_g_value
+
+    def calculate_elow_ev(self):
+        """
+        Calculates the lower energy level in eV
+        """
+        # convert cm^-1 to eV
+        return self.lower_level_ec * 0.00012398419
 
 
 class BFTransition:
