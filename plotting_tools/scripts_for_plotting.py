@@ -596,7 +596,8 @@ def find_elements(elements_data, left_wavelength, right_wavelength, loggf_thresh
 def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
                               hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
                               nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False,
-                              m3dis_package_name="m3dis", return_parsed_linelist=False, loggf_limit_parsed_linelist=-5.0):
+                              m3dis_package_name="m3dis", return_parsed_linelist=False, loggf_limit_parsed_linelist=-5.0,
+                              plot_output=False):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -638,7 +639,7 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
-    create_window_linelist([lmin - 4], [lmax + 4], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
+    create_window_linelist([lmin - 2], [lmax + 2], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
     # if m3dis, then combine all linelists into one
     # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
     parsed_linelist_data = []
@@ -737,12 +738,12 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
                     else:
                         wave_mod = wave_mod_macro
                         flux_norm_mod = flux_norm_mod_macro
-
-                    plt.plot(wave_mod, flux_norm_mod)
-                    plt.xlim(lmin - 0.2, lmax + 0.2)
-                    plt.ylim(0, 1.05)
-                    plt.xlabel("Wavelength")
-                    plt.ylabel("Normalised flux")
+                    if plot_output:
+                        plt.plot(wave_mod, flux_norm_mod)
+                        plt.xlim(lmin - 0.2, lmax + 0.2)
+                        plt.ylim(0, 1.05)
+                        plt.xlabel("Wavelength")
+                        plt.ylabel("Normalised flux")
                 else:
                     print('m3dis failed')
                     wave_mod, flux_norm_mod = np.array([]), np.array([])
