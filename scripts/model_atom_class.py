@@ -1027,14 +1027,18 @@ class ModelAtom:
             line_index += 1
         return lines[line_index], line_index + 1
 
-    def find_bb_transition_of_wavelength(self, wavelength: float, tolerance: float = 0.01):
+    def find_bb_transition_of_wavelength(self, wavelengths: list[float], tolerance: float = 0.01):
+        # if wavelengths is a float, then convert it to a list
+        if isinstance(wavelengths, float) or isinstance(wavelengths, int):
+            wavelengths = [wavelengths]
         bb_transition_ids = []
         bb_transition_wavelengths = []
-        for bb_transition in self.bb_transitions:
-            if abs(bb_transition.wavelength_aa - wavelength) <= tolerance:
-                print(f"Found BB transition ID {bb_transition.bb_id} of wavelength {wavelength} within tolerance {tolerance}")
-                bb_transition_ids.append(bb_transition.bb_id)
-                bb_transition_wavelengths.append(wavelength)
+        for wavelength in wavelengths:
+            for bb_transition in self.bb_transitions:
+                if abs(bb_transition.wavelength_aa - wavelength) <= tolerance:
+                    print(f"Found BB transition ID {int(bb_transition.bb_id)} of wavelength {wavelength} within tolerance {tolerance}")
+                    bb_transition_ids.append(int(bb_transition.bb_id))
+                    bb_transition_wavelengths.append(wavelength)
         # print the wavelengths and ids as a zip, such that it can be copied as a dictionary
         for i, (id, wavelength) in enumerate(zip(bb_transition_ids, bb_transition_wavelengths)):
             print(f"{wavelength}: {id}, ", end="")
