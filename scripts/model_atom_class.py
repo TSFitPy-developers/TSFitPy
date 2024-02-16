@@ -1043,6 +1043,15 @@ class ModelAtom:
         for i, (id, wavelength) in enumerate(zip(bb_transition_ids, bb_transition_wavelengths)):
             print(f"{wavelength}: {id}, ", end="")
 
+    def leave_only_bb_transitions_specific_ids(self, bb_ids: list[int]):
+        bb_transitions_to_leave = [
+            x
+            for x in self.bb_transitions
+            if int(x.bb_id) in bb_ids
+        ]
+        self.bb_transitions = bb_transitions_to_leave
+        self.sort_bb_transitions()
+
 
 
 if __name__ == '__main__':
