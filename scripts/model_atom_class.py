@@ -1043,13 +1043,22 @@ class ModelAtom:
         for i, (id, wavelength) in enumerate(zip(bb_transition_ids, bb_transition_wavelengths)):
             print(f"{wavelength}: {id}, ", end="")
 
-    def leave_only_bb_transitions_specific_ids(self, bb_ids: list[int]):
+    def leave_only_bb_transitions_specific_ids(self, bb_ids: list[int], nq_new=None, qmax_new=None, q0_new=None):
         bb_transitions_to_leave = [
             x
             for x in self.bb_transitions
             if int(x.bb_id) in bb_ids
         ]
         self.bb_transitions = bb_transitions_to_leave
+        if nq_new is not None:
+            for bb_transition in self.bb_transitions:
+                bb_transition.nq = nq_new
+        if qmax_new is not None:
+            for bb_transition in self.bb_transitions:
+                bb_transition.qmax = qmax_new
+        if q0_new is not None:
+            for bb_transition in self.bb_transitions:
+                bb_transition.q0 = q0_new
         self.sort_bb_transitions()
 
 
