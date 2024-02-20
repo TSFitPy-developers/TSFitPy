@@ -786,8 +786,10 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 os.remove(temp_spectra_location)
             if run_babsma_flag:
                 # generate the model atmosphere
+                logging.debug("Calculating atmosphere")
                 self.calculate_atmosphere()
             if (run_bsyn_flag and self.nlte_flag) or run_babsma_flag:
+                logging.debug("Interpolating atmosphere")
                 self._interpolate_atmosphere(self.atmosphere_properties['marcs_model_list'])
             try:
                 logging.debug("Running Turbospectrum")
@@ -803,10 +805,11 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             except AttributeError:
                 if not self.night_mode:
                     print("No attribute, fail of generation?")
-        except (ModuleNotFoundError, ValueError, TypeError) as error:
+        except (FileNotFoundError, ValueError, TypeError) as error:
             if not self.night_mode:
                 print(f"Interpolation failed? {error}")
-                print("ValueError can sometimes imply problem with the departure coefficients grid")
+                if error == ValueError:
+                    print("ValueError can sometimes imply problem with the departure coefficients grid")
         return None, None, None
 
 
