@@ -341,52 +341,6 @@ class SyntheticSpectrumGenerator:
         return {"errors": None, "marcs_model_list": marcs_model_list, "spherical": spherical}
 
 
-    def make_atmosphere_properties(self, spherical, element):
-        logging.debug(f"make_atmosphere_properties: spherical={spherical}, element={element}, {self.free_abundances}")
-        if self.nlte_flag:
-            # Write configuration input for interpolator
-            output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            model_test = "{}.test".format(output)
-            interpol_config = ""
-            for line in self.marcs_model_list_global:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-            interpol_config += "'{}.interpol'\n".format(output)
-            interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
-            interpol_config += "'{}'\n".format(
-                os_path.join(self.departure_file_path, self.depart_bin_file[element]))  # needed for nlte interpolator
-            interpol_config += "'{}'\n".format(
-                os_path.join(self.departure_file_path, self.depart_aux_file[element]))  # needed for nlte interpolator
-            interpol_config += "{}\n".format(self.aux_file_length_dict[element])
-            interpol_config += "{}\n".format(self.t_eff)
-            interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-            element_abundance = self._get_element_abundance(element)
-            interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
-            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-            interpol_config += "'{}'\n".format(model_test)
-        else:
-            output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            model_test = "{}.test".format(output)
-            interpol_config = ""
-            for line in self.marcs_model_list_global:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-            interpol_config += "'{}.interpol'\n".format(output)
-            interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "{}\n".format(self.t_eff)
-            interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{}\n".format(self.metallicity)
-            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-            interpol_config += "'{}'\n".format(model_test)
-
-        return {
-            "interpol_config": interpol_config,
-            "spherical": spherical,
-            "errors": None
-        }
-
     @abc.abstractmethod
     def calculate_atmosphere(self):
         pass
