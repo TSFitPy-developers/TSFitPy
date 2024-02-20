@@ -803,7 +803,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             except AttributeError:
                 if not self.night_mode:
                     print("No attribute, fail of generation?")
-        except (ModuleNotFoundError) as error:
+        except (ModuleNotFoundError, ValueError, TypeError) as error:
             if not self.night_mode:
                 print(f"Interpolation failed? {error}")
                 print("ValueError can sometimes imply problem with the departure coefficients grid")

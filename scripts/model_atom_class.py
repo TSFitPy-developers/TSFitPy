@@ -1042,6 +1042,7 @@ class ModelAtom:
         # print the wavelengths and ids as a zip, such that it can be copied as a dictionary
         for i, (id, wavelength) in enumerate(zip(bb_transition_ids, bb_transition_wavelengths)):
             print(f"{wavelength}: {id}, ", end="")
+        return bb_transition_ids
 
     def leave_only_bb_transitions_specific_ids(self, bb_ids: list[int], nq_new=None, qmax_new=None, q0_new=None):
         bb_transitions_to_leave = [
