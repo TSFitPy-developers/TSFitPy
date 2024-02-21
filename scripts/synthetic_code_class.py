@@ -3,16 +3,14 @@ from __future__ import annotations
 import subprocess
 import os
 from os import path as os_path
-import glob
 import re
 from operator import itemgetter
+from typing import Tuple
 import numpy as np
-import math
 import logging
 import abc
-from scripts.auxiliary_functions import closest_available_value
-from scripts.solar_abundances import solar_abundances, periodic_table, molecules_atomic_number
-from scripts.solar_isotopes import solar_isotopes
+from .auxiliary_functions import closest_available_value
+from .solar_abundances import solar_abundances, molecules_atomic_number
 
 class SyntheticSpectrumGenerator:
     """
@@ -36,7 +34,7 @@ class SyntheticSpectrumGenerator:
     def __init__(self, code_path: str, interpol_path: str, line_list_paths: str, marcs_grid_path: str,
                  marcs_grid_list: str, model_atom_path: str,
                  marcs_value_keys: list, marcs_values: dict, marcs_models: dict, model_temperatures: np.ndarray,
-                 model_logs: np.ndarray, model_mets: np.ndarray):
+                 model_logs: np.ndarray, model_mets: np.ndarray, night_mode=False):
         """
         Instantiate a class for generating synthetic stellar spectra using Turbospectrum.
 
@@ -107,8 +105,13 @@ class SyntheticSpectrumGenerator:
         self.model_mets = model_mets
         self.marcs_model_list_global = []  # needed for microturbulence interpolation
 
+        self.night_mode = night_mode
+
     @abc.abstractmethod
-    def configure(self):
+    def configure(self, t_eff=None, log_g=None, metallicity=None, turbulent_velocity=None, lambda_delta=None,
+                  lambda_min=None, lambda_max=None, free_abundances=None, temp_directory=None, nlte_flag=None,
+                  verbose=None, atmosphere_dimension=None, windows_flag=None, segment_file=None, line_mask_file=None,
+                  depart_bin_file=None, depart_aux_file=None, model_atom_file=None):
         """
         Configure the code to run.
         """
@@ -148,19 +151,9 @@ class SyntheticSpectrumGenerator:
         Generates an interpolated model atmosphere from the MARCS grid using the interpol.f routine developed by
         T. Masseron (Masseron, PhD Thesis, 2006). This is a python wrapper for that fortran code.
         """
-        # self.counter_marcs += 1
-        # self.marcs_model_name = "marcs_{:08d}".format(self.counter_marcs)
         self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
                                                                                    self.metallicity,
                                                                                    self.turbulent_velocity)
-        #global marcs_model_list_global
-
-        #        if self.verbose:
-        #            stdout = None
-        #            stderr = subprocess.STDOUT
-        #        else:
-        #            stdout = open('/dev/null', 'w')
-        #            stderr = subprocess.STDOUT
 
         # Defines default point at which plane-parallel vs spherical model atmosphere models are used
         spherical: bool = self.sphere
@@ -341,342 +334,19 @@ class SyntheticSpectrumGenerator:
                     parameter_descriptor[1] = options[parameter_descriptor[3]]
 
         logging.debug(marcs_model_list)
-        # save marcs model list in a file as one line at a time
-        #with open(os_path.join("test12312123.txt"), 'a') as f:
-        #    for item in marcs_model_list:
-        #        f.write("%s\n" % item)
 
-        # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
-        if self.nlte_flag:
-            for element in self.model_atom_file:
-                element_abundance = self._get_element_abundance(element)
-
-                if self.verbose:
-                    stdout = None
-                    stderr = subprocess.STDOUT
-                else:
-                    stdout = open('/dev/null', 'w')
-                    stderr = subprocess.STDOUT
-                # Write configuration input for interpolator
-                output = os_path.join(self.tmp_dir, self.marcs_model_name)
-                model_test = "{}.test".format(output)
-                interpol_config = ""
-                self.marcs_model_list_global = marcs_model_list
-                for line in marcs_model_list:
-                    interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-                interpol_config += "'{}.interpol'\n".format(output)
-                interpol_config += "'{}.alt'\n".format(output)
-                interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
-                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_bin_file[
-                    element]))  # needed for nlte interpolator
-                interpol_config += "'{}'\n".format(os_path.join(self.departure_file_path, self.depart_aux_file[
-                    element]))  # needed for nlte interpolator
-                interpol_config += "{}\n".format(self.aux_file_length_dict[element])
-                interpol_config += "{}\n".format(self.t_eff)
-                interpol_config += "{}\n".format(self.log_g)
-                interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-                interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
-                interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-                interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-                interpol_config += "'{}'\n".format(model_test)
-
-                # Now we run the FORTRAN model interpolator
-                try:
-                    if self.atmosphere_dimension == "1D":
-                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles_nlte')],
-                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                        p.stdin.write(bytes(interpol_config, 'utf-8'))
-                        stdout, stderr = p.communicate()
-                    elif self.atmosphere_dimension == "3D":
-                        p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi_nlte')],
-                                             stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                        p.stdin.write(bytes(interpol_config, 'utf-8'))
-                        stdout, stderr = p.communicate()
-                except subprocess.CalledProcessError:
-                    return {
-                        "interpol_config": interpol_config,
-                        "errors": "MARCS model atmosphere interpolation failed."
-                    }
-                if spherical:
-                    self.turbulent_velocity = microturbulence
-        else:
-            if self.verbose:
-                stdout = None
-                stderr = subprocess.STDOUT
-            else:
-                stdout = open('/dev/null', 'w')
-                stderr = subprocess.STDOUT
-            # print(len(np.loadtxt(os_path.join(self.departure_file_path,self.depart_aux_file[element]), dtype='str')))
-            # Write configuration input for interpolator
-            output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            # output = os_path.join('Testout/', self.marcs_model_name)
-            # print(output)
-            model_test = "{}.test".format(output)
-            interpol_config = ""
-            self.marcs_model_list_global = marcs_model_list
-            # print(marcs_model_list)
-            # print(self.free_abundances["Ca"]+float(solar_abundances["Ca"]))
-            for line in marcs_model_list:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-            interpol_config += "'{}.interpol'\n".format(output)
-            interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "{}\n".format(self.t_eff)
-            interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{}\n".format(self.metallicity)
-            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-            interpol_config += "'{}'\n".format(model_test)
-
-            # Now we run the FORTRAN model interpolator
-            # print(self.free_abundances["Ba"])
-            try:
-                if self.atmosphere_dimension == "1D":
-                    p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_modeles')],
-                                         stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                    p.stdin.write(bytes(interpol_config, 'utf-8'))
-                    stdout, stderr = p.communicate()
-                elif self.atmosphere_dimension == "3D":
-                    p = subprocess.Popen([os_path.join(self.interpol_path, 'interpol_multi')],
-                                         stdin=subprocess.PIPE, stdout=stdout, stderr=stderr)
-                    p.stdin.write(bytes(interpol_config, 'utf-8'))
-                    stdout, stderr = p.communicate()
-            except subprocess.CalledProcessError:
-                # print("spud")
-                return {
-                    "interpol_config": interpol_config,
-                    "errors": "MARCS model atmosphere interpolation failed."
-                }
-            # print("spud")
-            if spherical:
-                self.turbulent_velocity = microturbulence
-
-        return {
-            "interpol_config": interpol_config,
-            "spherical": spherical,
-            "errors": None
-        }
-
-
-    def make_atmosphere_properties(self, spherical, element):
-        logging.debug(f"make_atmosphere_properties: spherical={spherical}, element={element}, {self.free_abundances}")
-        if self.nlte_flag:
-            # Write configuration input for interpolator
-            output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            model_test = "{}.test".format(output)
-            interpol_config = ""
-            for line in self.marcs_model_list_global:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-            interpol_config += "'{}.interpol'\n".format(output)
-            interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "'{}_{}_coef.dat'\n".format(output, element)  # needed for nlte interpolator
-            interpol_config += "'{}'\n".format(
-                os_path.join(self.departure_file_path, self.depart_bin_file[element]))  # needed for nlte interpolator
-            interpol_config += "'{}'\n".format(
-                os_path.join(self.departure_file_path, self.depart_aux_file[element]))  # needed for nlte interpolator
-            interpol_config += "{}\n".format(self.aux_file_length_dict[element])
-            interpol_config += "{}\n".format(self.t_eff)
-            interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{:.6f}\n".format(round(float(self.metallicity), 6))
-            element_abundance = self._get_element_abundance(element)
-            interpol_config += "{:.6f}\n".format(round(float(element_abundance), 6))
-            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-            interpol_config += "'{}'\n".format(model_test)
-        else:
-            output = os_path.join(self.tmp_dir, self.marcs_model_name)
-            model_test = "{}.test".format(output)
-            interpol_config = ""
-            for line in self.marcs_model_list_global:
-                interpol_config += "'{}{}'\n".format(self.marcs_grid_path, line)
-            interpol_config += "'{}.interpol'\n".format(output)
-            interpol_config += "'{}.alt'\n".format(output)
-            interpol_config += "{}\n".format(self.t_eff)
-            interpol_config += "{}\n".format(self.log_g)
-            interpol_config += "{}\n".format(self.metallicity)
-            interpol_config += ".false.\n"  # test option - set to .true. if you want to plot comparison model (model_test)
-            interpol_config += ".false.\n"  # MARCS binary format (.true.) or MARCS ASCII web format (.false.)?
-            interpol_config += "'{}'\n".format(model_test)
-
-        return {
-            "interpol_config": interpol_config,
-            "spherical": spherical,
-            "errors": None
-        }
-
-    def calculate_atmosphere(self):
-        # figure out if we need to interpolate the model atmosphere for microturbulence
-        possible_turbulence = [0.0, 1.0, 2.0, 5.0]
-        flag_dont_interp_microturb = False
-        for i in range(len(possible_turbulence)):
-            if self.turbulent_velocity == possible_turbulence[i]:
-                flag_dont_interp_microturb = True
-
-        if self.log_g < 3:
-            flag_dont_interp_microturb = True
-
-        logging.debug(f"flag_dont_interp_microturb: {flag_dont_interp_microturb} {self.turbulent_velocity} {self.t_eff} {self.log_g}")
-
-        if not flag_dont_interp_microturb and self.turbulent_velocity < 2.0 and (
-                self.turbulent_velocity > 1.0 or (self.turbulent_velocity < 1.0 and self.t_eff < 3900.)):
-            # Bracket the microturbulence to figure out what two values to generate the models to interpolate between using Andy's code
-            turbulence_low = 0.0
-            microturbulence = self.turbulent_velocity
-            for i in range(len(possible_turbulence)):
-                if self.turbulent_velocity > possible_turbulence[i]:
-                    turbulence_low = possible_turbulence[i]
-                    place = i
-            turbulence_high = possible_turbulence[place + 1]
-            # print(turbulence_low,turbulence_high)
-
-            self.turbulent_velocity = turbulence_low
-            atmosphere_properties_low = self._generate_model_atmosphere()
-            # print(marcs_model_list_global)
-            low_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-            low_model_name += '.interpol'
-            if atmosphere_properties_low['errors']:
-                return atmosphere_properties_low
-            self.turbulent_velocity = turbulence_high
-            atmosphere_properties_high = self._generate_model_atmosphere()
-            high_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-            high_model_name += '.interpol'
-            if atmosphere_properties_high['errors']:
-                return atmosphere_properties_high
-
-            self.turbulent_velocity = microturbulence
-            # self.tmp_dir = temp_dir
-
-            # interpolate and find a model atmosphere for the microturbulence
-            self.marcs_model_name = "marcs_tef{:.1f}_g{:.2f}_z{:.2f}_tur{:.2f}".format(self.t_eff, self.log_g,
-                                                                                       self.metallicity,
-                                                                                       self.turbulent_velocity)
-            f_low = open(low_model_name, 'r')
-            lines_low = f_low.read().splitlines()
-            t_low, temp_low, pe_low, pt_low, micro_low, lum_low, spud_low = np.loadtxt(
-                open(low_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
-
-            f_high = open(high_model_name, 'r')
-            lines_high = f_high.read().splitlines()
-            t_high, temp_high, pe_high, pt_high, micro_high, lum_high, spud_high = np.loadtxt(
-                open(high_model_name, 'rt').readlines()[:-8], skiprows=1, unpack=True)
-
-            fxhigh = (microturbulence - turbulence_low) / (turbulence_high - turbulence_low)
-            fxlow = 1.0 - fxhigh
-
-            t_interp = t_low * fxlow + t_high * fxhigh
-            temp_interp = temp_low * fxlow + temp_high * fxhigh
-            pe_interp = pe_low * fxlow + pe_high * fxhigh
-            pt_interp = pt_low * fxlow + pt_high * fxhigh
-            lum_interp = lum_low * fxlow + lum_high * fxhigh
-            spud_interp = spud_low * fxlow + spud_high * fxhigh
-
-            interp_model_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-            interp_model_name += '.interpol'
-            # print(interp_model_name)
-            g = open(interp_model_name, 'w')
-            print(lines_low[0], file=g)
-            for i in range(len(t_interp)):
-                print(" {:.4f}  {:.2f}  {:.4f}   {:.4f}   {:.4f}    {:.6e}  {:.4f}".format(t_interp[i],
-                                                                                           temp_interp[i],
-                                                                                           pe_interp[i],
-                                                                                           pt_interp[i],
-                                                                                           microturbulence,
-                                                                                           lum_interp[i],
-                                                                                           spud_interp[i]), file=g)
-            print(lines_low[-8], file=g)
-            print(lines_low[-7], file=g)
-            print(lines_low[-6], file=g)
-            print(lines_low[-5], file=g)
-            print(lines_low[-4], file=g)
-            print(lines_low[-3], file=g)
-            print(lines_low[-2], file=g)
-            print(lines_low[-1], file=g)
-            g.close()
-
-            # generate models for low and high parts
-            if self.nlte_flag:
-                #  {self.model_atom_file}
-                logging.debug(f"self.model_atom_file inside ts_class_nlte.py: {self.model_atom_file}")
-                for element in self.model_atom_file:
-                    logging.debug(f"now low/high parts calling element: {element}")
-                    atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'],
-                                                                            element)
-                    low_coef_dat_name = low_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
-                    logging.debug(f"low_coef_dat_name: {low_coef_dat_name}")
-                    f_coef_low = open(low_coef_dat_name, 'r')
-                    lines_coef_low = f_coef_low.read().splitlines()
-                    f_coef_low.close()
-
-                    high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                    high_coef_dat_name += '_{}_coef.dat'.format(element)
-
-                    high_coef_dat_name = high_model_name.replace('.interpol', '_{}_coef.dat'.format(element))
-                    logging.debug(f"high_coef_dat_name: {high_coef_dat_name}")
-                    f_coef_high = open(high_coef_dat_name, 'r')
-                    lines_coef_high = f_coef_high.read().splitlines()
-                    f_coef_high.close()
-
-                    interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
-                    interp_coef_dat_name += '_{}_coef.dat'.format(element)
-
-                    #num_lines = np.loadtxt(low_coef_dat_name, unpack=True, skiprows=9, max_rows=1)
-
-                    g = open(interp_coef_dat_name, 'w')
-                    logging.debug(f"interp_coef_dat_name: {interp_coef_dat_name}")
-                    for i in range(11):
-                        print(lines_coef_low[i], file=g)
-                    for i in range(len(t_interp)):
-                        print(" {:7.4f}".format(t_interp[i]), file=g)
-                    for i in range(10 + len(t_interp) + 1, 10 + 2 * len(t_interp) + 1):
-                        fields_low = lines_coef_low[i].strip().split()
-                        fields_high = lines_coef_high[i].strip().split()
-                        fields_interp = []
-                        for j in range(len(fields_low)):
-                            fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
-                        fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
-                        # TODO check if any nans or negative values
-                        print(*fields_interp_print, file=g)
-                    for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
-                        print(lines_coef_low[i], file=g)
-                    g.close()
-            else:
-                # atmosphere_properties = atmosphere_properties_low
-                atmosphere_properties = self.make_atmosphere_properties(atmosphere_properties_low['spherical'], 'Fe')
-
-        elif not flag_dont_interp_microturb and self.turbulent_velocity > 2.0:  # not enough models to interp if higher than 2
-            microturbulence = self.turbulent_velocity  # just use 2.0 for the model if between 2 and 3
-            self.turbulent_velocity = 2.0
-            atmosphere_properties = self._generate_model_atmosphere()
-            if atmosphere_properties['errors']:
-                return atmosphere_properties
+        if spherical:
             self.turbulent_velocity = microturbulence
 
-        elif not flag_dont_interp_microturb and self.turbulent_velocity < 1.0 and self.t_eff >= 3900.:  # not enough models to interp if lower than 1 and t_eff > 3900
-            microturbulence = self.turbulent_velocity
-            self.turbulent_velocity = 1.0
-            atmosphere_properties = self._generate_model_atmosphere()
-            if atmosphere_properties['errors']:
-                return atmosphere_properties
-            self.turbulent_velocity = microturbulence
+        return {"errors": None, "marcs_model_list": marcs_model_list, "spherical": spherical}
 
-
-        elif flag_dont_interp_microturb:
-            if self.log_g < 3:
-                microturbulence = self.turbulent_velocity
-                self.turbulent_velocity = 2.0
-            atmosphere_properties = self._generate_model_atmosphere()
-            if self.log_g < 3:
-                self.turbulent_velocity = microturbulence
-            if atmosphere_properties['errors']:
-                # print('spud')
-                print(atmosphere_properties['errors'])
-                return atmosphere_properties
-        else:
-            print("Unexpected error?")
-        self.atmosphere_properties = atmosphere_properties
-        # print(self.atmosphere_properties)
 
     @abc.abstractmethod
-    def synthesize_spectra(self):
+    def calculate_atmosphere(self):
+        pass
+
+    @abc.abstractmethod
+    def synthesize_spectra(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Abstract method that should be implemented by child classes."""
         pass
 
@@ -768,9 +438,9 @@ def fetch_marcs_grid(marcs_grid_list: str, marcs_parameters_to_ignore: list):
         # logging.info("Warning: MARCS model <{}> duplicates one we already have.".format(item))
         dict_iter["filename"] = item
 
-    model_temperatures = np.asarray(model_temperatures)
-    model_logs = np.asarray(model_logs)
-    model_mets = np.asarray(model_mets)
+    #model_temperatures = np.asarray(model_temperatures)
+    #model_logs = np.asarray(model_logs)
+    #model_mets = np.asarray(model_mets)
 
     # Sort model parameter values into order
     for parameter in marcs_value_keys:

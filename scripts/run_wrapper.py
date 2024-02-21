@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import pickle
-from scripts.turbospectrum_class_nlte import TurboSpectrum
-from scripts.convolve import *
+from .turbospectrum_class_nlte import TurboSpectrum
+from .convolve import *
 import datetime
 import shutil
 import os
-from scripts.solar_abundances import solar_abundances
-from scripts.auxiliary_functions import calculate_vturb
+from .solar_abundances import solar_abundances
+from .auxiliary_functions import calculate_vturb
 
 
 def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vmic=None, verbose=False, **kwargs):
@@ -155,17 +155,25 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
         for element, value in abundances_dict.items():
             if nlte_flag:
                 if element in nlte_elements:
-                    nlte_flag = "NLTE"
+                    nlte_flag_label = "NLTE"
                 else:
-                    nlte_flag = "LTE"
+                    nlte_flag_label = "LTE"
             else:
-                nlte_flag = "LTE"
+                nlte_flag_label = "LTE"
             if element != "Fe":
-                print(f"#[{element}/Fe]={value} {nlte_flag}", file=f)
+                print(f"#[{element}/Fe]={value} {nlte_flag_label}", file=f)
             else:
                 # if Fe, it is given as weird Fe/Fe way, which can be fixed back by:
                 # xfe + feh + A(X)_sun = A(X)_star
-                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag}", file=f)
+                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag_label}", file=f)
+
+        # also print NLTE elements that are not in the abundances_dict
+        if nlte_flag:
+            for element in nlte_elements:
+                if element not in abundances_dict.keys():
+                    if element != "Fe":
+                        print(f"#[{element}/Fe]=0.0 (solar scaled) NLTE", file=f)
+
         print("#", file=f)
 
         if save_unnormalised_spectra:

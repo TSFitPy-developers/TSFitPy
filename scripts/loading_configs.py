@@ -6,7 +6,7 @@ from _warnings import warn
 from configparser import ConfigParser
 import pandas as pd
 import numpy as np
-from scripts.solar_abundances import periodic_table, solar_abundances
+from .solar_abundances import periodic_table, solar_abundances
 
 class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
@@ -47,7 +47,8 @@ class SpectraParameters:
                          'feh': ['met', 'metallicity', 'metallicityfeh', 'metallicityfeh', 'mh', 'mh', 'mh'],
                          'rotation': ['vsini', 'vrot', 'rot', 'vrotini', 'vrotini', 'vrotini'],
                          'specname': ['spec_name', 'spectrum_name', 'spectrumname', 'spectrum', 'spectrumname', 'spectrumname'],
-                         'resolution': ['res', 'resolution', 'resolvingpower', 'resolvingpower', 'r'],}
+                         'resolution': ['res', 'resolution', 'resolvingpower', 'resolvingpower', 'r'],
+                         'snr': ['snr', 'signaltonoiseratio'],}
 
         # Reverse the dictionary: map variants to standard names
         name_dict = {variant: standard for standard, variants in name_variants.items() for variant in variants}
@@ -180,11 +181,17 @@ class SpectraParameters:
             resolution_list = self.spectra_parameters_df['resolution'].values
         else:
             resolution_list = np.zeros(len(specname_list))
+        # if snr is in the columns, add it
+        if 'snr' in self.spectra_parameters_df.columns:
+            snr_list = self.spectra_parameters_df['snr'].values
+        else:
+            snr_list = np.zeros(len(specname_list))
+
         # get abundance elements, put in dictionary and then list, where each entry is a dictionary
         abundance_list = self._get_abundance_list()
 
         # stack all parameters
-        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list, resolution_list), axis=1)
+        stacked_parameters = np.stack((specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list, resolution_list, snr_list), axis=1)
 
         return stacked_parameters
 
@@ -261,7 +268,7 @@ class TSFitPyConfig:
             self.output_folder_title: str = "none"
 
         self.compiler: str = None
-        self.turbospectrum_path: str = None
+        self.spectral_code_path: str = None
         self.interpolators_path: str = None
         self.line_list_path: str = None
         self.model_atmosphere_grid_path_1d: str = None
@@ -351,12 +358,12 @@ class TSFitPyConfig:
         self.depart_aux_file_dict: dict = None
         self.model_atom_file_dict: dict = None
 
-        self.line_begins_sorted: list[float] = None
-        self.line_ends_sorted: list[float] = None
-        self.line_centers_sorted: list[float] = None
+        self.line_begins_sorted: np.ndarray[float] = None
+        self.line_ends_sorted: np.ndarray[float] = None
+        self.line_centers_sorted: np.ndarray[float] = None
 
-        self.seg_begins: list[float] = None
-        self.seg_ends: list[float] = None
+        self.seg_begins: np.ndarray[float] = None
+        self.seg_ends: np.ndarray[float] = None
 
         self.aux_file_length_dict: dict = None
         self.ndimen: int = None
@@ -397,6 +404,50 @@ class TSFitPyConfig:
         self.time_limit_hours = 71
         self.slurm_partition = "debug"
 
+        # new options for the m3dis
+        self.n_nu = 1
+        self.hash_table_size = 10
+        self.mpi_cores = 1
+        self.iterations_max = 0
+        self.iterations_max_precompute = 0
+        self.convlim = 0.01
+        self.snap = 1
+        self.dims = 23
+        self.nx = 10
+        self.ny = 10
+        self.nz = 230
+
+        # advanced options
+        # scipy xatol and fatol for the minimisation, different methods
+        self.xatol_all = 0.0001
+        self.fatol_all = 0.00001
+        self.xatol_lbl = 0.0001
+        self.fatol_lbl = 0.00001
+        self.xatol_teff = 0.0001
+        self.fatol_teff = 0.00001
+        self.xatol_logg = 0.0001
+        self.fatol_logg = 0.00001
+        self.xatol_vmic = 0.0001
+        self.fatol_vmic = 0.00001
+        self.maxfev = 50 # scipy maxfev for the minimisation
+        # Value of lpoint for turbospectrum in spectrum.inc file
+        self.lpoint_turbospectrum = 1000000
+        # m3dis parameters
+        self.m3dis_python_package_name = "m3dis"
+        self.margin = 3.0
+        self.guess_ratio_to_add = 0.1
+        # whether to save different parameters
+        self.save_original_spectra = True
+        self.save_fitted_spectra = True
+        self.save_convolved_fitted_spectra = True
+        self.save_results = True
+        self.save_linemask = True
+        self.save_fitlist = True
+        self.save_config_file = True
+        self.make_output_directory = True
+        self.pretrim_linelist = True
+        self.lightweight_ts_run = False
+
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
         if self.config_location[-4:] == ".cfg":
@@ -424,7 +475,7 @@ class TSFitPyConfig:
         self.bounds_teff = [2000, 8000] # default value
         self.guess_range_teff = [-250, 250] # default value
 
-        self.turbospectrum_path = "../turbospectrum/"
+        self.spectral_code_path = "../turbospectrum/"
         self.cluster_name = "None"
         self.debug_mode = 0
 
@@ -631,8 +682,14 @@ class TSFitPyConfig:
         # read the configuration file
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
-        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
-        self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
+        self.compiler = self._validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "m3dis", "ifort", "ifx"])
+        # 08.02.2024: ifx is the new intel compiler. So replacing intel with ifort
+        if self.compiler == "intel":
+            self.compiler = "ifort"
+        try:
+            self.spectral_code_path = self.config_parser["MainPaths"]["code_path"]
+        except KeyError:
+            self.spectral_code_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
         self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
@@ -750,8 +807,145 @@ class TSFitPyConfig:
             self.time_limit_hours = 71
             self.slurm_partition = "debug"
 
+        # m3dis stuff
+        try:
+            self.n_nu = int(self.config_parser["m3disParameters"]["n_nu"])
+            self.hash_table_size = int(self.config_parser["m3disParameters"]["hash_table_size"])
+            self.mpi_cores = int(self.config_parser["m3disParameters"]["mpi_cores"])
+            self.iterations_max = int(self.config_parser["m3disParameters"]["iterations_max"])
+            self.iterations_max_precompute = int(self.config_parser["m3disParameters"]["iterations_max_precompute"])
+            self.convlim = float(self.config_parser["m3disParameters"]["convlim"])
+            self.snap = int(self.config_parser["m3disParameters"]["snap"])
+            self.dims = int(self.config_parser["m3disParameters"]["dims"])
+            self.nx = int(self.config_parser["m3disParameters"]["nx"])
+            self.ny = int(self.config_parser["m3disParameters"]["ny"])
+            self.nz = int(self.config_parser["m3disParameters"]["nz"])
+        except KeyError:
+            self.n_nu = 1
+            self.hash_table_size = 10
+            self.mpi_cores = 1
+            self.iterations_max = 0
+            self.iterations_max_precompute = 0
+            self.convlim = 0.01
+            self.snap = 1
+            self.dims = 23
+            self.nx = 10
+            self.ny = 10
+            self.nz = 230
+
+        # advanced options
+        try:
+            self.xatol_all = float(self.config_parser["AdvancedOptions"]["xatol_all"])
+            self.fatol_all = float(self.config_parser["AdvancedOptions"]["fatol_all"])
+            self.xatol_lbl = float(self.config_parser["AdvancedOptions"]["xatol_lbl"])
+            self.fatol_lbl = float(self.config_parser["AdvancedOptions"]["fatol_lbl"])
+            self.xatol_teff = float(self.config_parser["AdvancedOptions"]["xatol_teff"])
+            self.fatol_teff = float(self.config_parser["AdvancedOptions"]["fatol_teff"])
+            self.xatol_logg = float(self.config_parser["AdvancedOptions"]["xatol_logg"])
+            self.fatol_logg = float(self.config_parser["AdvancedOptions"]["fatol_logg"])
+            self.xatol_vmic = float(self.config_parser["AdvancedOptions"]["xatol_vmic"])
+            self.fatol_vmic = float(self.config_parser["AdvancedOptions"]["fatol_vmic"])
+            self.maxfev = int(self.config_parser["AdvancedOptions"]["maxfev"])
+            self.lpoint_turbospectrum = int(self.config_parser["AdvancedOptions"]["lpoint_turbospectrum"])
+            self.m3dis_python_package_name = self.config_parser["AdvancedOptions"]["m3dis_python_package_name"]
+            self.margin = float(self.config_parser["AdvancedOptions"]["margin"])
+            self.guess_ratio_to_add = float(self.config_parser["AdvancedOptions"]["guess_ratio_to_add"])
+            self.save_original_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_original_spectra"])
+            self.save_fitted_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_fitted_spectra"])
+            self.save_convolved_fitted_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_convolved_fitted_spectra"])
+            self.save_results = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_results"])
+            self.save_linemask = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_linemask"])
+            self.save_fitlist = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_fitlist"])
+            self.save_config_file = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_config_file"])
+            self.pretrim_linelist = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["pretrim_linelist"])
+            self.lightweight_ts_run = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["lightweight_ts_run"])
+        except KeyError:
+            pass
+
+    def warn_on_config_issues(self):
+        print("\n\nChecking inputs\n")
+
+        if np.size(self.seg_begins) != np.size(self.seg_ends):
+            print("Segment beginning and end are not the same length")
+        if np.size(self.line_centers_sorted) != np.size(self.line_begins_sorted) or np.size(self.line_centers_sorted) != np.size(self.line_ends_sorted):
+            print("Line center, beginning and end are not the same length")
+        if self.guess_range_teff[0] > 0:
+            print(
+                f"You requested your {self.guess_range_teff[0]} to be positive. That will result in the lower "
+                f"guess value to be bigger than the expected star temperature. Consider changing the number to negative.")
+        if self.guess_range_teff[1] < 0:
+            print(
+                f"You requested your {self.guess_range_teff[1]} to be negative. That will result in the upper "
+                f"guess value to be smaller than the expected star temperature. Consider changing the number to positive.")
+        if min(self.guess_range_vmac) < min(self.bounds_vmac) or max(
+                self.guess_range_vmac) > max(self.bounds_vmac):
+            print(f"You requested your macro bounds as {self.bounds_vmac}, but guesses"
+                  f"are {self.guess_range_vmac}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses.")
+        if min(self.guess_range_vmic) < min(self.bounds_vmic) or max(
+                self.guess_range_vmic) > max(self.bounds_vmic):
+            print(f"You requested your micro bounds as {self.bounds_vmic}, but guesses"
+                  f"are {self.guess_range_vmic}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses.")
+        if min(self.guess_range_abundance) < min(self.bounds_abundance) or max(
+                self.guess_range_abundance) > max(self.bounds_abundance):
+            print(f"You requested your abundance bounds as {self.bounds_abundance}, but guesses"
+                  f"are {self.guess_range_abundance} , which is outside hard bound range. Consider"
+                  f"changing bounds or guesses if you fit elements except for Fe.")
+        if min(self.guess_range_abundance) < min(self.bounds_feh) or max(
+                self.guess_range_abundance) > max(self.bounds_feh):
+            print(f"You requested your metallicity bounds as {self.bounds_feh}, but guesses"
+                  f"are {self.guess_range_abundance}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses IF YOU FIT METALLICITY.")
+        if min(self.guess_range_doppler) < min(self.bounds_doppler) or max(
+                self.guess_range_doppler) > max(self.bounds_doppler):
+            print(f"You requested your RV bounds as {self.bounds_doppler}, but guesses"
+                  f"are {self.guess_range_doppler}, which is outside hard bound range. Consider"
+                  f"changing bounds or guesses.")
+        if self.rotation < 0:
+            print(
+                f"Requested rotation of {self.rotation}, which is less than 0. Consider changing it.")
+        if self.resolution < 0:
+            print(
+                f"Requested resolution of {self.resolution}, which is less than 0. Consider changing it.")
+        if self.vmac < 0:
+            print(
+                f"Requested macroturbulence input of {self.vmac}, which is less than 0. Consider changing it if "
+                f"you fit it.")
+        # check done in tsfitpyconfiguration
+        if self.nlte_flag:
+            if self.compiler.lower() != "m3dis":
+                for file in self.depart_bin_file_dict:
+                    if not os.path.isfile(os.path.join(self.departure_file_path,
+                                                       self.depart_bin_file_dict[file])):
+                        print(
+                            f"{self.depart_bin_file_dict[file]} does not exist! Check the spelling or if the file exists")
+                for file in self.depart_aux_file_dict:
+                    if not os.path.isfile(os.path.join(self.departure_file_path,
+                                                       self.depart_aux_file_dict[file])):
+                        print(
+                            f"{self.depart_aux_file_dict[file]} does not exist! Check the spelling or if the file exists")
+            for file in self.model_atom_file_dict:
+                if not os.path.isfile(os.path.join(self.model_atoms_path,
+                                                   self.model_atom_file_dict[file])):
+                    print(
+                        f"{self.model_atom_file_dict[file]} does not exist! Check the spelling or if the file exists")
+
+        for line_start, line_end in zip(self.line_begins_sorted,
+                                        self.line_ends_sorted):
+            index_location = np.where(np.logical_and(self.seg_begins <= line_start,
+                                                     line_end <= self.seg_ends))[0]
+            if np.size(index_location) > 1:
+                print(f"{line_start} {line_end} linemask has more than 1 segment!")
+            if np.size(index_location) == 0:
+                print(f"{line_start} {line_end} linemask does not have any corresponding segment")
+
+        print(
+            "\nDone doing some basic checks. Consider reading the messages above, if there are any. Can be useful if it "
+            "crashes.\n\n")
+
     @staticmethod
-    def _get_fitting_mode(fitting_mode: str):
+    def _get_fitting_mode(fitting_mode: str) -> (bool, bool):
         fit_variable, input_variable = None, None  # both booleans
         if fitting_mode == "Yes" or fitting_mode == "True":
             fit_variable = True
@@ -771,7 +965,7 @@ class TSFitPyConfig:
         self.config_parser["turbospectrum_compiler"]["compiler"] = self.compiler
 
         self.config_parser.add_section("MainPaths")
-        self.config_parser["MainPaths"]["turbospectrum_path"] = self.old_turbospectrum_global_path
+        self.config_parser["MainPaths"]["code_path"] = self.old_turbospectrum_global_path
         self.config_parser["MainPaths"]["interpolators_path"] = self.interpolators_path
         self.config_parser["MainPaths"]["line_list_path"] = self.line_list_path
         self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"] = self.model_atmosphere_grid_path_1d
@@ -947,18 +1141,24 @@ class TSFitPyConfig:
 
         self.nelement = len(self.elements_to_fit)
 
-        if self.turbospectrum_path is None:
-            self.turbospectrum_path = "../turbospectrum/"
-        self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path))
-        if self.compiler.lower() == "intel":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
+        if self.spectral_code_path is None:
+            self.spectral_code_path = "../turbospectrum/"
+        self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path))
+        if self.compiler.lower() == "ifort" or self.compiler.lower() == "intel":
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec", "")
+        elif self.compiler.lower() == "ifx":
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
+                                                   "exec-ifx", "")
         elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.turbospectrum_path, check_valid_path),
+            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
                                                    "exec-gf", "")
+        elif self.compiler.lower() == "m3dis":
+            _ = self._check_if_file_exists(os.path.join(self.spectral_code_path, "dispatch.x"), check_valid_path)
+            self.spectral_code_path = os.path.join(os.getcwd(), self.spectral_code_path, "")
         else:
             raise ValueError("Compiler not recognized")
-        self.turbospectrum_path = self.turbospectrum_path
+        self.spectral_code_path = self.spectral_code_path
 
         if os.path.exists(self.interpolators_path):
             self.interpolators_path = os.path.join(os.getcwd(), self.interpolators_path)
@@ -981,7 +1181,16 @@ class TSFitPyConfig:
         self.departure_file_path = self._check_if_path_exists(self.departure_file_path, check_valid_path)
         self.old_output_folder_path_global = self._check_if_path_exists(self.output_folder_path, check_valid_path)
 
-        nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
+        if self.nlte_flag:
+            if self.compiler.lower() == "m3dis":
+                if self.iterations_max_precompute > 0 or self.iterations_max > 0:
+                    nlte_flag_to_save = "NLTE"
+                else:
+                    nlte_flag_to_save = "LTE"
+            else:
+                nlte_flag_to_save = "NLTE"
+        else:
+            nlte_flag_to_save = "LTE"
 
         self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self._convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
 
@@ -998,20 +1207,65 @@ class TSFitPyConfig:
         if self.fit_teff:
             self.fit_feh = False
 
+        if self.n_nu <= 0:
+            raise ValueError("n_nu must be greater than 0")
+        if self.hash_table_size <= 0:
+            raise ValueError("hash_table_size must be greater than 0")
+        if self.mpi_cores <= 0:
+            raise ValueError("mpi_cores must be greater than 0")
+        if self.iterations_max < 0:
+            raise ValueError("iterations_max must be greater than or equal to 0")
+        if self.iterations_max_precompute < 0:
+            raise ValueError("iterations_max_precompute must be greater than or equal to 0")
+        if self.convlim < 0:
+            raise ValueError("convlim must be greater than or equal to 0")
+        if self.snap < 0:
+            raise ValueError("snap must be greater than or equal to 0")
+        if self.dims <= 0:
+            raise ValueError("dims must be greater than 0")
+        if self.nx <= 0:
+            raise ValueError("nx must be greater than 0")
+        if self.ny <= 0:
+            raise ValueError("ny must be greater than 0")
+        if self.nz <= 0:
+            raise ValueError("nz must be greater than 0")
+
+        if self.xatol_all <= 0:
+            raise ValueError("xatol_all must be greater than 0")
+        if self.fatol_all <= 0:
+            raise ValueError("fatol_all must be greater than 0")
+        if self.xatol_lbl <= 0:
+            raise ValueError("xatol_lbl must be greater than 0")
+        if self.fatol_lbl <= 0:
+            raise ValueError("fatol_lbl must be greater than 0")
+        if self.xatol_teff <= 0:
+            raise ValueError("xatol_teff must be greater than 0")
+        if self.fatol_teff <= 0:
+            raise ValueError("fatol_teff must be greater than 0")
+        if self.xatol_logg <= 0:
+            raise ValueError("xatol_logg must be greater than 0")
+        if self.fatol_logg <= 0:
+            raise ValueError("fatol_logg must be greater than 0")
+        if self.xatol_vmic <= 0:
+            raise ValueError("xatol_vmic must be greater than 0")
+        if self.fatol_vmic <= 0:
+            raise ValueError("fatol_vmic must be greater than 0")
+        if self.maxfev <= 0:
+            raise ValueError("maxfev must be greater than 0")
+        if self.lpoint_turbospectrum <= 0:
+            raise ValueError("lpoint_turbospectrum must be greater than 0")
+
+        if not np.any(self.save_original_spectra + self.save_fitted_spectra + self.save_convolved_fitted_spectra + self.save_results + self.save_linemask + self.save_fitlist + self.save_config_file):
+            self.make_output_directory = False
+
     def load_spectra_config(self, spectra_object):
+        # not used anymore
         spectra_object.atmosphere_type = self.atmosphere_type
         spectra_object.fitting_mode = self.fitting_mode
         spectra_object.include_molecules = self.include_molecules
         spectra_object.nlte_flag = self.nlte_flag
 
-        # TODO: redo as booleans instead of strings
-        if self.fit_vmic:
-            spectra_object.fit_vmic = "Yes"
-        elif self.vmic_input:
-            spectra_object.fit_vmic = "Input"
-        else:
-            spectra_object.fit_vmic = "No"
-
+        spectra_object.fit_vmic = self.fit_vmic
         spectra_object.fit_vmac = self.fit_vmac
         spectra_object.fit_rotation = self.fit_rotation
         spectra_object.input_vmic = self.vmic_input
@@ -1057,7 +1311,8 @@ class TSFitPyConfig:
         spectra_object.experimental_parallelisation = self.experimental_parallelisation
 
         spectra_object.nelement = self.nelement
-        spectra_object.turbospec_path = self.turbospectrum_path
+        spectra_object.spectral_code_path = self.spectral_code_path
+        spectra_object.compiler = self.compiler
 
         spectra_object.interpol_path = self.interpolators_path
 
@@ -1097,7 +1352,7 @@ class TSFitPyConfig:
         spectra_object.input_elem_abundance = self.input_elem_abundance_dict
 
         spectra_object.find_upper_limit = self.find_upper_limit
-        spectra_object.sigmas_upper_limit = self.sigmas_upper_limit
+        spectra_object.sigmas_error = self.sigmas_upper_limit
         spectra_object.find_teff_errors = self.find_teff_errors
         spectra_object.teff_error_sigma = self.teff_error_sigma
 

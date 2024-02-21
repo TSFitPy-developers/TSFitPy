@@ -7,15 +7,14 @@ import socket
 from configparser import ConfigParser
 from os import path as os_path
 import glob
-from sys import argv
 from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize, root_scalar
-from scripts.create_window_linelist_function import binary_search_lower_bound, write_lines
-from scripts.auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file
-from scripts.loading_configs import SpectraParameters, TSFitPyConfig
-from scripts.turbospectrum_class_nlte import TurboSpectrum
-from scripts.synthetic_code_class import fetch_marcs_grid
+from .create_window_linelist_function import binary_search_lower_bound, write_lines
+from .auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file
+from .loading_configs import SpectraParameters, TSFitPyConfig
+from .turbospectrum_class_nlte import TurboSpectrum
+from .synthetic_code_class import fetch_marcs_grid
 
 
 def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
@@ -161,7 +160,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
         os.makedirs(temp_directory)
 
     ts = TurboSpectrum(
-        turbospec_path=abusingclasses.turbospec_path,
+        turbospec_path=abusingclasses.spectral_code_path,
         interpol_path=abusingclasses.interpol_path,
         line_list_paths=line_list_path,
         marcs_grid_path=abusingclasses.model_atmosphere_grid_path,
@@ -276,7 +275,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     print(
         f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
 
-    abusingclasses.turbospec_path = tsfitpy_configuration.turbospectrum_path
+    abusingclasses.spectral_code_path = tsfitpy_configuration.spectral_code_path
     abusingclasses.interpol_path = tsfitpy_configuration.interpolators_path
     line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path,
                                           f'linelist_for_fitting_trimmed_{output_folder_title}', "")

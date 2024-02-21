@@ -14,10 +14,13 @@ from warnings import warn
 from scripts.convolve import conv_macroturbulence, conv_rotation, conv_res
 from scripts.create_window_linelist_function import create_window_linelist
 from scripts.turbospectrum_class_nlte import TurboSpectrum
+from scripts.m3dis_class import M3disCall
+from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 from scripts.synthetic_code_class import fetch_marcs_grid
 from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
                              output_default_linemask_name)
-from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction
+from scripts.auxiliary_functions import (calculate_equivalent_width, apply_doppler_correction, import_module_from_path,
+                                         combine_linelists)
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 from scripts.solar_abundances import periodic_table
 
@@ -131,6 +134,11 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["output_folder_location"] = output_folder_location
     config_dict["output_file_df"] = output_file_df
     config_dict["fitted_element"] = tsfitpy_config.elements_to_fit[0]
+    config_dict["fitting_method"] = tsfitpy_config.fitting_mode
+    config_dict["parsed_fitlist"] = fitlist
+    config_dict["vmac_input_bool"] = tsfitpy_config.vmac_input
+    config_dict["vmic_input_bool"] = tsfitpy_config.vmic_input
+    config_dict["rotation_input_bool"] = tsfitpy_config.rotation_input
 
     return config_dict
 
@@ -143,6 +151,7 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         specname_fitlist: np.ndarray = config_dict["specname_fitlist"]
         rv_fitlist: np.ndarray = config_dict["rv_fitlist"]
         output_file_df: pd.DataFrame = config_dict["output_file_df"]
+        output_folder_location: str = config_dict["output_folder_location"]
 
         # tries to find the index where the star name is contained in the output folder name. since we do not expect the star name to be exactly the same, we just try to find indices where given name is PART of the output folder names
         # E.g. given arr = ['abc', 'def', 'ghi'], if we try to use name = 'ef', we get index 1 as return, since it is contained within 'def'
@@ -172,7 +181,11 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
 
         # loads fitted and observed wavelength and flux
         wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
-        wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
+        # check if file is located in the output folder, if not, load from the original folder
+        if os.path.isfile(os.path.join(output_folder_location, filename_observed_spectra)):
+            wavelength_observed, flux_observed = np.loadtxt(os.path.join(output_folder_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1))  # normalised flux observed
+        else:
+            wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
 
         # sort the observed spectra, just like in TSFitPy
         if wavelength_observed.size > 1:
@@ -218,13 +231,21 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
             # other fitted values
             fitted_chisqr = output_file_df[df_correct_specname_indices]["chi_squared"].values[output_result_index_to_plot]
             fitted_element = config_dict['fitted_element']
-            if fitted_element != "Fe":
-                abund_column_name = f"[{fitted_element}/Fe]"
-                column_name = f"{fitted_element}_Fe"
-            else:
-                abund_column_name = "[Fe/H]"
-                column_name = "Fe_H"
-            fitted_abund = output_file_df[df_correct_specname_indices][column_name].values[output_result_index_to_plot]
+            if config_dict["fitting_method"] == "lbl" or config_dict["fitting_method"] == "vmic":
+                if fitted_element != "Fe":
+                    abund_column_name = f"[{fitted_element}/Fe]"
+                    column_name = f"{fitted_element}_Fe"
+                else:
+                    abund_column_name = "[Fe/H]"
+                    column_name = "Fe_H"
+                fitted_abund = output_file_df[df_correct_specname_indices][column_name].values[output_result_index_to_plot]
+            elif config_dict["fitting_method"] == "teff":
+                abund_column_name = "teff"
+                fitted_abund = output_file_df[df_correct_specname_indices]["Teff"].values[output_result_index_to_plot]
+            elif config_dict["fitting_method"] == "logg":
+                abund_column_name = "logg"
+                fitted_abund = output_file_df[df_correct_specname_indices]["logg"].values[output_result_index_to_plot]
+
             fitted_ew = output_file_df[df_correct_specname_indices]["ew"].values[output_result_index_to_plot]
 
             # Doppler shift is RV correction + fitted rv for the line. Corrects observed wavelength for it
@@ -400,10 +421,10 @@ def check_if_path_exists(path_to_check: str) -> str:
             raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
-                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False):
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False):
     for element in element_abundances:
         element_abundances[element] += met
-    temp_directory = f"../temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
 
     for path in turbospectrum_paths:
         turbospectrum_paths[path] = check_if_path_exists(turbospectrum_paths[path])
@@ -421,25 +442,24 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
         model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
 
-    nlte_config = ConfigParser()
-    nlte_config.read(os.path.join(turbospectrum_paths["departure_file_path"], "nlte_filenames.cfg"))
-
     depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
-
-    for element in elements_in_nlte:
-        if atmosphere_type == "1D":
-            bin_config_name, aux_config_name = "1d_bin", "1d_aux"
-        else:
-            bin_config_name, aux_config_name = "3d_bin", "3d_aux"
-        depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
-        depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
-        model_atom_file_dict[element] = nlte_config[element]["atom_file"]
-
     aux_file_length_dict = {}
+
     if nlte_flag:
+        nlte_config = ConfigParser()
+        nlte_config.read(os.path.join(turbospectrum_paths["departure_file_path"], "nlte_filenames.cfg"))
+
+        for element in elements_in_nlte:
+            if atmosphere_type == "1D":
+                bin_config_name, aux_config_name = "1d_bin", "1d_aux"
+            else:
+                bin_config_name, aux_config_name = "3d_bin", "3d_aux"
+            depart_bin_file_dict[element] = nlte_config[element][bin_config_name]
+            depart_aux_file_dict[element] = nlte_config[element][aux_config_name]
+            model_atom_file_dict[element] = nlte_config[element]["atom_file"]
+
         for element in model_atom_file_dict:
-            aux_file_length_dict[element] = len(
-                np.loadtxt(os.path.join(turbospectrum_paths["departure_file_path"], depart_aux_file_dict[element]), dtype='str'))
+            aux_file_length_dict[element] = len(np.loadtxt(os.path.join(turbospectrum_paths["departure_file_path"], depart_aux_file_dict[element]), dtype='str'))
 
     today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
     today = f"{today}_{np.random.random(1)[0]}"
@@ -475,48 +495,267 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                  line_mask_file=None, depart_bin_file=depart_bin_file_dict,
                  depart_aux_file=depart_aux_file_dict, model_atom_file=model_atom_file_dict)
     print("Running TS")
-    ts.synthesize_spectra()
+    wave_mod_orig, flux_norm_mod_orig, flux_unnorm = ts.synthesize_spectra()
     print("TS completed")
-    try:
-        wave_mod_orig, flux_norm_mod_orig = np.loadtxt('{}spectrum_00000000.spec'.format(temp_directory),
-                                                                  usecols=(0, 1), unpack=True)
-        wave_mod_filled = wave_mod_orig
-        flux_norm_mod_filled = flux_norm_mod_orig
+    if wave_mod_orig is not None:
+        if np.size(wave_mod_orig) != 0.0:
+            try:
+                wave_mod_filled = wave_mod_orig
+                flux_norm_mod_filled = flux_norm_mod_orig
 
-        if len(wave_mod_orig) > 0:
-            if resolution != 0.0:
-                wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
-            else:
-                wave_mod_conv = wave_mod_filled
-                flux_norm_mod_conv = flux_norm_mod_filled
+                if len(wave_mod_orig) > 0:
+                    if resolution != 0.0:
+                        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+                    else:
+                        wave_mod_conv = wave_mod_filled
+                        flux_norm_mod_conv = flux_norm_mod_filled
 
-            if macro != 0.0:
-                wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
-            else:
-                wave_mod_macro = wave_mod_conv
-                flux_norm_mod_macro = flux_norm_mod_conv
+                    if macro != 0.0:
+                        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+                    else:
+                        wave_mod_macro = wave_mod_conv
+                        flux_norm_mod_macro = flux_norm_mod_conv
 
-            if rotation != 0.0:
-                wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
-            else:
-                wave_mod = wave_mod_macro
-                flux_norm_mod = flux_norm_mod_macro
+                    if rotation != 0.0:
+                        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+                    else:
+                        wave_mod = wave_mod_macro
+                        flux_norm_mod = flux_norm_mod_macro
 
-            plt.plot(wave_mod, flux_norm_mod)
-            plt.xlim(lmin - 0.2, lmax + 0.2)
-            plt.ylim(0, 1.05)
-            plt.xlabel("Wavelength")
-            plt.ylabel("Normalised flux")
+                    plt.plot(wave_mod, flux_norm_mod)
+                    plt.xlim(lmin - 0.2, lmax + 0.2)
+                    plt.ylim(0, 1.05)
+                    plt.xlabel("Wavelength")
+                    plt.ylabel("Normalised flux")
+                else:
+                    print('TS failed')
+                    wave_mod, flux_norm_mod = np.array([]), np.array([])
+                    flux_unnorm = np.array([])
+            except (FileNotFoundError, ValueError, IndexError) as e:
+                print(f"TS failed: {e}")
+                wave_mod, flux_norm_mod = np.array([]), np.array([])
+                flux_unnorm = np.array([])
         else:
             print('TS failed')
             wave_mod, flux_norm_mod = np.array([]), np.array([])
-    except (FileNotFoundError, ValueError, IndexError) as e:
-        print(f"TS failed: {e}")
+            flux_unnorm = np.array([])
+    else:
+        print('TS failed')
         wave_mod, flux_norm_mod = np.array([]), np.array([])
+        flux_unnorm = np.array([])
+    shutil.rmtree(temp_directory)
+    #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+    if return_unnorm_flux:
+        return wave_mod, flux_norm_mod, flux_unnorm
+    else:
+        return wave_mod, flux_norm_mod
+
+
+def read_element_data(lines):
+    i = 0
+    elements_data = []
+    while i < len(lines):
+        line_parts = lines[i].split()
+        if len(line_parts) == 0:
+            i += 1
+            continue
+        if line_parts[0] == "'":
+            atomic_num = (line_parts[1])
+        else:
+            atomic_num = (line_parts[0])
+        ionization = int(line_parts[-2])
+        num_lines = int(line_parts[-1])
+
+        element_name = lines[i + 1].strip().replace("'", "").replace("NLTE", "").replace("LTE", "")
+
+        for _ in range(num_lines):
+            i += 1
+            data_line = lines[i + 1]
+            wavelength, loggf = float(data_line.split()[0]), float(data_line.split()[2])
+            #elements_data.append((element_name, atomic_num, ionization, wavelength, loggf))
+            elements_data.append((wavelength, f"{element_name}", loggf))
+
+        i += 2
+
+    return elements_data
+
+def find_elements(elements_data, left_wavelength, right_wavelength, loggf_threshold):
+    filtered_elements = []
+    for element_data in elements_data:
+        wavelength, element_name, loggf = element_data
+        if left_wavelength <= wavelength <= right_wavelength and loggf >= loggf_threshold:
+            filtered_elements.append(element_data)
+
+    sorted_elements = sorted(filtered_elements, key=lambda x: x[0])  # Sort by wavelength
+
+    return sorted_elements
+
+    #for element_data in sorted_elements:
+    #    element_name, atomic_num, ionization, wavelength, loggf = element_data
+    #    print(element_name.replace("'", "").replace("NLTE", "").replace("LTE", ""), atomic_num, wavelength, loggf)
+
+def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
+                              hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
+                              nlte_iterations_max, nlte_convergence_limit, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False,
+                              m3dis_package_name="m3dis", return_parsed_linelist=False, loggf_limit_parsed_linelist=-5.0,
+                              plot_output=False):
+    for element in element_abundances:
+        element_abundances[element] += met
+    temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    # convert temp directory to absolute path
+    temp_directory = os.path.join(os.getcwd(), temp_directory, "")
+
+    for path in m3dis_paths:
+        if ((atmosphere_type != "3D" and path != "3D_atmosphere_path") or atmosphere_type == "3D") and not path == "nlte_config_path":
+            m3dis_paths[path] = check_if_path_exists(m3dis_paths[path])
+
+    if not os.path.exists(temp_directory):
+        os.makedirs(temp_directory)
+
+    if atmosphere_type == "1D":
+        model_atmosphere_grid_path = os.path.join(m3dis_paths["model_atmosphere_grid_path"], "1D", "")
+        model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
+
+        model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
+            model_atmosphere_list, TurboSpectrum.marcs_parameters_to_ignore)
+    elif atmosphere_type == "3D":
+        model_atmosphere_grid_path = None
+        model_atmosphere_list = None
+
+        model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = None, None, None, None, None, None
+
+    depart_bin_file_dict, depart_aux_file_dict, model_atom_file_dict = {}, {}, {}
+
+    if nlte_flag:
+        nlte_config = ConfigParser()
+        nlte_config.read(m3dis_paths["nlte_config_path"])
+
+        model_atom_file_dict[element_in_nlte] = nlte_config[element_in_nlte]["atom_file"]
+
+    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    today = f"{today}_{np.random.random(1)[0]}"
+    line_list_path_trimmed = os.path.join(f"{temp_directory}", "linelist_for_fitting_trimmed", "")
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
+
+    print("Trimming")
+    create_window_linelist([lmin - 2], [lmax + 2], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
+    # if m3dis, then combine all linelists into one
+    # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
+    parsed_linelist_data = combine_linelists(line_list_path_trimmed, return_parsed_linelist=return_parsed_linelist)
+    parsed_elements_sorted_info = None
+    if return_parsed_linelist:
+        parsed_model_atom_data = []
+        for i in range(len(parsed_linelist_data)):
+            parsed_model_atom_data.extend(parsed_linelist_data[i].split("\n"))
+
+        left_wavelength = lmin  # change this to change the range of wavelengths to print
+        right_wavelength = lmax
+        loggf_threshold = loggf_limit_parsed_linelist           # change this to change the threshold for loggf
+        elements_data = read_element_data(parsed_model_atom_data)
+        parsed_elements_sorted_info = find_elements(elements_data, left_wavelength, right_wavelength, loggf_threshold)
+
+    print("Trimming done")
+
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
+
+    module_path = os.path.join(m3dis_paths["m3dis_path"], f"{m3dis_package_name}/__init__.py")
+    m3dis_python_module = import_module_from_path("m3dis", module_path)
+
+    m3dis = M3disCall(
+        m3dis_path=m3dis_paths["m3dis_path"],
+        interpol_path=None,
+        line_list_paths=line_list_path_trimmed,
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=m3dis_paths["model_atom_path"],
+        departure_file_path=None,
+        aux_file_length_dict=None,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values,
+        m3dis_python_module=m3dis_python_module,
+        n_nu=n_nu,
+        hash_table_size=hash_table_size,
+        mpi_cores=mpi_cores,
+        iterations_max=nlte_iterations_max,
+        convlim=nlte_convergence_limit,
+        snap=snap,
+        dims=dims,
+        nx=nx,
+        ny=ny,
+        nz=nz
+    )
+
+    m3dis.configure(t_eff=teff, log_g=logg, metallicity=met,
+                 turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin - 3, lambda_max=lmax + 3,
+                 free_abundances=element_abundances, temp_directory=f"{temp_directory}", nlte_flag=nlte_flag, verbose=verbose,
+                 atmosphere_dimension=atmosphere_type, windows_flag=False, segment_file=None,
+                 line_mask_file=None, model_atom_file=model_atom_file_dict, atmos_format_3d=atmos_format, atmosphere_path_3d_model=m3dis_paths["3D_atmosphere_path"])
+    m3dis.use_precomputed_depart = False
+    print("Running m3dis")
+
+    wave_mod_orig, flux_norm_mod_orig, flux_unnorm = m3dis.synthesize_spectra()
+    print("m3dis completed")
+    if wave_mod_orig is not None:
+        if np.size(wave_mod_orig) != 0.0:
+            try:
+                wave_mod_filled = wave_mod_orig
+                flux_norm_mod_filled = flux_norm_mod_orig
+
+                if len(wave_mod_orig) > 0:
+                    if resolution != 0.0:
+                        wave_mod_conv, flux_norm_mod_conv = conv_res(wave_mod_filled, flux_norm_mod_filled, resolution)
+                    else:
+                        wave_mod_conv = wave_mod_filled
+                        flux_norm_mod_conv = flux_norm_mod_filled
+
+                    if macro != 0.0:
+                        wave_mod_macro, flux_norm_mod_macro = conv_macroturbulence(wave_mod_conv, flux_norm_mod_conv, macro)
+                    else:
+                        wave_mod_macro = wave_mod_conv
+                        flux_norm_mod_macro = flux_norm_mod_conv
+
+                    if rotation != 0.0:
+                        wave_mod, flux_norm_mod = conv_rotation(wave_mod_macro, flux_norm_mod_macro, rotation)
+                    else:
+                        wave_mod = wave_mod_macro
+                        flux_norm_mod = flux_norm_mod_macro
+                    if plot_output:
+                        plt.plot(wave_mod, flux_norm_mod)
+                        plt.xlim(lmin - 0.2, lmax + 0.2)
+                        plt.ylim(0, 1.05)
+                        plt.xlabel("Wavelength")
+                        plt.ylabel("Normalised flux")
+                else:
+                    print('m3dis failed')
+                    wave_mod, flux_norm_mod = np.array([]), np.array([])
+                    flux_unnorm = np.array([])
+            except (FileNotFoundError, ValueError, IndexError) as e:
+                print(f"m3dis failed: {e}")
+                wave_mod, flux_norm_mod = np.array([]), np.array([])
+                flux_unnorm = np.array([])
+        else:
+            print('m3dis failed')
+            wave_mod, flux_norm_mod = np.array([]), np.array([])
+            flux_unnorm = np.array([])
+    else:
+        print('m3dis failed')
+        wave_mod, flux_norm_mod = np.array([]), np.array([])
+        flux_unnorm = np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
 
-    return wave_mod, flux_norm_mod
+    result = [wave_mod, flux_norm_mod]
+
+    if return_unnorm_flux:
+        result.append(flux_unnorm)
+    if return_parsed_linelist:
+        result.append(parsed_elements_sorted_info)
+
+    return tuple(result)
 
 
 def remove_bad_lines(output_data):
@@ -568,6 +807,9 @@ class Star:
     # this class will load abundances from several different files and load them into a class for later use
     # it will also load linelist such that we get atomic information about different lines
     def __init__(self, name, input_folders: list, linelist_folder):
+        # if input_folders is a string, then convert it to a list
+        if isinstance(input_folders, str):
+            input_folders = [input_folders]
         self.name = name
         self.linelist_folder = linelist_folder
         # get names of all files in the linelist folder
@@ -665,7 +907,7 @@ class Star:
         self.parsed_linelist = read_linelist(self.linelist_filenames)
 
         # load each element using dataframe:
-        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}, "chisqr": {}, "rv": {}, "vmic": {}, "vmac": {}, "rotation": {}}
+        self.elemental_data = {"wavelength": {}, "ew": {}, "abund": {}, "chisqr": {}, "rv": {}, "vmic": {}, "vmac": {}, "rotation": {}, "flag_error": {}, "flag_warning": {}}
         for input_folder in input_folders:
             config_dict = load_output_data(input_folder)
             fitted_element = config_dict["fitted_element"]
@@ -675,31 +917,37 @@ class Star:
             df = df[mask]
             # get the line wavelength
             line_wavelengths = df["wave_center"].values
-            self.elemental_data["wavelength"][fitted_element] = line_wavelengths
+            self.elemental_data["wavelength"][fitted_element] = np.asarray(line_wavelengths)
             # get the line equivalent width
             line_ew = df["ew"].values
-            self.elemental_data["ew"][fitted_element] = line_ew
+            self.elemental_data["ew"][fitted_element] = np.asarray(line_ew)
             # get the line abundance
             if fitted_element == "Fe":
                 line_abund = df["Fe_H"].values
             else:
                 line_abund = df[f"{fitted_element}_Fe"].values
-            self.elemental_data["abund"][fitted_element] = line_abund
+            self.elemental_data["abund"][fitted_element] = np.asarray(line_abund)
             # get the line chi squared
             line_chisqr = df["chi_squared"].values
-            self.elemental_data["chisqr"][fitted_element] = line_chisqr
+            self.elemental_data["chisqr"][fitted_element] = np.asarray(line_chisqr)
             # get the line rv
             line_rv = df["Doppler_Shift_add_to_RV"].values
-            self.elemental_data["rv"][fitted_element] = line_rv
+            self.elemental_data["rv"][fitted_element] = np.asarray(line_rv)
             # get the line microturbulence
             line_microturbulence = df["Microturb"].values
-            self.elemental_data["vmic"][fitted_element] = line_microturbulence
+            self.elemental_data["vmic"][fitted_element] = np.asarray(line_microturbulence)
             # get the line macroturbulence
             line_macroturbulence = df["Macroturb"].values
-            self.elemental_data["vmac"][fitted_element] = line_macroturbulence
+            self.elemental_data["vmac"][fitted_element] = np.asarray(line_macroturbulence)
             # get the line rotation
             line_rotation = df["rotation"].values
-            self.elemental_data["rotation"][fitted_element] = line_rotation
+            self.elemental_data["rotation"][fitted_element] = np.asarray(line_rotation)
+            # get the line flag error
+            line_flag_error = df["flag_error"].values
+            self.elemental_data["flag_error"][fitted_element] = np.asarray(line_flag_error)
+            # get the line flag warning
+            line_flag_warning = df["flag_warning"].values
+            self.elemental_data["flag_warning"][fitted_element] = np.asarray(line_flag_warning)
 
     def get_line_data(self, element, wavelengths, column, ionisation_stage=None, tolerance=0.1):
         element_data = self.parsed_linelist[element]
@@ -733,7 +981,18 @@ class Star:
 
         return result, ionisation_stages
 
-    def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None):
+    def remove_data_bad_flags(self, data_list, element, flag_error, flag_warning):
+        if flag_error:
+            mask = self.elemental_data["flag_error"][element] == 0
+            for i in range(len(data_list)):
+                data_list[i] = data_list[i][mask]
+        if flag_warning:
+            mask = self.elemental_data["flag_warning"][element] == 0
+            for i in range(len(data_list)):
+                data_list[i] = data_list[i][mask]
+        return data_list
+
+    def plot_fit_parameters_vs_abundance(self, fit_parameter, element, abund_limits=None, remove_flag_error=True, remove_flag_warning=False):
         allowed_params = ["wavelength", "ew"]
         if fit_parameter not in allowed_params:
             raise ValueError(f"Fit parameter must be {allowed_params}, not {fit_parameter}")
@@ -741,9 +1000,8 @@ class Star:
         x_data = self.elemental_data[fit_parameter][element]
         y_data = self.elemental_data["abund"][element]
         # if abund_limits is not None, then remove the lines that are outside the limits
+        x_data, y_data = self.remove_data_bad_flags([x_data, y_data], element, remove_flag_error, remove_flag_warning)
         if abund_limits is not None:
-            x_data = np.array(x_data)
-            y_data = np.array(y_data)
             mask = (y_data >= abund_limits[0]) & (y_data <= abund_limits[1])
             x_data = x_data[mask]
             y_data = y_data[mask]
@@ -859,7 +1117,7 @@ class Star:
 
         plt.show()
 
-    def get_average_abundances(self, ew_limits=None, chi_sqr_limits=None):
+    def get_average_abundances(self, ew_limits=None, chi_sqr_limits=None, remove_flag_error=True, remove_flag_warning=False):
         # gets average abundances by element
         # get all elements
         elements = self.elemental_data["abund"].keys()
@@ -870,9 +1128,25 @@ class Star:
             abundances_element = self.elemental_data["abund"][element]
             ews_element = self.elemental_data["ew"][element]
             chi_sqrs_element = self.elemental_data["chisqr"][element]
+            # if remove_flag_error is True, then remove the lines that have flag_error == 1
+            flag_error_element = self.elemental_data["flag_error"][element]
+            flag_warning_element = self.elemental_data["flag_warning"][element]
             abundances_element = np.array(abundances_element)
             ews_element = np.array(ews_element)
             chi_sqrs_element = np.array(chi_sqrs_element)
+            flag_error_element = np.array(flag_error_element)
+            flag_warning_element = np.array(flag_warning_element)
+            if remove_flag_error:
+                mask = flag_error_element == 0
+                abundances_element = abundances_element[mask]
+                ews_element = ews_element[mask]
+                chi_sqrs_element = chi_sqrs_element[mask]
+                flag_warning_element = flag_warning_element[mask]
+            if remove_flag_warning:
+                mask = flag_warning_element == 0
+                abundances_element = abundances_element[mask]
+                ews_element = ews_element[mask]
+                chi_sqrs_element = chi_sqrs_element[mask]
             # if ew_limits is not None, then remove the lines that are outside the limits
             if ew_limits is not None:
                 mask = (ews_element >= ew_limits[0]) & (ews_element <= ew_limits[1])
@@ -883,15 +1157,15 @@ class Star:
                 mask = (chi_sqrs_element >= chi_sqr_limits[0]) & (chi_sqrs_element <= chi_sqr_limits[1])
                 abundances_element = abundances_element[mask]
             if len(abundances_element) > 1:
-                abundances_element = np.mean(abundances_element)
-                stdev_abundance_element = np.std(abundances_element)
+                mean_abundances_element = np.mean(abundances_element)
+                stdev_abundance_element = np.std(abundances_element) / np.sqrt(len(abundances_element))
             elif len(abundances_element) == 1:
-                abundances_element = abundances_element[0]
+                mean_abundances_element = abundances_element[0]
                 stdev_abundance_element = 0
             else:
-                abundances_element = None
+                mean_abundances_element = None
                 stdev_abundance_element = None
-            average_abundances[f"{element}_mean"] = abundances_element
+            average_abundances[f"{element}_mean"] = mean_abundances_element
             stdev_abundances[f"{element}_stdev"] = stdev_abundance_element
 
         # Create an ordered dictionary
@@ -914,7 +1188,10 @@ class Star:
         return df
 
 
-def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None, chi_sqr_limits=None):
+def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None, chi_sqr_limits=None, remove_flag_error=True, remove_flag_warning=False):
+    # if input_folders is a string, then convert it to a list
+    if isinstance(input_folders, str):
+        input_folders = [input_folders]
     config_dict = load_output_data(input_folders[0])
     # get all spectra names from the first folder
     spectra_names = config_dict["output_file_df"]["specname"].unique()
@@ -923,7 +1200,7 @@ def get_average_abundance_all_stars(input_folders, linelist_path, ew_limits=None
     for spectra_name in spectra_names:
         stars.append(Star(spectra_name, input_folders, linelist_path))
     # get all abundances for different spectra and combine into one dataframe
-    df = pd.concat([star.get_average_abundances(ew_limits=ew_limits, chi_sqr_limits=chi_sqr_limits) for star in stars], axis=0)
+    df = pd.concat([star.get_average_abundances(ew_limits=ew_limits, chi_sqr_limits=chi_sqr_limits, remove_flag_error=remove_flag_error, remove_flag_warning=remove_flag_warning) for star in stars], axis=0)
     return df
 
 

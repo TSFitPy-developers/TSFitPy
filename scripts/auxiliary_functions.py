@@ -5,6 +5,8 @@ import os
 import numpy as np
 from scipy import integrate
 from scipy.interpolate import interp1d
+import importlib.util
+import sys
 
 
 def create_dir(directory: str):
@@ -88,11 +90,11 @@ def apply_doppler_correction(wave_ob: np.ndarray, doppler: float) -> np.ndarray:
     return wave_ob / (1 + (doppler / 299792.))
 
 
-def create_segment_file(segment_size: float, line_begins_list, line_ends_list) -> tuple[np.ndarray, np.ndarray]:
+def create_segment_file(segment_size: float, line_begins_list: np.ndarray[float], line_ends_list: np.ndarray[float]) -> tuple[np.ndarray[float], np.ndarray[float]]:
     segments_left = []
     segments_right = []
-    start = line_begins_list[0] - segment_size
-    end = line_ends_list[0] + segment_size
+    start: float = line_begins_list[0] - segment_size
+    end: float = line_ends_list[0] + segment_size
 
     for (line_left, line_right) in zip(line_begins_list, line_ends_list):
         if line_left > end + segment_size:
@@ -123,3 +125,42 @@ def closest_available_value(target: float, options: list[float]) -> float:
     options = np.asarray(options)
     idx = (np.abs(options - target)).argmin()
     return options[idx]
+
+def import_module_from_path(module_name, file_path):
+    """
+    Dynamically imports a module or package from a given file path.
+
+    Parameters:
+    module_name (str): The name to assign to the module.
+    file_path (str): The file path to the module or package.
+
+    Returns:
+    module: The imported module.
+    """
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None:
+        raise ImportError(f"Module spec not found for {file_path}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def combine_linelists(line_list_path_trimmed: str, combined_linelist_name: str = "combined_linelist.bsyn", return_parsed_linelist: bool = False):
+    parsed_linelist_data = []
+    for folder in os.listdir(line_list_path_trimmed):
+        if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
+            # go into each folder and combine all linelists into one
+            combined_linelist = os.path.join(line_list_path_trimmed, folder, combined_linelist_name)
+            with open(combined_linelist, "w") as combined_linelist_file:
+                for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
+                    if file.endswith(".bsyn") and not file == combined_linelist_name:
+                        with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
+                            read_file = linelist_file.read()
+                            combined_linelist_file.write(read_file)
+                            if return_parsed_linelist:
+                                parsed_linelist_data.append(read_file)
+                        # delete the file
+                        os.remove(os.path.join(line_list_path_trimmed, folder, file))
+    if return_parsed_linelist:
+        return parsed_linelist_data

@@ -5,7 +5,7 @@ from numpy.fft import fft, ifft
 from scipy.interpolate import interp1d
 
 SPEED_OF_LIGHT_KMS = const.c.to('km/s').value
-CONV_RES_CONST_TWOS = (2.0 * np.sqrt(2. * np.log(2.)))  # just not to call it every time
+#CONV_RES_CONST_TWOS = (2.0 * np.sqrt(2. * np.log(2.)))  # just not to call it every time
 MIN_RD = 0.1 / SPEED_OF_LIGHT_KMS    # RESAMPLING-DISTANCE
 
 def conv_res(wavelength, flux, resolution):

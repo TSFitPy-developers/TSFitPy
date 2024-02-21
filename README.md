@@ -1,6 +1,6 @@
 # Turbospectrum Spectral Fitting with Python (TSFitPy)
 
-TSFitPy is a pipeline designed to determine stellar abundances and atmospheric parameters through the use of Nelder-Mead (simplex algorithm) minimization. It calculates model spectra "on the fly" while fitting instead of using a more sophisticated method that relies on training neural networks such as the method used by the full SAPP used for much larger datasets. Using this method allows the pipeline to gain flexibility in the stellar physics used at the expense of computation time, which makes it useful for small datasets of ~100 stars and fewer.
+TSFitPy is a pipeline designed to determine stellar abundances and atmospheric parameters through the use of Nelder-Mead (simplex algorithm) minimization. It calculates model spectra "on the fly" while fitting instead of using a more sophisticated method that relies on training neural networks (such as the method used by the full SAPP used for much larger datasets). Using this method allows the pipeline to gain flexibility in the stellar physics used at the expense of computation time, which makes it useful for small datasets of ~100 stars and fewer.
 
 To use TSFitPy, you will need a working Turbospectrum (TS) installation of the latest version, which has the capability to compute NLTE line profiles as well as calculate specified spectral windows instead of a full spectrum for a given range. TSFitPy has not been tested on older versions of TS. The latest version of TS can be found here: https://github.com/bertrandplez/Turbospectrum_NLTE
 
@@ -15,6 +15,47 @@ The code requires at least version Python 3.7. It also makes use of fortran prog
 
 Also, Windows is not supported (?).
 
+## Quick start
+
+This is a short version of the installation + running the code just to test that it works (not all inputs are downloaded). Please read the full version when you actually want to use the code.
+
+- `git clone https://github.com/TSFitPy-developers/TSFitPy.git`
+- `cd TSFitPy/turbospectrum/`
+- `rm readme.txt`
+- `cd ..`
+- `git clone https://github.com/bertrandplez/Turbospectrum_NLTE.git turbospectrum`
+- `cd turbospectrum/exec/` (or `cd turbospectrum/exec-gf/` if using gnu compiler)
+- if linux: uncomment `mcmodel=medium` in the makefile on line 11
+- `make`
+- `cd ../../`
+- Download from [1D MARCS standard composition models](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) file `atmospheres/marcs_standard_comp.zip` and put the unzipped files in `TSFitPy/input_files/model_atmospheres/1D/`
+- Download from [NLTE Gaia-ESO linelist](https://keeper.mpdl.mpg.de/d/3a5749b0bb5d4e0d8f4f/) file `nlte_ges_linelist_jmgXX20XX_I_II` and put it in `TSFitPy/input_files/linelists/linelist_for_fitting/`
+- `pwd` -> `TSFitPy/`
+- `cp -r input_files/sample_spectrum/* input_files/observed_spectra/`
+- `cp -r turbospectrum/interpolator/* scripts/model_interpolators/`
+- `cd scripts/`
+- `python3 compile_fortran_codes.py` (choose `GNU` or `INTEL` compiler)
+- `cd ..`
+- `python3 main.py ./input_files/tsfitpy_input_configuration.cfg`
+- You should see something like this at the end of each line fit:
+  - [...]
+  - `[Fe/H]=-0.3180 rv= 0.3268 vmic= 1.0516 vmac= 2.4664 rotation= 0.0000 chisqr=    0.55214633`
+  - `Converged: Fe: -0.32 Number of iterations: 14`
+  - [...]
+  - `[Fe/H]= 0.0282 rv= 0.2282 vmic= 1.0679 vmac= 3.7423 rotation= 0.0000 chisqr=    0.33176552`
+  - `Converged: Fe: 0.03 Number of iterations: 10`
+  - `Total runtime was XXXX minutes.`
+  - `TSFitPy had normal termination`
+  - `Fitting completed`
+  - `End of the fitting: XXX-XX-20XX-XX-XX-XX`
+- `cd plotting_tools/`
+- `cp plot_output.ipynb plot_output_test.ipynb`
+- open `plot_output_test.ipynb` and run the first cell
+- change `output_folder_location` to the folder where the output is saved (e.g. you will find a folder `TSFitPy/output_files/XXX-XX-20XX-XX-XX-XX_0.XXXXXXXXXXXXXXXX_LTE_Fe_1D/`, so copy `XXX-XX-20XX-XX-XX-XX_0.XXXXXXXXXXXXXXXX_LTE_Fe_1D` and paste it instead of `OUTPUTCHANGEHERE`)
+- run the next 5 cells to plot the results
+  - ![Fitted image](./example_image_plot/fitted_star_example.png)
+
+
 ## Installation
 
 - Clone or download code to your favourite directory
@@ -26,11 +67,11 @@ Also, Windows is not supported (?).
 - Download all desired linelists and put them into `TSFitPy/input_files/linelists/linelist_for_fitting/`
   - Example VALD lines are included in the `TSFitPy/input_files/linelists/linelist_vald/`, which you can move to the `TSFitPy/input_files/linelists/linelist_for_fitting/` (they are LTE ONLY)
   - **ALTERNATIVELY** but **required** for the [NLTE Gaia-ESO linelists are provided here](https://keeper.mpdl.mpg.de/d/3a5749b0bb5d4e0d8f4f/) in the file `nlte_ges_linelist` (wavelength ranges: 4200-9200 Å)
-  - Additional linelists to include are vald ones (3700-3800, 3800-4200, 9200-9300, 9300-9800) that extend the wavelength regime of the Gaia-ESO linelist
+  - Additional linelists to include are VALD ones (3700-3800, 3800-4200, 9200-9300, 9300-9800) that extend the wavelength regime of the Gaia-ESO linelist
     - Example of how your linelist files should look like:
       `TSFitPy/input_files/linelists/linelist_for_fitting/`
     
-      |-> `nlte_ges_linelist_jmgDATE_I_II.txt`
+      |-> `nlte_ges_linelist_jmgDATE_I_II`
     
       |-> 	`vald-3700-3800-for-grid-nlte-DATE`
     
@@ -58,7 +99,7 @@ Also, Windows is not supported (?).
   - The same idea applies for 3D averaged STAGGER atmospheres:
     - atom.ELEMENT_AND_NUMBER
     - auxData_ELEMENT_STAGGERmean3D_DATE_marcs_names.dat
-    - NLTEgrid_Ba_STAGGERmean3D_DATE.bin
+    - NLTEgrid_ELEMENT_STAGGERmean3D_DATE.bin
   - The naming might vary, but use MARCS for 1D models, use STAGGERmean3D (with `_marcs_names`! for aux files) for average STAGGER models
   - For each element, download, unzip and place auxData and NLTEgrid into their own folder (e.g. `TSFitPy/input_files/nlte_data/Ba/`)
   - Put all relevant atom files into `TSFitPy/input_files/nlte_data/model_atoms/`
@@ -71,15 +112,15 @@ Also, Windows is not supported (?).
       - First column: wavelength center of the line (no need to be exact, it is only used in printing)
       - Second column: left side of the line where it is fitted (i.e. include wings as well)
       - Third column: right side of the line where it is fitted
-    - You can add comments using `;`
+    - You can add comments using `;` (either on any line or after the line's values)
 
 ## Usage for fitting
 
-- There are three main steps to take for every fit: get normalised spectra, create corresponding fitlist and change the configuration (config) file
+- There are three main steps to take for every fit: get normalised spectra, create the corresponding fitlist and change the configuration (config) file
 - As an example, we are going to use provided sample spectrum and change config file to fit the Sun
 - Take spectrum from `TSFitPy/input_files/sample_spectrum/` and put it into desired folder, such as `TSFitPy/input_files/observed spectra/`
-  - One can also supply error as third column, but it is not required (otherwise it will be set to 1)
-    - ANY third column will be treated as error, so make sure it is error and not something else
+  - One can also supply error as third column, but it is not required (otherwise it will be set to 0.01)
+    - ANY third column will be treated as an error, so make sure it is an error and not something else
   - Error is sigma, i.e. standard deviation, not variance
   - Error is used in chi2 calculation
 - It is recommended to create a separate config file for each run/set of stars. This allows to quickly refit the same sample of stars without recreating config file each time
@@ -120,8 +161,9 @@ Also, Windows is not supported (?).
     - `rotation` is default macroturbulence for all stars if `fit_rotation = No`
     - `init_guess_elements` are elements to use for initial guess. Only important if you fit several elements at once (e.g. blended line).  Can be several elements: `input_elements_abundance = Mg Ti Ca`
     - `init_guess_elements_path` is the path to the linelist for the initial guess elements. E.g. it can look like this: each line is name of spectra and abundance for the guess [X/Fe]: `HD000001 0.2`. Order of elements should be the same as in `init_guess_elements`
-    - `input_elements_abundance` are elements to use for input abundance. This allows to specify abundance of the star for each element. If not specified, then solar scaled abundances are used. Can be several elements: `input_elements_abundance = Mg Ti Ca`
-    - `input_elements_abundance_path` is the path to the linelist for the input abundance elements. E.g. it can look like this: each line is name of spectra and abundance [X/Fe]: `HD000001 0.2`. Order of elements should be the same as in `input_elements_abundance`
+    - The following are a bit "outdated" and left for backwards compatibility. You can alternatively pass abundance of elements in the fitlist
+      - `input_elements_abundance` are elements to use for input abundance. This allows to specify abundance of the star for each element. If not specified, then solar scaled abundances are used. Can be several elements: `input_elements_abundance = Mg Ti Ca`
+      - `input_elements_abundance_path` is the path to the linelist for the input abundance elements. E.g. it can look like this: each line is name of spectra and abundance [X/Fe]: `HD000001 0.2`. Order of elements should be the same as in `input_elements_abundance`
   - [ParametersForModeAll]
     - `wavelength_minimum` and `wavelength_maximum` specifies the ranges of the fitted spectra
   - [ParametersForModeLbl]
@@ -137,7 +179,7 @@ Also, Windows is not supported (?).
     - Guess ranges for vmac, rotation, abundance and doppler shift (deviated from RV)
 - An example of `fitlist` file is added as well:
   - `name_of_spectrum_to_fit     rv      teff  logg  [Fe/H]  Input_vmicroturb Input_vmacroturb` is first row
-    - Most importantly you need specname, rv, teff, logg, [Fe/H] (if fitted) and optionally vmic and vmac
+    - Most importantly, you need specname, rv, teff, logg, [Fe/H] (if fitted) and optionally vmic and vmac
     - You can also provide abundance for each element. Example:
       - `name_of_spectrum_to_fit rv teff logg [Fe/H] vmic vmac  Mg/Fe  Ti/H  A(Ca)`
       - Then provide their values in the next row:
@@ -145,6 +187,9 @@ Also, Windows is not supported (?).
       - The code will automatically convert them to [X/Fe] for fitting
       - Order doesn't matter, except for the first being a name of the spectra (the code reads the header and then matches the values)
       - Use `;` for comments
+      - IMPORTANT!!! Just saying `Mg` would presume that you want `A(Mg)` and not `[Mg/Fe]`
+      - You can also add column `snr`, which will be used to estimate an error using formula `sigma = 1/snr`, if no error is provided in the spectra
+        - Pass `0` to use default error of `0.01`
 - Now you can run the fitting. To do so, you need to run the `main.py` script. You can do by running:
   - `python3 main.py ./input_files/tsfitpy_input_configuration.cfg` - this will run the fitting on your local computer
   - This will run the job and save output in its unique folder in `./output_files/`
@@ -162,8 +207,8 @@ Also, Windows is not supported (?).
         - 1st bit: if the fitted parameters are at the edge of the bounds (abundance, vmic, vmac, rotation, teff, extra rv)
         - 2nd bit: if at least one flux point in the observed spectra is above 1.1 or below 0
         - 3rd bit:
-        - 4th bit:
-        - 5th bit:
+        - 4th bit: if the EW of the line is significantly different from the EW of the line in the model (within factor of 1.25). Perhaps a broken pixel might result in a trigger of this flag?
+        - 5th bit: number of iterations of the fit is <= 5. Normally it takes ~9 iterations for a lbl fit.
         - 6th bit:
         - 7th bit:
         - 8th bit:
@@ -185,12 +230,11 @@ Also, Windows is not supported (?).
 
 ## Usage for grid generation
 
-- 16.06.2023 - finally added grid generation (hooray? please be sure to test before using it maybe? seems to work on my side though)
 - To generate the grid, you need to create a `synthetic_spectra_generation_configuration.cfg` file based on the one provided in `./input_files/`
 - It is very similar to the config for fitting (just fewer options) and it only has one extra parameter:
   - `save_unnormalised_spectra` is a boolean, if True, then it will save the unnormalised synthetic spectra (each file would be 30% larger)
-- It uses similar `fitlist`, but that one is much more flexible (see example in `./input_files/synthetic_spectra_parameters`)
-  - First column specifies columns (order not important). Most importantly to have `teff  logg  [Fe/H]`
+- It uses similar `fitlist` (see example in `./input_files/synthetic_spectra_parameters`)
+  - The first row specifies columns (order not important). Most importantly to have `teff  logg  [Fe/H]`
   - You can also add options such as `vmic`, `vmac` and `rotation`
   - Of course, you can also add abundance of elements
     - You have to be specific with abundances. `[X/Fe]`, `[X/H]` and `A(X)` (and their combinations) are allowed
@@ -209,7 +253,7 @@ Also, Windows is not supported (?).
 - It uses the same config file as the fitting, it just skips some parameters
 - Specify element (`elements_to_fit`), line (`linemask`) and model atmosphere (`fitlist`) in the config file
 - It calculates the NLTE correction for the given line and saves it in the output folder by matching EW of NLTE line to LTE line
-- This can be useful to calculate pure NLTE correction withouth fitting the spectrum
+- This can be useful to calculate pure NLTE correction without fitting the spectrum
   - The precision is much higher than in the fitting, because it doesn't have to fit the spectrum
   - Remember that the NLTE correction is different for different A(X) abundances
     - You can specify abundance beforehand in the fitlist (using [X/Fe], [X/H] or A(X) notation); then it will calculate the NLTE correction for that abundance
@@ -250,7 +294,7 @@ Also, Windows is not supported (?).
 - Before you are able to run `ifort` command, you might need to source the `setvars.sh` file (see [this intel link](https://www.intel.com/content/www/us/en/docs/oneapi/programming-guide/2023-0/use-the-setvars-script-with-linux-or-macos.html) and [especially this intel link](https://www.intel.com/content/www/us/en/docs/fortran-compiler/developer-guide-reference/2023-0/specifying-the-location-of-compiler-components.html))
   - You can find it in the installation folder, e.g. `source <install-dir>/setvars.sh`
     - `<install_dir>` is probably `/opt/intel/oneapi/`? 
-  - You can also add it to your `.bashrc` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
+  - You can also add it to your `.bashrc`/`.profile` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
 
 ## Multiprocessing usage
 
@@ -315,9 +359,9 @@ Here is the Trello board for the project: https://trello.com/b/2xe7T6qH/tsfitpy-
   - Look at the bottom of the output: usually you will see what goes wrong
     - You can also search for `forr`, because Fortran errors usually start with `forrtl`
 
+
 - TurboSpectrum has a limit of 100 linelists. So if you have too many linelists, it will crash.
   - In that case combine some of the linelists into one
-
 
 
 - If you get a Fortran error `forrtl: severe (24): end-of-file during read, unit -5, file Internal List-Directed Read` in the `bsyn_lu            000000000041DB92  getlele_                   38  getlele.f` just after it trying to `  starting scan of linelist` with some molecular name, then the issue is probably the following one:
