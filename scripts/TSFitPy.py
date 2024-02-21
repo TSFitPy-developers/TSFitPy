@@ -8,7 +8,7 @@ import numpy as np
 from distributed import get_worker
 from scipy.optimize import minimize, root_scalar
 from .auxiliary_functions import create_dir, calculate_vturb, calculate_equivalent_width, \
-    apply_doppler_correction, create_segment_file, import_module_from_path
+    apply_doppler_correction, create_segment_file, import_module_from_path, combine_linelists
 from .model_atom_class import ModelAtom
 from .solar_abundances import periodic_table
 from .turbospectrum_class_nlte import TurboSpectrum
@@ -2988,18 +2988,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
     if tsfitpy_configuration.compiler.lower() == "m3dis":
         # if m3dis, then combine all linelists into one
         # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
-        for folder in os.listdir(line_list_path_trimmed):
-            if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
-                # go into each folder and combine all linelists into one
-                combined_linelist = os.path.join(line_list_path_trimmed, folder, "combined_linelist.bsyn")
-                with open(combined_linelist, "w") as combined_linelist_file:
-                    for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
-                        if file.endswith(".bsyn") and not file == "combined_linelist.bsyn":
-                            with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
-                                combined_linelist_file.write(linelist_file.read())
-                            # delete the file
-                            os.remove(os.path.join(line_list_path_trimmed, folder, file))
-                            #print(os.path.join(line_list_path_trimmed, folder, file))
+        combine_linelists(line_list_path_trimmed)
         # also want to precut model atom if LTE, but using model atom
         if tsfitpy_configuration.nlte_flag and tsfitpy_configuration.iterations_max_precompute == 0 and tsfitpy_configuration.iterations_max == 0:
             # if NLTE, then do nothing
@@ -3009,7 +2998,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
             for segment_index, (segment_begin, segment_end) in enumerate(zip(tsfitpy_configuration.seg_begins, tsfitpy_configuration.seg_ends)):
                 # load model atom
                 model_atom = ModelAtom()
-                model_atom.read_model_atom(os.path.join(tsfitpy_configuration.model_atoms_path, tsfitpy_configuration.model_atom_file_dict[tsfitpy_configuration.nlte_elements[0]]))
+                model_atom.read_model_atom(os.path.join(tsfitpy_configuration.model_atoms_path, tsfitpy_configuration.model_atom_file_dict[tsfitpy_configuration.nlte_elements[0]]), read_collisions=False, sort_bb_transitions=False)
                 # cut model atom
                 model_atom.leave_only_bb_transitions_between_wavelength(segment_begin, segment_end)
                 # lets create new temporary directory, where for each segment we will save model atom
@@ -3147,6 +3136,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
         print("TSFitPy had normal termination")
 
     return df_results
+
 
 if __name__ == '__main__':
     raise RuntimeError("This file is not meant to be run as main. Please run TSFitPy/main.py instead.")  # this is a module

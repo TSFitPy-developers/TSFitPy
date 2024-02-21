@@ -19,7 +19,8 @@ from scripts.synthetic_code_class import SyntheticSpectrumGenerator
 from scripts.synthetic_code_class import fetch_marcs_grid
 from scripts.TSFitPy import (output_default_configuration_name, output_default_fitlist_name,
                              output_default_linemask_name)
-from scripts.auxiliary_functions import calculate_equivalent_width, apply_doppler_correction, import_module_from_path
+from scripts.auxiliary_functions import (calculate_equivalent_width, apply_doppler_correction, import_module_from_path,
+                                         combine_linelists)
 from scripts.loading_configs import SpectraParameters, TSFitPyConfig
 from scripts.solar_abundances import periodic_table
 
@@ -607,8 +608,6 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     for path in m3dis_paths:
         if ((atmosphere_type != "3D" and path != "3D_atmosphere_path") or atmosphere_type == "3D") and not path == "nlte_config_path":
             m3dis_paths[path] = check_if_path_exists(m3dis_paths[path])
-        #if path == "nlte_config_path" and nlte_flag:
-        #    m3dis_paths[path] = check_if_file_exists(m3dis_paths[path])
 
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
@@ -642,21 +641,7 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     create_window_linelist([lmin - 2], [lmax + 2], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
     # if m3dis, then combine all linelists into one
     # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
-    parsed_linelist_data = []
-    for folder in os.listdir(line_list_path_trimmed):
-        if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
-            # go into each folder and combine all linelists into one
-            combined_linelist = os.path.join(line_list_path_trimmed, folder, "combined_linelist.bsyn")
-            with open(combined_linelist, "w") as combined_linelist_file:
-                for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
-                    if file.endswith(".bsyn") and not file == "combined_linelist.bsyn":
-                        with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
-                            read_file = linelist_file.read()
-                            combined_linelist_file.write(read_file)
-                            if return_parsed_linelist:
-                                parsed_linelist_data.append(read_file)
-                        # delete the file
-                        os.remove(os.path.join(line_list_path_trimmed, folder, file))
+    parsed_linelist_data = combine_linelists(line_list_path_trimmed, return_parsed_linelist)
     parsed_elements_sorted_info = None
     if return_parsed_linelist:
         parsed_model_atom_data = []

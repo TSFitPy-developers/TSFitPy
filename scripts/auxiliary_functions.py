@@ -144,3 +144,23 @@ def import_module_from_path(module_name, file_path):
     sys.modules[module_name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def combine_linelists(line_list_path_trimmed: str, combined_linelist_name: str = "combined_linelist.bsyn", return_parsed_linelist: bool = False):
+    parsed_linelist_data = []
+    for folder in os.listdir(line_list_path_trimmed):
+        if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
+            # go into each folder and combine all linelists into one
+            combined_linelist = os.path.join(line_list_path_trimmed, folder, combined_linelist_name)
+            with open(combined_linelist, "w") as combined_linelist_file:
+                for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
+                    if file.endswith(".bsyn") and not file == combined_linelist_name:
+                        with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
+                            read_file = linelist_file.read()
+                            combined_linelist_file.write(read_file)
+                            if return_parsed_linelist:
+                                parsed_linelist_data.append(read_file)
+                        # delete the file
+                        os.remove(os.path.join(line_list_path_trimmed, folder, file))
+    if return_parsed_linelist:
+        return parsed_linelist_data
