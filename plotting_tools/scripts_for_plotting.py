@@ -139,6 +139,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["vmac_input_bool"] = tsfitpy_config.vmac_input
     config_dict["vmic_input_bool"] = tsfitpy_config.vmic_input
     config_dict["rotation_input_bool"] = tsfitpy_config.rotation_input
+    config_dict["resolution_constant"] = tsfitpy_config.resolution
 
     return config_dict
 
