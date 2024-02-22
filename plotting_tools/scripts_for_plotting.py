@@ -426,6 +426,8 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
 
+    temp_directory = os.path.join(os.getcwd(), temp_directory, "")
+
     for path in turbospectrum_paths:
         turbospectrum_paths[path] = check_if_path_exists(turbospectrum_paths[path])
 
