@@ -139,6 +139,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     config_dict["vmac_input_bool"] = tsfitpy_config.vmac_input
     config_dict["vmic_input_bool"] = tsfitpy_config.vmic_input
     config_dict["rotation_input_bool"] = tsfitpy_config.rotation_input
+    config_dict["resolution_constant"] = tsfitpy_config.resolution
 
     return config_dict
 
@@ -425,6 +426,8 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+
+    temp_directory = os.path.join(os.getcwd(), temp_directory, "")
 
     for path in turbospectrum_paths:
         turbospectrum_paths[path] = check_if_path_exists(turbospectrum_paths[path])
