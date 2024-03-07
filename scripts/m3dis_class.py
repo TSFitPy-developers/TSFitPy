@@ -734,3 +734,63 @@ class M3disCall(SyntheticSpectrumGenerator):
                 print(f"Interpolation failed? {error}")
         return wavelength, normalised_flux, flux
 
+
+if __name__ == '__main__':
+    from scripts.synthetic_code_class import fetch_marcs_grid
+
+    teff, logg, feh, vmic = 5777, 4.44, 0.0, 1.0
+
+    model_atmosphere_grid_path = "/Users/storm/docker_common_folder/TSFitPy/input_files/model_atmospheres/1D/"
+    model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    temp_dir = "./temppp_dirrr/"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
+        model_atmosphere_list, M3disCall.marcs_parameters_to_ignore)
+
+    m3dis_class = M3disCall(
+        m3dis_path=None,
+        interpol_path=None,
+        line_list_paths=None,
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=None,
+        departure_file_path=None,
+        aux_file_length_dict=None,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values,
+        m3dis_python_module=None,
+        n_nu=None,
+        hash_table_size=None,
+        mpi_cores=None,
+        iterations_max=None,
+        convlim=None,
+        snap=None,
+        dims=None,
+        nx=None,
+        ny=None,
+        nz=None
+    )
+    teff, logg, feh, vmic = 5777, 4.44, 0.0, 1.0
+
+    teff = 4665
+    logg = 1.64
+    feh = -2.5
+    vmic = 2.0
+
+    fehs = [-2.5, -2.3, -2.1, -1.9, -2.7, -2.9, -3.1]
+
+    for feh in fehs:
+        m3dis_class.configure(t_eff=teff, log_g=logg, metallicity=feh, turbulent_velocity=vmic,
+                                        lambda_delta=None, lambda_min=None, lambda_max=None,
+                                        free_abundances=None, temp_directory=temp_dir, nlte_flag=False,
+                                        verbose=None,
+                                        atmosphere_dimension="1D", windows_flag=None,
+                                        segment_file=None, line_mask_file=None,
+                                        depart_bin_file=None, depart_aux_file=None,
+                                        model_atom_file=None)
+        m3dis_class.calculate_atmosphere()
