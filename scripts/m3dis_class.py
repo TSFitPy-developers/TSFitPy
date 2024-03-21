@@ -396,7 +396,31 @@ class M3disCall(SyntheticSpectrumGenerator):
             linelist_parameters = (f"&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' {linelist_param_extra}/\n\
                                      &spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n")
 
-        #0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000
+        if False:
+            # check if feh is almost 0
+            absmet_file_global_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/"
+            if np.abs(self.metallicity) < 0.01:
+                # /mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00
+                absmet_file = f"OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+            # check if feh is almost -1 or -0.5
+            elif np.abs(self.metallicity + 1) < 0.01 or np.abs(self.metallicity + 0.5) < 0.01:
+                absmet_file = f"m-1.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=T"
+            # check if feh is almost -2
+            elif np.abs(self.metallicity + 2) < 0.01:
+                absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+            # check if feh is almost +0.5
+            elif np.abs(self.metallicity - 0.5) < 0.01:
+                absmet_file = f"OPACITIES/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}'  absmet_big_end=F"
+            #    &composition_params absmet_file='/u/nisto/data/absmet//m1/metals.x01' absmet_big_end=T /
+            # absmet_file = f"absmet_file='{os.path.join(self.departure_file_path, '')}' absmet_big_end=T"
+        else:
+            absmet_file = ""
+
+        # 0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000
         # turbospectrum angles
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
@@ -405,7 +429,7 @@ class M3disCall(SyntheticSpectrumGenerator):
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
 &m3d_params         decouple_continuum=T verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='custom' custom_mu='0.010 0.052 0.124 0.223 0.340 0.468 0.598 0.722 0.831 0.917 0.975 1.000'/\n\
 {linelist_parameters}\
-&composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
+&composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}' {absmet_file}/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
         #TODO absmet files?
         if self.verbose:
