@@ -523,11 +523,12 @@ class M3disCall(SyntheticSpectrumGenerator):
             density_new, depth_new, pe_new, tau500_new, temp_new, vmic_new)
         return tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new
 
-    def convert_atmo_to_equidistant_one(self, density, depth, pe, tau500, temp, vmic):
+    def convert_atmo_to_equidistant_one(self, density, depth, pe, tau500, temp, vmic, depth_points=256):
         # interpolate all variables to equidistant depth grid
         depth_min = np.min(depth)
         depth_max = np.max(depth)
-        depth_points = np.size(depth)
+        if depth_points is None:
+            depth_points = np.size(depth)
         depth_new_equi = np.linspace(depth_min, depth_max, depth_points)
         tau500 = np.interp(depth_new_equi, depth, tau500)
         temp = np.interp(depth_new_equi, depth, temp)
