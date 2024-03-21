@@ -382,7 +382,7 @@ class M3disCall(SyntheticSpectrumGenerator):
             else:
                 precomputed_depart = ""
             atom_params = (f"&atom_params        atom_file='{os.path.join(atom_path, self.model_atom_file[atom_file_element])}' "
-                           f"convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=F exclude_from_line_list=T "
+                           f"convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=T exclude_from_line_list=T "
                            f"{precomputed_depart}/\n")
             # linelist_param_extra
             linelist_param_extra = f"exclude_elements='{atom_file_element}'"
