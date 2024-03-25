@@ -45,6 +45,9 @@ def get_convolved_spectra(wave: np.ndarray, flux: np.ndarray, resolution: float,
     :param rot: Rotation in km/s, 0 if not required
     :return: 2 arrays, first is convolved wavelength, second is convolved flux
     """
+    # check that wave and flux are non-empty
+    if np.size(wave) == 0 or np.size(flux) == 0:
+        return wave, flux
     if resolution != 0.0:
         wave_mod_conv, flux_mod_conv = conv_res(wave, flux, resolution)
     else:
