@@ -1201,7 +1201,9 @@ class Spectra:
                     indices_argsorted = np.argsort(result_one_line['fit_wavelength'])
                     np.savetxt(g, np.column_stack((result_one_line['fit_wavelength'][indices_argsorted], result_one_line['fit_flux_norm'][indices_argsorted], result_one_line['fit_flux'][indices_argsorted])), fmt=('%.5f', '%.5f', '%.10f'))
             line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
-            segment_left, segment_right = self.seg_begins[line_number], self.seg_ends[line_number]
+            segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
+                                                    self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
+            segment_left, segment_right = self.seg_begins[segment_index], self.seg_ends[segment_index]
 
             wavelength_fit_array = result_one_line['fit_wavelength']
             norm_flux_fit_array = result_one_line['fit_flux_norm']
