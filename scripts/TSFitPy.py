@@ -1215,7 +1215,10 @@ class Spectra:
                                                                        result_one_line["macroturb"],
                                                                        result_one_line["rotation"])
 
-            equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
+            try:
+                equivalent_width = calculate_equivalent_width(wavelength_fit_conv, flux_fit_conv, line_left, line_right)
+            except ValueError:
+                equivalent_width = 999999
 
             extra_wavelength_to_save = 1  # AA extra wavelength to save left and right of the line
 
@@ -1264,7 +1267,10 @@ class Spectra:
             # check if EW is significantly different from the EW of the line in the model
             ratio_threshold = 1.5
             # calculate EW of the line in the spectra
-            equivalent_width_ob = calculate_equivalent_width(wave_ob_cut, flux_ob_cut, line_left, line_right)
+            try:
+                equivalent_width_ob = calculate_equivalent_width(wave_ob_cut, flux_ob_cut, line_left, line_right)
+            except ValueError:
+                equivalent_width_ob = 999999
             # check if EW of the line in the spectra is within ratio_threshold of the EW of the line in the model
             if equivalent_width_ob > equivalent_width * ratio_threshold or equivalent_width_ob < equivalent_width / ratio_threshold:
                 flag_error = flag_error[:3] + "1" + flag_error[4:]
