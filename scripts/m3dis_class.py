@@ -382,7 +382,7 @@ class M3disCall(SyntheticSpectrumGenerator):
             else:
                 precomputed_depart = ""
             atom_params = (f"&atom_params        atom_file='{os.path.join(atom_path, self.model_atom_file[atom_file_element])}' "
-                           f"convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=F exclude_from_line_list=T "
+                           f"convlim={self.convlim} use_atom_abnd=F exclude_trace_cont=T exclude_from_line_list=T "
                            f"{precomputed_depart}/\n")
             # linelist_param_extra
             linelist_param_extra = f"exclude_elements='{atom_file_element}'"
@@ -396,7 +396,31 @@ class M3disCall(SyntheticSpectrumGenerator):
             linelist_parameters = (f"&linelist_params    linelist_file='{os.path.join(self.line_list_paths[0], self.line_list_files[0])}' {linelist_param_extra}/\n\
                                      &spectrum_params    daa={self.lambda_delta} aa_blue={self.lambda_min} aa_red={self.lambda_max} /\n")
 
-        #0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000
+        if False:
+            # check if feh is almost 0
+            absmet_file_global_path = "/mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/"
+            if np.abs(self.metallicity) < 0.01:
+                # /mnt/beegfs/gemini/groups/bergemann/users/storm/data/absmet/OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00
+                absmet_file = f"OPACITIES/M+0.00a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+            # check if feh is almost -1 or -0.5
+            elif np.abs(self.metallicity + 1) < 0.01 or np.abs(self.metallicity + 0.5) < 0.01:
+                absmet_file = f"m-1.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=T"
+            # check if feh is almost -2
+            elif np.abs(self.metallicity + 2) < 0.01:
+                absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+            # check if feh is almost +0.5
+            elif np.abs(self.metallicity - 0.5) < 0.01:
+                absmet_file = f"OPACITIES/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}'  absmet_big_end=F"
+            #    &composition_params absmet_file='/u/nisto/data/absmet//m1/metals.x01' absmet_big_end=T /
+            # absmet_file = f"absmet_file='{os.path.join(self.departure_file_path, '')}' absmet_big_end=T"
+        else:
+            absmet_file = ""
+
+        # 0.010018 0.052035 0.124619 0.222841 0.340008 0.468138 0.598497 0.722203 0.830825 0.916958 0.974726 1.000000
         # turbospectrum angles
         output = {}
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
@@ -405,7 +429,7 @@ class M3disCall(SyntheticSpectrumGenerator):
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
 &m3d_params         decouple_continuum=T verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='custom' custom_mu='0.010 0.052 0.124 0.223 0.340 0.468 0.598 0.722 0.831 0.917 0.975 1.000'/\n\
 {linelist_parameters}\
-&composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}'/\n\
+&composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}' {absmet_file}/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
         #TODO absmet files?
         if self.verbose:
@@ -523,11 +547,12 @@ class M3disCall(SyntheticSpectrumGenerator):
             density_new, depth_new, pe_new, tau500_new, temp_new, vmic_new)
         return tau500_new, temp_new, pe_new, vmic_new, density_new, depth_new
 
-    def convert_atmo_to_equidistant_one(self, density, depth, pe, tau500, temp, vmic):
+    def convert_atmo_to_equidistant_one(self, density, depth, pe, tau500, temp, vmic, depth_points=256):
         # interpolate all variables to equidistant depth grid
         depth_min = np.min(depth)
         depth_max = np.max(depth)
-        depth_points = np.size(depth)
+        if depth_points is None:
+            depth_points = np.size(depth)
         depth_new_equi = np.linspace(depth_min, depth_max, depth_points)
         tau500 = np.interp(depth_new_equi, depth, tau500)
         temp = np.interp(depth_new_equi, depth, temp)
@@ -734,3 +759,63 @@ class M3disCall(SyntheticSpectrumGenerator):
                 print(f"Interpolation failed? {error}")
         return wavelength, normalised_flux, flux
 
+
+if __name__ == '__main__':
+    from scripts.synthetic_code_class import fetch_marcs_grid
+
+    teff, logg, feh, vmic = 5777, 4.44, 0.0, 1.0
+
+    model_atmosphere_grid_path = "/Users/storm/docker_common_folder/TSFitPy/input_files/model_atmospheres/1D/"
+    model_atmosphere_list = model_atmosphere_grid_path + "model_atmosphere_list.txt"
+    temp_dir = "./temppp_dirrr/"
+    os.makedirs(temp_dir, exist_ok=True)
+
+    model_temperatures, model_logs, model_mets, marcs_value_keys, marcs_models, marcs_values = fetch_marcs_grid(
+        model_atmosphere_list, M3disCall.marcs_parameters_to_ignore)
+
+    m3dis_class = M3disCall(
+        m3dis_path=None,
+        interpol_path=None,
+        line_list_paths=None,
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=None,
+        departure_file_path=None,
+        aux_file_length_dict=None,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values,
+        m3dis_python_module=None,
+        n_nu=None,
+        hash_table_size=None,
+        mpi_cores=None,
+        iterations_max=None,
+        convlim=None,
+        snap=None,
+        dims=None,
+        nx=None,
+        ny=None,
+        nz=None
+    )
+    teff, logg, feh, vmic = 5777, 4.44, 0.0, 1.0
+
+    teff = 4665
+    logg = 1.64
+    feh = -2.5
+    vmic = 2.0
+
+    fehs = [-2.5, -2.3, -2.1, -1.9, -2.7, -2.9, -3.1]
+
+    for feh in fehs:
+        m3dis_class.configure(t_eff=teff, log_g=logg, metallicity=feh, turbulent_velocity=vmic,
+                                        lambda_delta=None, lambda_min=None, lambda_max=None,
+                                        free_abundances=None, temp_directory=temp_dir, nlte_flag=False,
+                                        verbose=None,
+                                        atmosphere_dimension="1D", windows_flag=None,
+                                        segment_file=None, line_mask_file=None,
+                                        depart_bin_file=None, depart_aux_file=None,
+                                        model_atom_file=None)
+        m3dis_class.calculate_atmosphere()

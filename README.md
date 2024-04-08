@@ -34,7 +34,7 @@ This is a short version of the installation + running the code just to test that
 - `cp -r input_files/sample_spectrum/* input_files/observed_spectra/`
 - `cp -r turbospectrum/interpolator/* scripts/model_interpolators/`
 - `cd scripts/`
-- `python3 compile_fortran_codes.py` (choose `GNU` or `INTEL` compiler)
+- `python3 compile_fortran_codes.py` (choose `GNU`, `IFORT` or `IFX` compiler)
 - `cd ..`
 - `python3 main.py ./input_files/tsfitpy_input_configuration.cfg`
 - You should see something like this at the end of each line fit:
@@ -128,7 +128,7 @@ This is a short version of the installation + running the code just to test that
   - The reason to copy and paste is so that `git pull` cannot interfer with the default configuration
 - The config file should already be ready for a test run, but here is the reference breakdown if needed
   - [turbospectrum_compiler]:
-    - `compiler` specifies the compiler (intel or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
+    - `compiler` specifies the compiler (ifort, ifx or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
   - [MainPaths]
     - Next few lines specify the paths. Default paths are relative to the `TSFitPy/scripts/TSFitPy.py`, but it is possible to change paths if you want to keep your data in a separate folder (e.g. it can be useful if sharing data on a cluster)
   - [FittingParameters]
@@ -295,6 +295,7 @@ This is a short version of the installation + running the code just to test that
   - You can find it in the installation folder, e.g. `source <install-dir>/setvars.sh`
     - `<install_dir>` is probably `/opt/intel/oneapi/`? 
   - You can also add it to your `.bashrc`/`.profile` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
+- **ifx should be similar, but Mac is not supported any more**
 
 ## Multiprocessing usage
 
