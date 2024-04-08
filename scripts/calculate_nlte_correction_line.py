@@ -10,11 +10,51 @@ import glob
 from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize, root_scalar
-from .create_window_linelist_function import binary_search_lower_bound, write_lines
 from .auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file
 from .loading_configs import SpectraParameters, TSFitPyConfig
 from .turbospectrum_class_nlte import TurboSpectrum
 from .synthetic_code_class import fetch_marcs_grid
+
+def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int,
+                              element_to_search: float) -> tuple[int, dict]:
+    """
+	Gives out the lower index where the value is located between the ranges. For example, given array [12, 20, 32, 40, 52]
+	Value search: 5, result: 0
+	Value search: 13, result: 1
+	Value search: 20, result: 1
+	Value search: 21, result: 2
+	Value search: 51 or 52 or 53, result: 4
+	:param array_to_search:
+	:param dict_array_values:
+	:param low:
+	:param high:
+	:param element_to_search:
+	:return:
+	"""
+    while low < high:
+        middle: int = low + (high - low) // 2
+
+        if middle not in dict_array_values:
+            dict_array_values[middle] = float(array_to_search[middle].strip().split()[0])
+        array_element_value: float = dict_array_values[middle]
+
+        if array_element_value < element_to_search:
+            low: int = middle + 1
+        else:
+            high: int = middle
+    return low, dict_array_values
+
+
+def write_lines(all_lines_to_write: dict[list[str]], elem_line_1_to_save: str, elem_line_2_to_save: str,
+                new_path_name: str, line_list_number: float):
+    for key in all_lines_to_write:
+        new_linelist_name: str = os.path.join(f"{new_path_name}", f"{key}", f"linelist-{line_list_number}.bsyn")
+        with open(new_linelist_name, "a") as new_file_to_write:
+            new_file_to_write.write(f"{elem_line_1_to_save}	{len(all_lines_to_write[key])}\n")
+            new_file_to_write.write(f"{elem_line_2_to_save}")
+            for line_to_write in all_lines_to_write[key]:
+                # pass
+                new_file_to_write.write(line_to_write)
 
 
 def cut_linelist(seg_begins: list[float], seg_ends: list[float], old_path_name: str, new_path_name: str,
@@ -422,7 +462,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     futures = []
     for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
         # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
-        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1 = one_spectra_parameters
+        specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1, _ = one_spectra_parameters
         # if element is Fe, then take abundance from metallicity
         if abusingclasses.elem_to_fit[0] == "Fe":
             abundance = met1
