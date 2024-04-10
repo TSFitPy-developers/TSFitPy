@@ -177,11 +177,13 @@ def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_
     error_obs_variance = error_obs_variance[indices_to_use_obs]
 
     if np.size(flux_obs) == 0:
+        logging.debug(f"Line {lmin} - {lmax} not found in the observed spectra?")
         return 999999
 
     try:
         wave_synt, flux_synt = get_convolved_spectra(wave_synt_orig, flux_synt_orig, resolution, vmac, rotation)
     except ValueError:
+        logging.debug(f"Was not able to convolve the spectra for line {lmin} - {lmax}")
         return 999999
 
     flux_synt_interp = np.interp(wave_obs, wave_synt, flux_synt)
@@ -470,7 +472,10 @@ class Spectra:
         else:
             self.vmic = None
         if self.input_vmac:
-            self.vmac: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
+            if not np.isnan(macro):
+                self.vmac: float = float(macro)  # macroturbulence km/s, constant for all stars if not fitted
+            else:
+                self.vmac: float = 0
         if self.input_rotation:
             self.rotation: float = float(rotation)  # rotation km/s, constant for all stars if not fitted
         if resolution != 0.0 and resolution is not None and not np.isnan(resolution):
