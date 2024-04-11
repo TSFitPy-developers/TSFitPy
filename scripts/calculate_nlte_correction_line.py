@@ -282,17 +282,17 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
             #                  options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
             nlte_correction = result.root
-            ew_nlte = ew_lte
+            ew_nlte_converged = result.converged
             print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte}")
         except ValueError:
             print("Fitting failed")
-            ew_nlte = -99999
+            ew_nlte_converged = False
             nlte_correction = -99999
     else:
         ew_lte = -99999
-        ew_nlte = -99999
+        ew_nlte_converged = False
         nlte_correction = -99999
-    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction - abundance}"]
+    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte_converged}\t{nlte_correction}\t{nlte_correction - abundance}"]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
@@ -489,7 +489,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     f = open(output, 'a')
     # specname, line_center, ew_lte, ew_nlte, nlte_correction
-    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tew_nlte\tew_diff\tnlte_correction"
+    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tconverged_flag\tnlte_abund\tnlte_correction"
     print(output_columns, file=f)
 
     results = np.array(results)
