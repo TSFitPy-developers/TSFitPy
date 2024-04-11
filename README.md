@@ -15,6 +15,8 @@ The code requires at least version Python 3.7. It also makes use of fortran prog
 
 Also, Windows is not supported (?).
 
+There is a WIP (developed by NS only atm) GUI for TSFitPy (at least results plotting). You can see whether you might like it. It is available [here](https://github.com/stormnick/TSGuiPy).
+
 ## Quick start
 
 This is a short version of the installation + running the code just to test that it works (not all inputs are downloaded). Please read the full version when you actually want to use the code.
