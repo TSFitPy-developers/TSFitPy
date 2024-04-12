@@ -199,26 +199,61 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
 
+    if nlte_flag:
+        atmosphere_type = abusingclasses.atmosphere_type
+        model_atmosphere_grid_path = abusingclasses.model_atmosphere_grid_path
+        model_atmosphere_list = abusingclasses.model_atmosphere_list
+        model_atom_path = abusingclasses.model_atom_path
+        departure_file_path = abusingclasses.departure_file_path
+        aux_file_length_dict = abusingclasses.aux_file_length_dict
+        model_temperatures = abusingclasses.model_temperatures
+        model_logs = abusingclasses.model_logs
+        model_mets  = abusingclasses.model_mets
+        marcs_value_keys = abusingclasses.marcs_value_keys
+        marcs_models = abusingclasses.marcs_models
+        marcs_values = abusingclasses.marcs_values
+    else:
+        atmosphere_type = "1D"
+
+        """    abusingclasses.model_temperatures_1 = model_temperatures_1d
+    abusingclasses.model_logs_1 = model_logs_1d
+    abusingclasses.model_mets_1 = model_mets_1d
+    abusingclasses.marcs_value_keys_1 = marcs_value_keys_1d
+    abusingclasses.marcs_models_1 = marcs_models_1d
+    abusingclasses.marcs_values_1 = marcs_values_1d"""
+
+        model_atmosphere_grid_path = abusingclasses.model_atmosphere_grid_path_1d
+        model_atmosphere_list = abusingclasses.model_atmosphere_list_1d
+        model_atom_path = None
+        departure_file_path = None
+        aux_file_length_dict = None
+        model_temperatures = abusingclasses.model_temperatures_1d
+        model_logs = abusingclasses.model_logs_1d
+        model_mets = abusingclasses.model_mets_1d
+        marcs_value_keys = abusingclasses.marcs_value_keys_1d
+        marcs_models = abusingclasses.marcs_models_1d
+        marcs_values = abusingclasses.marcs_values_1d
+
     ts = TurboSpectrum(
         turbospec_path=abusingclasses.spectral_code_path,
         interpol_path=abusingclasses.interpol_path,
         line_list_paths=line_list_path,
-        marcs_grid_path=abusingclasses.model_atmosphere_grid_path,
-        marcs_grid_list=abusingclasses.model_atmosphere_list,
-        model_atom_path=abusingclasses.model_atom_path,
-        departure_file_path=abusingclasses.departure_file_path,
-        aux_file_length_dict=abusingclasses.aux_file_length_dict,
-        model_temperatures=abusingclasses.model_temperatures,
-        model_logs=abusingclasses.model_logs,
-        model_mets=abusingclasses.model_mets,
-        marcs_value_keys=abusingclasses.marcs_value_keys,
-        marcs_models=abusingclasses.marcs_models,
-        marcs_values=abusingclasses.marcs_values)
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=model_atom_path,
+        departure_file_path=departure_file_path,
+        aux_file_length_dict=aux_file_length_dict,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values)
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
                  free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
-                 atmosphere_dimension=abusingclasses.atmosphere_type, windows_flag=False,
+                 atmosphere_dimension=atmosphere_type, windows_flag=False,
                  segment_file=abusingclasses.segment_file,
                  line_mask_file=abusingclasses.linemask_file, depart_bin_file=abusingclasses.depart_bin_file_dict,
                  depart_aux_file=abusingclasses.depart_aux_file_dict,
@@ -323,11 +358,13 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path,
                                           f'linelist_for_fitting_trimmed_{output_folder_title}', "")
     abusingclasses.model_atmosphere_grid_path = tsfitpy_configuration.model_atmosphere_grid_path
+    abusingclasses.model_atmosphere_grid_path_1d = tsfitpy_configuration.model_atmosphere_grid_path_1d
     abusingclasses.model_atmosphere_list = tsfitpy_configuration.model_atmosphere_list
     abusingclasses.model_atom_path = tsfitpy_configuration.model_atoms_path
     abusingclasses.departure_file_path = tsfitpy_configuration.departure_file_path
     abusingclasses.output_folder = tsfitpy_configuration.output_folder_path
     abusingclasses.spec_input_path = tsfitpy_configuration.spectra_input_path
+    abusingclasses.model_atmosphere_list_1d = os.path.join(tsfitpy_configuration.model_atmosphere_grid_path_1d, "model_atmosphere_list.txt")
 
     nlte_config = ConfigParser()
     nlte_config.read(tsfitpy_configuration.departure_file_config_path)
@@ -439,6 +476,15 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     abusingclasses.marcs_value_keys = marcs_value_keys
     abusingclasses.marcs_models = marcs_models
     abusingclasses.marcs_values = marcs_values
+
+    model_temperatures_1d, model_logs_1d, model_mets_1d, marcs_value_keys_1d, marcs_models_1d, marcs_values_1d = fetch_marcs_grid(
+        abusingclasses.model_atmosphere_list_1d, TurboSpectrum.marcs_parameters_to_ignore)
+    abusingclasses.model_temperatures_1 = model_temperatures_1d
+    abusingclasses.model_logs_1 = model_logs_1d
+    abusingclasses.model_mets_1 = model_mets_1d
+    abusingclasses.marcs_value_keys_1 = marcs_value_keys_1d
+    abusingclasses.marcs_models_1 = marcs_models_1d
+    abusingclasses.marcs_values_1 = marcs_values_1d
 
     if tsfitpy_configuration.debug_mode >= 2:
         verbose = True
