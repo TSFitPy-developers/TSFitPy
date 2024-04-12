@@ -252,13 +252,16 @@ def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, l
                                                           line_list_path, element, abundance, {}, True, verbose)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
-        diff = (nlte_ew - lte_ew)
     else:
         nlte_ew = 9999999
-        diff = 9999999
-    print(f"NLTE abund={abundance} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
-    return diff
 
+    return nlte_ew
+
+def get_nlte_lte_diff(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose):
+    nlte_ew = get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose)
+    diff = nlte_ew - lte_ew
+    print(f"NLTE abund={param} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
+    return nlte_ew - lte_ew
 
 
 def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
@@ -282,17 +285,17 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
             #                  options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
             nlte_correction = result.root
-            ew_nlte_converged = result.converged
-            print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte}")
+            ew_nlte = get_nlte_ew(nlte_correction, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose)
+            print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte} EW_nlte={ew_nlte}")
         except ValueError:
             print("Fitting failed")
-            ew_nlte_converged = False
+            ew_nlte = False
             nlte_correction = -99999
     else:
         ew_lte = -99999
-        ew_nlte_converged = False
+        ew_nlte = False
         nlte_correction = -99999
-    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte_converged}\t{nlte_correction}\t{nlte_correction - abundance}"]
+    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{nlte_correction}\t{nlte_correction - abundance}"]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
@@ -489,7 +492,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     f = open(output, 'a')
     # specname, line_center, ew_lte, ew_nlte, nlte_correction
-    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tconverged_flag\tnlte_abund\tnlte_correction"
+    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tew_nlte\tnlte_abund\tnlte_correction"
     print(output_columns, file=f)
 
     results = np.array(results)
