@@ -479,12 +479,12 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     model_temperatures_1d, model_logs_1d, model_mets_1d, marcs_value_keys_1d, marcs_models_1d, marcs_values_1d = fetch_marcs_grid(
         abusingclasses.model_atmosphere_list_1d, TurboSpectrum.marcs_parameters_to_ignore)
-    abusingclasses.model_temperatures_1 = model_temperatures_1d
-    abusingclasses.model_logs_1 = model_logs_1d
-    abusingclasses.model_mets_1 = model_mets_1d
-    abusingclasses.marcs_value_keys_1 = marcs_value_keys_1d
-    abusingclasses.marcs_models_1 = marcs_models_1d
-    abusingclasses.marcs_values_1 = marcs_values_1d
+    abusingclasses.model_temperatures_1d = model_temperatures_1d
+    abusingclasses.model_logs_1d = model_logs_1d
+    abusingclasses.model_mets_1d = model_mets_1d
+    abusingclasses.marcs_value_keys_1d = marcs_value_keys_1d
+    abusingclasses.marcs_models_1d = marcs_models_1d
+    abusingclasses.marcs_values_1d = marcs_values_1d
 
     if tsfitpy_configuration.debug_mode >= 2:
         verbose = True
