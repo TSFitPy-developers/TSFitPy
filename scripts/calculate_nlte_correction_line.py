@@ -277,7 +277,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
         print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte} LTE_abund={abundance}")
         try:
-            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
+            result = root_scalar(get_nlte_lte_diff, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
                                  bracket=[abundance - 3, abundance + 3], method='brentq')
             #result = minimize(get_nlte_ew, [abundance - 0.1, abundance + 0.5],
             #                  args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
@@ -289,11 +289,11 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
             print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte} EW_nlte={ew_nlte}")
         except ValueError:
             print("Fitting failed")
-            ew_nlte = False
+            ew_nlte = 999999
             nlte_correction = -99999
     else:
         ew_lte = -99999
-        ew_nlte = False
+        ew_nlte = 999999
         nlte_correction = -99999
     return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{nlte_correction}\t{nlte_correction - abundance}"]
 
