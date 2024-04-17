@@ -51,12 +51,19 @@ def calculate_vturb(teff: float, logg: float, met: float) -> float:
     return v_mturb
 
 
-def calculate_equivalent_width(fit_wavelength: np.ndarray, fit_flux: np.ndarray, left_bound: float, right_bound: float) -> float:
-    line_func = interp1d(fit_wavelength, fit_flux, kind='linear', assume_sorted=True,
-                                     fill_value=1, bounds_error=False)
+def calculate_equivalent_width(wavelength: np.ndarray, normalised_flux: np.ndarray, left_bound: float, right_bound: float) -> float:
+    """
+    Calculates the equivalent width of a line based on the input parameters
+    :param wavelength: Wavelength array
+    :param normalised_flux: Normalised flux array
+    :param left_bound: Left bound of the line
+    :param right_bound: Right bound of the line
+    :return: Equivalent width of the line
+    """
+    line_func = interp1d(wavelength, normalised_flux, kind='linear', assume_sorted=True, fill_value=1, bounds_error=False)
     total_area = (right_bound - left_bound) * 1.0   # continuum
     try:
-        integration_points = fit_wavelength[np.logical_and.reduce((fit_wavelength > left_bound, fit_wavelength < right_bound))]
+        integration_points = wavelength[np.logical_and.reduce((wavelength > left_bound, wavelength < right_bound))]
         area_under_line = integrate.quad(line_func, left_bound, right_bound, points=integration_points, limit=len(integration_points) * 5)
     except ValueError:
         return -9999

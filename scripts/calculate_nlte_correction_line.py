@@ -215,13 +215,6 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     else:
         atmosphere_type = "1D"
 
-        """    abusingclasses.model_temperatures_1 = model_temperatures_1d
-    abusingclasses.model_logs_1 = model_logs_1d
-    abusingclasses.model_mets_1 = model_mets_1d
-    abusingclasses.marcs_value_keys_1 = marcs_value_keys_1d
-    abusingclasses.marcs_models_1 = marcs_models_1d
-    abusingclasses.marcs_values_1 = marcs_values_1d"""
-
         model_atmosphere_grid_path = abusingclasses.model_atmosphere_grid_path_1d
         model_atmosphere_list = abusingclasses.model_atmosphere_list_1d
         model_atom_path = None

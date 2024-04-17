@@ -162,7 +162,7 @@ class SyntheticSpectrumGenerator:
 
         # Create dictionary of the MARCS model parameters we're looking for in grid
         marcs_parameters = self.marcs_parameters.copy()
-        marcs_parameters['turbulence'] = self.turbulent_velocity  # JMG line to make microturbulence an adjustable variable
+
         # print(marcs_parameters)
         if spherical:
             marcs_parameters['spherical'] = "s"
@@ -174,6 +174,8 @@ class SyntheticSpectrumGenerator:
         else:
             marcs_parameters['spherical'] = "p"
             marcs_parameters['mass'] = 0  # All plane-parallel models have mass set to zero
+
+        marcs_parameters['turbulence'] = self.turbulent_velocity  # JMG line to make microturbulence an adjustable variable
 
         # Pick MARCS settings which bracket requested stellar parameters
         interpolate_parameters = ("metallicity", "log_g", "temperature")
