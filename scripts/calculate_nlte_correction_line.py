@@ -199,26 +199,54 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
 
+    if nlte_flag:
+        atmosphere_type = abusingclasses.atmosphere_type
+        model_atmosphere_grid_path = abusingclasses.model_atmosphere_grid_path
+        model_atmosphere_list = abusingclasses.model_atmosphere_list
+        model_atom_path = abusingclasses.model_atom_path
+        departure_file_path = abusingclasses.departure_file_path
+        aux_file_length_dict = abusingclasses.aux_file_length_dict
+        model_temperatures = abusingclasses.model_temperatures
+        model_logs = abusingclasses.model_logs
+        model_mets  = abusingclasses.model_mets
+        marcs_value_keys = abusingclasses.marcs_value_keys
+        marcs_models = abusingclasses.marcs_models
+        marcs_values = abusingclasses.marcs_values
+    else:
+        atmosphere_type = "1D"
+
+        model_atmosphere_grid_path = abusingclasses.model_atmosphere_grid_path_1d
+        model_atmosphere_list = abusingclasses.model_atmosphere_list_1d
+        model_atom_path = None
+        departure_file_path = None
+        aux_file_length_dict = None
+        model_temperatures = abusingclasses.model_temperatures_1d
+        model_logs = abusingclasses.model_logs_1d
+        model_mets = abusingclasses.model_mets_1d
+        marcs_value_keys = abusingclasses.marcs_value_keys_1d
+        marcs_models = abusingclasses.marcs_models_1d
+        marcs_values = abusingclasses.marcs_values_1d
+
     ts = TurboSpectrum(
         turbospec_path=abusingclasses.spectral_code_path,
         interpol_path=abusingclasses.interpol_path,
         line_list_paths=line_list_path,
-        marcs_grid_path=abusingclasses.model_atmosphere_grid_path,
-        marcs_grid_list=abusingclasses.model_atmosphere_list,
-        model_atom_path=abusingclasses.model_atom_path,
-        departure_file_path=abusingclasses.departure_file_path,
-        aux_file_length_dict=abusingclasses.aux_file_length_dict,
-        model_temperatures=abusingclasses.model_temperatures,
-        model_logs=abusingclasses.model_logs,
-        model_mets=abusingclasses.model_mets,
-        marcs_value_keys=abusingclasses.marcs_value_keys,
-        marcs_models=abusingclasses.marcs_models,
-        marcs_values=abusingclasses.marcs_values)
+        marcs_grid_path=model_atmosphere_grid_path,
+        marcs_grid_list=model_atmosphere_list,
+        model_atom_path=model_atom_path,
+        departure_file_path=departure_file_path,
+        aux_file_length_dict=aux_file_length_dict,
+        model_temperatures=model_temperatures,
+        model_logs=model_logs,
+        model_mets=model_mets,
+        marcs_value_keys=marcs_value_keys,
+        marcs_models=marcs_models,
+        marcs_values=marcs_values)
 
     ts.configure(t_eff=teff, log_g=logg, metallicity=met,
                  turbulent_velocity=vturb, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
                  free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
-                 atmosphere_dimension=abusingclasses.atmosphere_type, windows_flag=False,
+                 atmosphere_dimension=atmosphere_type, windows_flag=False,
                  segment_file=abusingclasses.segment_file,
                  line_mask_file=abusingclasses.linemask_file, depart_bin_file=abusingclasses.depart_bin_file_dict,
                  depart_aux_file=abusingclasses.depart_aux_file_dict,
@@ -252,13 +280,16 @@ def get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, l
                                                           line_list_path, element, abundance, {}, True, verbose)
     if wavelength_nlte is not None:
         nlte_ew = calculate_equivalent_width(wavelength_nlte, norm_flux_nlte, lmin - 3, lmax + 3) * 1000
-        diff = (nlte_ew - lte_ew)
     else:
         nlte_ew = 9999999
-        diff = 9999999
-    print(f"NLTE abund={abundance} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
-    return diff
 
+    return nlte_ew
+
+def get_nlte_lte_diff(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose):
+    nlte_ew = get_nlte_ew(param, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, lte_ew, verbose)
+    diff = nlte_ew - lte_ew
+    print(f"NLTE abund={param} EW_lte={lte_ew} EW_nlte={nlte_ew} EW_diff={diff}")
+    return nlte_ew - lte_ew
 
 
 def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
@@ -274,7 +305,7 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
         ew_lte = calculate_equivalent_width(wavelength_lte, norm_flux_lte, lmin - 3, lmax + 3) * 1000
         print(f"Fitting {specname} Teff={teff} logg={logg} [Fe/H]={met} microturb={microturb} line_center={line_center} ew_lte={ew_lte} LTE_abund={abundance}")
         try:
-            result = root_scalar(get_nlte_ew, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
+            result = root_scalar(get_nlte_lte_diff, args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose),
                                  bracket=[abundance - 3, abundance + 3], method='brentq')
             #result = minimize(get_nlte_ew, [abundance - 0.1, abundance + 0.5],
             #                  args=(abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte),
@@ -282,17 +313,17 @@ def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microtur
             #                  options={'maxiter': 50, 'disp': False, 'fatol': 1e-8, 'xatol': 1e-3})  # 'eps': 1e-8
 
             nlte_correction = result.root
-            ew_nlte = ew_lte
-            print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte}")
+            ew_nlte = get_nlte_ew(nlte_correction, abusingclasses, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element, ew_lte, verbose)
+            print(f"Fitted with NLTE correction={nlte_correction - abundance} EW_lte={ew_lte} EW_nlte={ew_nlte}")
         except ValueError:
             print("Fitting failed")
-            ew_nlte = -99999
+            ew_nlte = 999999
             nlte_correction = -99999
     else:
         ew_lte = -99999
-        ew_nlte = -99999
+        ew_nlte = 999999
         nlte_correction = -99999
-    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{np.abs(ew_nlte - ew_lte)}\t{nlte_correction - abundance}"]
+    return [f"{specname}\t{teff}\t{logg}\t{met}\t{microturb}\t{line_center}\t{ew_lte}\t{ew_nlte}\t{nlte_correction}\t{nlte_correction - abundance}"]
 
 
 def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
@@ -320,11 +351,13 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path,
                                           f'linelist_for_fitting_trimmed_{output_folder_title}', "")
     abusingclasses.model_atmosphere_grid_path = tsfitpy_configuration.model_atmosphere_grid_path
+    abusingclasses.model_atmosphere_grid_path_1d = tsfitpy_configuration.model_atmosphere_grid_path_1d
     abusingclasses.model_atmosphere_list = tsfitpy_configuration.model_atmosphere_list
     abusingclasses.model_atom_path = tsfitpy_configuration.model_atoms_path
     abusingclasses.departure_file_path = tsfitpy_configuration.departure_file_path
     abusingclasses.output_folder = tsfitpy_configuration.output_folder_path
     abusingclasses.spec_input_path = tsfitpy_configuration.spectra_input_path
+    abusingclasses.model_atmosphere_list_1d = os.path.join(tsfitpy_configuration.model_atmosphere_grid_path_1d, "model_atmosphere_list.txt")
 
     nlte_config = ConfigParser()
     nlte_config.read(tsfitpy_configuration.departure_file_config_path)
@@ -437,6 +470,15 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
     abusingclasses.marcs_models = marcs_models
     abusingclasses.marcs_values = marcs_values
 
+    model_temperatures_1d, model_logs_1d, model_mets_1d, marcs_value_keys_1d, marcs_models_1d, marcs_values_1d = fetch_marcs_grid(
+        abusingclasses.model_atmosphere_list_1d, TurboSpectrum.marcs_parameters_to_ignore)
+    abusingclasses.model_temperatures_1d = model_temperatures_1d
+    abusingclasses.model_logs_1d = model_logs_1d
+    abusingclasses.model_mets_1d = model_mets_1d
+    abusingclasses.marcs_value_keys_1d = marcs_value_keys_1d
+    abusingclasses.marcs_models_1d = marcs_models_1d
+    abusingclasses.marcs_values_1d = marcs_values_1d
+
     if tsfitpy_configuration.debug_mode >= 2:
         verbose = True
     else:
@@ -489,7 +531,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     f = open(output, 'a')
     # specname, line_center, ew_lte, ew_nlte, nlte_correction
-    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tew_nlte\tew_diff\tnlte_correction"
+    output_columns = "#specname\tteff\tlogg\tmet\tmicroturb\twave_center\tew_lte\tew_nlte\tnlte_abund\tnlte_correction"
     print(output_columns, file=f)
 
     results = np.array(results)

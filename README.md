@@ -15,6 +15,30 @@ The code requires at least version Python 3.7. It also makes use of fortran prog
 
 Also, Windows is not supported (?).
 
+There is a WIP (developed by NS only atm) GUI for TSFitPy (at least results plotting). You can see whether you might like it. It is available [here](https://github.com/stormnick/TSGuiPy).
+
+## Acknowledgements
+
+If you use this code, please acknowledge the authors of the code and the Turbospectrum code. Please reference the following papers:
+
+- [Alvarez, R & Plez, B. 1998](https://ui.adsabs.harvard.edu/abs/1998A%26A...330.1109A/abstract)
+- [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
+- [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract)
+
+If you make use of the new multiprocessing using Dask or vmac fitting in lbl method, please acknowledge the latest updates as described in:
+
+- [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
+
+If you make use of the `teff` or `vmic` fitting methods, please acknowledge the following paper with the description of the method:
+
+- D'Orazi, V. et al. (subm) (TO ADD LINK WHEN AVAILABLE)
+
+If you make use of the NLTE data, please acknowledge the appropriate papers for the NLTE data used (different one for each element!). See docs in the [TurboSpectrum GitHub](https://github.com/bertrandplez/Turbospectrum_NLTE) page for most sources. If you use Y, Eu, Al, Na (qmh new), here are the updated references (might not be inside TurboSpectrum documentation just yet):
+
+- Yttrium: [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
+- Europium: [Storm, N. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...683A.200S)
+- Al, Na (qmh new): Ezzeddine, R. (priv comm)
+
 ## Quick start
 
 This is a short version of the installation + running the code just to test that it works (not all inputs are downloaded). Please read the full version when you actually want to use the code.
