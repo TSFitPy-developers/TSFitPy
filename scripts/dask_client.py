@@ -1,6 +1,5 @@
 from __future__ import annotations
 from dask.distributed import Client
-from dask_jobqueue import SLURMCluster
 import time
 import numpy as np
 import socket
@@ -46,6 +45,7 @@ def get_local_client(workers_amount, **kwargs):
 
 def get_slurm_cluster(cores_per_job: int, jobs_nodes: int, memory_per_core_gb: int, script_commands=None,
                       time_limit_hours=72, slurm_partition='debug', **kwargs):
+    from dask_jobqueue import SLURMCluster
     if script_commands is None:
         script_commands = [            # Additional commands to run before starting dask worker
             'module purge',
