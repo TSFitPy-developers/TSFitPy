@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import numpy as np
 import shutil
+import logging
 
 def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[float], old_path_name: str,
                            new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True):
@@ -24,6 +25,8 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     # go through all files in line_list_files and if any ends with .DS_Store, remove it
     for line_list_file in line_list_files:
         if line_list_file.endswith(".DS_Store"):
+            # print warning that DS_Store file is removed
+            logging.debug(f"LINELIST WARNING! File {line_list_file} is a .DS_Store file and will be removed")
             line_list_files.remove(line_list_file)
 
     # convert to numpy arrays in case they are not
