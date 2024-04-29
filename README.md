@@ -25,6 +25,8 @@ If you use this code, please acknowledge the authors of the code and the Turbosp
 - TS [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
 - TS NLTE + TSFitPy [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract)
 - Solar abundances input [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) AND [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
+- 1D MARCS models [Gustafsson, B. et al. 2008](https://ui.adsabs.harvard.edu/abs/2008A%26A...486..951G/abstract)
+- <3D> STAGGER models (if using those) [Magic, Z. et al. 2013](https://ui.adsabs.harvard.edu/abs/2013A%26A...557A..26M/abstract)
 
 If you make use of the new multiprocessing using Dask or vmac fitting in lbl method, please acknowledge the latest updates as described in:
 
