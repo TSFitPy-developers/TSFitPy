@@ -21,9 +21,10 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     # get all files in directory
     line_list_files: list = [entry.path for entry in os.scandir(old_path_name) if entry.is_file()]
 
-    # remove file .DS_Store if it exists
-    if ".DS_Store" in line_list_files:
-        line_list_files.remove(".DS_Store")
+    # go through all files in line_list_files and if any ends with .DS_Store, remove it
+    for line_list_file in line_list_files:
+        if line_list_file.endswith(".DS_Store"):
+            line_list_files.remove(line_list_file)
 
     # convert to numpy arrays in case they are not
     segment_to_use_begins: np.ndarray = np.asarray(seg_begins)
@@ -49,7 +50,11 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     for line_list_number, line_list_file in enumerate(line_list_files):
         with open(line_list_file) as fp:
             # so that we dont read full file if we are not sure that we use it (if it is a molecule)
-            first_line: str = fp.readline()
+            try:
+                first_line: str = fp.readline()
+            except UnicodeDecodeError:
+                print(f"LINELIST WARNING! File {line_list_file} is not a valid linelist file")
+                continue
             # check if line is empty
             if not first_line:
                 print(f"LINELIST WARNING! File {line_list_file} is empty")
