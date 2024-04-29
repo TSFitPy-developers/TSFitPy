@@ -21,9 +21,12 @@ There is a WIP (developed by NS only atm) GUI for TSFitPy (at least results plot
 
 If you use this code, please acknowledge the authors of the code and the Turbospectrum code. Please reference the following papers:
 
-- [Alvarez, R & Plez, B. 1998](https://ui.adsabs.harvard.edu/abs/1998A%26A...330.1109A/abstract)
-- [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
-- [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract)
+- Original TS [Alvarez, R & Plez, B. 1998](https://ui.adsabs.harvard.edu/abs/1998A%26A...330.1109A/abstract)
+- TS [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
+- TS NLTE + TSFitPy [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract)
+- Solar abundances input [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) AND [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
+- 1D MARCS models [Gustafsson, B. et al. 2008](https://ui.adsabs.harvard.edu/abs/2008A%26A...486..951G/abstract)
+- <3D> STAGGER models (if using those) [Magic, Z. et al. 2013](https://ui.adsabs.harvard.edu/abs/2013A%26A...557A..26M/abstract)
 
 If you make use of the new multiprocessing using Dask or vmac fitting in lbl method, please acknowledge the latest updates as described in:
 
@@ -31,13 +34,13 @@ If you make use of the new multiprocessing using Dask or vmac fitting in lbl met
 
 If you make use of the `teff` or `vmic` fitting methods, please acknowledge the following paper with the description of the method:
 
-- D'Orazi, V. et al. (subm) (TO ADD LINK WHEN AVAILABLE)
+- D'Orazi, V. et al. (accepted) (TO ADD LINK WHEN AVAILABLE)
 
-If you make use of the NLTE data, please acknowledge the appropriate papers for the NLTE data used (different one for each element!). See docs in the [TurboSpectrum GitHub](https://github.com/bertrandplez/Turbospectrum_NLTE) page for most sources. If you use Y, Eu, Al, Na (qmh new), here are the updated references (might not be inside TurboSpectrum documentation just yet):
+If you make use of the NLTE data, please acknowledge the appropriate papers for the NLTE data used (different one for each element!). See docs in the [TurboSpectrum GitHub](https://github.com/bertrandplez/Turbospectrum_NLTE) page for most sources. If you use Y, Eu, Al, Na (qmh), here are the updated references (might not be inside TurboSpectrum documentation just yet):
 
-- Yttrium: [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
-- Europium: [Storm, N. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...683A.200S)
-- Al, Na (qmh new): Ezzeddine, R. (priv comm)
+- Al, Na (qmh): [Ezzeddine, R. et al. 2018](https://ui.adsabs.harvard.edu/abs/2018A%26A...618A.141E/abstract)
+- Y: [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
+- Eu: [Storm, N. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...683A.200S)
 
 ## Quick start
 

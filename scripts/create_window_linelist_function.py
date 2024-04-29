@@ -21,6 +21,10 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     # get all files in directory
     line_list_files: list = [entry.path for entry in os.scandir(old_path_name) if entry.is_file()]
 
+    # remove file .DS_Store if it exists
+    if ".DS_Store" in line_list_files:
+        line_list_files.remove(".DS_Store")
+
     # convert to numpy arrays in case they are not
     segment_to_use_begins: np.ndarray = np.asarray(seg_begins)
     segment_to_use_ends: np.ndarray = np.asarray(seg_ends)
