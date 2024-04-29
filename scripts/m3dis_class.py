@@ -411,6 +411,14 @@ class M3disCall(SyntheticSpectrumGenerator):
             elif np.abs(self.metallicity + 2) < 0.01:
                 absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
                 absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+            # check if feh is almost -3
+            elif np.abs(self.metallicity + 3) < 0.01:
+                absmet_file = f"OPACITIES/M-2.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
+            # check if feh is almost -4
+            elif np.abs(self.metallicity + 4) < 0.01:
+                absmet_file = f"OPACITIES/M-4.00a+0.40c+0.00n+0.00o+0.40r+0.00s+0.00/metals_noMnCrCoNi.x01"
+                absmet_file = f"absmet_file='{absmet_file_global_path}/{absmet_file}' absmet_big_end=F"
             # check if feh is almost +0.5
             elif np.abs(self.metallicity - 0.5) < 0.01:
                 absmet_file = f"OPACITIES/M+0.50a+0.00c+0.00n+0.00o+0.00r+0.00s+0.00/metals_noMnCrCoNi.x01"
