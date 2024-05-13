@@ -422,7 +422,8 @@ def check_if_path_exists(path_to_check: str) -> str:
             raise ValueError(f"Configuration: {path_to_check} does not exist")
 
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
-                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0, verbose=False, return_unnorm_flux=False):
+                        elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0,
+                        verbose=False, return_unnorm_flux=False, do_matplotlib_plot=True):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -525,11 +526,12 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
                         wave_mod = wave_mod_macro
                         flux_norm_mod = flux_norm_mod_macro
 
-                    plt.plot(wave_mod, flux_norm_mod)
-                    plt.xlim(lmin - 0.2, lmax + 0.2)
-                    plt.ylim(0, 1.05)
-                    plt.xlabel("Wavelength")
-                    plt.ylabel("Normalised flux")
+                    if do_matplotlib_plot:
+                        plt.plot(wave_mod, flux_norm_mod)
+                        plt.xlim(lmin - 0.2, lmax + 0.2)
+                        plt.ylim(0, 1.05)
+                        plt.xlabel("Wavelength")
+                        plt.ylabel("Normalised flux")
                 else:
                     print('TS failed')
                     wave_mod, flux_norm_mod = np.array([]), np.array([])
