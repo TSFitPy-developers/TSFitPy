@@ -27,6 +27,9 @@ If you use this code, please acknowledge the authors of the code and the Turbosp
 - Solar abundances input [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) AND [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
 - 1D MARCS models [Gustafsson, B. et al. 2008](https://ui.adsabs.harvard.edu/abs/2008A%26A...486..951G/abstract)
 - <3D> STAGGER models (if using those) [Magic, Z. et al. 2013](https://ui.adsabs.harvard.edu/abs/2013A%26A...557A..26M/abstract)
+- Gaia-ESO linelist [Heiter, U. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021A%26A...645A.106H/abstract)
+  - With new atomic data for C, N, O, Si, Mg, as described in [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
+  - Gaps of it are filled with VALD (if using those) [Ryabchikova, T. et al. 2015](https://ui.adsabs.harvard.edu/abs/2015PhyS...90e4005R/abstract)
 
 If you make use of the new multiprocessing using Dask or vmac fitting in lbl method, please acknowledge the latest updates as described in:
 
@@ -34,7 +37,7 @@ If you make use of the new multiprocessing using Dask or vmac fitting in lbl met
 
 If you make use of the `teff` or `vmic` fitting methods, please acknowledge the following paper with the description of the method:
 
-- D'Orazi, V. et al. (accepted) (TO ADD LINK WHEN AVAILABLE)
+- D'Orazi, V. et al. [D'Orazi, V. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024MNRAS.tmp.1155D/abstract)
 
 If you make use of the NLTE data, please acknowledge the appropriate papers for the NLTE data used (different one for each element!). See docs in the [TurboSpectrum GitHub](https://github.com/bertrandplez/Turbospectrum_NLTE) page for most sources. If you use Y, Eu, Al, Na (qmh), here are the updated references (might not be inside TurboSpectrum documentation just yet):
 
