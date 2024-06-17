@@ -12,7 +12,7 @@ class SpectraParameters:
     def __init__(self, input_file_path: str, first_row_name: bool):
         # read in the atmosphere grid to compute for the synthetic spectra
         # Read the file
-        df = pd.read_csv(input_file_path, delim_whitespace=True, index_col=False, comment=';')
+        df = pd.read_csv(input_file_path, index_col=False, comment=';', sep='\s+')
 
         with open(input_file_path, 'r') as f:
             header = f.readline()

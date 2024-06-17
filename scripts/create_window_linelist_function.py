@@ -339,15 +339,17 @@ def write_lines(indices_to_write: dict, lines_file: list[str], elem_line_1_to_sa
 
 if __name__ == '__main__':
     # can be used for trimming yourself or for testing
-    old_linelists_path = "../input_files/linelists/linelist_for_fitting/"
+    old_linelists_path = "../input_files/linelists/linelist_for_fitting_4most_templates/"
     new_linelists_path = "./linelist_for_fitting_trimmed_new/"
 
-    segments_beginnings = [4883, 4900, 5300]
-    segments_ends = [4885, 4920, 8000]
+    #  4000-4020, 6500-6520AA)
+
+    segments_beginnings = [4000, 6500]
+    segments_ends = [4020, 6520]
 
     do_molecules = True
-    lbl_flag = False
-    do_hydrogen_flag = True
+    lbl_flag = True
+    do_hydrogen_flag = False
 
     create_window_linelist(segments_beginnings, segments_ends, old_linelists_path, new_linelists_path, do_molecules,
                            lbl_flag, do_hydrogen_flag)
