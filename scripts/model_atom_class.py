@@ -12,6 +12,22 @@ light_speed = 2.99792458e8
 mass_electron = 9.1093837015e-31
 epsilon_0 = 8.8541878128e-12
 
+def vac_to_air(lam_vac):    #lam_vac has to be in Angstrom!
+   lam_air = list()
+   for i in range(len(lam_vac)):
+        lam_vac[i] = float(lam_vac[i])
+        s = 10**4/lam_vac[i]
+        n = 1 + 0.0000834254 + 0.02406147 / (130 - s**2) + 0.00015998 / (38.9 - s**2)
+        lam_air.append(lam_vac[i]/n)
+   return lam_air    #lam_air in Angstrom
+
+def air_to_vac(lam_air):    #lam_air has to be in Angstrom!
+    lam_vac = list()
+    for i in range(len(lam_air)):
+      s = 10**4/lam_air[i]
+      n = 1 + 0.00008336624212083 + 0.02408926869968 / (130.1065924522 - s**2) + 0.0001599740894897 / (38.92568793293 - s**2)
+      lam_vac = lam_air[i]*n
+    return lam_vac         #lam_air in Angstrom
 
 class ECLevel:
     def __init__(self, level_id: int, ec: float, g: float, term: str, ion: int, config: str, ionisation_ec: float):
@@ -136,7 +152,7 @@ class BBTransition:
             self.lower_level_label = lower_levels_within_tolerance[0].label_name
             lower_g_value = lower_levels_within_tolerance[0].g_value
             self.lower_level_g_value = lower_g_value
-            self.calculate_f_value(lower_g_value)
+            self.change_f_value_from_loggf(lower_g_value)
         else:
             print(f"Found {len(lower_levels_within_tolerance)} lower levels for {self}")
             self.lower_level_id = -2
@@ -188,8 +204,8 @@ class BBTransition:
                 f"{self.lower_level_label:>{label_length}} {self.upper_level_label:>{label_length}}\n"
             )
         file.write(
-            f"{self.upper_level_id:>4} {self.lower_level_id:>4}{self.f_value:>12.3E}{self.nq:>6}{self.qmax:>6.1f}{self.q0:>6.1f}"
-            f"{self.iw:>5}{self.ga:>11.3E}{self.gv:>10.1f}{self.gq:>10.2e}{self.line_profile:>12}\n"
+            f"{self.upper_level_id:>4} {self.lower_level_id:>4} {self.f_value:>11.3E} {self.nq:>5} {self.qmax:>5.1f} {self.q0:>5.1f}"
+            f"{self.iw:>5} {self.ga:>10.3E} {self.gv:>9.1f} {self.gq:>9.2e} {self.line_profile:>11}\n"
         )
         if self.hyperfine:
             for i in range(len(self.hyperfine_delta_ec)):
@@ -220,8 +236,16 @@ class BBTransition:
         """
         Calculates the f value from loggf and lower g value
         :param lower_g_value:  Lower g value
+        :return: f value
         """
-        self.f_value = 10**self.loggf / lower_g_value
+        return 10**self.loggf / lower_g_value
+
+    def change_f_value_from_loggf(self, lower_g_value: float):
+        """
+        Calculates the f value from loggf and lower g value and changes the f value
+        :param lower_g_value:  Lower g value
+        """
+        self.f_value = self.calculate_f_value(lower_g_value)
 
     def calculate_elow_ev(self):
         """
@@ -230,6 +254,23 @@ class BBTransition:
         # convert cm^-1 to eV
         return self.lower_level_ec * 0.00012398419
 
+    def calculate_wavelength_air(self):
+        """
+        Calculates the wavelength from the energy levels
+        :return: Wavelength in angstroms
+        """
+        # convert cm^-1 to angstroms
+        vac_wavelength = self.calculate_wavelength_vac()
+        if vac_wavelength <= 2000:
+            return vac_wavelength
+        return vac_to_air([vac_wavelength])[0]
+
+    def calculate_wavelength_vac(self):
+        """
+        Calculates the wavelength from the energy levels and converts to vacuum wavelength
+        :return: Wavelength in angstroms
+        """
+        return 1e8 / (self.upper_level_ec - self.lower_level_ec)
 
 class BFTransition:
     def __init__(self, lower_level_ec, upper_level_ec, a0, nq, lmax, lmin=None):
@@ -587,7 +628,7 @@ class ModelAtom:
             file.write(f"{self.atom_element}\n")
             file.write(f"{self.atom_abundance:>8.2f}  {self.atom_mass:>7.3f}\n")
             file.write(
-                f"{self.ec_length():>6}{self.bb_length():>6}{self.bf_length():>6}{self.nrfix:>6}\n"
+                f"{self.ec_length():>5} {self.bb_length():>5} {self.bf_length():>5} {self.nrfix:>5}\n"
             )
             # write the energy levels
             file.write(f"*  EC          G       LABEL                   ION\n")
@@ -1062,9 +1103,84 @@ class ModelAtom:
                 bb_transition.q0 = q0_new
         self.sort_bb_transitions()
 
+    def check_model_atom(self, check_ec_levels=True, check_bb_transitions=True, check_bf_transitions=True, check_collisions=False, fix_problems=False):
+        if check_ec_levels:
+            self.check_ec_levels()
+        if check_bb_transitions:
+            self.check_bb_transitions(fix_comments=fix_problems)
+        if check_bf_transitions:
+            self.check_bf_transitions()
+        if check_collisions:
+            self.check_collisions()
+
+    def check_ec_levels(self):
+        # check that the energy levels are in order
+        for i, ec_level in enumerate(self.ec_levels):
+            if ec_level.level_id != i + 1:
+                print(f"Level ID {ec_level.level_id} is not in order")
+        print("Energy levels are in order")
+
+    def check_bb_transitions(self, ratio_tolerance=1e-2, wavelength_tolerance=0.1, fix_comments=False):
+        """
+        Check that the BB transitions have correct f_values and wavelengths
+        :param ratio_tolerance: in fraction
+        :param wavelength_tolerance: in AA
+        :return:
+        """
+        # check that bb transitions have correct loggf and wavelength
+        for bb_transition in self.bb_transitions:
+            f_value_from_comment = bb_transition.calculate_f_value(bb_transition.lower_level_g_value)
+            # if ratio is more than ratio_tolerance, then print the transition
+            if abs(f_value_from_comment / bb_transition.f_value - 1) > ratio_tolerance:
+                print(f"BB transition {bb_transition.bb_id} has incorrect f_value: {bb_transition.f_value} vs {f_value_from_comment}")
+                if fix_comments:
+                    new_loggf = np.log10(f_value_from_comment * bb_transition.lower_level_g_value)
+                    print(f"Changing loggf from {bb_transition.loggf} to {new_loggf}")
+                    bb_transition.loggf = new_loggf
+            # check if the wavelength is correct
+            if abs(bb_transition.wavelength_aa - bb_transition.calculate_wavelength_air()) > wavelength_tolerance:
+                print(f"BB transition {bb_transition.bb_id} has incorrect wavelength: {bb_transition.wavelength_aa} vs {bb_transition.calculate_wavelength_air()}")
+                if fix_comments:
+                    new_wavelength = bb_transition.calculate_wavelength_air()
+                    print(f"Changing wavelength from {bb_transition.wavelength_aa} to {new_wavelength}")
+                    bb_transition.wavelength_aa = new_wavelength
+
+    def check_bf_transitions(self):
+        pass
+
+    def check_collisions(self, fix_problems=False):
+        # go through all collisions. check that that low to high is not the same
+        collisions_indices_to_remove = []
+        for collision_index, collisional_transition in enumerate(self.collisional_transitions):
+            if collisional_transition.upper_level == collisional_transition.lower_level:
+                print(f"Collisional transition {collisional_transition.label} has the same upper and lower level: {collisional_transition.upper_level}")
+                if fix_problems:
+                    # remove the collisional transition
+                    collisions_indices_to_remove.append(collision_index)
+
+        for collision_index in collisions_indices_to_remove[::-1]:
+            print(f"Removing collisional transition {self.collisional_transitions[collision_index].label} between {self.collisional_transitions[collision_index].upper_level} and {self.collisional_transitions[collision_index].lower_level}")
+            self.collisional_transitions.pop(collision_index)
+
 
 
 if __name__ == '__main__':
+    main_path = "/Users/storm/PycharmProjects/3d_nlte_stuff/model_atoms/"
+    model_atom_names = ["atom.al_qmh", "atom.ba111", "atom.ca105b", "atom.co247", "atom.mg86b", "atom.eu662qmkhfs",
+                   "atom.fe607a", "atom.mg86b", "atom.mg_qmh", "atom.mn281kbc", "atom.na102", "atom.na_qmh",
+                    "atom.ni538qm", "atom.o41f", "atom.si340", "atom.sr191", "atom.ti503", "atom.y423qm"]
+    model_atom_names = ["atom.mg86b"]
+
+    for model_atom_name in model_atom_names:
+        print(f"Checking {model_atom_name}")
+        atom = ModelAtom()
+        atom.read_model_atom(main_path + model_atom_name)
+        atom.check_model_atom(check_collisions=True, fix_problems=False)
+        print("Done checking\n\n")
+
+    exit()
+
+
     fe_atom = ModelAtom()
     fe_atom.read_model_atom("atom.fe607a_nq_p")
 
@@ -1122,7 +1238,7 @@ if __name__ == '__main__':
                 else:
                     bb_transition.loggf = y_loggf[wavelength]["loggf_uncorr"]
                 # recalculate f_value
-                bb_transition.calculate_f_value(bb_transition.lower_level_g_value)
+                bb_transition.change_f_value_from_loggf(bb_transition.lower_level_g_value)
                 # remove the wavelength from the dictionary
                 del y_loggf[wavelength]
                 break
