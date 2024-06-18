@@ -340,11 +340,11 @@ class M3disCall(SyntheticSpectrumGenerator):
             else:
                 if self.atmosphere_path_3d_model is not None:
                     atmos_path = self.atmosphere_path_3d_model
-                    if self.atmos_format_3d.lower == "multi" or self.atmos_format_3d.lower == "muram":
+                    if self.atmos_format_3d.lower() == "multi" or self.atmos_format_3d.lower() == "muram":
                         atmo_param = f"atmos_format='Multi'"
-                    elif self.atmos_format_3d.lower == "stagger":
+                    elif self.atmos_format_3d.lower() == "stagger":
                         atmo_param = f"atmos_format='Stagger' snap={self.snap} nx={self.nx} ny={self.ny} nz={self.nz}"
-                    elif self.atmos_format_3d.lower == "must":
+                    elif self.atmos_format_3d.lower() == "must":
                         atmo_param = f"atmos_format='MUST'"
                     else:
                         raise ValueError(f"Atmosphere format {self.atmos_format_3d} not recognized")
