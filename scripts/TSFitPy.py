@@ -1999,7 +1999,7 @@ def print_intermediate_results(intermediate_results: dict, atmosphere_type: str,
         string_to_print = ""
         for key in intermediate_results:
             if key in chi_sqr_possible_columns:
-                string_to_print += f"chi_sqr= {intermediate_results[key]:>14.8f} "
+                string_to_print += f"chi_sqr= {intermediate_results[key]:>16.8f} "
             else:
                 if key.lower() in vmic_possible_columns and atmosphere_type == "3D":
                     # don't print vmic for 3D
@@ -2009,7 +2009,7 @@ def print_intermediate_results(intermediate_results: dict, atmosphere_type: str,
                         for element in intermediate_results[key]:
                             string_to_print += f"[{element}/H]= {intermediate_results[key][element]:>7.4f} "
                     else:
-                        string_to_print += f"{key}= {intermediate_results[key]:>.4f} "
+                        string_to_print += f"{key}= {intermediate_results[key]:>9.4f} "
         print(string_to_print)
 
 
