@@ -39,7 +39,7 @@ class SpectraParameters:
         df.columns = header
 
         # Create a dictionary that maps non-standard names to standard ones
-        name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'inputvmicroturb', 'inputvmic'],
+        name_variants = {'vmic': ['vturb', 'vturbulence', 'vmicro', 'vm', 'inputvmicroturb', 'inputvmic', 'vt'],
                          'rv': ['radvel', 'radialvelocity', 'radial_velocity', "rv", "radvel", "radialvelocity", "radialvelocity"],
                          'teff': ['temp', 'temperature', 't'],
                          'vmac': ['vmac', 'vmacroturb', 'vmacro', 'vmacroturb', 'vmacroturbulence', 'vmacroturbulence', 'inputvmacroturb', 'inputvmacroturbulence'],
