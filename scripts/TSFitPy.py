@@ -2659,191 +2659,17 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
     else:
         m3dis_python_module = None
 
-    if not config_location[-4:] == ".cfg":
-        logging.debug("Configuration: Config file does not end with .cfg. Converting to new format.")
-        tsfitpy_configuration.convert_old_config()
-
     if tsfitpy_configuration.debug_mode >= 0:
         print(f"Fitting data at {tsfitpy_configuration.spectra_input_path} with resolution {tsfitpy_configuration.resolution} and rotation {tsfitpy_configuration.rotation}")
 
     # set directories
     line_list_path_orig = tsfitpy_configuration.line_list_path
-    line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path, "linelist_for_fitting_trimmed", "") # f"{line_list_path}../linelist_for_fitting_trimmed/"
+    line_list_path_trimmed = os.path.join(tsfitpy_configuration.temporary_directory_path, "linelist_for_fitting_trimmed", "")
 
     # load NLTE data dicts
     if tsfitpy_configuration.nlte_flag:
         logging.debug("Configuration: NLTE flag is set to True. Loading NLTE data.")
         nlte_elements_add_to_og_config = []
-        if tsfitpy_configuration.oldconfig_nlte_config_outdated is not False:
-            print("\n\nDEPRECATION WARNING PLEASE CHECK IT\n\n")
-            warn("There is no need to specify paths of NLTE elements. Now you can just specify which elements you want "
-                 "in NLTE and the code will load everything. This will cause error in the future.", DeprecationWarning, stacklevel=2)
-            if not os.path.exists(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg")):
-                nlte_config_to_write = ConfigParser()
-
-                nlte_items_config = {"Ba": [
-                                            'atom.ba111',
-                                            'Ba/NLTEgrid_Ba_MARCS_May-10-2021.bin',
-                                            'Ba/auxData_Ba_MARCS_May-10-2021.txt',
-                                            'Ba/NLTEgrid_Ba_STAGGERmean3D_May-10-2021.bin',
-                                            'Ba/auxData_Ba_mean3D_May-10-2021_marcs_names.txt'
-                                        ],
-                                     "Ca": [
-                                         'atom.ca105b',
-                                         'Ca/NLTEgrid4TS_Ca_MARCS_Jun-02-2021.bin',
-                                         'Ca/auxData_Ca_MARCS_Jun-02-2021.dat',
-                                         'Ca/NLTEgrid4TS_Ca_STAGGERmean3D_May-18-2021.bin',
-                                         'Ca/auxData_Ca_STAGGERmean3D_May-18-2021_marcs_names.txt'
-                                    ],
-                                     "Co": [
-                                         'atom.co247',
-                                         'Co/NLTEgrid4TS_CO_MARCS_Mar-15-2023.bin',
-                                         'Co/auxData_CO_MARCS_Mar-15-2023.dat',
-                                         '',
-                                         ''
-                                        ],
-                                     "Fe": [
-                                         'atom.fe607a',
-                                         'Fe/NLTEgrid4TS_Fe_MARCS_May-07-2021.bin',
-                                         'Fe/auxData_Fe_MARCS_May-07-2021.dat',
-                                         'Fe/NLTEgrid4TS_Fe_STAGGERmean3D_May-21-2021.bin',
-                                         'Fe/auxData_Fe_STAGGERmean3D_May-21-2021_marcs_names.txt'
-                                     ],
-                                     "H": [
-                                         'atom.h20',
-                                         'H/NLTEgrid_H_MARCS_May-10-2021.bin',
-                                         'H/auxData_H_MARCS_May-10-2021.txt',
-                                         'H/NLTEgrid4TS_H_STAGGERmean3D_Jun-17-2021.bin',
-                                         'H/auxData_H_STAGGERmean3D_Jun-17-2021_marcs_names.txt'
-                                     ],
-                                     "Mg": [
-                                         'atom.mg86b',
-                                         'Mg/NLTEgrid4TS_Mg_MARCS_Jun-02-2021.bin',
-                                         'Mg/auxData_Mg_MARCS_Jun-02-2021.dat',
-                                         'Mg/NLTEgrid_Mg_STAGGERmean3D_May-17-2021.bin',
-                                         'Mg/auxData_Mg_STAGGEmean3D_May-17-2021_marcs_names.txt'
-                                     ],
-                                     "Mn": [
-                                         'atom.mn281kbc',
-                                         'Mn/NLTEgrid4TS_MN_MARCS_Mar-15-2023.bin',
-                                         'Mn/auxData_MN_MARCS_Mar-15-2023.dat',
-                                         'Mn/NLTEgrid4TS_Mn_STAGGERmean3D_May-17-2021.bin',
-                                         'Mn/auxData_Mn_STAGGERmean3D_May-17-2021_marcs_names.txt'
-                                     ],
-                                    "Na": [
-                                        'atom.na102',
-                                        'Na/NLTEgrid4TS_NA_MARCS_Feb-20-2022.bin',
-                                        'Na/auxData_Na_MARCS_Feb-20-2022.dat',
-                                        '',
-                                        ''
-                                    ],
-                                    "Ni": [
-                                        'atom.ni538qm',
-                                        'Ni/NLTEgrid4TS_Ni_MARCS_Jan-31-2022.bin',
-                                        'Ni/auxData_Ni_MARCS_Jan-21-2022.txt',
-                                        'Ni/NLTEgrid4TS_NI_STAGGERmean3D_Jun-10-2021.bin',
-                                        'Ni/auxData_NI_STAGGERmean3DJun-10-2021_marcs_names.txt'
-                                    ],
-                                    "O": [
-                                        'atom.o41f',
-                                        'O/NLTEgrid4TS_O_MARCS_May-21-2021.bin',
-                                        'O/auxData_O_MARCS_May-21-2021.txt',
-                                        'O/NLTEgrid4TS_O_STAGGERmean3D_May-18-2021.bin',
-                                        'O/auxData_O_STAGGER_May-18-2021_marcs_names.txt'
-                                    ],
-                                    "Si": [
-                                        'atom.si340',
-                                        'Si/NLTEgrid4TS_Si_MARCS_Feb-13-2022.bin',
-                                        'Si/auxData_Si_MARCS_Feb-13-2022.dat',
-                                        '',
-                                        ''
-                                    ],
-                                    "Sr": [
-                                        'atom.sr191',
-                                        'Sr/NLTEgrid4TS_Sr_MARCS_Mar-15-2023.bin',
-                                        'Sr/auxData_Sr_MARCS_Mar-15-2023.dat',
-                                        '',
-                                        ''
-                                    ],
-                                    "Ti": [
-                                        'atom.ti503',
-                                        'Ti/NLTEgrid4TS_TI_MARCS_Feb-21-2022.bin',
-                                        'Ti/auxData_TI_MARCS_Feb-21-2022.dat',
-                                        '',
-                                        ''
-                                    ],
-                                    "Y": [
-                                        'atom.y423',
-                                        'Y/NLTEgrid4TS_Y_MARCS_Mar-27-2023.bin',
-                                        'Y/auxData_Y_MARCS_Mar-27-2023.dat',
-                                        'Y/NLTEgrid4TS_Y_STAGGERmean3D_May-08-2023.bin',
-                                        'Y/auxData_Y_STAGGERmean3D_May-08-2023_marcs_names.dat'
-                                    ]
-                                     }
-
-
-                for elements_to_save in nlte_items_config:
-                    nlte_config_to_write.add_section(elements_to_save)
-                    nlte_config_to_write[elements_to_save]["1d_bin"] = nlte_items_config[elements_to_save][1]
-                    nlte_config_to_write[elements_to_save]["1d_aux"] = nlte_items_config[elements_to_save][2]
-                    nlte_config_to_write[elements_to_save]["3d_bin"] = nlte_items_config[elements_to_save][3]
-                    nlte_config_to_write[elements_to_save]["3d_aux"] = nlte_items_config[elements_to_save][4]
-                    nlte_config_to_write[elements_to_save]["atom_file"] = nlte_items_config[elements_to_save][0]
-
-                with open(os.path.join(tsfitpy_configuration.departure_file_path, "nlte_filenames.cfg"), "w") as new_config_file:
-                    new_config_file.write("# You can add more or change models paths/names here if needed\n"
-                                          "#\n"
-                                          "# Changelog:\n"
-                                          "# 2023 Apr 18: File creation date\n"
-                                          "\n"
-                                          "# 14 elements\n"
-                                          "# 3D and 1D models: Ba, Ca, Fe, H, Mg, Mn, Ni, O\n"
-                                          "# 1D models only: Co, Na, Si, Sr, Ti, Y\n\n")
-                    nlte_config_to_write.write(new_config_file)
-
-                warn(f"Added {tsfitpy_configuration.departure_file_path, 'nlte_filenames.cfg'} with paths. Please check it or maybe "
-                     f"download updated one from the GitHub", DeprecationWarning, stacklevel=2)
-            if tsfitpy_configuration.oldconfig_need_to_add_new_nlte_config:
-                for element in tsfitpy_configuration.oldconfig_model_atom_file + tsfitpy_configuration.oldconfig_model_atom_file_input_elem:
-                    if ".ba" in element:
-                        nlte_elements_add_to_og_config.append("Ba")
-                    if ".ca" in element:
-                        nlte_elements_add_to_og_config.append("Ca")
-                    if ".co" in element:
-                        nlte_elements_add_to_og_config.append("Co")
-                    if ".fe" in element:
-                        nlte_elements_add_to_og_config.append("Fe")
-                    if ".h" in element:
-                        nlte_elements_add_to_og_config.append("H")
-                    if ".mg" in element:
-                        nlte_elements_add_to_og_config.append("Mg")
-                    if ".mn" in element:
-                        nlte_elements_add_to_og_config.append("Mn")
-                    if ".na" in element:
-                        nlte_elements_add_to_og_config.append("Na")
-                    if ".ni" in element:
-                        nlte_elements_add_to_og_config.append("Ni")
-                    if ".o" in element:
-                        nlte_elements_add_to_og_config.append("O")
-                    if ".si" in element:
-                        nlte_elements_add_to_og_config.append("Si")
-                    if ".sr" in element:
-                        nlte_elements_add_to_og_config.append("Sr")
-                    if ".ti" in element:
-                        nlte_elements_add_to_og_config.append("Ti")
-                    if ".y" in element:
-                        nlte_elements_add_to_og_config.append("Y")
-
-                nlte_elements_to_write = ""
-                for element in nlte_elements_add_to_og_config:
-                    nlte_elements_to_write = f"{nlte_elements_to_write} {element}"
-
-                with open(config_location, "a") as og_config_file:
-                    og_config_file.write(f"\n#elements to have in NLTE (just choose whichever elements you want, whether you fit them or not, as few or many as you want). E.g. :"
-                                         f"# nlte_elements = Mg Ca Fe\n"
-                                         f"nlte_elements = {nlte_elements_to_write}\n"
-                                         f"#\n")
-                    warn(f"Added how to add NLTE elements now in the {config_location}", DeprecationWarning, stacklevel=2)
 
         if len(tsfitpy_configuration.nlte_elements) == 0 and len(nlte_elements_add_to_og_config) > 0:
             tsfitpy_configuration.nlte_elements = nlte_elements_add_to_og_config
@@ -2890,10 +2716,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
     # copy config file into output folder (for easier plotting)
     if tsfitpy_configuration.save_config_file:
-        if not config_location[-4:] == ".cfg":
-            shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, output_default_configuration_name.replace(".cfg", ".txt")))
-        else:
-            shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, output_default_configuration_name))
+        shutil.copyfile(config_location, os.path.join(tsfitpy_configuration.output_folder_path, output_default_configuration_name))
 
     fitlist = os.path.join(tsfitpy_configuration.fitlist_input_path, tsfitpy_configuration.input_fitlist_filename)
 
