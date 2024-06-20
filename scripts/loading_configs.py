@@ -79,7 +79,8 @@ class SpectraParameters:
                         standard_name = f"{starting_element.lower()}"
                         abundances_xfe_given.append(standard_name)
                         self.abundance_elements_given.append(standard_name.capitalize())
-                    elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table:
+                    elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table and not ending_element[-2:] == 'rh':
+                        # 20.06.2024: added check for rh, because Rh is Rhodium, not Ar/H
                         # means X/H
                         standard_name = f"{testing_col[:-1].lower()}"
                         abundances_xh_given.append(standard_name)
