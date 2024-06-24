@@ -104,7 +104,13 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
 
     # Convert columns to appropriate data types
     # TODO: except for columns with names "flag error" and "flag warning"
-    output_file_df = output_file_df.apply(pd.to_numeric, errors='ignore')
+    def safe_to_numeric(val):
+        try:
+            return pd.to_numeric(val)
+        except ValueError:
+            return val
+
+    output_file_df = output_file_df.applymap(safe_to_numeric)
 
     # check if fitlist exists and if not load old fitlist
     output_filist_location = os.path.join(output_folder_location, output_default_fitlist_name)
