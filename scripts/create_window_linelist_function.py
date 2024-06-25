@@ -5,7 +5,8 @@ import shutil
 import logging
 
 def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[float], old_path_name: str,
-                           new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True):
+                           new_path_name: str, molecules_flag: bool, lbl=False, do_hydrogen=True,
+                           folder_element_names: list[str]=None, extract_linelist_info: bool=False):
     """
     Creates a new linelist from the old one, but only with the lines that are within the given segments. If lbl is True,
     then the linelist is created for each segment separately. If lbl is False, then the linelist is created for all
@@ -19,6 +20,11 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     for all segments together in the same folder. /new_path_name/0/*
     :param do_hydrogen: If False, then the linelist is not created for hydrogen.
     """
+    if folder_element_names is None:
+        folder_element_names = len(seg_begins) * ["0"]
+
+    unique_folder_element_names = np.unique(folder_element_names)
+
     # get all files in directory
     line_list_files: list = [entry.path for entry in os.scandir(old_path_name) if entry.is_file()]
 
@@ -42,12 +48,15 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
 
     if not lbl:
         # if lbl is False, then we create the linelist for all segments together in the same folder
-        os.makedirs(os.path.join(f"{new_path_name}", "0", ''))
+        for unique_folder_element_name in unique_folder_element_names:
+            new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{unique_folder_element_name}", '')
+            os.makedirs(new_path_name_one_seg)
     else:
         # if lbl is True, then we create the folder for each segment separately
         for seg_idx in range(len(seg_begins)):
-            new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{seg_idx}", '')
-            os.makedirs(new_path_name_one_seg)
+            for unique_folder_element_name in unique_folder_element_names:
+                new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{unique_folder_element_name}", f"{seg_idx}", '')
+                os.makedirs(new_path_name_one_seg)
 
     # go through all files in the old linelist folder
     for line_list_number, line_list_file in enumerate(line_list_files):
@@ -171,38 +180,6 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                         new_path_name, line_list_number)
                             # clear the dictionary instead of creating new one
                             lines_to_write_indices.clear()
-
-def binary_search_lower_bound(array_to_search: list[str], dict_array_values: dict, low: int, high: int,
-                              element_to_search: float) -> int:
-    """
-    OLD FUNCTION, just left here as a reference/backwards compatibility
-	Gives out the upper index where the value is located between the ranges. For example, given array [12, 20, 32, 40, 52]
-	Value search: 5, result: 0
-	Value search: 13, result: 1
-	Value search: 20, result: 1
-	Value search: 21, result: 2
-	Value search: 51 or 52 or 53, result: 4
-	:param array_to_search:
-	:param dict_array_values:
-	:param low:
-	:param high:
-	:param element_to_search:
-	:return:
-	"""
-    if element_to_search >= float(array_to_search[-1].strip().split()[0]):
-        return min(high, len(array_to_search) - 1)
-    while low < high:
-        middle: int = low + (high - low) // 2
-
-        if middle not in dict_array_values:
-            dict_array_values[middle] = float(array_to_search[middle].strip().split()[0])
-        array_element_value: float = dict_array_values[middle]
-
-        if array_element_value < element_to_search:
-            low: int = middle + 1
-        else:
-            high: int = middle
-    return low
 
 def get_wavelength_from_array(array_to_search: list[str], dict_array_values: dict, index_to_search: int, offset_idx: int):
     """
