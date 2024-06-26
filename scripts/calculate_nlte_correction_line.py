@@ -248,7 +248,7 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
                  free_abundances=item_abund, temp_directory=temp_directory, nlte_flag=nlte_flag, verbose=verbose,
                  atmosphere_dimension=atmosphere_type, windows_flag=False,
                  segment_file=abusingclasses.segment_file,
-                 line_mask_file=abusingclasses.linemask_file, depart_bin_file=abusingclasses.depart_bin_file_dict,
+                 line_mask_file=abusingclasses.linemasks_files, depart_bin_file=abusingclasses.depart_bin_file_dict,
                  depart_aux_file=abusingclasses.depart_aux_file_dict,
                  model_atom_file=abusingclasses.model_atom_file_dict)
 
@@ -399,7 +399,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         print("Error: output folder already exists. Run was stopped to prevent overwriting")
         return
 
-    abusingclasses.linemask_file = os.path.join(tsfitpy_configuration.linemasks_path, tsfitpy_configuration.linemask_file)
+    abusingclasses.linemask_file = os.path.join(tsfitpy_configuration.linemasks_path, tsfitpy_configuration.linemasks_files)
 
     print(f"Temporary directory name: {abusingclasses.global_temp_dir}")
     create_dir(abusingclasses.global_temp_dir)

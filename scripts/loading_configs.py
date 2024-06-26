@@ -296,7 +296,7 @@ class TSFitPyConfig:
         self.elements_to_fit: list[str] = None
         self.fit_feh: bool = None
         self.nlte_elements: list[str] = []
-        self.linemask_file: list[str] = None
+        self.linemasks_files: list[str] = None
         self.wavelength_delta: float = None
         self.segment_size: float = 5  # default value
 
@@ -507,7 +507,7 @@ class TSFitPyConfig:
             self.fit_feh = False
 
         self.nlte_elements = self._split_string_to_string_list(self.config_parser["FittingParameters"]["nlte_elements"])
-        self.linemask_file = self.config_parser["FittingParameters"]["linemask_file"]
+        self.linemasks_files = self._split_string_to_string_list(self.config_parser["FittingParameters"]["linemask_file"])
         self.wavelength_delta = float(self.config_parser["FittingParameters"]["wavelength_delta"])
         self.segment_size = float(self.config_parser["FittingParameters"]["segment_size"])
 
@@ -966,7 +966,7 @@ class TSFitPyConfig:
         spectra_object.line_ends_sorted = self.line_ends_sorted
         spectra_object.line_centers_sorted = self.line_centers_sorted
 
-        spectra_object.linemask_file = self.linemask_file
+        spectra_object.linemasks_files = self.linemasks_files
         spectra_object.segment_file = self.segment_file
         spectra_object.seg_begins = self.seg_begins
         spectra_object.seg_ends = self.seg_ends

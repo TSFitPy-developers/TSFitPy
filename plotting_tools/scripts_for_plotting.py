@@ -133,7 +133,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
     if os.path.isfile(linemask_output_location):
         config_dict["linemask_location"]: str = linemask_output_location
     else:
-        config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemask_file)
+        config_dict["linemask_location"]: str = os.path.join(tsfitpy_config.linemasks_path, tsfitpy_config.linemasks_files)
     config_dict["observed_spectra_location"]: str = tsfitpy_config.spectra_input_path
     config_dict["specname_fitlist"]: np.ndarray = specname_fitlist
     config_dict["rv_fitlist"]: np.ndarray = rv_fitlist

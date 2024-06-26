@@ -21,7 +21,7 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     :param do_hydrogen: If False, then the linelist is not created for hydrogen.
     """
     if folder_element_names is None:
-        folder_element_names = len(seg_begins) * ["0"]
+        folder_element_names = len(seg_begins) * [""]
 
     unique_folder_element_names = np.unique(folder_element_names)
 
@@ -49,14 +49,13 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
     if not lbl:
         # if lbl is False, then we create the linelist for all segments together in the same folder
         for unique_folder_element_name in unique_folder_element_names:
-            new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{unique_folder_element_name}", '')
+            new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{unique_folder_element_name}_{0}", '')
             os.makedirs(new_path_name_one_seg)
     else:
         # if lbl is True, then we create the folder for each segment separately
         for seg_idx in range(len(seg_begins)):
-            for unique_folder_element_name in unique_folder_element_names:
-                new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{unique_folder_element_name}", f"{seg_idx}", '')
-                os.makedirs(new_path_name_one_seg)
+            new_path_name_one_seg: str = os.path.join(f"{new_path_name}", f"{folder_element_names[seg_idx]}_{seg_idx}", '')
+            os.makedirs(new_path_name_one_seg)
 
     # go through all files in the old linelist folder
     for line_list_number, line_list_file in enumerate(line_list_files):
@@ -86,13 +85,14 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                     # use shutil.copyfile instead of open and write
                     if not lbl:
                         # if not lbl, we just copy the file once
-                        new_linelist_name: str = os.path.join(f"{new_path_name}", "0",
-                                                              f"linelist-{line_list_number}.bsyn")
-                        shutil.copyfile(line_list_file, new_linelist_name)
+                        for unique_folder_element_name in unique_folder_element_names:
+                            new_linelist_name: str = os.path.join(f"{new_path_name}", f"{unique_folder_element_name}_{0}",
+                                                                  f"linelist-{line_list_number}.bsyn")
+                            shutil.copyfile(line_list_file, new_linelist_name)
                     else:
                         # if lbl, we copy the file for each segment
                         for seg_index in range(len(seg_begins)):
-                            new_linelist_name: str = os.path.join(f"{new_path_name}", f"{seg_index}",
+                            new_linelist_name: str = os.path.join(f"{new_path_name}", f"{folder_element_names[seg_index]}_{seg_index}",
                                                                   f"linelist-{line_list_number}.bsyn")
                             shutil.copyfile(line_list_file, new_linelist_name)
                 elif element != '01.000000':
@@ -166,12 +166,12 @@ def create_window_linelist(seg_begins: np.ndarray[float], seg_ends: np.ndarray[f
                                         seg_current_index = 0
                                     if seg_current_index not in lines_to_write_indices:
                                         # to keep track of all segments if lbl is False, we need to create list with indices of lines to write
-                                        lines_to_write_indices[seg_current_index] = []
+                                        lines_to_write_indices[f"{folder_element_names[seg_current_index]}_{seg_current_index}"] = []
                                     # add the indices of the lines to write using slice.
                                     # they will be written to the new linelist later for lines using
                                     # lines_file[index_start:index_end]. Thus we add (index_start, index_end + 1)
                                     # (otherwise last line not written) and with offset of line_number_read_file
-                                    lines_to_write_indices[seg_current_index].append((index_seg_start + line_number_read_file, index_seg_end + line_number_read_file + 1))
+                                    lines_to_write_indices[f"{folder_element_names[seg_current_index]}_{seg_current_index}"].append((index_seg_start + line_number_read_file, index_seg_end + line_number_read_file + 1))
                         # update the line number read in the file
                         line_number_read_file: int = number_of_lines_element + line_number_read_file
                         # if we have lines to write, then we write them
