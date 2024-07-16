@@ -408,15 +408,24 @@ if __name__ == '__main__':
     for one_spectra_parameter in spectra_parameters:
         specname, teff, logg, feh, vmic, vmac, rotation, abundances_dict = one_spectra_parameter
         spectrum_name = f"{specname}.spec"
-        future = client.submit(run_and_save_wrapper, tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
-                               config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
-                               spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose)
-        futures.append(future)  # prepares to get values
+        if config_synthetic_spectra.number_of_cpus > 1:
+            future = client.submit(run_and_save_wrapper, tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
+                                   config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
+                                   spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose)
+            futures.append(future)  # prepares to get values
+        else:
+            future = run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
+                                 config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
+                                 spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose)
+            futures.append(future)
 
-    print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
-    futures = np.array(client.gather(futures))  # starts the calculations (takes a long time here)
-    results = futures
-    print("Worker calculation done")  # when done, save values
+    if config_synthetic_spectra.number_of_cpus > 1:
+        print("Start gathering")  # use http://localhost:8787/status to check status. the port might be different
+        futures = np.array(client.gather(futures))  # starts the calculations (takes a long time here)
+        results = futures
+        print("Worker calculation done")  # when done, save values
+    else:
+        results = futures
 
     # in spectra_parameters_class.spectra_parameters_df change the column names and add .spec to the specname
     spectra_parameters_class.spectra_parameters_df["specname"] = spectra_parameters_class.spectra_parameters_df["specname"].apply(lambda x: f"{x}.spec")
