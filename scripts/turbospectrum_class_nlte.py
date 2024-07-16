@@ -451,6 +451,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         for line in lines_coef:
             if "NaN" in line and ".mod" not in line:
                 print(lines_coef)
+                print("NAN")
+                exit(0)
                 raise ValueError("NaN in interpolated model atmosphere")
 
     def calculate_atmosphere(self):
