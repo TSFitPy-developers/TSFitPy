@@ -317,6 +317,10 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_low = f_coef_low.read().splitlines()
                     f_coef_low.close()
 
+                    for line in lines_coef_low:
+                        if "NaN" in line and ".mod" not in line:
+                            raise ValueError("NaN in interpolated model atmosphere")
+
                     high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     high_coef_dat_name += '_{}_coef.dat'.format(element)
 
@@ -325,6 +329,10 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     f_coef_high = open(high_coef_dat_name, 'r')
                     lines_coef_high = f_coef_high.read().splitlines()
                     f_coef_high.close()
+
+                    for line in lines_coef_high:
+                        if "NaN" in line and ".mod" not in line:
+                            raise ValueError("NaN in interpolated model atmosphere")
 
                     interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     interp_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -342,7 +350,6 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                         for j in range(len(fields_low)):
                             fields_interp.append(float(fields_low[j]) * fxlow + float(fields_high[j]) * fxhigh)
                         fields_interp_print = ['   {:.5f} '.format(elem) for elem in fields_interp]
-                        # TODO check if any nans or negative values
                         print(*fields_interp_print, file=g)
                     for i in range(10 + 2 * len(t_interp) + 1, len(lines_coef_low)):
                         print(lines_coef_low[i], file=g)
@@ -402,6 +409,16 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                         "interpol_config": interpol_config,
                         "errors": "MARCS model atmosphere interpolation failed."
                     }
+
+                coef_dat_name = "'{}_{}_coef.dat'\n".format(output, element).replace('.interpol', '_{}_coef.dat'.format(element)).strip().replace("'", "")
+
+                coef_element = open(coef_dat_name, 'r')
+                lines_coef = coef_element.read().splitlines()
+                coef_element.close()
+
+                for line in lines_coef:
+                    if "NaN" in line and ".mod" not in line:
+                        raise ValueError("NaN in interpolated model atmosphere")
         else:
             # Write configuration input for interpolator
             interpol_config = ""
