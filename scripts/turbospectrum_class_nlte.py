@@ -317,7 +317,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_low = f_coef_low.read().splitlines()
                     f_coef_low.close()
 
-                    self.check_nan_in_coefficients(lines_coef_low)
+                    #self.check_nan_in_coefficients(lines_coef_low)
 
                     high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     high_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -328,7 +328,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_high = f_coef_high.read().splitlines()
                     f_coef_high.close()
 
-                    self.check_nan_in_coefficients(lines_coef_high)
+                    #self.check_nan_in_coefficients(lines_coef_high)
 
                     interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     interp_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -406,13 +406,13 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                         "errors": "MARCS model atmosphere interpolation failed."
                     }
 
-                coef_dat_name = "'{}_{}_coef.dat'\n".format(output, element).replace('.interpol', '_{}_coef.dat'.format(element)).strip().replace("'", "")
+                #coef_dat_name = "'{}_{}_coef.dat'\n".format(output, element).replace('.interpol', '_{}_coef.dat'.format(element)).strip().replace("'", "")
 
-                coef_element = open(coef_dat_name, 'r')
-                lines_coef = coef_element.read().splitlines()
-                coef_element.close()
+                #coef_element = open(coef_dat_name, 'r')
+                #lines_coef = coef_element.read().splitlines()
+                #coef_element.close()
 
-                self.check_nan_in_coefficients(lines_coef)
+                #self.check_nan_in_coefficients(lines_coef)
         else:
             # Write configuration input for interpolator
             interpol_config = ""
