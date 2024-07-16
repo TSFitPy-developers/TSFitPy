@@ -317,9 +317,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_low = f_coef_low.read().splitlines()
                     f_coef_low.close()
 
-                    for line in lines_coef_low:
-                        if "NaN" in line and ".mod" not in line:
-                            raise ValueError("NaN in interpolated model atmosphere")
+                    self.check_nan_in_coefficients(lines_coef_low)
 
                     high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     high_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -330,9 +328,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_high = f_coef_high.read().splitlines()
                     f_coef_high.close()
 
-                    for line in lines_coef_high:
-                        if "NaN" in line and ".mod" not in line:
-                            raise ValueError("NaN in interpolated model atmosphere")
+                    self.check_nan_in_coefficients(lines_coef_high)
 
                     interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     interp_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -416,9 +412,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 lines_coef = coef_element.read().splitlines()
                 coef_element.close()
 
-                for line in lines_coef:
-                    if "NaN" in line and ".mod" not in line:
-                        raise ValueError("NaN in interpolated model atmosphere")
+                self.check_nan_in_coefficients(lines_coef)
         else:
             # Write configuration input for interpolator
             interpol_config = ""
@@ -453,6 +447,11 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 }
         return {"errors": None}
 
+    def check_nan_in_coefficients(self, lines_coef):
+        for line in lines_coef:
+            if "NaN" in line and ".mod" not in line:
+                print(lines_coef)
+                raise ValueError("NaN in interpolated model atmosphere")
 
     def calculate_atmosphere(self):
         # figure out if we need to interpolate the model atmosphere for microturbulence
