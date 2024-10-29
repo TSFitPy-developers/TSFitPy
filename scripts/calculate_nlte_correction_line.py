@@ -10,7 +10,7 @@ import glob
 from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize, root_scalar
-from .auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file
+from .auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file, calculate_vturb
 from .loading_configs import SpectraParameters, TSFitPyConfig
 from .turbospectrum_class_nlte import TurboSpectrum
 from .synthetic_code_class import fetch_marcs_grid
@@ -176,6 +176,9 @@ class AbusingClasses:
 
 def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldelta, line_list_path, element, abundance, abundances_dict1, nlte_flag, verbose=False):
     # parameters to adjust
+
+    if vturb is None:
+        vturb = calculate_vturb(teff, logg, met)
 
     teff = teff
     logg = logg
@@ -503,7 +506,7 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
 
     futures = []
     for idx, one_spectra_parameters in enumerate(fitlist_spectra_parameters):
-        # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, abundance_list
+        # specname_list, rv_list, teff_list, logg_list, feh_list, vmic_list, vmac_list, rotation_list, abundance_list, resolution_list, snr_list
         specname1, rv1, teff1, logg1, met1, microturb1, macroturb1, rotation1, abundances_dict1, resolution1, _ = one_spectra_parameters
         # if element is Fe, then take abundance from metallicity
         if abusingclasses.elem_to_fit[0] == "Fe":
