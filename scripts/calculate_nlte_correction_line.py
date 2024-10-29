@@ -11,6 +11,7 @@ from dask.distributed import Client
 import numpy as np
 from scipy.optimize import minimize, root_scalar
 from .auxiliary_functions import create_dir, calculate_equivalent_width, create_segment_file, calculate_vturb
+from .dask_client import get_dask_client
 from .loading_configs import SpectraParameters, TSFitPyConfig
 from .turbospectrum_class_nlte import TurboSpectrum
 from .synthetic_code_class import fetch_marcs_grid
@@ -256,7 +257,6 @@ def generate_atmosphere(abusingclasses, teff, logg, vturb, met, lmin, lmax, ldel
                  model_atom_file=abusingclasses.model_atom_file_dict)
 
     ts.synthesize_spectra()
-    # ts.run_turbospectrum()
 
     try:
         if os_path.exists('{}/spectrum_00000000.spec'.format(temp_directory)) and os.stat('{}/spectrum_00000000.spec'.format(temp_directory)).st_size != 0:
@@ -297,6 +297,10 @@ def get_nlte_lte_diff(param, abusingclasses, teff, logg, microturb, met, lmin, l
 
 def generate_and_fit_atmosphere(pickle_file_path, specname, teff, logg, microturb, met, lmin, lmax, ldelta, line_list_path, element,
                                 abundance, abundances_dict1, line_center, verbose=False):
+
+    if microturb is None:
+        microturb = calculate_vturb(teff, logg, met)
+
     # load pickle file
     with open(pickle_file_path, 'rb') as f:
         abusingclasses = pickle.load(f)
@@ -488,7 +492,12 @@ def run_nlte_corrections(config_file_name, output_folder_title, abundance=0):
         verbose = False
 
     print("Preparing workers")  # TODO check memory issues? set higher? give warnings?
-    client = Client(threads_per_worker=1, n_workers=abusingclasses.dask_workers)
+    client = get_dask_client(tsfitpy_configuration.cluster_type, tsfitpy_configuration.cluster_name,
+                             tsfitpy_configuration.number_of_cpus, nodes=tsfitpy_configuration.number_of_nodes,
+                             slurm_script_commands=tsfitpy_configuration.script_commands,
+                             slurm_memory_per_core=tsfitpy_configuration.memory_per_cpu_gb,
+                             time_limit_hours=tsfitpy_configuration.time_limit_hours,
+                             slurm_partition=tsfitpy_configuration.slurm_partition, night_mode=False)
     print(client)
 
     host = client.run_on_scheduler(socket.gethostname)
