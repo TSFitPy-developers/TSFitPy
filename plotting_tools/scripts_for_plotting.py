@@ -167,7 +167,11 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         rv = rv_fitlist[rv_index]
 
         # loads fitted and observed wavelength and flux
-        wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
+        try:
+            wavelength, flux = np.loadtxt(filename_fitted_spectra, dtype=float, unpack=True)  # normalised flux fitted
+        except FileNotFoundError:
+            print(f"Error: {filename_fitted_spectra} not found")
+            wavelength, flux = np.array([]), np.array([])
         # check if file is located in the output folder, if not, load from the original folder
         if os.path.isfile(os.path.join(output_folder_location, filename_observed_spectra)):
             wavelength_observed, flux_observed = np.loadtxt(os.path.join(output_folder_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1))  # normalised flux observed
@@ -603,6 +607,34 @@ def find_elements(elements_data, left_wavelength, right_wavelength, loggf_thresh
     #for element_data in sorted_elements:
     #    element_name, atomic_num, ionization, wavelength, loggf = element_data
     #    print(element_name.replace("'", "").replace("NLTE", "").replace("LTE", ""), atomic_num, wavelength, loggf)
+
+def get_just_parsed_linelist(lmin, lmax, line_list_path, loggf_limit_parsed_linelist):
+    temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
+    # convert temp directory to absolute path
+    temp_directory = os.path.join(os.getcwd(), temp_directory, "")
+
+    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    today = f"{today}_{np.random.random(1)[0]}"
+    line_list_path_trimmed = os.path.join(f"{temp_directory}", "linelist_for_fitting_trimmed", "")
+    line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
+
+    create_window_linelist([lmin - 2], [lmax + 2], line_list_path, line_list_path_trimmed, False, False, do_hydrogen=False)
+    # if m3dis, then combine all linelists into one
+    # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
+    parsed_linelist_data = combine_linelists(line_list_path_trimmed, return_parsed_linelist=True)
+
+    parsed_model_atom_data = []
+    for i in range(len(parsed_linelist_data)):
+        parsed_model_atom_data.extend(parsed_linelist_data[i].split("\n"))
+
+    left_wavelength = lmin  # change this to change the range of wavelengths to print
+    right_wavelength = lmax
+    elements_data = read_element_data(parsed_model_atom_data)
+    parsed_elements_sorted_info = find_elements(elements_data, left_wavelength, right_wavelength, loggf_limit_parsed_linelist)
+
+    shutil.rmtree(temp_directory)
+
+    return parsed_elements_sorted_info
 
 def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, atmos_format, n_nu, mpi_cores,
                               hash_table_size, nlte_flag, element_in_nlte, element_abundances, snap, dims, nx, ny, nz,
