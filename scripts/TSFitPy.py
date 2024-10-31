@@ -428,6 +428,10 @@ class Spectra:
         self.pretrim_linelist: bool = True
         self.lightweight_ts_run: bool = False
 
+        self.compute_blend_spectra: bool = True
+        self.sensitivity_abundance_offset: float = 0.2
+        self.just_blend_reduce_abundance: float = -10
+
         # Set values from config
         if n_workers != 1:
             try:
@@ -675,6 +679,9 @@ class Spectra:
         self.save_config_file = tsfitpy_config.save_config_file
         self.pretrim_linelist = tsfitpy_config.pretrim_linelist
         self.lightweight_ts_run = tsfitpy_config.lightweight_ts_run
+        self.compute_blend_spectra = tsfitpy_config.compute_blend_spectra
+        self.sensitivity_abundance_offset = tsfitpy_config.sensitivity_abundance_offset
+        self.just_blend_reduce_abundance = tsfitpy_config.just_blend_reduce_abundance
 
         self.pickled_marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
 
@@ -1253,6 +1260,72 @@ class Spectra:
                     indices_argsorted = np.argsort(wavelength_fit_conv[indices_to_save_conv])
                     np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv][indices_argsorted], flux_fit_conv[indices_to_save_conv][indices_argsorted])), fmt='%.5f')
 
+            # new thing: lets compute spectra with +/- 0.something dex and -10 dex
+            # so we can see how the line changes with abundance
+            if self.compute_blend_spectra:
+                ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
+                ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
+
+                temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
+
+                teff = self.teff
+                logg = self.logg
+
+                abundance_variants = {"just_blend": self.just_blend_reduce_abundance,
+                                      "minus_sensitivity": -self.sensitivity_abundance_offset,
+                                      "plus_sensitivity": self.sensitivity_abundance_offset}
+
+                for abundance_variant, abundance_value in abundance_variants.items():
+                    create_dir(temp_directory)
+
+                    if self.fit_feh:
+                        if abundance_variant == "just_blend":
+                            if self.atmosphere_type == "1D":
+                                feh = -5
+                            else:
+                                feh = -4
+                        else:
+                            feh = result_one_line["fitted_abund"] + abundance_value
+                    else:
+                        feh = self.feh
+
+                    if self.atmosphere_type != "3D" and self.fit_vmic:
+                        vmic = result_one_line["fitted_vmic"]
+                    else:
+                        vmic = get_vmic_value(self.atmosphere_type, self.input_vmic, self.fit_vmic, self.vmic, teff, logg, feh)
+
+                    elem_abund_dict_xh = get_input_xh_abund(feh, self)
+                    if not self.fit_feh:
+                        elem_abund_dict_xh[self.elem_to_fit[0]] = result_one_line["fitted_abund"] + feh + abundance_value
+
+                    wavelength_synthetic_justblend, flux_norm_synthetic_justblend, _ = self.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict_xh, vmic,
+                                                                                                             segment_left, segment_right,
+                                                                                                             False, temp_dir=temp_directory, teff=teff, logg=logg)
+
+                    spectra_generated, chi_squared = check_if_spectra_generated(wavelength_synthetic_justblend, True)
+
+                    if spectra_generated:
+                        if self.save_fitted_spectra:
+                            indices_to_use_cut = np.where((wavelength_synthetic_justblend <= segment_right) & (wavelength_synthetic_justblend >= segment_left))
+                            wavelength_synthetic_justblend, flux_norm_synthetic_justblend = wavelength_synthetic_justblend[indices_to_use_cut], \
+                                flux_norm_synthetic_justblend[indices_to_use_cut]
+                            wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra(wavelength_synthetic_justblend,
+                                                                                       flux_norm_synthetic_justblend,
+                                                                                       self.resolution,
+                                                                                       result_one_line["macroturb"],
+                                                                                       result_one_line["rotation"])
+
+                        with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved_{abundance_variant}.spec"), 'a') as g:
+                                indices_argsorted = np.argsort(wavelength_synthetic_justblend)
+                                np.savetxt(g, np.column_stack((wavelength_synthetic_justblend[indices_argsorted],
+                                                               flux_norm_synthetic_justblend[indices_argsorted])),
+                                           fmt=('%.5f', '%.8f'))
+                    else:
+                        logging.debug(f"Could not generate blend spectra for blend for line {line_number} at {self.line_centers_sorted[line_number]} angstroms")
+
+                    shutil.rmtree(temp_directory)
+
+
             wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
             flux_ob = self.flux_norm_obs
 
@@ -1805,17 +1878,11 @@ class Spectra:
                     # here element is [X/Fe], unless it's Fe, then it's [Fe/H]
                     elem_abund_dict[elem_name] = res.x[i]
             doppler_fit = self.rv_extra_fitted_dict[line_number]
-            if self.atmosphere_type == "3D":
-                vmic = 2.0
+            if self.atmosphere_type != "3D" and self.fit_vmic:
+                vmic = res.x[-1]  # last param is vmic
             else:
-                if self.input_vmic:  # Input given
-                    vmic = self.vmic
-                elif not self.fit_vmic:
-                    vmic = calculate_vturb(self.teff, self.logg, feh)
-                elif self.fit_vmic:
-                    vmic = res.x[-1]  # last param is vmic
-                else:
-                    raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
+                vmic = get_vmic_value(self.atmosphere_type, self.input_vmic, self.fit_vmic, self.vmic, self.teff, self.logg, feh)
+
             if self.fit_vmac:
                 vmac = self.vmac_fitted_dict[line_number]
             else:
@@ -2186,17 +2253,11 @@ def calc_chi_sqr_abund_and_vmic(param: list, ssg: SyntheticSpectrumGenerator, sp
         if elem_name != "Fe":
             elem_abund_dict_xh[elem_name] = param[i] + feh     # convert [X/Fe] to [X/H]
 
-    if spectra_to_fit.atmosphere_type == "3D":
-        vmic = 2.0
+    if spectra_to_fit.atmosphere_type != "3D" and spectra_to_fit.fit_vmic:
+        vmic = param[-1]  # last param is vmic
     else:
-        if spectra_to_fit.input_vmic:  # Input given
-            vmic = spectra_to_fit.vmic
-        elif not spectra_to_fit.fit_vmic:
-            vmic = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, feh)
-        elif spectra_to_fit.fit_vmic:
-            vmic = param[-1]  # last param is vmic
-        else:
-            raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
+        vmic = get_vmic_value(spectra_to_fit.atmosphere_type, spectra_to_fit.input_vmic, spectra_to_fit.fit_vmic,
+                              spectra_to_fit.vmic, teff, logg, feh)
 
     return calc_chi_sqr_generic_lbl(feh, elem_abund_dict_xh, vmic, teff, logg, ssg, spectra_to_fit, lmin, lmax,
                                     lmin_segment, lmax_segment, temp_directory, line_number)
@@ -2435,15 +2496,8 @@ def calc_chi_sqr_teff(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_f
     teff = param[0]
     logg = spectra_to_fit.logg
 
-    if spectra_to_fit.atmosphere_type == "3D":
-        vmic = 2.0
-    else:
-        if spectra_to_fit.input_vmic:  # Input given
-            vmic = spectra_to_fit.vmic
-        elif not spectra_to_fit.fit_vmic:
-            vmic = calculate_vturb(teff, spectra_to_fit.logg, spectra_to_fit.feh)
-        else:
-            raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
+    vmic = get_vmic_value(spectra_to_fit.atmosphere_type, spectra_to_fit.input_vmic, spectra_to_fit.fit_vmic,
+                            spectra_to_fit.vmic, teff, logg, spectra_to_fit.feh)
 
     elem_abund_dict_xh = get_input_xh_abund(spectra_to_fit.feh, spectra_to_fit)
 
@@ -2471,21 +2525,37 @@ def calc_chi_sqr_logg(param: list, ssg: SyntheticSpectrumGenerator, spectra_to_f
     teff = spectra_to_fit.teff
     logg = param[0]
 
-    if spectra_to_fit.atmosphere_type == "3D":
-        vmic = 2.0
-    else:
-        if spectra_to_fit.input_vmic:  # Input given
-            vmic = spectra_to_fit.vmic
-        elif not spectra_to_fit.fit_vmic:
-            vmic = calculate_vturb(spectra_to_fit.teff, logg, spectra_to_fit.feh)
-        else:
-            raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
+    vmic = get_vmic_value(spectra_to_fit.atmosphere_type, spectra_to_fit.input_vmic, spectra_to_fit.fit_vmic,
+                            spectra_to_fit.vmic, teff, logg, spectra_to_fit.feh)
 
     elem_abund_dict_xh = get_input_xh_abund(spectra_to_fit.feh, spectra_to_fit)
 
     return calc_chi_sqr_generic_lbl(spectra_to_fit.feh, elem_abund_dict_xh, vmic, teff, logg, ssg, spectra_to_fit,
                                     lmin, lmax, lmin_segment, lmax_segment, temp_directory, line_number)
 
+
+def get_vmic_value(atmosphere_type, input_vmic, fit_vmic, vmic, teff, logg, feh) -> float:
+    """
+    Gets the vmic value based on the input parameters
+    :param atmosphere_type: Atmosphere type
+    :param input_vmic: Input vmic
+    :param fit_vmic: Fit vmic
+    :param vmic: Vmic value
+    :param teff: Effective temperature
+    :param logg: Log g
+    :param feh: Fe/H
+    :return: Vmic value
+    """
+    if atmosphere_type == "3D":
+        vmic = 2.0
+    else:
+        if input_vmic:  # Input given
+            vmic = vmic
+        elif not fit_vmic:
+            vmic = calculate_vturb(teff, logg, feh)
+        else:
+            raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
+    return vmic
 
 def calc_chi_sqr_all_mode(param, ssg: SyntheticSpectrumGenerator, spectra_to_fit: Spectra) -> float:
     """
@@ -2517,15 +2587,8 @@ def calc_chi_sqr_all_mode(param, ssg: SyntheticSpectrumGenerator, spectra_to_fit
     if not spectra_to_fit.fit_feh:
         elem_abund_dict[spectra_to_fit.elem_to_fit[0]] = abund + feh
 
-    if spectra_to_fit.atmosphere_type == "3D":
-        vmic = 2.0
-    else:
-        if spectra_to_fit.input_vmic:  # Input given
-            vmic = spectra_to_fit.vmic
-        elif not spectra_to_fit.fit_vmic:
-            vmic = calculate_vturb(spectra_to_fit.teff, spectra_to_fit.logg, feh)
-        else:
-            raise ValueError("vmic is not set, input_vmic, fit_vmic and vmic are all False")
+    vmic = get_vmic_value(spectra_to_fit.atmosphere_type, spectra_to_fit.input_vmic, spectra_to_fit.fit_vmic,
+                          spectra_to_fit.vmic, spectra_to_fit.teff, spectra_to_fit.logg, feh)
 
     wavelength_fitted, flux_norm_fitted, _ = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict, vmic, spectra_to_fit.lmin, spectra_to_fit.lmax, True)
 
