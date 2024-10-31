@@ -436,7 +436,7 @@ class M3disCall(SyntheticSpectrumGenerator):
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
 &atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
-&m3d_params         decouple_continuum=T verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} quad_scheme='set_a2' long_scheme='custom' custom_mu='0.010 0.052 0.124 0.223 0.340 0.468 0.598 0.722 0.831 0.917 0.975 1.000'/\n\
+&m3d_params         decouple_continuum=T verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} short_scheme='set_a2' long_scheme='custom' custom_mu='0.010 0.052 0.124 0.223 0.340 0.468 0.598 0.722 0.831 0.917 0.975 1.000'/\n\
 {linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}' {absmet_file}/\n\
 &task_list_params   hash_table_size={self.hash_table_size} /\n")
