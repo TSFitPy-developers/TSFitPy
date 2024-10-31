@@ -38,32 +38,9 @@ def get_all_file_names_in_a_folder(path_to_get_files_from: str) -> list:
         file_names.remove('.DS_Store')  # Sometimes these get in the way, so try to remove this file
     return file_names
 
-def load_output_data(output_folder_location: str, old_variable=None) -> dict:
-    if old_variable is not None:
-        warn("Warning: now the config file is copied into the output folder. There is no need to "
-             "pass config file location for new outputs. Thus you only need to write output folder "
-             "from now on. In the future this will give an error", DeprecationWarning, stacklevel=2)
-        if os.path.isfile(os.path.join(old_variable, "configuration.txt")):
-            # trying new way of loading: first variable is output folder with config in it
-            print(f"Loading config from {os.path.join(old_variable, output_default_configuration_name.replace('.cfg', '.txt'))}")
-            config_file_location = os.path.join(old_variable, output_default_configuration_name.replace(".cfg", ".txt"))
-            output_folder_location = old_variable
-        elif os.path.isfile(os.path.join(old_variable, output_default_configuration_name)):
-            # trying new way of loading: first variable is output folder with config in it
-            print(f"Loading config from {os.path.join(old_variable, output_default_configuration_name)}")
-            config_file_location = os.path.join(old_variable, output_default_configuration_name)
-            output_folder_location = old_variable
-        else:
-            # this was an old way of loading. first variable: config file, second variable: output folder
-            print(f"Loading config from {output_folder_location}")
-            config_file_location = output_folder_location
-            output_folder_location = old_variable
-    else:
-        # new way of loading: first variable is output folder with config in it
-        if os.path.isfile(os.path.join(output_folder_location, output_default_configuration_name.replace(".cfg", ".txt"))):
-            config_file_location = os.path.join(output_folder_location, output_default_configuration_name.replace(".cfg", ".txt"))
-        else:
-            config_file_location = os.path.join(output_folder_location, output_default_configuration_name)
+def load_output_data(output_folder_location: str) -> dict:
+    # new way of loading: first variable is output folder with config in it
+    config_file_location = os.path.join(output_folder_location, output_default_configuration_name)
 
     tsfitpy_config = TSFitPyConfig(config_file_location, "none")
     tsfitpy_config.load_config(check_valid_path=False)
@@ -110,7 +87,7 @@ def load_output_data(output_folder_location: str, old_variable=None) -> dict:
         except ValueError:
             return val
 
-    output_file_df = output_file_df.applymap(safe_to_numeric)
+    output_file_df = output_file_df.map(safe_to_numeric)
 
     # check if fitlist exists and if not load old fitlist
     output_filist_location = os.path.join(output_folder_location, output_default_fitlist_name)
@@ -175,6 +152,9 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
         # get the name of the fitted and observed spectra
         filename_fitted_spectra = filenames_output_folder[index_to_plot]
         filename_observed_spectra = filename_fitted_spectra.replace("result_spectrum_", "").replace("_convolved.spec", "").replace(os.path.join(config_dict["output_folder_location"], ""), "")
+        filename_fitted_spectra_just_blend = filename_fitted_spectra.replace("_convolved.spec", "_convolved_just_blend.spec")
+        filename_fitted_spectra_minus_sensitivity = filename_fitted_spectra.replace("_convolved.spec", "_convolved_minus_sensitivity.spec")
+        filename_fitted_spectra_plus_sensitivity = filename_fitted_spectra.replace("_convolved.spec", "_convolved_plus_sensitivity.spec")
 
         # find where output results have the spectra (can be several lines if there are several lines fitted for each star)
         #output_results_correct_specname_indices = np.where(output_results_specname == filename_observed_spectra)[0]
@@ -193,6 +173,22 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
             wavelength_observed, flux_observed = np.loadtxt(os.path.join(output_folder_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1))  # normalised flux observed
         else:
             wavelength_observed, flux_observed = np.loadtxt(os.path.join(observed_spectra_location, filename_observed_spectra), dtype=float, unpack=True, usecols=(0, 1)) # normalised flux observed
+
+        # check if file just blend exists, then load, otherwise set empty arrays
+        if os.path.isfile(filename_fitted_spectra_just_blend):
+            wavelength_just_blend, flux_just_blend = np.loadtxt(filename_fitted_spectra_just_blend, dtype=float, unpack=True)
+        else:
+            wavelength_just_blend, flux_just_blend = np.array([]), np.array([])
+        # check if file minus sensitivity exists, then load, otherwise set empty arrays
+        if os.path.isfile(filename_fitted_spectra_minus_sensitivity):
+            wavelength_minus_sensitivity, flux_minus_sensitivity = np.loadtxt(filename_fitted_spectra_minus_sensitivity, dtype=float, unpack=True)
+        else:
+            wavelength_minus_sensitivity, flux_minus_sensitivity = np.array([]), np.array([])
+        # check if file plus sensitivity exists, then load, otherwise set empty arrays
+        if os.path.isfile(filename_fitted_spectra_plus_sensitivity):
+            wavelength_plus_sensitivity, flux_plus_sensitivity = np.loadtxt(filename_fitted_spectra_plus_sensitivity, dtype=float, unpack=True)
+        else:
+            wavelength_plus_sensitivity, flux_plus_sensitivity = np.array([]), np.array([])
 
         # sort the observed spectra, just like in TSFitPy
         if wavelength_observed.size > 1:
@@ -261,8 +257,11 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
 
             if plot_title:
                 plt.title(f"{abund_column_name}={float(f'{fitted_abund:.3g}'):g}; EW={float(f'{fitted_ew:.3g}'):g}; χ2={float(f'{fitted_chisqr:.3g}'):g}")
+            plt.plot(wavelength_minus_sensitivity, flux_minus_sensitivity, color='blue', alpha=0.5)
+            plt.plot(wavelength_plus_sensitivity, flux_plus_sensitivity, color='blue', alpha=0.5)
+            plt.plot(wavelength_just_blend, flux_just_blend, color='grey', alpha=0.5)
             plt.plot(wavelength, flux, color='red')
-            plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.5)
+            plt.scatter(wavelength_observed_rv, flux_observed, color='black', marker='o', linewidths=0.4)
             # xlimit is wavelength left/right +/- 0.3 AA
             if xlim is not None:
                 plt.xlim(xlim)

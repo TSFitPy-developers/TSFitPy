@@ -448,6 +448,9 @@ class TSFitPyConfig:
         self.make_output_directory = True
         self.pretrim_linelist = True
         self.lightweight_ts_run = False
+        self.compute_blend_spectra = True
+        self.sensitivity_abundance_offset = 0.2
+        self.just_blend_reduce_abundance = -10
 
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -641,6 +644,13 @@ class TSFitPyConfig:
             self.save_config_file = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["save_config_file"])
             self.pretrim_linelist = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["pretrim_linelist"])
             self.lightweight_ts_run = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["lightweight_ts_run"])
+        except KeyError:
+            pass
+
+        try:
+            self.compute_blend_spectra = self._convert_string_to_bool(self.config_parser["AdvancedOptions"]["compute_blend_spectra"])
+            self.sensitivity_abundance_offset = float(self.config_parser["AdvancedOptions"]["sensitivity_abundance_offset"])
+            self.just_blend_reduce_abundance = float(self.config_parser["AdvancedOptions"]["just_blend_reduce_abundance"])
         except KeyError:
             pass
 
