@@ -226,7 +226,7 @@ This is a short version of the installation + running the code just to test that
         - 3rd bit: all of flux points of the observed spectra are above 1 or below 0
         - 4th bit: EW of the line is significantly different from the EW of the line in the model (within factor of 1.5). Perhaps a broken pixel might result in a trigger of this flag? 1.5 should be quite a conservative factor though
         - 5th bit: number of iterations of the fit is <= 3 (most likely the line doesn't exist within the linemask or some other issue resulted in a bad fit). Normally it takes ~9 iterations for a lbl fit.
-        - 6th bit:
+        - 6th bit: when calculating spectra with offset abundance or no abundance (options `compute_blend_spectra` and `sensitivity_abundance_offset`), the chi squared should be higher than the chi squared of the fit with abundance. If it is not, then it is likely that the minimum is not found and triggers this flag
         - 7th bit: 
         - 8th bit:
       - `flag_warning`: if any bits are `1`, then it could be that the fit is bad, but that is not guaranteed. For a big sample, you might want to remove any of these objects as well. For a small one, maybe check them by eye.
