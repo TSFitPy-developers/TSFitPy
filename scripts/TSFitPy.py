@@ -153,7 +153,7 @@ def calc_ts_spectra_all_lines(obs_name: str, wave_mod_orig: np.ndarray, flux_mod
 
 def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_obs_variance: np.ndarray,
                               wave_synt_orig: np.ndarray, flux_synt_orig: np.ndarray, resolution: float, lmin: float,
-                              lmax: float, vmac: float, rotation: float) -> float:
+                              lmax: float, vmac: float, rotation: float, convolve_spectra=True) -> float:
     """
     Calculates chi squared by opening a created synthetic spectrum and comparing to the observed spectra. Then
     calculates chi squared. Used for line by line method, by only looking at a specific line.
@@ -180,11 +180,15 @@ def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_
         logging.debug(f"Line {lmin} - {lmax} not found in the observed spectra?")
         return 999999
 
-    try:
-        wave_synt, flux_synt = get_convolved_spectra(wave_synt_orig, flux_synt_orig, resolution, vmac, rotation)
-    except ValueError:
-        logging.debug(f"Was not able to convolve the spectra for line {lmin} - {lmax}")
-        return 999999
+    if convolve_spectra:
+        try:
+            wave_synt, flux_synt = get_convolved_spectra(wave_synt_orig, flux_synt_orig, resolution, vmac, rotation)
+        except ValueError:
+            logging.debug(f"Was not able to convolve the spectra for line {lmin} - {lmax}")
+            return 999999
+    else:
+        wave_synt = wave_synt_orig
+        flux_synt = flux_synt_orig
 
     flux_synt_interp = np.interp(wave_obs, wave_synt, flux_synt)
 
@@ -1191,7 +1195,7 @@ class Spectra:
         3rd bit: all flux points are above 1 or below 0
         4th bit: EW of the line is significantly different from the EW of the line in the model; perhaps within factor of 1.5
         5th bit: if number of iterations of the line is <= 3
-        6th bit:
+        6th bit: if calculating sensitivity/blends, chi squared should be higher than fitted; if not triggers this flag
         7th bit: 
         8th bit:
         """
@@ -1207,12 +1211,16 @@ class Spectra:
         8th bit:
         """
 
+        analysed_values_blend_sensitivity = {"just_blend": {"ew": 999999, "chi_sqr": 999999},
+                                             "minus_sensitivity": {"ew": 999999, "chi_sqr": 999999},
+                                             "plus_sensitivity": {"ew": 999999, "chi_sqr": 999999}}
+
         if len(result_one_line["fit_wavelength"]) > 0 and result_one_line["chi_sqr"] <= 99999:
             if self.save_fitted_spectra:
                 with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}.spec"), 'a') as g:
                     indices_argsorted = np.argsort(result_one_line['fit_wavelength'])
                     np.savetxt(g, np.column_stack((result_one_line['fit_wavelength'][indices_argsorted], result_one_line['fit_flux_norm'][indices_argsorted], result_one_line['fit_flux'][indices_argsorted])), fmt=('%.5f', '%.5f', '%.10f'))
-            line_left, line_right = self.line_begins_sorted[line_number], self.line_ends_sorted[line_number]
+            line_left, line_right = float(self.line_begins_sorted[line_number]), float(self.line_ends_sorted[line_number])
             segment_index = np.where(np.logical_and(self.seg_begins <= self.line_centers_sorted[line_number],
                                                     self.line_centers_sorted[line_number] <= self.seg_ends))[0][0]
             segment_left, segment_right = self.seg_begins[segment_index], self.seg_ends[segment_index]
@@ -1260,8 +1268,17 @@ class Spectra:
                     indices_argsorted = np.argsort(wavelength_fit_conv[indices_to_save_conv])
                     np.savetxt(h, np.column_stack((wavelength_fit_conv[indices_to_save_conv][indices_argsorted], flux_fit_conv[indices_to_save_conv][indices_argsorted])), fmt='%.5f')
 
+            wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
+            flux_ob = self.flux_norm_obs
+
+            # cut to the line
+            indices_to_use_cut = np.where((wave_ob <= line_right) & (wave_ob >= line_left))
+            wave_ob_cut, flux_ob_cut = wave_ob[indices_to_use_cut], flux_ob[indices_to_use_cut]
+
             # new thing: lets compute spectra with +/- 0.something dex and -10 dex
             # so we can see how the line changes with abundance
+            # we calculate EW and chi squared with abundance of the element at -10 dex, and say +/- 0.2 dex
+            # that way we can see how the line changes with abundance
             if self.compute_blend_spectra:
                 ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
                 ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
@@ -1302,36 +1319,41 @@ class Spectra:
                                                                                                              segment_left, segment_right,
                                                                                                              False, temp_dir=temp_directory, teff=teff, logg=logg)
 
-                    spectra_generated, chi_squared = check_if_spectra_generated(wavelength_synthetic_justblend, True)
+                    spectra_generated, _ = check_if_spectra_generated(wavelength_synthetic_justblend, True)
+
+                    try:
+                        equivalent_width_temp = calculate_equivalent_width(wavelength_synthetic_justblend, flux_norm_synthetic_justblend, line_left, line_right)
+                    except ValueError:
+                        equivalent_width_temp = 999999
+
+                    indices_to_use_cut = np.where((wavelength_synthetic_justblend <= segment_right) & (wavelength_synthetic_justblend >= segment_left))
+                    wavelength_synthetic_justblend, flux_norm_synthetic_justblend = wavelength_synthetic_justblend[indices_to_use_cut], flux_norm_synthetic_justblend[indices_to_use_cut]
+                    wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra( wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, result_one_line["macroturb"], result_one_line["rotation"])
+
+                    analysed_values_blend_sensitivity[abundance_variant]["ew"] = equivalent_width_temp * 1000 # convert to mAngstroms
+
+                    chi_squared_temp = calculate_lbl_chi_squared(wave_ob, flux_ob, self.error_obs_variance, wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, line_left,
+                                                                 line_right, result_one_line["macroturb"], result_one_line["rotation"], convolve_spectra=False)
+
+                    analysed_values_blend_sensitivity[abundance_variant]["chi_sqr"] = chi_squared_temp
+
+                    logging.debug(f"Chi squared for {abundance_variant} is {chi_squared_temp} with EW {equivalent_width_temp}")
 
                     if spectra_generated:
                         if self.save_fitted_spectra:
-                            indices_to_use_cut = np.where((wavelength_synthetic_justblend <= segment_right) & (wavelength_synthetic_justblend >= segment_left))
-                            wavelength_synthetic_justblend, flux_norm_synthetic_justblend = wavelength_synthetic_justblend[indices_to_use_cut], \
-                                flux_norm_synthetic_justblend[indices_to_use_cut]
-                            wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra(wavelength_synthetic_justblend,
-                                                                                       flux_norm_synthetic_justblend,
-                                                                                       self.resolution,
-                                                                                       result_one_line["macroturb"],
-                                                                                       result_one_line["rotation"])
 
-                        with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved_{abundance_variant}.spec"), 'a') as g:
-                                indices_argsorted = np.argsort(wavelength_synthetic_justblend)
-                                np.savetxt(g, np.column_stack((wavelength_synthetic_justblend[indices_argsorted],
-                                                               flux_norm_synthetic_justblend[indices_argsorted])),
-                                           fmt=('%.5f', '%.8f'))
+                            # here we calculate the equivalent width of the line and chi squared
+
+
+                            with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved_{abundance_variant}.spec"), 'a') as g:
+                                    indices_argsorted = np.argsort(wavelength_synthetic_justblend)
+                                    np.savetxt(g, np.column_stack((wavelength_synthetic_justblend[indices_argsorted],
+                                                                   flux_norm_synthetic_justblend[indices_argsorted])),
+                                               fmt=('%.5f', '%.8f'))
                     else:
                         logging.debug(f"Could not generate blend spectra for blend for line {line_number} at {self.line_centers_sorted[line_number]} angstroms")
 
                     shutil.rmtree(temp_directory)
-
-
-            wave_ob = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
-            flux_ob = self.flux_norm_obs
-
-            # cut to the line
-            indices_to_use_cut = np.where((wave_ob <= line_right) & (wave_ob >= line_left))
-            wave_ob_cut, flux_ob_cut = wave_ob[indices_to_use_cut], flux_ob[indices_to_use_cut]
 
             # ERROR FLAGS
             # see how many points are in the line
@@ -1359,6 +1381,13 @@ class Spectra:
             if "fit_iterations" in result_one_line:
                 if result_one_line["fit_iterations"] <= 3:
                     flag_error = flag_error[:4] + "1" + flag_error[5:]
+
+            # check that chi-squared is higher than the fitted chi-squared
+            if self.compute_blend_spectra:
+                if (analysed_values_blend_sensitivity["just_blend"]["chi_sqr"] <= result_one_line["chi_sqr"]) or \
+                        (analysed_values_blend_sensitivity["minus_sensitivity"]["chi_sqr"] <= result_one_line["chi_sqr"]) or \
+                        (analysed_values_blend_sensitivity["plus_sensitivity"]["chi_sqr"] <= result_one_line["chi_sqr"]):
+                    flag_error = flag_error[:5] + "1" + flag_error[6:]
 
             # WARNING FLAGS
             # if fitting feh, check if the fitted parameters are at the edge of the bounds
@@ -1412,6 +1441,20 @@ class Spectra:
         result_one_line["result"]['ew'] = equivalent_width * 1000
         result_one_line["result"]["flag_error"] = flag_error
         result_one_line["result"]["flag_warning"] = flag_warning
+        # we also want to save the ew of JUST the abundance. for that we subtract the ew of the line from the ew of the blend
+        if analysed_values_blend_sensitivity["just_blend"]["ew"] < 999999:
+            result_one_line["result"]["ew_just_line"] = result_one_line["result"]['ew'] - analysed_values_blend_sensitivity["just_blend"]["ew"]
+            result_one_line["result"]["ew_blend"] = analysed_values_blend_sensitivity["just_blend"]["ew"]
+        else:
+            result_one_line["result"]["ew_just_line"] = 999999
+            result_one_line["result"]["ew_blend"] = 999999
+        # we also kinda want to see the sensitivity of the line to the abundance. so we calculate by how much the ew changes per dex
+        if analysed_values_blend_sensitivity["minus_sensitivity"]["ew"] < 999999 and analysed_values_blend_sensitivity["plus_sensitivity"]["ew"] < 999999:
+            minus_sensitivity = (result_one_line["result"]['ew'] - analysed_values_blend_sensitivity["minus_sensitivity"]["ew"]) / self.sensitivity_abundance_offset
+            plus_sensitivity = (analysed_values_blend_sensitivity["plus_sensitivity"]["ew"] - result_one_line["result"]['ew']) / self.sensitivity_abundance_offset
+            result_one_line["result"]["ew_sensitivity"] = (minus_sensitivity + plus_sensitivity) / 2
+        else:
+            result_one_line["result"]["ew_sensitivity"] = 999999
 
         if find_error_sigma:
             if flag_error == "00000000":
