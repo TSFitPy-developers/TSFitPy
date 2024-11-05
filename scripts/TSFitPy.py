@@ -1489,7 +1489,9 @@ class Spectra:
 
         temp_directory = os.path.join(self.temp_dir, str(np.random.random()), "")
 
-        offset_chi_sqr = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit) / calculate_dof(self.wavelength_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
+        wave_obs = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + result_one_line["rv"])
+
+        offset_chi_sqr = result_one_line["chi_sqr"] + np.square(sigmas_upper_limit) / calculate_dof(wave_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
         start_abundance = result_one_line["fitted_abund"]
         # we are trying to find abundance which results in chi_sqr = offset_chi_sqr. so we need to add some constant
         # that overshoots this offset_chi_sqr, so that we can find the abundance that results in offset_chi_sqr
@@ -1514,7 +1516,7 @@ class Spectra:
                               result_one_line["vmic"], offset_chi_sqr)
         try:
             res = root_scalar(calc_chi_sqr_abund_error, args=function_arguments, bracket=[start_abundance, end_abundance],
-                              method='brentq', options={'disp': False}, xtol=0.0025)
+                              method='brentq', options={'disp': False}, xtol=0.0005)
             if not self.night_mode:
                 print(res)
             fitted_abund = res.root
@@ -2339,8 +2341,26 @@ def calc_chi_sqr_error_generic(feh: float, elem_abund_dict_xh: dict, vmic: float
 
     spectra_generated, chi_square = check_if_spectra_generated(wavelength_fitted, spectra_to_fit.night_mode)
     if spectra_generated:
-        wave_obs_shifted = apply_doppler_correction(spectra_to_fit.wavelength_obs, rv + spectra_to_fit.stellar_rv)
-        chi_square = calculate_lbl_chi_squared(wave_obs_shifted, spectra_to_fit.flux_norm_obs, spectra_to_fit.error_obs_variance, wavelength_fitted, flux_norm_fitted, spectra_to_fit.resolution, lmin, lmax, vmac, rotation)
+        param_guess, min_bounds = spectra_to_fit.get_rv_macro_rotation_guess(min_macroturb=spectra_to_fit.guess_min_vmac,
+                                                                             max_macroturb=spectra_to_fit.guess_max_vmac)
+        # now for the generated abundance it tries to fit best fit macro + doppler shift.
+        # Thus, macro should not be dependent on the abundance directly, hopefully
+        # Seems to work way better
+        function_args = (spectra_to_fit, lmin, lmax, wavelength_fitted, flux_norm_fitted)
+        minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
+        res = minimize_function(calc_chi_sq_broadening, np.median(param_guess, axis=0),
+                                function_args, min_bounds, 'L-BFGS-B', minimize_options)
+
+        rv = res.x[0]
+        if spectra_to_fit.fit_vmac:
+            vmac = res.x[1]
+        else:
+            vmac = spectra_to_fit.vmac
+        if spectra_to_fit.fit_rotation:
+            rotation = res.x[-1]
+        else:
+            rotation = spectra_to_fit.rotation
+        chi_square = res.fun
 
     intermediate_results = {"abundances": elem_abund_dict_xh, "teff": teff, "logg": logg, "rv": rv, "vmic": vmic,
                             "vmac": vmac, "rotation": rotation, "offset": offset_chisqr, "fitted_chisqr": chi_square,
