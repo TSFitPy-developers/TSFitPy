@@ -1279,7 +1279,7 @@ class Spectra:
             # so we can see how the line changes with abundance
             # we calculate EW and chi squared with abundance of the element at -10 dex, and say +/- 0.2 dex
             # that way we can see how the line changes with abundance
-            if self.compute_blend_spectra:
+            if self.compute_blend_spectra and self.fitting_mode == "lbl":
                 ssg = self.create_ssg_object(self._get_marcs_models(), segment_index=segment_index)
                 ssg.line_list_paths = [get_trimmed_lbl_path_name(self.line_list_path_trimmed, segment_index)]
 
@@ -1478,7 +1478,8 @@ class Spectra:
         Finds the sigma error for the abundance of the line, by fitting the line with the abundance offset by
         sigmas_upper_limit ** 2. I.e. it increases the abundance and finds the value which results in chi_sqr
         higher than the chi_sqr of the original fit by sigmas_upper_limit ** 2
-        It uses RV, broadening and vmic from the original fit. TODO: Is it really correct to use same broadening?
+        It uses RV, broadening and vmic from the original fit.
+        05 Nov 2024: now it fits RV and vmac
         :param result_one_line: the result of the lbl fitting with the original abundance
         :param sigmas_upper_limit: number of sigmas offset to find the abundance error
         :param line_number: line's index to fit
@@ -1608,7 +1609,8 @@ class Spectra:
                 print(f"Failed spectra generation completely, line is not fitted at all, not saving spectra then")
 
         if self.find_teff_errors and teff <= 999998:
-            dof = calculate_dof(self.wavelength_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
+            wave_obs = apply_doppler_correction(self.wavelength_obs, self.stellar_rv + doppler_fit)
+            dof = calculate_dof(wave_obs, lmin=self.line_begins_sorted[line_number], lmax=self.line_ends_sorted[line_number])
             if not self.night_mode:
                 print(f"Fitting {self.teff_error_sigma} sigma at {self.line_centers_sorted[line_number]} angstroms")
             try:
