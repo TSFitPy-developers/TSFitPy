@@ -1457,13 +1457,9 @@ class Spectra:
             result_one_line["result"]["ew_sensitivity"] = 999999
 
         if find_error_sigma:
-            if flag_error == "00000000":
-                result_upper_limit = self.lbl_abund_find_sigma_error(result_one_line, sigmas_error, line_number)
-                result_one_line["result"][f"err_{int(sigmas_error)}_err"] = np.abs(result_upper_limit["fitted_abund"] - result_one_line["fitted_abund"])
-                result_one_line["result"]["err_chi_sqr_diff"] = result_upper_limit["chi_sqr"] - result_one_line["chi_sqr"]
-            else:
-                result_one_line["result"][f"err_{int(sigmas_error)}_err"] = 999999
-                result_one_line["result"]["err_chi_sqr_diff"] = 999999
+            result_upper_limit = self.lbl_abund_find_sigma_error(result_one_line, sigmas_error, line_number)
+            result_one_line["result"][f"err_{int(sigmas_error)}_err"] = np.abs(result_upper_limit["fitted_abund"] - result_one_line["fitted_abund"])
+            result_one_line["result"]["err_chi_sqr_diff"] = result_upper_limit["chi_sqr"] - result_one_line["chi_sqr"]
 
         # let's only keep 4 decimals for most of the results in result_one_line["result"]
         for key, value in result_one_line["result"].items():
