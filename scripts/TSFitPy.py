@@ -192,6 +192,13 @@ def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_
 
     flux_synt_interp = np.interp(wave_obs, wave_synt, flux_synt)
 
+    # replace any zeroes in error_obs_variance with average of the array
+    # error_obs_variance is always positive, because we take square of the error
+    if np.mean(error_obs_variance) != 0:
+        error_obs_variance[error_obs_variance == 0] = np.mean(error_obs_variance)
+    else:
+        error_obs_variance = np.ones_like(error_obs_variance)
+
     chi_square = np.sum(np.square(flux_obs - flux_synt_interp) / error_obs_variance) / calculate_dof(wave_obs)
 
     return chi_square
@@ -2990,7 +2997,13 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
         if not tsfitpy_configuration.compiler.lower() == "m3dis":
             for element in model_atom_file_dict:
-                tsfitpy_configuration.aux_file_length_dict[element] = len(np.loadtxt(os.path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str'))
+                aux_file_element = np.loadtxt(os.path.join(tsfitpy_configuration.departure_file_path, depart_aux_file_dict[element]), dtype='str')
+                #if tsfitpy_configuration.fitting_mode == "lbl" and "Fe" not in tsfitpy_configuration.elements_to_fit and tsfitpy_configuration.experimental_parallelisation:
+                    # here we try to speed up the interpolator by choosing from the loaded aux_file_element only relevant model atmospheres.
+                    # aux_file_element columns: #atmos ID, Teff [K], log(g) [cgs], [Fe/H], [alpha/Fe], mass, Vturb [km/s], A(X), pointer
+
+                #else:
+                tsfitpy_configuration.aux_file_length_dict[element] = len(aux_file_element)
         else:
             for element in model_atom_file_dict:
                 tsfitpy_configuration.aux_file_length_dict[element] = 0
