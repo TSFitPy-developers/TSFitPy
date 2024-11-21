@@ -202,6 +202,18 @@ def plot_one_star(config_dict: dict, name_of_spectra_to_plot: str, plot_title=Tr
             sorted_wavelength_index = np.argsort(wavelength)
             wavelength, flux = wavelength[sorted_wavelength_index], flux[sorted_wavelength_index]
 
+        if np.size(wavelength_just_blend) > 0:
+            sorted_wavelength_index = np.argsort(wavelength_just_blend)
+            wavelength_just_blend, flux_just_blend = wavelength_just_blend[sorted_wavelength_index], flux_just_blend[sorted_wavelength_index]
+
+        if np.size(wavelength_minus_sensitivity) > 0:
+            sorted_wavelength_index = np.argsort(wavelength_minus_sensitivity)
+            wavelength_minus_sensitivity, flux_minus_sensitivity = wavelength_minus_sensitivity[sorted_wavelength_index], flux_minus_sensitivity[sorted_wavelength_index]
+
+        if np.size(wavelength_plus_sensitivity) > 0:
+            sorted_wavelength_index = np.argsort(wavelength_plus_sensitivity)
+            wavelength_plus_sensitivity, flux_plus_sensitivity = wavelength_plus_sensitivity[sorted_wavelength_index], flux_plus_sensitivity[sorted_wavelength_index]
+
 
         # loads the linemask
         linemask_center_wavelengths, linemask_left_wavelengths, linemask_right_wavelengths = np.loadtxt(linemask_location, dtype=float, comments=";", usecols=(0, 1, 2), unpack=True)
