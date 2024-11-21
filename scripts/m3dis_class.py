@@ -435,7 +435,7 @@ class M3disCall(SyntheticSpectrumGenerator):
         config_m3dis = (f"! -- Parameters defining the run -----------------------------------------------\n\
 &io_params          datadir='{self.tmp_dir}' gb_step=100.0 do_trace=F /\n\
 &timer_params       sec_per_report=1e8 /\n\
-&atmos_params       dims={self.dims} save_atmos=F atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
+&atmos_params       dims={self.dims} save_atmos=T atmos_file='{atmos_path}' {atmo_param}/\n{atom_params}\
 &m3d_params         decouple_continuum=T verbose=2 n_nu={self.n_nu} maxiter={self.iterations_max} short_scheme='set_a2' long_scheme='custom' custom_mu='0.010 0.052 0.124 0.223 0.340 0.468 0.598 0.722 0.831 0.917 0.975 1.000'/\n\
 {linelist_parameters}\
 &composition_params isotope_file='{isotope_file_path}' abund_file='{abund_file_path}' {absmet_file}/\n\
@@ -753,12 +753,12 @@ class M3disCall(SyntheticSpectrumGenerator):
             else:
                 if self.save_spectra:
                     try:
-                        completed_run = self.m3dis_python_module.read(
+                        completed_run = self.m3dis_python_module.m3dis.read(
                             self.tmp_dir
                         )
                         wavelength, _ = completed_run.get_xx(completed_run.lam)
-                        flux, continuum = completed_run.get_yy(norm=False)
-                        normalised_flux = flux / continuum
+                        flux = completed_run.get_yy(norm=False)
+                        normalised_flux = completed_run.get_yy(norm=True)
                         flux = flux * 2.99792458e10 / (wavelength**2) * 1e8
                     except FileNotFoundError as e:
                         if not self.night_mode:
