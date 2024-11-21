@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import types
 
 import numpy as np
 from scipy import integrate
@@ -138,21 +139,33 @@ def closest_available_value(target: float, options: list[float]) -> float:
 
 def import_module_from_path(module_name, file_path):
     """
-    Dynamically imports a module or package from a given file path.
+    Imports a module by temporarily adding its parent directory to sys.path.
 
     Parameters:
-    module_name (str): The name to assign to the module.
-    file_path (str): The file path to the module or package.
+    module_name (str): The full dotted module name (e.g., 'm3dis.m3dis').
+    file_path (str): The file path to the module.
 
     Returns:
     module: The imported module.
     """
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None:
-        raise ImportError(f"Module spec not found for {file_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    # Determine the directory containing the module
+    module_dir = os.path.dirname(file_path)
+
+    # Calculate how many levels up we need to go to get the package root
+    levels_up = module_name.count('.')
+
+    # Get the package root directory
+    package_root = module_dir
+    for _ in range(levels_up):
+        package_root = os.path.dirname(package_root)
+
+    # Add the package root to sys.path temporarily
+    sys.path.insert(0, package_root)
+    try:
+        module = importlib.import_module(module_name)
+    finally:
+        # Remove the package root from sys.path
+        sys.path.pop(0)
     return module
 
 

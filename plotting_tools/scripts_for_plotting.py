@@ -717,8 +717,8 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
-    module_path = os.path.join(m3dis_paths["m3dis_path"], f"{m3dis_package_name}/__init__.py")
-    m3dis_python_module = import_module_from_path("m3dis", module_path)
+    module_path = os.path.join(m3dis_paths["m3dis_path"], f"{m3dis_package_name}/m3dis.py")
+    m3dis_python_module = import_module_from_path("m3dis.m3dis", module_path)
 
     m3dis = M3disCall(
         m3dis_path=m3dis_paths["m3dis_path"],
