@@ -432,7 +432,7 @@ def check_if_path_exists(path_to_check: str) -> str:
 
 def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, ldelta, atmosphere_type, nlte_flag,
                         elements_in_nlte, element_abundances, include_molecules, resolution=0, macro=0, rotation=0,
-                        verbose=False, return_unnorm_flux=False, do_matplotlib_plot=True):
+                        verbose=False, return_unnorm_flux=False, do_matplotlib_plot=True, return_parsed_linelist=False, loggf_limit_parsed_linelist=-5.0):
     for element in element_abundances:
         element_abundances[element] += met
     temp_directory = f"../temp_directory/temp_directory_{datetime.datetime.now().strftime('%b-%d-%Y-%H-%M-%S')}__{np.random.random(1)[0]}/"
@@ -483,6 +483,18 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
     create_window_linelist([lmin - 4], [lmax + 4], turbospectrum_paths["line_list_path"], line_list_path_trimmed, include_molecules, False)
     print("Trimming done")
 
+    if return_parsed_linelist:
+        parsed_linelist_data = combine_linelists(line_list_path_trimmed, return_parsed_linelist=True, save_combined_linelist=False)
+        parsed_model_atom_data = []
+        for i in range(len(parsed_linelist_data)):
+            parsed_model_atom_data.extend(parsed_linelist_data[i].split("\n"))
+
+        left_wavelength = lmin  # change this to change the range of wavelengths to print
+        right_wavelength = lmax
+        loggf_threshold = loggf_limit_parsed_linelist  # change this to change the threshold for loggf
+        elements_data = read_element_data(parsed_model_atom_data)
+        parsed_elements_sorted_info = find_elements(elements_data, left_wavelength, right_wavelength,
+                                                    loggf_threshold)
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
     ts = TurboSpectrum(
@@ -559,10 +571,15 @@ def plot_synthetic_data(turbospectrum_paths, teff, logg, met, vmic, lmin, lmax, 
         flux_unnorm = np.array([])
     shutil.rmtree(temp_directory)
     #shutil.rmtree(line_list_path_trimmed)  # clean up trimmed line list
+
+    result = [wave_mod, flux_norm_mod]
+
     if return_unnorm_flux:
-        return wave_mod, flux_norm_mod, flux_unnorm
-    else:
-        return wave_mod, flux_norm_mod
+        result.append(flux_unnorm)
+    if return_parsed_linelist:
+        result.append(parsed_elements_sorted_info)
+
+    return tuple(result)
 
 
 def read_element_data(lines):

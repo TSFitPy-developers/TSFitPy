@@ -156,21 +156,42 @@ def import_module_from_path(module_name, file_path):
     return module
 
 
-def combine_linelists(line_list_path_trimmed: str, combined_linelist_name: str = "combined_linelist.bsyn", return_parsed_linelist: bool = False):
+def combine_linelists(line_list_path_trimmed: str, combined_linelist_name: str = "combined_linelist.bsyn", return_parsed_linelist: bool = False, save_combined_linelist: bool = True):
     parsed_linelist_data = []
     for folder in os.listdir(line_list_path_trimmed):
         if os.path.isdir(os.path.join(line_list_path_trimmed, folder)):
             # go into each folder and combine all linelists into one
             combined_linelist = os.path.join(line_list_path_trimmed, folder, combined_linelist_name)
-            with open(combined_linelist, "w") as combined_linelist_file:
+            if save_combined_linelist:
+                with open(combined_linelist, "w") as combined_linelist_file:
+                    for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
+                        if file.endswith(".bsyn") and not file == combined_linelist_name:
+                            with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
+                                read_file = linelist_file.read()
+                                combined_linelist_file.write(read_file)
+                                if return_parsed_linelist:
+                                    parsed_linelist_data.append(read_file)
+                            # delete the file
+                            os.remove(os.path.join(line_list_path_trimmed, folder, file))
+            else:
                 for file in os.listdir(os.path.join(line_list_path_trimmed, folder)):
                     if file.endswith(".bsyn") and not file == combined_linelist_name:
                         with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
-                            read_file = linelist_file.read()
-                            combined_linelist_file.write(read_file)
-                            if return_parsed_linelist:
-                                parsed_linelist_data.append(read_file)
-                        # delete the file
-                        os.remove(os.path.join(line_list_path_trimmed, folder, file))
+                            try:
+                                first_line: str = linelist_file.readline()
+                                fields = first_line.strip().split()
+                                sep = '.'
+                                element = fields[0] + fields[1]
+                                elements = element.split(sep, 1)[0]
+                                if len(elements) <= 3:
+                                    with open(os.path.join(line_list_path_trimmed, folder, file), "r") as linelist_file:
+                                        read_file = linelist_file.read()
+                                        # opens each file, reads first row, if it is long enough then it is molecule. If fitting molecules, then
+                                        # keep it, otherwise ignore molecules
+                                        if return_parsed_linelist:
+                                            parsed_linelist_data.append(read_file)
+                            except UnicodeDecodeError:
+                                print(f"LINELIST WARNING! File {linelist_file} is not a valid linelist file")
+                                continue
     if return_parsed_linelist:
         return parsed_linelist_data
