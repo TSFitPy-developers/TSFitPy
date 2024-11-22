@@ -1353,10 +1353,31 @@ class Spectra:
 
 
                             with open(os.path.join(self.output_folder, f"result_spectrum_{self.spec_name}_convolved_{abundance_variant}.spec"), 'a') as g:
-                                    indices_argsorted = np.argsort(wavelength_synthetic_justblend)
-                                    np.savetxt(g, np.column_stack((wavelength_synthetic_justblend[indices_argsorted],
-                                                                   flux_norm_synthetic_justblend[indices_argsorted])),
-                                               fmt=('%.5f', '%.8f'))
+                                # this will save extra +/- extra_wavelength_to_save in convolved spectra. But just so that it doesn't
+                                # overlap other lines, I save only up to half of the other linemask if they are close enough
+                                if line_number > 0:
+                                    line_previous_right = self.line_ends_sorted[line_number - 1]
+                                    left_bound_to_save = max(line_left - extra_wavelength_to_save,
+                                                             (line_left - line_previous_right) / 2 + line_previous_right)
+                                else:
+                                    left_bound_to_save = line_left - extra_wavelength_to_save
+                                if line_number < len(self.line_begins_sorted) - 1:
+                                    line_next_left = self.line_begins_sorted[line_number + 1]
+                                    right_bound_to_save = min(line_right + extra_wavelength_to_save,
+                                                              (line_next_left - line_right) / 2 + line_right)
+                                else:
+                                    right_bound_to_save = line_right + extra_wavelength_to_save
+                                indices_to_save_conv = np.logical_and.reduce(
+                                    (wavelength_fit_conv > left_bound_to_save,
+                                     wavelength_fit_conv < right_bound_to_save))
+
+                                wavelength_synthetic_justblend = wavelength_synthetic_justblend[indices_to_save_conv]
+                                flux_norm_synthetic_justblend = flux_norm_synthetic_justblend[indices_to_save_conv]
+
+                                indices_argsorted = np.argsort(wavelength_synthetic_justblend)
+                                np.savetxt(g, np.column_stack((wavelength_synthetic_justblend[indices_argsorted],
+                                                               flux_norm_synthetic_justblend[indices_argsorted])),
+                                           fmt=('%.5f', '%.8f'))
                     else:
                         logging.debug(f"Could not generate blend spectra for blend for line {line_number} at {self.line_centers_sorted[line_number]} angstroms")
 
