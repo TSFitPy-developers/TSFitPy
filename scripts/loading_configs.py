@@ -838,7 +838,7 @@ class TSFitPyConfig:
         else:
             nlte_flag_to_save = "LTE"
 
-        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self._convert_list_to_str(self.elements_to_fit).replace(' ', '')}_{self.atmosphere_type.upper()}"
+        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.elements_to_fit[0]}_{self.atmosphere_type.upper()}"
 
         self.output_folder_path = os.path.join(self._check_if_path_exists(self.output_folder_path, check_valid_path),
                                                self.output_folder_title)
