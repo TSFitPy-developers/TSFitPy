@@ -194,8 +194,8 @@ def calculate_lbl_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, error_
         logging.debug(f"Line {lmin} - {lmax} not found in the synthetic spectra?")
         return 999999
 
-    if np.size(wave_obs) != np.size(wave_synt):
-        logging.debug(f"Lenght of the observed and synthetic spectra is not the same for line {lmin} - {lmax}")
+    if np.size(wave_synt) != np.size(flux_synt):
+        logging.debug(f"Lenght of the synthetic spectra and flux is not the same for line {lmin} - {lmax}")
         return 999999
 
     flux_synt_interp = np.interp(wave_obs, wave_synt, flux_synt)
