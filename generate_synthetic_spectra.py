@@ -92,7 +92,7 @@ class SyntheticSpectraConfig:
         # read the configuration file
         self.config_parser.read(self.config_location)
         # intel or gnu compiler
-        self.compiler = self.validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu"])
+        self.compiler = self.validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "ifx", "ifort"])
         self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
         self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
         self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
@@ -156,12 +156,16 @@ class SyntheticSpectraConfig:
         self.number_of_cpus = int(self.number_of_cpus)
 
         self.debug_mode = int(self.debug_mode)
-        if self.compiler.lower() == "intel":
+        if self.compiler.lower() == "intel" or self.compiler.lower() == "ifort":
             self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec", "")
         elif self.compiler.lower() == "gnu":
             self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec-gf", "")
+        elif self.compiler.lower() == "ifx":
+            self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
+                                                   "exec-ifx", "")
+
         else:
             raise ValueError("Compiler not recognized")
         self.turbospectrum_path = self.turbospectrum_path
