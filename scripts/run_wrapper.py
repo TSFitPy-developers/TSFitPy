@@ -10,7 +10,8 @@ from .solar_abundances import solar_abundances
 from .auxiliary_functions import calculate_vturb
 
 
-def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0, macro=0, rotation=0, vmic=None, verbose=False, **kwargs):
+def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0,
+                macro=0, rotation=0, vmic=None, verbose=False, lpoint_turbospectrum=500_000, **kwargs):
     #parameters to adjust
 
     teff = teff
@@ -61,6 +62,8 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
                  depart_bin_file=ts_config["depart_bin_file"],
                  depart_aux_file=ts_config["depart_aux_file"],
                  model_atom_file=ts_config["model_atom_file"])
+
+    ts.lpoint = lpoint_turbospectrum
 
     ts.synthesize_spectra()
 
@@ -128,7 +131,7 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
     with open(tsfitpy_pickled_configuration_path, 'rb') as f:
         ts_config = pickle.load(f)
 
-    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb, verbose=verbose)
+    wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb, verbose=verbose, lpoint_turbospectrum=lpoint_turbospectrum)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
     if len(wave_mod) > 0:
         f = open(file_location_output, 'w')

@@ -88,6 +88,8 @@ class SyntheticSpectraConfig:
         self.time_limit_hours = 71
         self.slurm_partition = "debug"
 
+        self.lpoint_turbospectrum = 1_000_000
+
     def load_config(self):
         # read the configuration file
         self.config_parser.read(self.config_location)
@@ -129,16 +131,12 @@ class SyntheticSpectraConfig:
             self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
             self.slurm_partition = self.config_parser["SlurmClusterParameters"]["partition"]
         except KeyError:
-            self.cluster_type = "local"
-            self.number_of_nodes = 1
-            self.memory_per_cpu_gb = 3.6
-            self.script_commands = [            # Additional commands to run before starting dask worker
-                'module purge',
-                'module load basic-path',
-                'module load intel',
-                'module load anaconda3-py3.10']
-            self.time_limit_hours = 71
-            self.slurm_partition = "debug"
+            pass
+
+        try:
+            self.lpoint_turbospectrum = int(self.config_parser["AdvancedOptions"]["lpoint_turbospectrum"])
+        except KeyError:
+            pass
 
 
 
@@ -365,7 +363,8 @@ if __name__ == '__main__':
                  "depart_bin_file": depart_bin_file,
                  "depart_aux_file": depart_aux_file,
                  "model_atom_file": model_atom_file,
-                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path}
+                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path,
+                 "lpoint_turbospectrum": config_synthetic_spectra.lpoint_turbospectrum}
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
