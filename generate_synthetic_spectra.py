@@ -363,8 +363,7 @@ if __name__ == '__main__':
                  "depart_bin_file": depart_bin_file,
                  "depart_aux_file": depart_aux_file,
                  "model_atom_file": model_atom_file,
-                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path,
-                 "lpoint_turbospectrum": config_synthetic_spectra.lpoint_turbospectrum}
+                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path}
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
@@ -414,12 +413,12 @@ if __name__ == '__main__':
         if config_synthetic_spectra.number_of_cpus > 1:
             future = client.submit(run_and_save_wrapper, tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
                                    config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
-                                   spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose)
+                                   spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose, config_synthetic_spectra.lpoint_turbospectrum)
             futures.append(future)  # prepares to get values
         else:
             future = run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, feh, config_synthetic_spectra.wavelength_min,
                                  config_synthetic_spectra.wavelength_max, config_synthetic_spectra.wavelength_delta,
-                                 spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose)
+                                 spectrum_name, config_synthetic_spectra.nlte_flag, config_synthetic_spectra.resolution, vmac, rotation, output_dir, vmic, abundances_dict, config_synthetic_spectra.save_unnormalised_spectra, verbose, config_synthetic_spectra.lpoint_turbospectrum)
             futures.append(future)
 
     if config_synthetic_spectra.number_of_cpus > 1:
