@@ -71,16 +71,15 @@ class SpectraParameters:
             if standard_name is None:
                 standard_name = self._strip_string(col.lower())
                 if standard_name not in name_variants.keys():
-                    testing_col = self._strip_string(col.lower())
+                    testing_col = self._strip_string(col)
                     ending_element = testing_col[-2:]
-                    starting_element = testing_col[:-2].capitalize()
-                    if ending_element == "fe" and starting_element in periodic_table:
+                    starting_element = testing_col[:-2]
+                    if ending_element.lower() == "fe" and starting_element in periodic_table:
                         # means X/Fe
                         standard_name = f"{starting_element.lower()}"
                         abundances_xfe_given.append(standard_name)
                         self.abundance_elements_given.append(standard_name.capitalize())
-                    elif ending_element[-1] == 'h' and testing_col[:-1].capitalize() in periodic_table and not ending_element[-2:] == 'rh':
-                        # 20.06.2024: added check for rh, because Rh is Rhodium, not Ar/H
+                    elif ending_element[-1].lower() == 'h' and testing_col[:-1].lower().capitalize() in periodic_table:
                         # means X/H
                         standard_name = f"{testing_col[:-1].lower()}"
                         abundances_xh_given.append(standard_name)
