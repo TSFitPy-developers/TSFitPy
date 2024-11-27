@@ -680,6 +680,9 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         wave1, flux_norm1, flux1 = np.loadtxt(specname1, unpack=True)
         wave2, flux_norm2, flux2 = np.loadtxt(specname2, unpack=True)
 
+        if np.size(wave1) == 0 or np.size(wave2) == 0:
+            raise ValueError("Empty spectrum file")
+
         # print(lmin, lmin+(count*new_range))
 
         wave1_clipped = wave1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
