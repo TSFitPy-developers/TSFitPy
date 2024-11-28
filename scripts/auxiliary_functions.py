@@ -62,8 +62,11 @@ def calculate_equivalent_width(wavelength: np.ndarray, normalised_flux: np.ndarr
     :return: Equivalent width of the line
     """
     # first cut wavelength and flux to the bounds
-    normalised_flux = normalised_flux[np.logical_and(wavelength >= left_bound, wavelength <= right_bound)]
-    wavelength = wavelength[np.logical_and(wavelength >= left_bound, wavelength <= right_bound)]
+    try:
+        normalised_flux = normalised_flux[np.logical_and(wavelength >= left_bound, wavelength <= right_bound)]
+        wavelength = wavelength[np.logical_and(wavelength >= left_bound, wavelength <= right_bound)]
+    except TypeError:
+        return -9999
     line_func = interp1d(wavelength, normalised_flux, kind='linear', assume_sorted=True, fill_value=1, bounds_error=False)
     total_area = (right_bound - left_bound) * 1.0   # continuum
     try:
