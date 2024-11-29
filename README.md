@@ -322,6 +322,11 @@ This is a short version of the installation + running the code just to test that
     - `<install_dir>` is probably `/opt/intel/oneapi/`? 
   - You can also add it to your `.bashrc`/`.profile` file, so that it is sourced automatically (because otherwise you will have to source it every time you open a new terminal)
 - **ifx should be similar, but Mac is not supported any more**
+- `ifort` to be gone from 2025? Please use `ifx` instead
+
+## gfortran on Mac M-chips
+
+- Spherical models may result in NaNs when running with gfortran on Mac M-chips. [See the solution here](https://github.com/bertrandplez/Turbospectrum_NLTE/issues/17#issuecomment-2506515304)
 
 ## Multiprocessing usage
 
