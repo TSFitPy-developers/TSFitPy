@@ -1336,25 +1336,27 @@ class Spectra:
 
                     spectra_generated, _ = check_if_spectra_generated(wavelength_synthetic_justblend, True)
 
-                    try:
-                        equivalent_width_temp = calculate_equivalent_width(wavelength_synthetic_justblend, flux_norm_synthetic_justblend, line_left, line_right)
-                    except ValueError:
-                        equivalent_width_temp = 999999
-
-                    indices_to_use_cut = np.where((wavelength_synthetic_justblend <= segment_right) & (wavelength_synthetic_justblend >= segment_left))
-                    wavelength_synthetic_justblend, flux_norm_synthetic_justblend = wavelength_synthetic_justblend[indices_to_use_cut], flux_norm_synthetic_justblend[indices_to_use_cut]
-                    wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra( wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, result_one_line["macroturb"], result_one_line["rotation"])
-
-                    analysed_values_blend_sensitivity[abundance_variant]["ew"] = equivalent_width_temp * 1000 # convert to mAngstroms
-
-                    chi_squared_temp = calculate_lbl_chi_squared(wave_ob, flux_ob, self.error_obs_variance, wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, line_left,
-                                                                 line_right, result_one_line["macroturb"], result_one_line["rotation"], convolve_spectra=False)
-
-                    analysed_values_blend_sensitivity[abundance_variant]["chi_sqr"] = chi_squared_temp
-
-                    logging.debug(f"Chi squared for {abundance_variant} is {chi_squared_temp} with EW {equivalent_width_temp}")
-
                     if spectra_generated:
+                        try:
+                            equivalent_width_temp = calculate_equivalent_width(wavelength_synthetic_justblend,
+                                                                               flux_norm_synthetic_justblend, line_left,
+                                                                               line_right)
+                        except ValueError:
+                            equivalent_width_temp = 999999
+
+                        indices_to_use_cut = np.where((wavelength_synthetic_justblend <= segment_right) & (wavelength_synthetic_justblend >= segment_left))
+                        wavelength_synthetic_justblend, flux_norm_synthetic_justblend = wavelength_synthetic_justblend[indices_to_use_cut], flux_norm_synthetic_justblend[indices_to_use_cut]
+                        wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra( wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, result_one_line["macroturb"], result_one_line["rotation"])
+
+                        analysed_values_blend_sensitivity[abundance_variant]["ew"] = equivalent_width_temp * 1000 # convert to mAngstroms
+
+                        chi_squared_temp = calculate_lbl_chi_squared(wave_ob, flux_ob, self.error_obs_variance, wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, line_left,
+                                                                     line_right, result_one_line["macroturb"], result_one_line["rotation"], convolve_spectra=False)
+
+                        analysed_values_blend_sensitivity[abundance_variant]["chi_sqr"] = chi_squared_temp
+
+                        logging.debug(f"Chi squared for {abundance_variant} is {chi_squared_temp} with EW {equivalent_width_temp}")
+
                         if self.save_fitted_spectra:
 
                             # here we calculate the equivalent width of the line and chi squared
@@ -1387,6 +1389,9 @@ class Spectra:
                                                                flux_norm_synthetic_justblend[indices_argsorted])),
                                            fmt=('%.5f', '%.8f'))
                     else:
+                        analysed_values_blend_sensitivity[abundance_variant]["ew"] = 999999
+                        analysed_values_blend_sensitivity[abundance_variant]["chi_sqr"] = 999999
+
                         logging.debug(f"Could not generate blend spectra for blend for line {line_number} at {self.line_centers_sorted[line_number]} angstroms")
 
                     shutil.rmtree(temp_directory)
