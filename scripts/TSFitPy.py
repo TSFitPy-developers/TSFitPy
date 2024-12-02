@@ -3063,7 +3063,7 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
         if tsfitpy_configuration.compiler.lower() == "m3dis":
             module_path = os.path.join(tsfitpy_configuration.spectral_code_path, f"{tsfitpy_configuration.m3dis_python_package_name}/__init__.py")
-            client.run(import_module_from_path, "m3dis", module_path)
+            client.run(import_module_from_path, "m3dis.m3dis", module_path)
 
         tsfitpy_configuration_scattered = client.scatter(tsfitpy_configuration)
 
