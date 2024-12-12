@@ -317,7 +317,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_low = f_coef_low.read().splitlines()
                     f_coef_low.close()
 
-                    #self.check_nan_in_coefficients(lines_coef_low)
+                    self.check_nan_in_coefficients(lines_coef_low, low_coef_dat_name)
 
                     high_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     high_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -328,7 +328,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                     lines_coef_high = f_coef_high.read().splitlines()
                     f_coef_high.close()
 
-                    #self.check_nan_in_coefficients(lines_coef_high)
+                    self.check_nan_in_coefficients(lines_coef_high, high_coef_dat_name)
 
                     interp_coef_dat_name = os_path.join(self.tmp_dir, self.marcs_model_name)
                     interp_coef_dat_name += '_{}_coef.dat'.format(element)
@@ -406,13 +406,13 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                         "errors": "MARCS model atmosphere interpolation failed."
                     }
 
-                #coef_dat_name = "'{}_{}_coef.dat'\n".format(output, element).replace('.interpol', '_{}_coef.dat'.format(element)).strip().replace("'", "")
+                coef_dat_name = "'{}_{}_coef.dat'\n".format(output, element).replace('.interpol', '_{}_coef.dat'.format(element)).strip().replace("'", "")
 
-                #coef_element = open(coef_dat_name, 'r')
-                #lines_coef = coef_element.read().splitlines()
-                #coef_element.close()
+                coef_element = open(coef_dat_name, 'r')
+                lines_coef = coef_element.read().splitlines()
+                coef_element.close()
 
-                #self.check_nan_in_coefficients(lines_coef)
+                self.check_nan_in_coefficients(lines_coef, coef_dat_name)
         else:
             # Write configuration input for interpolator
             interpol_config = ""
@@ -447,13 +447,49 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 }
         return {"errors": None}
 
-    def check_nan_in_coefficients(self, lines_coef):
-        for line in lines_coef:
-            if "NaN" in line and ".mod" not in line:
-                print(lines_coef)
-                print("NAN")
-                exit(0)
-                raise ValueError("NaN in interpolated model atmosphere")
+    @staticmethod
+    def check_nan_in_coefficients(lines_coef, file_to_save):
+        # read through the lines. first skip comments that start with #
+        idx_to_read = 0
+        while lines_coef[idx_to_read][0] == "#":
+            idx_to_read += 1
+        idx_to_read += 1
+        number_of_depths = int(lines_coef[idx_to_read])
+        number_of_levels = int(lines_coef[idx_to_read + 1])
+        idx_to_read += 2 + number_of_depths
+        lines_coef_to_check = lines_coef[idx_to_read:idx_to_read + number_of_depths][::-1]
+
+        save_new_lines = False
+
+        for line_idx, line in enumerate(lines_coef_to_check):
+            if "        NaN" in line:
+                save_new_lines = True
+                # we need to find location of every nan and take the value that is in the same column, but a row below, if it is not a nan
+                # if reaching the end of rows, take value of 1 and replace it
+                # first find the indices of every nan
+                nan_indices = [i for i, x in enumerate(line.split()) if x == "        NaN"]
+                if line_idx == 0:
+                    # replace all nans with 1
+                    lines_coef_to_check[line_idx] = line.replace("        NaN", "1.00000E+00")
+                else:
+                    # take the value from the line below
+                    # first need to find indices within the string where it contains each "        NaN", then take the value from the line below at the same index
+                    line_below = lines_coef_to_check[line_idx - 1]
+                    idx_contains_nan = [line.find("        NaN", i) for i in range(len(line)) if
+                                        line.find("        NaN", i) != -1]
+                    idx_contains_nan = sorted(list(set(idx_contains_nan)))
+                    for idx in idx_contains_nan:
+                        # find the value in the line below
+                        value_below = line_below[idx:idx + 12]
+                        line = line[:idx] + value_below + line[idx + 12:]
+                    lines_coef_to_check[line_idx] = line
+
+        if save_new_lines:
+            new_lines = lines_coef[:idx_to_read] + lines_coef_to_check[::-1] + lines_coef[
+                                                                               idx_to_read + number_of_depths:]
+            with open(file_to_save, 'w') as f:
+                for line in new_lines:
+                    f.write("%s\n" % line)
 
     def calculate_atmosphere(self):
         # figure out if we need to interpolate the model atmosphere for microturbulence
