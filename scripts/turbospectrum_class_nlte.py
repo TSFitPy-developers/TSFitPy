@@ -463,11 +463,11 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         for line_idx, line in enumerate(lines_coef_to_check):
             if "        NaN" in line:
+                logging.debug(f"Found NaN in line {line_idx}")
                 save_new_lines = True
                 # we need to find location of every nan and take the value that is in the same column, but a row below, if it is not a nan
                 # if reaching the end of rows, take value of 1 and replace it
                 # first find the indices of every nan
-                nan_indices = [i for i, x in enumerate(line.split()) if x == "        NaN"]
                 if line_idx == 0:
                     # replace all nans with 1
                     lines_coef_to_check[line_idx] = line.replace("        NaN", "1.00000E+00")
