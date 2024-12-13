@@ -347,45 +347,21 @@ def read_model_atom(nlte_model):
     return atom_EC, atom_label, atom_level, atom_upper2j1, atom_bb_transitions
 
 if __name__ == '__main__':
-    lte_linelist_dir = "12CH-BX_Masseron_v2.list"
-    # lte_linelist_dir = "nlte_ges_linelist_jmg18jul2023_I_II"
-    lte_linelist = lte_linelist_dir
-    output_file = f"{lte_linelist_dir}_nlte"
-
-    nlte_models = ["atom.ch_lte"]
-
-    transition_names = [["chb"]]
-    ion_energy = [[0.0]]
-
-    accessory_match = False  # whether or not to use accessory matching files set as True or False, in almost all cases, this will be false (it is outdated)
-    accessory_matching_files = []  # can leave empty if not using accessory matching files
-
-    match_multiplicity = False  # whether or not the upper level multiplicity (2J+1) from the lte linelist needs to match the multiplicity in the model atom
-    # do not use with accessory_match set to True, is often not needed
-
-    overwrite_lte = False  # whether or not to overwrite the information such as excitation potential, loggf, etc. from the lte linelist with the information found in the model atom
-    model_line_list = ["model_lines_ca", "model_lines_fe"]  # needed for overwriting, otherwise can leave blank
-    vald_output = ["ca_vald_short", "fe_vald_short"]  # needed for overwriting, otherwise can leave blank
-
-    energy_factor = 1.05  # this parameter can be adjusted to whatever margin of error is wanted (currently at 0.05%)
-
-    read_atoms(output_file, transition_names, ion_energy, nlte_models)
-
-    exit()
-
-    lte_linelist = "turbospec.20180901t20.atoms"
-    output_file = f"{lte_linelist}_test_3"
+    lte_linelist = "syn_all_3000_10000_2014HFS.list"
+    output_file = f"{lte_linelist.replace('.list', '_nlte_20241014.list')}"
 
     nlte_models = ["atom.fe607a", "atom.ba111", "atom.ca105b", "atom.co247", "atom.mg86b",
                    "atom.mn281kbc", "atom.ni538qm", "atom.si340", "atom.sr191", "atom.ti503",
-                   "atom.y423"]
+                   "atom.y423qm", "atom.al_qmh_nq_qmax", "atom.eu662qm", "atom.na_qmh_nq_qmax", "atom.o41f"]
 
     transition_names = [["Fe I", "Fe II"], ["BA I", "BA II"], ["CA I", "CA II"], ["CO I", "CO II"],
                         ["MG I", "MG II"], ["MN I", "MN II"], ["NI I", "NI II"], ["SI I", "SI II"],
-                        ["SR I", "SR II"], ["TI I", "TI II"], ["Y I", "Y II"]]
+                        ["SR I", "SR II"], ["TI I", "TI II"], ["Y I", "Y II"],
+                        ["AL I", "AL II"], ["EU I", "EU II"], ["NA I", "NA II"], ["O I", "O II"]]
     ion_energy = [[0.0, 7.9024681], [0.0, 5.2116646], [0.0, 6.11315547], [0.0, 7.88101],
                   [0.0, 7.646236], [0.0, 7.4340380], [0.0, 7.639878], [0.0, 8.15168],
-                  [0.0, 5.69486745], [0.0, 6.828120], [0.0, 6.2173]]
+                  [0.0, 5.69486745], [0.0, 6.828120], [0.0, 6.2173],
+                  [0.0, 5.985769], [0.0, 5.67038], [0.0, 5.13907696], [0.0, 13.618055]]
 
     accessory_match = False  # whether or not to use accessory matching files set as True or False, in almost all cases, this will be false (it is outdated)
     accessory_matching_files = []  # can leave empty if not using accessory matching files
