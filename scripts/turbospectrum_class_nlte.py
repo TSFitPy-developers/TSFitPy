@@ -73,6 +73,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         self.run_babsma_flag: bool = True
         self.run_bsyn_flag: bool = True
 
+        self.compute_intensity_flag: bool = False
+
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
                   turbulent_velocity: float=None, free_abundances=None, free_isotopes=None,
@@ -648,6 +650,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         else:
             segment_file_string = ""
 
+        intensity_or_flux = "Intensity" if self.compute_intensity_flag else "Flux"
+
         # Build babsma configuration file
         babsma_config = """\
 'PURE-LTE  :'  '{pure_lte}'
@@ -679,7 +683,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 {segment_file_string}'LAMBDA_MIN:'    '{this[lambda_min]:.4f}'
 'LAMBDA_MAX:'    '{this[lambda_max]:.4f}'
 'LAMBDA_STEP:'   '{this[lambda_delta]:.5f}'
-'INTENSITY/FLUX:' 'Flux'
+'INTENSITY/FLUX:' '{intensity_or_flux}'
 'COS(THETA)    :' '1.00'
 'ABFIND        :' '.false.'
 'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
@@ -698,6 +702,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
   15
   1.30
 """.format(this=self.__dict__,
+           intensity_or_flux=intensity_or_flux,
            segment_file_string=segment_file_string,
            alpha=alpha,
            spherical=spherical_boolean_code,
@@ -712,27 +717,41 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
         # print(bsyn_config)
         return babsma_config, bsyn_config
 
-    def stitch(self, specname1, specname2, lmin, lmax, new_range, count):  # toss a coin to your stitcher
-        wave1, flux_norm1, flux1 = np.loadtxt(specname1, unpack=True)
-        wave2, flux_norm2, flux2 = np.loadtxt(specname2, unpack=True)
+    def load_generated_spectra(self, location):
+        if not self.compute_intensity_flag:
+            wave, flux_norm, flux = np.loadtxt(location, unpack=True, dtype=float)
+            return wave, flux_norm, flux
+        else:
+            results = np.loadtxt(location, dtype=float)
+            wavelength = results[:, 0]
+            intensities = results[:, 1:]
+            return wavelength, intensities
 
-        if np.size(wave1) == 0 or np.size(wave2) == 0:
+    def stitch(self, specname1, specname2, lmin, lmax, new_range, count):  # toss a coin to your stitcher
+        data1 = np.loadtxt(specname1)
+        data2 = np.loadtxt(specname2)
+
+        if np.size(data1) == 0 or np.size(data2) == 0:
             raise ValueError("Empty spectrum file")
 
         # print(lmin, lmin+(count*new_range))
 
-        wave1_clipped = wave1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
-        flux_norm1_clipped = flux_norm1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
-        flux1_clipped = flux1[np.where((wave1 < lmin + (count * new_range)) & (wave1 >= lmin))]
-        wave2_clipped = wave2[np.where((wave2 >= lmin + (count * new_range)) & (wave2 <= lmax))]
-        flux_norm2_clipped = flux_norm2[np.where((wave2 >= lmin + (count * new_range)) & (wave2 <= lmax))]
-        flux2_clipped = flux2[np.where((wave2 >= lmin + (count * new_range)) & (wave2 <= lmax))]
+        # Define masks for clipping
+        mask1 = (data1[:, 0] < lmin + (count * new_range)) & (data1[:, 0] >= lmin)
+        mask2 = (data2[:, 0] >= lmin + (count * new_range)) & (data2[:, 0] <= lmax)
 
-        wave = np.concatenate((wave1_clipped, wave2_clipped))
-        flux_norm = np.concatenate((flux_norm1_clipped, flux_norm2_clipped))
-        flux = np.concatenate((flux1_clipped, flux2_clipped))
+        # Clip each full 2D array by row
+        data1_clipped = data1[mask1]
+        data2_clipped = data2[mask2]
 
-        return wave, flux_norm, flux
+        # Concatenate along the row axis (axis=0)
+        data_stitched = np.concatenate((data1_clipped, data2_clipped), axis=0)
+
+        # Separate out wavelength (first column) and the rest
+        wave = data_stitched[:, 0]
+        other_data = data_stitched[:, 1:]
+
+        return wave, other_data
 
     def synthesize(self, run_babsma_flag=True, run_bsyn_flag=True):
         babsma_in, bsyn_in = self.make_babsma_bsyn_file(spherical=self.atmosphere_properties['spherical'])
@@ -847,11 +866,13 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             for i in range(number - 1):
                 spectrum1 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 spectrum2 = os_path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(i + 1))
-                wave, flux_norm, flux = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i + 1)
-                f = open(spectrum1, 'w')
-                for j in range(len(wave)):
-                    print("{}  {}  {}".format(wave[j], flux_norm[j], flux[j]), file=f)
-                f.close()
+                wave, data = self.stitch(spectrum1, spectrum2, lmin_orig, lmax_orig, new_range, i + 1)
+
+                # Combine wave (shape [N]) with data (shape [N, M]) into a single 2D array (shape [N, M+1])
+                combined = np.column_stack((wave, data))
+
+                # Save to a text file using numpy
+                np.savetxt(spectrum1, combined, fmt="%.6f")
         else:
             self.synthesize(run_babsma_flag=run_babsma_flag, run_bsyn_flag=run_bsyn_flag)
 
@@ -880,10 +901,13 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 temp_spectra_location = os.path.join(self.tmp_dir, "spectrum_{:08d}.spec".format(0))
                 if os_path.exists(temp_spectra_location):
                     if os.stat(temp_spectra_location).st_size != 0:
-                        return np.loadtxt(temp_spectra_location, unpack=True, usecols=(0, 1, 2), dtype=float)
+                        return self.load_generated_spectra(temp_spectra_location)
                     else:
                         # return 3 empty arrays, because the file exists but is empty
-                        return np.array([]), np.array([]), np.array([])
+                        if not self.compute_intensity_flag:
+                            return np.array([]), np.array([]), np.array([])
+                        else:
+                            return np.array([]), np.array([])
             except AttributeError:
                 if not self.night_mode:
                     print("No attribute, fail of generation?")

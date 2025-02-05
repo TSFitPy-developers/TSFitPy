@@ -790,13 +790,17 @@ class TSFitPyConfig:
             self.spectral_code_path = "../turbospectrum/"
         self.old_turbospectrum_global_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path))
         if self.compiler.lower() == "ifort" or self.compiler.lower() == "intel":
-            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
-                                                   "exec", "")
+            self.spectral_code_path = os.path.join(self.old_turbospectrum_global_path, "exec", "")
+            # check if path exists
+            if os.path.exists(self.spectral_code_path):
+                pass
+            else:
+                self.spectral_code_path = os.path.join(self.old_turbospectrum_global_path, "exec-intel", "")
         elif self.compiler.lower() == "ifx":
-            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
+            self.spectral_code_path = os.path.join(self.old_turbospectrum_global_path,
                                                    "exec-ifx", "")
         elif self.compiler.lower() == "gnu":
-            self.spectral_code_path = os.path.join(os.getcwd(), self._check_if_path_exists(self.spectral_code_path, check_valid_path),
+            self.spectral_code_path = os.path.join(self.old_turbospectrum_global_path,
                                                    "exec-gf", "")
         elif self.compiler.lower() == "m3dis":
             _ = self._check_if_file_exists(os.path.join(self.spectral_code_path, "dispatch.x"), check_valid_path)

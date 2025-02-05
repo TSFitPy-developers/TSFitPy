@@ -90,6 +90,8 @@ class SyntheticSpectraConfig:
 
         self.lpoint_turbospectrum = 1_000_000
 
+        self.compute_intensity_flag = False
+
     def load_config(self):
         # read the configuration file
         self.config_parser.read(self.config_location)
@@ -138,6 +140,11 @@ class SyntheticSpectraConfig:
         except KeyError:
             pass
 
+        try:
+            self.compute_intensity_flag = self.convert_string_to_bool(self.config_parser["AdvancedOptions"]["compute_intensity_flag"])
+        except KeyError:
+            pass
+
 
 
     def check_valid_input(self):
@@ -157,6 +164,10 @@ class SyntheticSpectraConfig:
         if self.compiler.lower() == "intel" or self.compiler.lower() == "ifort":
             self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec", "")
+            if os.path.exists(self.turbospectrum_path):
+                pass
+            else:
+                self.turbospectrum_path = os.path.join(self.turbospectrum_path, "exec-intel", "")
         elif self.compiler.lower() == "gnu":
             self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec-gf", "")
@@ -363,7 +374,8 @@ if __name__ == '__main__':
                  "depart_bin_file": depart_bin_file,
                  "depart_aux_file": depart_aux_file,
                  "model_atom_file": model_atom_file,
-                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path}
+                 "global_temporary_directory": config_synthetic_spectra.temporary_directory_path,
+                 "compute_intensity_flag": config_synthetic_spectra.compute_intensity_flag}
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
