@@ -63,12 +63,22 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
                  depart_aux_file=ts_config["depart_aux_file"],
                  model_atom_file=ts_config["model_atom_file"])
 
+    ts.compute_intensity_flag = ts_config["compute_intensity_flag"]
+
     ts.lpoint = lpoint_turbospectrum
 
-    ts.synthesize_spectra()
+    results = ts.synthesize_spectra()
+
+    shutil.rmtree(temp_directory)
+
+    if ts_config["compute_intensity_flag"]:
+        wavelength, intensities = results
+        return wavelength, intensities, []
+    else:
+        wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = results
+
 
     try:
-        wave_mod_orig, flux_norm_mod_orig, flux_mod_orig = np.loadtxt(os.path.join(temp_directory, 'spectrum_00000000.spec'), usecols=(0,1,2), unpack=True)
         if ts_config["windows_flag"]:
             seg_begins, seg_ends = np.loadtxt(ts_config['segment_file'], comments = ";", usecols=(0,1), unpack=True)
             wave_mod_filled = []
@@ -122,8 +132,6 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
         print(f"FileNotFoundError: {spectrum_name}. Failed to generate spectrum. Error: {err}")
         wave_mod, flux_norm_mod, flux_mod = [], [], []
 
-    shutil.rmtree(temp_directory)
-
     return wave_mod, flux_norm_mod, flux_mod
 
 
@@ -164,29 +172,45 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
             else:
                 nlte_flag_label = "LTE"
             if element != "Fe":
-                print(f"#[{element}/Fe]={value} {nlte_flag_label}", file=f)
+                print(f"#[{element}/Fe]={value:.4f} {nlte_flag_label}", file=f)
             else:
                 # if Fe, it is given as weird Fe/Fe way, which can be fixed back by:
                 # xfe + feh + A(X)_sun = A(X)_star
-                print(f"#A({element})={value + met + solar_abundances['Fe']} {nlte_flag_label}", file=f)
+                print(f"#A({element})={value + met + solar_abundances['Fe']:.4f} {nlte_flag_label}", file=f)
 
         # also print NLTE elements that are not in the abundances_dict
         if nlte_flag:
             for element in nlte_elements:
                 if element not in abundances_dict.keys():
-                    if element != "Fe":
+                    if element != "Fe" or element != "H":
                         print(f"#[{element}/Fe]=0.0 (solar scaled) NLTE", file=f)
+                    elif element == "H":
+                        print(f"#A({element})=12.0 NLTE", file=f)
+                    elif element == "Fe":
+                        print(f"#[Fe/H]={met:.4f} NLTE", file=f)
 
         print("#", file=f)
 
-        if save_unnormalised_spectra:
+        if save_unnormalised_spectra and not ts_config["compute_intensity_flag"]:
             print("#Wavelength Normalised_flux Unnormalised_flux", file=f)
             for i in range(len(wave_mod)):
                 print("{}  {}  {}".format(wave_mod[i], flux_norm_mod[i], flux_mod[i]), file=f)
-        else:
+        elif not ts_config["compute_intensity_flag"]:
             print("#Wavelength Normalised_flux", file=f)
             for i in range(len(wave_mod)):
                 print("{}  {}".format(wave_mod[i], flux_norm_mod[i]), file=f)
+        else:
+            print("#Wavelength Intensities", file=f)
+            # Example: flux_norm_mod is 1D
+            if flux_norm_mod.ndim == 1:
+                for i in range(len(wave_mod)):
+                    print(f"{wave_mod[i]}  {flux_norm_mod[i]}", file=f)
+            # Example: flux_norm_mod is 2D (multiple columns)
+            elif flux_norm_mod.ndim == 2:
+                for i in range(len(wave_mod)):
+                    # Convert the row of flux values into strings, separated by spaces
+                    flux_str = "  ".join(str(val) for val in flux_norm_mod[i])
+                    print(f"{wave_mod[i]}  {flux_str}", file=f)
         f.close()
         return spectrum_name
     else:
