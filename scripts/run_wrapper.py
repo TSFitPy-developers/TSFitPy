@@ -64,6 +64,7 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
                  model_atom_file=ts_config["model_atom_file"])
 
     ts.compute_intensity_flag = ts_config["compute_intensity_flag"]
+    ts.mupoint_path = ts_config["mupoint_path"]
 
     ts.lpoint = lpoint_turbospectrum
 
