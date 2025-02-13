@@ -75,6 +75,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         self.compute_intensity_flag: bool = False
 
+        self.mupoint_path: str = None
+
     def configure(self, lambda_min: float=None, lambda_max:float=None, lambda_delta: float=None,
                   metallicity: float=None, log_g: float=None, t_eff: float=None, stellar_mass: float=None,
                   turbulent_velocity: float=None, free_abundances=None, free_isotopes=None,
@@ -652,67 +654,56 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
 
         intensity_or_flux = "Intensity" if self.compute_intensity_flag else "Flux"
 
+        if self.compute_intensity_flag:
+            mu_point_path = f"\n'MU-POINTS:' '{self.mupoint_path}'"
+        else:
+            mu_point_path = ""
+
         # Build babsma configuration file
-        babsma_config = """\
-'PURE-LTE  :'  '{pure_lte}'
-'LAMBDA_MIN:'    '{this[lambda_min]:.4f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.4f}'
-'LAMBDA_STEP:'    '{this[lambda_delta]:.5f}'
-'MODELINPUT:' '{this[tmp_dir]}{this[marcs_model_name]}.interpol'
+        babsma_config = f"""\
+'PURE-LTE  :'  '{pure_lte_boolean_code}'
+'LAMBDA_MIN:'    '{self.lambda_min:.4f}'
+'LAMBDA_MAX:'    '{self.lambda_max:.4f}'
+'LAMBDA_STEP:'    '{self.lambda_delta:.5f}'
+'MODELINPUT:' '{self.tmp_dir}{self.marcs_model_name}.interpol'
 'MARCS-FILE:' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'METALLICITY:'    '{this[metallicity]:.2f}'
+'MODELOPAC:' '{self.tmp_dir}model_opacity_{self.counter_spectra:08d}.opac'
+'METALLICITY:'    '{self.metallicity:.2f}'
 'ALPHA/Fe   :'    '{alpha:.2f}'
 'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-'XIFIX:' '{xifix}'
-{this[turbulent_velocity]:.2f}
-""".format(this=self.__dict__,
-           alpha=alpha,
-           individual_abundances=individual_abundances.strip(),
-           pure_lte=pure_lte_boolean_code,
-           xifix=xifix_boolean_code
-           )
+'R-PROCESS  :'    '{self.r_process:.2f}'
+'S-PROCESS  :'    '{self.s_process:.2f}'
+{individual_abundances.strip()}
+'XIFIX:' '{xifix_boolean_code}'
+{self.turbulent_velocity:.2f}
+"""
         # Build bsyn configuration file
-        bsyn_config = """\
-'PURE-LTE  :'  '{pure_lte}'
-'NLTE :'          '{nlte}'
-'NLTEINFOFILE:'  '{this[tmp_dir]}SPECIES_LTE_NLTE_{this[counter_spectra]:08d}.dat'
-{segment_file_string}'LAMBDA_MIN:'    '{this[lambda_min]:.4f}'
-'LAMBDA_MAX:'    '{this[lambda_max]:.4f}'
-'LAMBDA_STEP:'   '{this[lambda_delta]:.5f}'
-'INTENSITY/FLUX:' '{intensity_or_flux}'
+        bsyn_config = f"""\
+'PURE-LTE  :'  '{pure_lte_boolean_code}'
+'NLTE :'          '{nlte_boolean_code}'
+'NLTEINFOFILE:'  '{self.tmp_dir}SPECIES_LTE_NLTE_{self.counter_spectra:08d}.dat'
+{segment_file_string}'LAMBDA_MIN:'    '{self.lambda_min:.4f}'
+'LAMBDA_MAX:'    '{self.lambda_max:.4f}'
+'LAMBDA_STEP:'   '{self.lambda_delta:.5f}'
+'INTENSITY/FLUX:' '{intensity_or_flux}'{mu_point_path}
 'COS(THETA)    :' '1.00'
 'ABFIND        :' '.false.'
-'MODELOPAC:' '{this[tmp_dir]}model_opacity_{this[counter_spectra]:08d}.opac'
-'RESULTFILE :' '{this[tmp_dir]}/spectrum_{this[counter_spectra]:08d}.spec'
-'METALLICITY:'    '{this[metallicity]:.2f}'
+'MODELOPAC:' '{self.tmp_dir}model_opacity_{self.counter_spectra:08d}.opac'
+'RESULTFILE :' '{self.tmp_dir}/spectrum_{self.counter_spectra:08d}.spec'
+'METALLICITY:'    '{self.metallicity:.2f}'
 'ALPHA/Fe   :'    '{alpha:.2f}'
 'HELIUM     :'    '0.00'
-'R-PROCESS  :'    '{this[r_process]:.2f}'
-'S-PROCESS  :'    '{this[s_process]:.2f}'
-{individual_abundances}
-{individual_isotopes}
-{line_lists}
-'SPHERICAL:'  '{spherical}'
+'R-PROCESS  :'    '{self.r_process:.2f}'
+'S-PROCESS  :'    '{self.s_process:.2f}'
+{individual_abundances.strip()}
+{individual_isotopes.strip()}
+{line_lists.strip()}
+'SPHERICAL:'  '{spherical_boolean_code}'
   30
   300.00
   15
   1.30
-""".format(this=self.__dict__,
-           intensity_or_flux=intensity_or_flux,
-           segment_file_string=segment_file_string,
-           alpha=alpha,
-           spherical=spherical_boolean_code,
-           individual_abundances=individual_abundances.strip(),
-           individual_isotopes=individual_isotopes.strip(),
-           line_lists=line_lists.strip(),
-           pure_lte=pure_lte_boolean_code,
-           nlte=nlte_boolean_code
-           )
-
+"""
         # print(babsma_config)
         # print(bsyn_config)
         return babsma_config, bsyn_config
@@ -916,6 +907,7 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                 print(f"Interpolation failed? {error}")
                 if error == ValueError:
                     print("ValueError can sometimes imply problem with the departure coefficients grid")
-        return None, None, None
-
-
+        if not self.compute_intensity_flag:
+            return np.array([]), np.array([]), np.array([])
+        else:
+            return np.array([]), np.array([])

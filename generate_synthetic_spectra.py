@@ -91,6 +91,7 @@ class SyntheticSpectraConfig:
         self.lpoint_turbospectrum = 1_000_000
 
         self.compute_intensity_flag = False
+        self.intensity_angles = [0.010018, 0.052035, 0.124619, 0.222841, 0.340008, 0.468138, 0.598497, 0.722203, 0.830825, 0.916958, 0.974726, 1.000000]
 
     def load_config(self):
         # read the configuration file
@@ -145,6 +146,11 @@ class SyntheticSpectraConfig:
         except KeyError:
             pass
 
+        try:
+            self.intensity_angles = self.split_string_to_float_list(self.config_parser["AdvancedOptions"]["intensity_angles"])
+        except KeyError:
+            pass
+
 
 
     def check_valid_input(self):
@@ -162,12 +168,12 @@ class SyntheticSpectraConfig:
 
         self.debug_mode = int(self.debug_mode)
         if self.compiler.lower() == "intel" or self.compiler.lower() == "ifort":
-            self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
+            turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec", "")
-            if os.path.exists(self.turbospectrum_path):
-                pass
+            if os.path.exists(turbospectrum_path):
+                self.turbospectrum_path = turbospectrum_path
             else:
-                self.turbospectrum_path = os.path.join(self.turbospectrum_path, "exec-intel", "")
+                self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path), "exec-intel", "")
         elif self.compiler.lower() == "gnu":
             self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
                                                    "exec-gf", "")
@@ -176,7 +182,7 @@ class SyntheticSpectraConfig:
                                                    "exec-ifx", "")
 
         else:
-            raise ValueError("Compiler not recognized")
+            raise ValueError(f"Compiler {self.compiler} not recognized")
         self.turbospectrum_path = self.turbospectrum_path
 
         if os.path.exists(self.interpolators_path):
@@ -286,7 +292,7 @@ class SyntheticSpectraConfig:
 
 if __name__ == '__main__':
     # load config file from command line
-    today = datetime.datetime.now().strftime("%b-%d-%Y-%H-%M-%S")  # used to not conflict with other instances of fits
+    today = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")  # used to not conflict with other instances of fits
     today = f"{today}_{np.random.random(1)[0]}"
 
     if len(sys.argv) == 1:
@@ -353,6 +359,15 @@ if __name__ == '__main__':
 
     logging.debug(config_synthetic_spectra.__dict__)
 
+    # create mupoint_path
+    mupoint_path = os.path.join(config_synthetic_spectra.temporary_directory_path, "mupoints.dat")
+    if config_synthetic_spectra.compute_intensity_flag:
+        print(f"IMPORTANT!! Intensity calculations require TS to be updated to version v20.1")
+        with open(mupoint_path, "w") as f:
+            f.write(f"{len(config_synthetic_spectra.intensity_angles)}\n")
+            # write all angles, separated by , and with a space at the end
+            f.write(f"{', '.join([str(i) for i in config_synthetic_spectra.intensity_angles])} ")
+
     ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
                  "line_list_paths": line_list_path_trimmed,
@@ -375,7 +390,8 @@ if __name__ == '__main__':
                  "depart_aux_file": depart_aux_file,
                  "model_atom_file": model_atom_file,
                  "global_temporary_directory": config_synthetic_spectra.temporary_directory_path,
-                 "compute_intensity_flag": config_synthetic_spectra.compute_intensity_flag}
+                 "compute_intensity_flag": config_synthetic_spectra.compute_intensity_flag,
+                 "mupoint_path": mupoint_path}
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
