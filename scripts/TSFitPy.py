@@ -1310,16 +1310,7 @@ class Spectra:
                 for abundance_variant, abundance_value in abundance_variants.items():
                     create_dir(temp_directory)
 
-                    if self.fit_feh:
-                        if abundance_variant == "just_blend":
-                            if self.atmosphere_type == "1D":
-                                feh = -5
-                            else:
-                                feh = -4
-                        else:
-                            feh = result_one_line["fitted_abund"] + abundance_value
-                    else:
-                        feh = self.feh
+                    feh = self.feh
 
                     if self.atmosphere_type != "3D" and self.fit_vmic:
                         vmic = result_one_line["fitted_vmic"]
@@ -1329,6 +1320,9 @@ class Spectra:
                     elem_abund_dict_xh = get_input_xh_abund(feh, self)
                     if not self.fit_feh:
                         elem_abund_dict_xh[self.elem_to_fit[0]] = result_one_line["fitted_abund"] + feh + abundance_value
+
+                    if self.fit_feh:
+                        elem_abund_dict_xh["Fe"] = feh + abundance_value
 
                     wavelength_synthetic_justblend, flux_norm_synthetic_justblend, _ = self.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict_xh, vmic,
                                                                                                              segment_left, segment_right,
