@@ -324,10 +324,6 @@ This is a short version of the installation + running the code just to test that
 - **ifx should be similar, but Mac is not supported any more**
 - `ifort` to be gone from 2025? Please use `ifx` instead
 
-## gfortran on Mac M-chips
-
-- Spherical models may result in NaNs when running with gfortran on Mac M-chips. [See the solution here](https://github.com/bertrandplez/Turbospectrum_NLTE/issues/17#issuecomment-2506515304)
-
 ## Multiprocessing usage
 
 Regarding the multiprocessing usage with Dask
