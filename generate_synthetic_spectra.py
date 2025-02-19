@@ -20,275 +20,7 @@ from time import perf_counter
 from scripts.loading_configs import SpectraParameters
 from scripts.solar_abundances import periodic_table, solar_abundances
 from scripts.auxiliary_functions import calculate_vturb
-
-class SyntheticSpectraConfig:
-    def __init__(self, config_location: str, output_folder_title: str):
-        self.config_parser = ConfigParser()
-        self.config_location: str = config_location
-        self.output_folder_title: str = output_folder_title
-
-        self.compiler: str = None
-        self.turbospectrum_path: str = None
-        self.interpolators_path: str = None
-        self.line_list_path: str = None
-        self.model_atmosphere_grid_path_1d: str = None
-        self.model_atmosphere_grid_path_3d: str = None
-        self.model_atoms_path: str = None
-        self.departure_file_path: str = None
-        self.departure_file_config_path: str = None
-        self.output_folder_path: str = None
-        self.input_parameter_path: str = None
-        self.temporary_directory_path: str = None
-
-        self.atmosphere_type: str = None
-        self.include_molecules: bool = None
-        self.nlte_flag: bool = None
-        self.nlte_elements: list[str] = []
-        self.wavelength_min: float = None
-        self.wavelength_max: float = None
-        self.wavelength_delta: float = None
-
-        self.debug_mode: int = None
-        self.number_of_cpus: int = None
-        self.cluster_name: str = None
-
-        self.input_parameters_filename: str = None
-        self.resolution: float = None
-        self.save_unnormalised_spectra: bool = None
-
-        # other things not in config
-        self.output_folder_path_global: str = None
-
-        self.model_atmosphere_list: str = None
-        self.model_atmosphere_grid_path: str = None
-
-        self.depart_bin_file_dict: dict = None
-        self.depart_aux_file_dict: dict = None
-        self.model_atom_file_dict: dict = None
-
-        self.aux_file_length_dict: dict = None
-        self.ndimen: int = None
-
-        self.model_temperatures = None
-        self.model_logs = None
-        self.model_mets = None
-        self.marcs_value_keys = None
-        self.marcs_models = None
-        self.marcs_values = None
-
-        # new options for the slurm cluster
-        self.cluster_type = "local"
-        self.number_of_nodes = 1
-        self.memory_per_cpu_gb = 3.6
-        self.script_commands = [            # Additional commands to run before starting dask worker
-            'module purge',
-            'module load basic-path',
-            'module load intel',
-            'module load anaconda3-py3.10']
-        self.time_limit_hours = 71
-        self.slurm_partition = "debug"
-
-        self.lpoint_turbospectrum = 1_000_000
-
-        self.compute_intensity_flag = False
-        self.intensity_angles = [0.010018, 0.052035, 0.124619, 0.222841, 0.340008, 0.468138, 0.598497, 0.722203, 0.830825, 0.916958, 0.974726, 1.000000]
-
-    def load_config(self):
-        # read the configuration file
-        self.config_parser.read(self.config_location)
-        # intel or gnu compiler
-        self.compiler = self.validate_string_input(self.config_parser["turbospectrum_compiler"]["compiler"], ["intel", "gnu", "ifx", "ifort"])
-        self.turbospectrum_path = self.config_parser["MainPaths"]["turbospectrum_path"]
-        self.interpolators_path = self.config_parser["MainPaths"]["interpolators_path"]
-        self.line_list_path = self.config_parser["MainPaths"]["line_list_path"]
-        self.model_atmosphere_grid_path_1d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_1d"]
-        self.model_atmosphere_grid_path_3d = self.config_parser["MainPaths"]["model_atmosphere_grid_path_3d"]
-        self.model_atoms_path = self.config_parser["MainPaths"]["model_atoms_path"]
-        self.departure_file_path = self.config_parser["MainPaths"]["departure_file_path"]
-        self.departure_file_config_path = self.config_parser["MainPaths"]["departure_file_config_path"]
-        self.output_folder_path = self.config_parser["MainPaths"]["output_path"]
-        self.input_parameter_path = self.config_parser["MainPaths"]["input_parameter_path"]
-        self.temporary_directory_path = os.path.join(self.config_parser["MainPaths"]["temporary_directory_path"], self.output_folder_title, '')
-
-        self.atmosphere_type = self.validate_string_input(self.config_parser["AtmosphereParameters"]["atmosphere_type"], ["1d", "3d"])
-        self.include_molecules = self.convert_string_to_bool(self.config_parser["AtmosphereParameters"]["include_molecules"])
-        self.nlte_flag = self.convert_string_to_bool(self.config_parser["AtmosphereParameters"]["nlte"])
-        self.nlte_elements = self.split_string_to_string_list(self.config_parser["AtmosphereParameters"]["nlte_elements"])
-        self.wavelength_min = float(self.config_parser["AtmosphereParameters"]["wavelength_min"])
-        self.wavelength_max = float(self.config_parser["AtmosphereParameters"]["wavelength_max"])
-        self.wavelength_delta = float(self.config_parser["AtmosphereParameters"]["wavelength_delta"])
-        self.resolution = float(self.config_parser["AtmosphereParameters"]["resolution"])
-
-        self.debug_mode = int(self.config_parser["ExtraParameters"]["debug_mode"])
-        self.number_of_cpus = int(self.config_parser["ExtraParameters"]["number_of_cpus"])
-        self.cluster_name = self.config_parser["ExtraParameters"]["cluster_name"]
-        self.save_unnormalised_spectra = self.convert_string_to_bool(self.config_parser["ExtraParameters"]["save_unnormalised_spectra"])
-
-        self.input_parameters_filename = self.config_parser["InputFile"]["input_filename"]
-
-        try:
-            self.cluster_type = self.config_parser["SlurmClusterParameters"]["cluster_type"].lower()
-            self.number_of_nodes = int(self.config_parser["SlurmClusterParameters"]["number_of_nodes"])
-            self.memory_per_cpu_gb = float(self.config_parser["SlurmClusterParameters"]["memory_per_cpu_gb"])
-            self.script_commands = self._split_string_to_string_list_with_semicolons(self.config_parser["SlurmClusterParameters"]["script_commands"])
-            self.time_limit_hours = float(self.config_parser["SlurmClusterParameters"]["time_limit_hours"])
-            self.slurm_partition = self.config_parser["SlurmClusterParameters"]["partition"]
-        except KeyError:
-            pass
-
-        try:
-            self.lpoint_turbospectrum = int(self.config_parser["AdvancedOptions"]["lpoint_turbospectrum"])
-        except KeyError:
-            pass
-
-        try:
-            self.compute_intensity_flag = self.convert_string_to_bool(self.config_parser["AdvancedOptions"]["compute_intensity_flag"])
-        except KeyError:
-            pass
-
-        try:
-            self.intensity_angles = self.split_string_to_float_list(self.config_parser["AdvancedOptions"]["intensity_angles"])
-        except KeyError:
-            pass
-
-
-
-    def check_valid_input(self):
-        self.atmosphere_type = self.atmosphere_type.upper()
-        self.include_molecules = self.include_molecules
-        self.nlte_flag = self.nlte_flag
-        self.wavelength_min = float(self.wavelength_min)
-        self.wavelength_max = float(self.wavelength_max)
-        if self.wavelength_min > self.wavelength_max:
-            raise ValueError("Wavelength min is greater than wavelength max")
-        self.wavelength_delta = float(self.wavelength_delta)
-        self.resolution = float(self.resolution)
-        self.temporary_directory_path = self.convert_to_absolute_path(self.temporary_directory_path)
-        self.number_of_cpus = int(self.number_of_cpus)
-
-        self.debug_mode = int(self.debug_mode)
-        if self.compiler.lower() == "intel" or self.compiler.lower() == "ifort":
-            turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
-                                                   "exec", "")
-            if os.path.exists(turbospectrum_path):
-                self.turbospectrum_path = turbospectrum_path
-            else:
-                self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path), "exec-intel", "")
-        elif self.compiler.lower() == "gnu":
-            self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
-                                                   "exec-gf", "")
-        elif self.compiler.lower() == "ifx":
-            self.turbospectrum_path = os.path.join(self._check_if_path_exists(self.turbospectrum_path),
-                                                   "exec-ifx", "")
-
-        else:
-            raise ValueError(f"Compiler {self.compiler} not recognized")
-        self.turbospectrum_path = self.turbospectrum_path
-
-        if os.path.exists(self.interpolators_path):
-            self.interpolators_path = os.path.join(os.getcwd(), self.interpolators_path)
-        else:
-            raise ValueError(f"Interpolators path {self.interpolators_path} does not exist")
-
-        if self.atmosphere_type.upper() == "1D":
-            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_1d)
-            self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
-                                                                "model_atmosphere_list.txt")
-        elif self.atmosphere_type.upper() == "3D":
-            self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_3d)
-            self.model_atmosphere_list = os.path.join(self.model_atmosphere_grid_path,
-                                                                "model_atmosphere_list.txt")
-        else:
-            raise ValueError(f"Expected atmosphere type 1D or 3D, got {self.atmosphere_type.upper()}")
-        self.model_atoms_path = self._check_if_path_exists(self.model_atoms_path)
-        self.departure_file_path = self._check_if_path_exists(self.departure_file_path)
-        self.output_folder_path_global = self.convert_to_absolute_path(self.output_folder_path)
-        self.line_list_path = self._check_if_path_exists(self.line_list_path)
-
-        nlte_flag_to_save = "NLTE" if self.nlte_flag else "LTE"
-
-        self.output_folder_title = f"{self.output_folder_title}_{nlte_flag_to_save}_{self.input_parameters_filename}"
-
-        self.output_folder_path = os.path.join(self.output_folder_path_global, self.output_folder_title, "")
-        self.input_parameter_path = os.path.join(self._check_if_path_exists(self.input_parameter_path), self.input_parameters_filename)
-
-
-    @staticmethod
-    def split_string_to_float_list(string_to_split: str) -> list[float]:
-        # remove commas from the string if they exist and split the string into a list
-        string_to_split = string_to_split.replace(",", " ").split()
-        # convert the list of strings to a list of floats
-        string_to_split = [float(i) for i in string_to_split]
-        return string_to_split
-
-    @staticmethod
-    def split_string_to_string_list(string_to_split: str) -> list[str]:
-        # remove commas from the string if they exist and split the string into a list
-        string_to_split = string_to_split.replace(",", " ").split()
-        return string_to_split
-
-    @staticmethod
-    def convert_string_to_bool(string_to_convert: str) -> bool:
-        if string_to_convert.lower() in ["true", "yes", "y", "1"]:
-            return True
-        elif string_to_convert.lower() in ["false", "no", "n", "0"]:
-            return False
-        else:
-            raise ValueError(f"Configuration: could not convert {string_to_convert} to a boolean")
-
-    @staticmethod
-    def validate_string_input(input_to_check: str, allowed_values: list[str]) -> str:
-        # check if input is in the list of allowed values
-        if input_to_check.lower() in allowed_values:
-            # return string in lower case with first letter capitalised
-            return input_to_check.lower().capitalize()
-        else:
-            raise ValueError(f"Configuration: {input_to_check} is not a valid input. Allowed values are {allowed_values}")
-
-    @staticmethod
-    def convert_to_absolute_path(path):
-        if os.path.isabs(path):
-            return path
-        else:
-            # otherwise just return the temp_directory
-            new_path = os.path.join(os.getcwd(), path)
-            return new_path
-
-    @staticmethod
-    def _check_if_path_exists(path_to_check: str, check_valid_path=True) -> str:
-        # check if path is absolute
-        if os.path.isabs(path_to_check):
-            # check if path exists or file exists
-            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
-                return path_to_check
-        else:
-            # if path is relative, check if it exists in the current directory
-            if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
-                # returns absolute path
-                return os.path.join(os.getcwd(), path_to_check, "")
-            else:
-                # if it starts with ../ convert to ./ and check again
-                if path_to_check.startswith("../"):
-                    path_to_check = path_to_check[3:]
-                    if os.path.exists(os.path.join(path_to_check, "")) or os.path.isfile(path_to_check):
-                        return os.path.join(os.getcwd(), path_to_check, "")
-        if check_valid_path:
-            raise FileNotFoundError(f"Configuration: {path_to_check} does not exist")
-        else:
-            return ""
-
-    @staticmethod
-    def convert_list_to_str(list_to_convert: list) -> str:
-        string_to_return = ""
-        for element_ in list_to_convert:
-            string_to_return = f"{string_to_return} {element_}"
-        return string_to_return
-
-    @staticmethod
-    def _split_string_to_string_list_with_semicolons(string_to_split: str) -> list[str]:
-        # separate based on semicolons and remove them from the list
-        string_to_split = string_to_split.split(';')
-        return string_to_split
+from scripts.loading_configs import SyntheticSpectraConfig
 
 if __name__ == '__main__':
     # load config file from command line
@@ -301,7 +33,7 @@ if __name__ == '__main__':
         config_file = sys.argv[1]
     config_synthetic_spectra = SyntheticSpectraConfig(config_file, today)
     config_synthetic_spectra.load_config()
-    config_synthetic_spectra.check_valid_input()
+    config_synthetic_spectra.validate_input()
 
     # if debug_mode is >= 1, then change logging level to debug
     if config_synthetic_spectra.debug_mode >= 1:
@@ -310,6 +42,11 @@ if __name__ == '__main__':
         verbose = True
     else:
         verbose = False
+
+    if config_synthetic_spectra.compiler.lower() == "m3dis":
+        m3dis_flag = True
+    else:
+        m3dis_flag = False
 
     spectra_parameters_class = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False)
     spectra_parameters = spectra_parameters_class.get_spectra_parameters_for_grid_generation()
@@ -368,7 +105,7 @@ if __name__ == '__main__':
             # write all angles, separated by , and with a space at the end
             f.write(f"{', '.join([str(i) for i in config_synthetic_spectra.intensity_angles])} ")
 
-    ts_config = {"turbospec_path": config_synthetic_spectra.turbospectrum_path,
+    ts_config = {"turbospec_path": config_synthetic_spectra.spectral_code_path,
                  "interpol_path": config_synthetic_spectra.interpolators_path,
                  "line_list_paths": line_list_path_trimmed,
                  "model_atmosphere_grid_path": config_synthetic_spectra.model_atmosphere_grid_path,
@@ -391,7 +128,8 @@ if __name__ == '__main__':
                  "model_atom_file": model_atom_file,
                  "global_temporary_directory": config_synthetic_spectra.temporary_directory_path,
                  "compute_intensity_flag": config_synthetic_spectra.compute_intensity_flag,
-                 "mupoint_path": mupoint_path}
+                 "mupoint_path": mupoint_path,
+                 "m3dis_flag": m3dis_flag}
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
