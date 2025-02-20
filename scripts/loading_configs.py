@@ -971,7 +971,7 @@ class TSFitPyConfig(GenericConfig):
         return fit_variable, input_variable
 
     def validate_input(self, check_valid_path=True):
-        super().validate_input()
+        super().validate_input(check_valid_path=check_valid_path)
 
         self.fitting_mode = self.fitting_mode.lower()
         self.fit_vmic = self.fit_vmic
@@ -1084,7 +1084,7 @@ class SyntheticSpectraConfig(GenericConfig):
             pass
 
     def validate_input(self, check_valid_path=True):
-        super().validate_input()
+        super().validate_input(check_valid_path=check_valid_path)
 
         self.temporary_directory_path = self._convert_to_absolute_path(self.temporary_directory_path)
 
