@@ -176,7 +176,7 @@ def run_and_save_wrapper(tsfitpy_pickled_configuration_path, teff, logg, met, lm
 
     wave_mod, flux_norm_mod, flux_mod = run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution, macro, rotation, vturb, verbose=verbose, lpoint_turbospectrum=lpoint_turbospectrum)
     file_location_output = os.path.join(new_directory_to_save_to, f"{spectrum_name}")
-    if len(wave_mod) > 0:
+    if wave_mod is not None and len(wave_mod) > 0:
         f = open(file_location_output, 'w')
 
         # save the parameters used to generate the spectrum
