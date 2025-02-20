@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import pickle
 from .turbospectrum_class_nlte import TurboSpectrum
+from .m3dis_class import M3disCall
 from .convolve import *
 import datetime
 import shutil
 import os
 from .solar_abundances import solar_abundances
-from .auxiliary_functions import calculate_vturb
+from .auxiliary_functions import calculate_vturb, import_module_from_path
 
 
 def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, nlte_flag, abundances_dict, resolution=0,
@@ -36,39 +37,72 @@ def run_wrapper(ts_config, spectrum_name, teff, logg, met, lmin, lmax, ldelta, n
     if not os.path.exists(temp_directory):
         os.makedirs(temp_directory)
 
-    ts = TurboSpectrum(
-                turbospec_path=ts_config["turbospec_path"],
-                interpol_path=ts_config["interpol_path"],
-                line_list_paths=ts_config["line_list_paths"],
-                marcs_grid_path=ts_config["model_atmosphere_grid_path"],
-                marcs_grid_list=ts_config["model_atmosphere_grid_list"],
-                model_atom_path=ts_config["model_atom_path"],
-                departure_file_path=ts_config["departure_file_path"],
-                aux_file_length_dict=ts_config["aux_file_length_dict"],
-                model_temperatures=ts_config["model_temperatures"],
-                model_logs=ts_config["model_logs"],
-                model_mets=ts_config["model_mets"],
-                marcs_value_keys=ts_config["marcs_value_keys"],
-                marcs_models=ts_config["marcs_models"],
-                marcs_values=ts_config["marcs_values"],)
+    if not ts_config["m3dis_flag"]:
+        ssg = TurboSpectrum(
+                    turbospec_path=ts_config["turbospec_path"],
+                    interpol_path=ts_config["interpol_path"],
+                    line_list_paths=ts_config["line_list_paths"],
+                    marcs_grid_path=ts_config["model_atmosphere_grid_path"],
+                    marcs_grid_list=ts_config["model_atmosphere_grid_list"],
+                    model_atom_path=ts_config["model_atom_path"],
+                    departure_file_path=ts_config["departure_file_path"],
+                    aux_file_length_dict=ts_config["aux_file_length_dict"],
+                    model_temperatures=ts_config["model_temperatures"],
+                    model_logs=ts_config["model_logs"],
+                    model_mets=ts_config["model_mets"],
+                    marcs_value_keys=ts_config["marcs_value_keys"],
+                    marcs_models=ts_config["marcs_models"],
+                    marcs_values=ts_config["marcs_values"],)
+    else:
+        ssg = M3disCall(
+            m3dis_path=ts_config["turbospec_path"],
+            interpol_path=ts_config["interpol_path"],
+            line_list_paths=ts_config["line_list_paths"],
+            marcs_grid_path=ts_config["model_atmosphere_grid_path"],
+            marcs_grid_list=ts_config["model_atmosphere_grid_list"],
+            model_atom_path=ts_config["model_atom_path"],
+            departure_file_path=ts_config["departure_file_path"],
+            aux_file_length_dict=ts_config["aux_file_length_dict"],
+            model_temperatures=ts_config["model_temperatures"],
+            model_logs=ts_config["model_logs"],
+            model_mets=ts_config["model_mets"],
+            marcs_value_keys=ts_config["marcs_value_keys"],
+            marcs_models=ts_config["marcs_models"],
+            marcs_values=ts_config["marcs_values"],
+            m3dis_python_module=import_module_from_path("m3dis.m3dis", ts_config["m3dis_python_module"]),
+            n_nu=ts_config["m3dis_n_nu"],
+            hash_table_size=ts_config["m3dis_hash_table_size"],
+            mpi_cores=ts_config["m3dis_mpi_cores"],
+            iterations_max=ts_config["m3dis_iterations_max"],
+            convlim=ts_config["m3dis_convlim"],
+            snap=ts_config["m3dis_snap"],
+            dims=ts_config["m3dis_dims"],
+            nx=ts_config["m3dis_nx"],
+            ny=ts_config["m3dis_ny"],
+            nz=ts_config["m3dis_nz"])
+        ssg.use_precomputed_depart = False
 
-    ts.configure(t_eff = teff, log_g = logg, metallicity = met,
-                 turbulent_velocity = vmic, lambda_delta = ldelta, lambda_min=lmin, lambda_max=lmax,
-                 free_abundances=abundances_dict_xh, temp_directory = temp_directory, nlte_flag=nlte_flag, verbose=verbose,
-                 atmosphere_dimension=ts_config["atmosphere_type"],
-                 windows_flag=ts_config["windows_flag"],
-                 segment_file=ts_config["segment_file"],
-                 line_mask_file=ts_config["line_mask_file"],
-                 depart_bin_file=ts_config["depart_bin_file"],
-                 depart_aux_file=ts_config["depart_aux_file"],
-                 model_atom_file=ts_config["model_atom_file"])
+        # TODO: support for intensity in m3dis
+        ts_config["compute_intensity_flag"] = False
 
-    ts.compute_intensity_flag = ts_config["compute_intensity_flag"]
-    ts.mupoint_path = ts_config["mupoint_path"]
+    ssg.configure(t_eff=teff, log_g=logg, metallicity=met,
+                  turbulent_velocity=vmic, lambda_delta=ldelta, lambda_min=lmin, lambda_max=lmax,
+                  free_abundances=abundances_dict_xh, temp_directory=temp_directory, nlte_flag=nlte_flag,
+                  verbose=verbose,
+                  atmosphere_dimension=ts_config["atmosphere_type"],
+                  windows_flag=ts_config["windows_flag"],
+                  segment_file=ts_config["segment_file"],
+                  line_mask_file=ts_config["line_mask_file"],
+                  depart_bin_file=ts_config["depart_bin_file"],
+                  depart_aux_file=ts_config["depart_aux_file"],
+                  model_atom_file=ts_config["model_atom_file"])
 
-    ts.lpoint = lpoint_turbospectrum
+    ssg.compute_intensity_flag = ts_config["compute_intensity_flag"]
+    ssg.mupoint_path = ts_config["mupoint_path"]
 
-    results = ts.synthesize_spectra()
+    ssg.lpoint = lpoint_turbospectrum
+
+    results = ssg.synthesize_spectra()
 
     shutil.rmtree(temp_directory)
 

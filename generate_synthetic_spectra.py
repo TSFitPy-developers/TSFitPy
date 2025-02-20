@@ -19,7 +19,7 @@ from scripts.run_wrapper import run_and_save_wrapper
 from time import perf_counter
 from scripts.loading_configs import SpectraParameters
 from scripts.solar_abundances import periodic_table, solar_abundances
-from scripts.auxiliary_functions import calculate_vturb
+from scripts.auxiliary_functions import calculate_vturb, import_module_from_path, combine_linelists
 from scripts.loading_configs import SyntheticSpectraConfig
 
 if __name__ == '__main__':
@@ -47,6 +47,38 @@ if __name__ == '__main__':
         m3dis_flag = True
     else:
         m3dis_flag = False
+
+    if m3dis_flag:
+        module_path = os.path.join(config_synthetic_spectra.spectral_code_path,
+                                   f"{config_synthetic_spectra.m3dis_python_package_name}/m3dis.py")
+
+
+        if config_synthetic_spectra.cluster_type.lower() == 'slurm':
+            # TODO what if i have several running in parallel, will they delete each other
+            # create a symlink to the m3dis executable
+            m3dis_executable_path = os.path.join(config_synthetic_spectra.spectral_code_path, "m3dis")
+            # check if m3dis_executable_path exists
+            if not os.path.exists(m3dis_executable_path):
+                raise ValueError(f"m3dis executable path {m3dis_executable_path} does not exist!")
+
+            # get current working directory
+            cwd = os.getcwd()
+            # convert to absolute path
+            m3dis_executable_path_symlink = os.path.join(cwd, "m3dis")
+            if os.path.exists(m3dis_executable_path_symlink):
+                if os.path.islink(m3dis_executable_path_symlink):
+                    os.remove(m3dis_executable_path_symlink)
+                else:
+                    raise ValueError(
+                        f"m3dis symlink {m3dis_executable_path_symlink} exists but is not a symlink! Stopped to prevent accidental deletion of files.")
+            os.symlink(m3dis_executable_path, m3dis_executable_path_symlink)
+
+        # set molecules to False
+        config_synthetic_spectra.include_molecules = False
+        do_hydrogen_linelist = False
+    else:
+        do_hydrogen_linelist = True
+        module_path = None
 
     spectra_parameters_class = SpectraParameters(config_synthetic_spectra.input_parameter_path, first_row_name=False)
     spectra_parameters = spectra_parameters_class.get_spectra_parameters_for_grid_generation()
@@ -89,8 +121,13 @@ if __name__ == '__main__':
 
     print("Trimming")
     include_molecules = config_synthetic_spectra.include_molecules
-    create_window_linelist([config_synthetic_spectra.wavelength_min - 5], [config_synthetic_spectra.wavelength_max + 5], config_synthetic_spectra.line_list_path, line_list_path_trimmed, include_molecules, False)
+    create_window_linelist([config_synthetic_spectra.wavelength_min - 5], [config_synthetic_spectra.wavelength_max + 5], config_synthetic_spectra.line_list_path, line_list_path_trimmed, include_molecules, False, do_hydrogen=do_hydrogen_linelist)
     print("trimming done")
+
+    if m3dis_flag:
+        # if m3dis, then combine all linelists into one
+        # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
+        combine_linelists(line_list_path_trimmed)
 
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "0", "")
 
@@ -129,7 +166,19 @@ if __name__ == '__main__':
                  "global_temporary_directory": config_synthetic_spectra.temporary_directory_path,
                  "compute_intensity_flag": config_synthetic_spectra.compute_intensity_flag,
                  "mupoint_path": mupoint_path,
-                 "m3dis_flag": m3dis_flag}
+                 "m3dis_flag": m3dis_flag,
+                    "m3dis_python_module": module_path,
+                    "m3dis_n_nu": config_synthetic_spectra.n_nu,
+                    "m3dis_hash_table_size": config_synthetic_spectra.hash_table_size,
+                 "m3dis_mpi_cores": config_synthetic_spectra.mpi_cores,
+                    "m3dis_iterations_max": config_synthetic_spectra.iterations_max,
+                 "m3dis_convlim": config_synthetic_spectra.convlim,
+                 "m3dis_snap": config_synthetic_spectra.snap,
+                 "m3dis_dims": config_synthetic_spectra.dims,
+                 "m3dis_nx": config_synthetic_spectra.nx,
+                    "m3dis_ny": config_synthetic_spectra.ny,
+                    "m3dis_nz": config_synthetic_spectra.nz}
+
 
     with open(os.path.join(config_synthetic_spectra.temporary_directory_path, "tsfitpy_configuration.pkl"), "wb") as f:
         pickle.dump(ts_config, f)
