@@ -4,7 +4,7 @@ TSFitPy is a pipeline designed to determine stellar abundances and atmospheric p
 
 To use TSFitPy, you will need a working Turbospectrum (TS) installation of the latest version, which has the capability to compute NLTE line profiles as well as calculate specified spectral windows instead of a full spectrum for a given range. TSFitPy has not been tested on older versions of TS. The latest version of TS can be found here: https://github.com/bertrandplez/Turbospectrum_NLTE
 
-The code requires at least version Python 3.7. It also makes use of fortran programs, which will need to be compiled on the user's machine (intel fortran ifort compiler highly recommended). The Python packages needed are as follows (they should all be installable via "pip install"):
+The code requires at least version Python 3.7. It also makes use of fortran programs, which will need to be compiled on the user's machine (intel fortran ifort/ifx compiler highly recommended). The Python packages needed are as follows (they should all be installable via "pip install"):
 - Numpy
 - Scipy (at least 1.7.1)
 - Dask (installed using `pip install dask[complete]`)
@@ -24,7 +24,7 @@ If you use this code, please acknowledge the authors of the code and the Turbosp
 - Original TS [Alvarez, R & Plez, B. 1998](https://ui.adsabs.harvard.edu/abs/1998A%26A...330.1109A/abstract)
 - TS [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
 - TS NLTE + TSFitPy [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract) and [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
-- Solar abundances input [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) AND [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
+- Solar abundances input [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) and [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
 - 1D MARCS models [Gustafsson, B. et al. 2008](https://ui.adsabs.harvard.edu/abs/2008A%26A...486..951G/abstract)
 - <3D> STAGGER models (if using those) [Magic, Z. et al. 2013](https://ui.adsabs.harvard.edu/abs/2013A%26A...557A..26M/abstract)
 - Gaia-ESO linelist [Heiter, U. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021A%26A...645A.106H/abstract)
@@ -35,10 +35,24 @@ If you make use of the `teff` or `vmic` fitting methods, please acknowledge the 
 
 - D'Orazi, V. et al. [D'Orazi, V. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024MNRAS.tmp.1155D/abstract)
 
-If you make use of the NLTE data, please acknowledge the appropriate papers for the NLTE data used (different one for each element!). See docs in the [TurboSpectrum GitHub](https://github.com/bertrandplez/Turbospectrum_NLTE) page for most sources. If you use Y, Eu, Al, Na (qmh), here are the updated references (might not be inside TurboSpectrum documentation just yet):
+If you make use of the NLTE data, please acknowledge the appropriate papers for the NLTE data used (different one for each element!):
 
-- Al, Na (qmh): [Ezzeddine, R. et al. 2018](https://ui.adsabs.harvard.edu/abs/2018A%26A...618A.141E/abstract)
-- Y: [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
+- H: [Mashonkina, L. et al. 2008](https://ui.adsabs.harvard.edu/abs/2008A%26A...478..529M/abstract)
+- O: [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract)
+- Na (qmh): [Ezzeddine, R. et al. 2018](https://ui.adsabs.harvard.edu/abs/2018A%26A...618A.141E/abstract)
+- Mg: [Bergemann, M. et al. 2017](https://ui.adsabs.harvard.edu/abs/2017ApJ...847...15B/abstract)
+- Al (qmh): [Ezzeddine, R. et al. 2018](https://ui.adsabs.harvard.edu/abs/2018A%26A...618A.141E/abstract)
+- Si: [Bergemann, M. et al. 2013](https://ui.adsabs.harvard.edu/abs/2013ApJ...764..115B/abstract) and [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
+- Ca: [Mashonkina, L. et al. 2017](https://ui.adsabs.harvard.edu/abs/2017A%26A...605A..53M/abstract) and [Semenova, E. et al. 2020](https://ui.adsabs.harvard.edu/abs/2020A%26A...643A.164S/abstract)
+- Ti: [Bergemann, M. et al. 2011](https://ui.adsabs.harvard.edu/abs/2011MNRAS.413.2184B/abstract)
+- Cr: [Bergemann, M. & Cescutti, G. 2010](https://ui.adsabs.harvard.edu/abs/2010A%26A...522A...9B/abstract)
+- Mn: [Bergemann, M. et al. 2019](https://ui.adsabs.harvard.edu/abs/2019A%26A...631A..80B/abstract)
+- Fe: [Bergemann, M. et al. 2012b](https://ui.adsabs.harvard.edu/abs/2012MNRAS.427...27B/abstract) and [Semenova, E. et al. 2020](https://ui.adsabs.harvard.edu/abs/2020A%26A...643A.164S/abstract)
+- Co: [Bergemann, M. et al. 2010](https://ui.adsabs.harvard.edu/abs/2010MNRAS.401.1334B/abstract) and [Yakovleva, S.A. et al. 2020](https://www.mdpi.com/2218-2004/8/3/34)
+- Ni: [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) and [Voronov, Y.V. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022ApJ...926..173V/abstract)
+- Sr: [Bergemann, M. et al. 2012a](https://ui.adsabs.harvard.edu/abs/2012A%26A...546A..90B/abstract) and [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract)
+- Y: [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract) and [Storm, N. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...683A.200S)
+- Ba: [Gallagher, A. et al. 2020](https://ui.adsabs.harvard.edu/abs/2020A%26A...634A..55G/abstract)
 - Eu: [Storm, N. et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...683A.200S)
 
 ## Quick start
@@ -50,7 +64,7 @@ This is a short version of the installation + running the code just to test that
 - `rm readme.txt`
 - `cd ..`
 - `git clone https://github.com/bertrandplez/Turbospectrum_NLTE.git turbospectrum`
-- `cd turbospectrum/exec/` (or `cd turbospectrum/exec-gf/` if using gnu compiler)
+- `cd turbospectrum/exec-intel/` (or `cd turbospectrum/exec-gf/` if using gnu compiler; or `cd turbospectrum/exec-ifx/` if using ifx compiler)
 - if linux: uncomment `mcmodel=medium` in the makefile on line 11
 - `make`
 - `cd ../../`
@@ -140,58 +154,67 @@ This is a short version of the installation + running the code just to test that
       - Third column: right side of the line where it is fitted
     - You can add comments using `;` (either on any line or after the line's values)
 
-## Usage for fitting
+## TSFitPy usage
+
+*When you don’t read the docs, every bug is a feature and every feature is a bug.*
+
+While TSFitPy was set up to make it as user-friendly as possible, scientific cases require at least basic understanding of the code. Please take your time to get familiar with the code, the results and assumptions made. Please feel free to ask questions in the issues if something is unclear.
+
+### Usage for fitting
 
 - There are three main steps to take for every fit: get normalised spectra, create the corresponding fitlist and change the configuration (config) file
 - As an example, we are going to use provided sample spectrum and change config file to fit the Sun
-- Take spectrum from `TSFitPy/input_files/sample_spectrum/` and put it into desired folder, such as `TSFitPy/input_files/observed spectra/`
+- Take spectrum from `TSFitPy/input_files/sample_spectrum/` and put it into desired folder, such as `TSFitPy/input_files/observed_spectra/`
   - One can also supply error as third column, but it is not required (otherwise it will be set to 0.01)
-    - ANY third column will be treated as an error, so make sure it is an error and not something else
+    - **ANY third column will be treated as an error, so make sure it is an error and not something else**
   - Error is sigma, i.e. standard deviation, not variance
-  - Error is used in chi2 calculation
+  - Error is used in chi2 calculation (see docs for the exact formula)
 - It is recommended to create a separate config file for each run/set of stars. This allows to quickly refit the same sample of stars without recreating config file each time
 - Copy and paste the existing `TSFitPy/input_files/tsfitpy_input_configuration.cfg` and call it something like `TSFitPy/input_files/tsfitpy_input_configuration_sun_test.cfg`
-  - The reason to copy and paste is so that `git pull` cannot interfer with the default configuration
+  - The reason to copy and paste is so that `git pull` cannot interfere with the default configuration
 - The config file should already be ready for a test run, but here is the reference breakdown if needed
   - [turbospectrum_compiler]:
     - `compiler` specifies the compiler (ifort, ifx or gnu). Location of turbospectrum is expected at `TSFitPy/turbospectrum/`
   - [MainPaths]
     - Next few lines specify the paths. Default paths are relative to the `TSFitPy/scripts/TSFitPy.py`, but it is possible to change paths if you want to keep your data in a separate folder (e.g. it can be useful if sharing data on a cluster)
   - [FittingParameters]
-    - `atmosphere_type` 1D or 3D: MARCS is 1D, STAGGER average are 3D models
-    - `mode` specifies fitting mode
-      - `all` fits all lines within the linemask at the same time. Advantage: faster. Disadvantage: cannot know whether any specific line has good or bad fit. Not recommended
-      - `lbl` fits all lines within the linemask one line at a time. Advantage: get full info for each line with separate abundance, macroturbulence etc. Can also fit microturbulence (not very well though?) Disadvatage: slower
-      - `teff` fits specified line by changing temperature, not abundance. Recommended use: use element H and include NLTE for H and Fe
-      - `vmic` changes vmic for each abundance line. Very slow, but can get a good vmic. Recommended use: use element Fe
+    - `atmosphere_type`: `1D` or `3D`. MARCS is 1D, STAGGER average are <3D> models
+      - Note that "<3D> models" have depth-dependent microturbulence (vmic). So inputting ANY vmic will have NO effect on the spectra for <3D> model based spectra
+    - `fitting_mode` specifies fitting mode
+      - `all` fits all lines within the linemask at the same time. Advantage: faster. Disadvantage: cannot know whether any specific line has good or bad fit. **Not recommended**
+      - `lbl` fits all lines within the linemask one line at a time. Advantage: get full info for each line with separate abundance, macroturbulence etc. Can also fit microturbulence (not very well though?) Disadvantage: slower
+      - `teff` fits specified line by changing temperature, not abundance. Recommended use: use element H and include NLTE for H. Also recommend to mask out cores of H-lines in your spectra
+      - `vmic` changes vmic for each abundance line. Very slow, but can get a better vmic estimate. Recommended use: use element Fe and fit both Fe and vmic together
+      - `logg` fits specified line by changing logg, not abundance. **NOT TESTED WELL, but I don't see why it wouldn't work. Use with caution**
     - `include_molecules` is whether you want molecules in your spectra. Fitting can be faster without them (useful when testing?). Recommended: yes, unless molecules are not expected in the spectra.
-    - `nlte` whether want to have NLTE or not. Elements to include with NLTE are written below
-    - `fit_vmic`, `fit_vmac`, `fit_rotation` Yes/No/Input depending on if you want to fit them or not. If "no", then microturbulence is calculated based on empirical relation (based on teff, logg, [Fe/H]) and works rather well for FGK-type stars. If Input, it is possible to input microturbulence in the fitlist later. If macroturbulence/rotation is "no", then constant one will be applied to all stars (chosen below). If Input, then each star can be given one in the fitlist later on. For vmic recommended "Input" or "No". Use 'vmic' fitting mode to fit vmic instead of using this option
-    - `element_to_fit` which element to fit. Normally one would fit one element at a time, but it is possible to fit several elements at once using the same linemask (e.g. blended line). If you want to fit abundance for different lines, then you need to fit one element at a time
-      - Providing several elements, will fit several elements for all lines within linemask. So if you want to fit several elements for different lines, you need to create separate config files for each element
+    - `nlte`: `True`/`False`: whether want to have NLTE or not. Elements to include with NLTE are written below
+    - `fit_vmic`: `Yes`/`No`/`Input`. `No` - microturbulence is calculated based on empirical relation (based on teff, logg, [Fe/H]) and works rather well for FGK-type stars (see `TSFitPy/scripts/auxiliary_functions.py:calculate_vturb()`). `Input` - microturbulence is taken from the fitlist (**Recommended** unless you cannot fit vmic/don't know vmic). `Yes` - microturbulence is fitted (**NOT recommended**). Use 'vmic' fitting mode to fit vmic instead of using this option
+    - `fit_vmac`, `fit_rotation`: `Yes`/`No`/`Input`. `No` - macroturbulence/rotation are set to 0. `Input` - macroturbulence/rotation is taken from the fitlist. `Yes` - macroturbulence/rotation is fitted. Recommended to either fit or take from input. Also doing only one is usually fine, unless you have a fast rotator.
+    - `element_to_fit` which element to fit. Normally one would fit one element at a time, but it is possible to fit several elements at once using the same linemask (e.g. blended line) (**NOT recommended**). If you want to fit abundance for different lines, then you need to fit one element at a time
+      - **IMPORTANT**: Providing several elements, will fit several elements for all lines within THE SAME linemask. So if you want to fit several elements for different lines, you need to create separate config files for each element
     - `nlte_elements` which elements to include NLTE for (ignored if `nlte = False`)
     - `linemask_file` is the path in the `linemasks_path` from where the linemask is taken
-    - `wavelength_delta` is the synthetic generated `wavelength_delta`. Try not to have it less than observed spectra, but too small will result in slow fitting. Recommended as a start: `0.005`
+    - `wavelength_delta` is the synthetic generated `wavelength_delta`. Try not to have it less than observed spectra, but too small will result in slow fitting.
     - `segment_size` is the size of the generated segment around the line. Recommended as a start: `4`. Not very important, but can be useful to change if nearby lines are very strong and affect the fit (note: H is always generated whether it is in the segment or not)
   - [ExtraParameters]
-    - `debug_mode` can be used for debugging code. 0 is best for normal fits, 1 outputs some extra information during the Python fitting, 2 outputs full TS fortran information (a lot of info and much slower fit)
-    - `number_of_cpus` is the number of CPUs to use for the fitting. 1 is best for debugging, but can be increased for faster fitting
-    - `experimental_parallelisation` parallelises based on each line (not just spectra) for lbl mode. Much faster, but if crashes, then try to set to False (I would recommend to keep it True)
+    - `debug_mode` can be used for debugging code. 0 is best for normal fits, 1 outputs some extra information during the Python fitting, 2 outputs full TS fortran information (a lot of info and much slower fit). -1 will minimise the output to almost nothing.
+    - `number_of_cpus` is the number of CPUs to use for the fitting (multiprocessing). 1 is best for debugging, but can be increased for faster fitting. Maximum: number of cores on your machine
+    - `experimental_parallelisation` currently does NOTHING (experimental is now part of the main code). Might do something later, who knows...
     - `cluster_name` is the name of the cluster, used just for printing. Honestly not very important
   - [InputAndOutputFiles]
-    - `input_filename` name of the used fitlist
+    - `input_filename` name of the used fitlist file
     - `output_filename` name of the output file (usually `output` and no need to change)
   - [SpectraParameters]
-    - `resolution` is resolution of teh spectra. 0 is no convolution based on the resolution
-    - `vmac` is default macroturbulence for all stars if `fit_macroturb = No`
-    - `rotation` is default macroturbulence for all stars if `fit_rotation = No`
-    - `init_guess_elements` are elements to use for initial guess. Only important if you fit several elements at once (e.g. blended line).  Can be several elements: `input_elements_abundance = Mg Ti Ca`
-    - `init_guess_elements_path` is the path to the linelist for the initial guess elements. E.g. it can look like this: each line is name of spectra and abundance for the guess [X/Fe]: `HD000001 0.2`. Order of elements should be the same as in `init_guess_elements`
-    - The following are a bit "outdated" and left for backwards compatibility. You can alternatively pass abundance of elements in the fitlist
+    - `resolution` is resolution of the spectra (big R). 0 is no convolution based on the resolution. Usually your R will be around 10000-100000 (it is NOT FWHM)
+    - `vmac` is the default macroturbulence for all stars if `fit_macroturb = No` (alternatively can put individual vmac for each star in the fitlist file)
+    - `rotation` is the default macroturbulence for all stars if `fit_rotation = No` (alternatively can put individual rotation for each star in the fitlist file)
+    - Old and slightly outdated (but still supported) parameters:
+      - `init_guess_elements` are elements to use for initial guess. Only important if you fit several elements at once (e.g. blended line).  Can be several elements: `input_elements_abundance = Mg Ti Ca`
+      - `init_guess_elements_path` is the path to the linelist for the initial guess elements. E.g. it can look like this: each line is name of spectra and abundance for the guess [X/Fe]: `HD000001 0.2`. Order of elements should be the same as in `init_guess_elements`
       - `input_elements_abundance` are elements to use for input abundance. This allows to specify abundance of the star for each element. If not specified, then solar scaled abundances are used. Can be several elements: `input_elements_abundance = Mg Ti Ca`
       - `input_elements_abundance_path` is the path to the linelist for the input abundance elements. E.g. it can look like this: each line is name of spectra and abundance [X/Fe]: `HD000001 0.2`. Order of elements should be the same as in `input_elements_abundance`
   - [ParametersForModeAll]
-    - `wavelength_minimum` and `wavelength_maximum` specifies the ranges of the fitted spectra
+    - `wavelength_minimum` and `wavelength_maximum` specifies the ranges of the fitted spectra **ONLY FOR THE `all` fitting mode. Normally it is not needed to change this**
   - [ParametersForModeLbl]
     - `bounds_vmic` are the bounds for microturbulence (HARD BOUNDS)
     - `guess_range_vmic` is the range of microturbulence for the initial guess
@@ -203,20 +226,29 @@ This is a short version of the installation + running the code just to test that
     - Bounds for vmac, rotation, abundance and doppler shift (deviated from RV)
   - [GuessRanges]
     - Guess ranges for vmac, rotation, abundance and doppler shift (deviated from RV)
-- An example of `fitlist` file is added as well:
-  - `name_of_spectrum_to_fit     rv      teff  logg  [Fe/H]  Input_vmicroturb Input_vmacroturb` is first row
-    - Most importantly, you need specname, rv, teff, logg, [Fe/H] (if fitted) and optionally vmic and vmac
-    - You can also provide abundance for each element. Example:
-      - `name_of_spectrum_to_fit rv teff logg [Fe/H] vmic vmac  Mg/Fe  Ti/H  A(Ca)`
-      - Then provide their values in the next row:
-      - `HD000001 0.0 5000.0 2.0 0.0 1.0 1.0 0.2 0.1 0.3`
-      - The code will automatically convert them to [X/Fe] for fitting
-      - Order doesn't matter, except for the first being a name of the spectra (the code reads the header and then matches the values)
-      - Use `;` for comments
-      - IMPORTANT!!! Just saying `Mg` would presume that you want `A(Mg)` and not `[Mg/Fe]`
-      - You can also add column `snr`, which will be used to estimate an error using formula `sigma = 1/snr`, if no error is provided in the spectra
-        - Pass `0` to use default error of `0.01`
-- Now you can run the fitting. To do so, you need to run the `main.py` script. You can do by running:
+  - [SlurmClusterParameters]
+    - See more details in [## Multiprocessing usage](##multiprocessing-usage)
+- Here is an example of `fitlist` file:
+```aiignore
+name_of_spectrum_to_fit rv      teff    logg    [Fe/H]  Input_vmicroturb    Input_vmacroturb    [Mg/Fe]
+HD000001                10.0    5000.0  2.0     0.0     1.0                 1.0                 0.2
+HD000002                -10.0   6000.0  4.0     -4.0    1.5                 3.0                 0.4
+```
+  - First column is ALWAYS the name of the spectra
+  - The rest of the columns can be in any order (they will be matched by name):
+    - `rv` is the radial velocity of the star (in km/s)
+    - `teff` is the effective temperature of the star (in K)
+    - `logg` is the surface gravity of the star (in cgs)
+    - `[Fe/H]` is the metallicity of the star (in dex)
+    - `Input_vmicroturb` (or `vmic`) is the microturbulence of the star (in km/s)
+    - `Input_vmacroturb` (or `vmac`) is the macroturbulence of the star (in km/s)
+    - `rotation` for the rotation of the star (in km/s)
+    - `resolution` is the resolution of the star (R value)
+    - `snr` is the signal to noise ratio of the star (if not provided, it will be set to 100 by default), used only for chi2 calculation
+      - Which will be used to estimate an error using formula `sigma = 1/snr`, if no error is provided in the spectra
+    - `[X/Fe]`, `[X/H]`, `A(X)` are the abundances of the star (in dex), relative to Fe, H or absolute. You can use any X value and however many you want
+      - **IF YOU DO NOT PROVIDE** value for any elements, then they ALL (including alpha) will be [Fe/H] scaled solar abundances
+- Now you can do the fitting. To do so, you need to run the `main.py` script. You can do by running:
   - `python3 main.py ./input_files/tsfitpy_input_configuration.cfg` - this will run the fitting on your local computer
   - This will run the job and save output in its unique folder in `./output_files/`
     - In the output, you will have the fitted parameters. But beyond that there are two flags: `flag_error` and `flag_warning`. It is 8 bit number. `00000000` means no issues were found. Any bit > `1` means some issue was discovered. Not all flags exist, so to be updated later, perhaps.
@@ -249,12 +281,12 @@ This is a short version of the installation + running the code just to test that
       - `xlim` and `ylim` are the limits of the plot
       - `font_size` is the font size of the plot
   - Here you can also generate the synthetic spectra (short window)
-    - Look at the last cell: change the folders and change the parameters for the synthetic spectra
+    - Look at the pre last cell: change the folders and change the parameters for the synthetic spectra
     - Just run the cell and it will generate the synthetic spectra
     - You can supply `resolution`, `macro` and `rotation` in `plot_synthetic_data` function to convolve the synthetic spectra
     - You can also supply `verbose=True` to see Fortran output (doesn't work on Mac? Linux only?)
 
-## Usage for grid generation
+### Usage for grid generation
 
 - To generate the grid, you need to create a `synthetic_spectra_generation_configuration.cfg` file based on the one provided in `./input_files/`
 - It is very similar to the config for fitting (just fewer options) and it only has one extra parameter:
@@ -273,7 +305,7 @@ This is a short version of the installation + running the code just to test that
   - It will also save the .csv file with the grid parameters (including the name of spectrum)
   - Each spectrum also has comments on top with the parameters used to generate it
 
-## Usage for calculate_nlte_correction_line.py
+### Usage for calculate_nlte_correction_line.py
 
 - This script calculates the NLTE correction for a given line, for a given element, for a given model atmosphere
 - It uses the same config file as the fitting, it just skips some parameters
@@ -284,7 +316,7 @@ This is a short version of the installation + running the code just to test that
   - Remember that the NLTE correction is different for different A(X) abundances
     - You can specify abundance beforehand in the fitlist (using [X/Fe], [X/H] or A(X) notation); then it will calculate the NLTE correction for that abundance
 
-## NLTE usage: important notes
+### NLTE usage: important notes
 
 - NLTE is **NOT** just the departure coefficients grid. It also **REQUIRES** linelist with the correct labels, where each transition is referenced to the correct levels in the model atom
   - E.g. `  3947.295  9.146 -2.095   -7.957    7.0  4.57E+06  's' 'p'   0.0    1.0 'O I LS:2s2.2p3.(4S*).3s 5S* LS:2s2.2p3.(4S*).4p 5P'  6 26  '3s5S2*' '4p5P3'  'c' 'a'`
