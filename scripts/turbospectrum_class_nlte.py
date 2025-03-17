@@ -487,6 +487,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
                         value_below = line_below[idx:idx + 12]
                         line = line[:idx] + value_below + line[idx + 12:]
                     lines_coef_to_check[line_idx] = line
+            elif " -" in line:
+                logging.debug(f"Found - in line {line_idx} in file {file_to_save}. Probably spectrum will not compute.")
 
         if save_new_lines:
             new_lines = lines_coef[:idx_to_read] + lines_coef_to_check[::-1] + lines_coef[
