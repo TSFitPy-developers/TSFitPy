@@ -35,6 +35,7 @@ There is a WIP (developed by NS only atm) GUI for TSFitPy (at least results plot
 6. [Parallelisation and Clusters](#parallelisation-and-clusters)
 7. [Troubleshooting & Flags](#troubleshooting--flags)
 8. [Conclusion](#conclusion)
+9. [FAQ](#faq)
 
 ---
 
@@ -545,6 +546,13 @@ Thank you for using **TSFitPy**! We hope these instructions help you install, fi
   - See [this](https://github.com/TSFitPy-developers/TSFitPy/issues/80), i.e. there is no published work
 - **Fitting isotopes?**
   - See [this](https://github.com/TSFitPy-developers/TSFitPy/issues/73)
+- **How is fitting done exactly?**
+  - Typically for line-by-line (`lbl`) fit, each line is fit separately on each CPU in the following manner:
+    1. Generate spectra for the specific abundance using TS (assuming constant stellar parameters). Steps: interpolate model atmosphere (+NLTE departure coefficients if relevant), run babsma, run bsyn. This step is done at every Nelder-Mean step.
+    2. Fit the generated spectrum, by changing vmac, rotation, RV using another minimisation algorithm (`L-BFGS-B`). This method works better here because we can take a very small step for gradient calculations. 
+    3. Therefore, for the specific abundance generated in step 1, we find best-fit vmac/rotation/RV. This breaks degeneracy of fitting both broadening and abundance (way more accurate).
+    4. Repeat steps 1-3 until best-fit abundance is found. This is done by changing the abundance in the generated spectrum and repeating the fit.
+    5. Once the best-fit abundance is found, we can calculate the equivalent width of the line and do other analysis (generate spectra of just the blends, by changing abundance a bit etc.).
 
 ---
 
