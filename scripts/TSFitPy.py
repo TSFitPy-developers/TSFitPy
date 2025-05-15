@@ -2814,7 +2814,10 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
 
         # set molecules to False
         tsfitpy_configuration.include_molecules = False
-        do_hydrogen_linelist = False
+        if tsfitpy_configuration.nlte_elements[0] != "H":
+            do_hydrogen_linelist = True
+        else:
+            do_hydrogen_linelist = False
     else:
         m3dis_python_module = None
 
@@ -2828,10 +2831,6 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
     # load NLTE data dicts
     if tsfitpy_configuration.nlte_flag:
         logging.debug("Configuration: NLTE flag is set to True. Loading NLTE data.")
-        nlte_elements_add_to_og_config = []
-
-        if len(tsfitpy_configuration.nlte_elements) == 0 and len(nlte_elements_add_to_og_config) > 0:
-            tsfitpy_configuration.nlte_elements = nlte_elements_add_to_og_config
 
         nlte_config = ConfigParser()
         # check if nlte_filenames.cfg exists
