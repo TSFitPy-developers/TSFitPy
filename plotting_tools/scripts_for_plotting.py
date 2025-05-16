@@ -709,7 +709,11 @@ def plot_synthetic_data_m3dis(m3dis_paths, teff, logg, met, vmic, lmin, lmax, ld
     line_list_path_trimmed = os.path.join(line_list_path_trimmed, "all", today, '')
 
     print("Trimming")
-    create_window_linelist([lmin - 2], [lmax + 2], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=False)
+    if element_in_nlte != "H":
+        do_hydrogen = True
+    else:
+        do_hydrogen = False
+    create_window_linelist([lmin - 2], [lmax + 2], m3dis_paths["line_list_path"], line_list_path_trimmed, False, False, do_hydrogen=do_hydrogen)
     # if m3dis, then combine all linelists into one
     # go into line_list_path_trimmed and each folder and combine all linelists into one in each of the folders
     parsed_linelist_data = combine_linelists(line_list_path_trimmed, return_parsed_linelist=return_parsed_linelist)

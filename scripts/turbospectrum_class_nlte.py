@@ -647,7 +647,8 @@ class TurboSpectrum(SyntheticSpectrumGenerator):
             spherical_boolean_code = "F"
         xifix_boolean_code = "T" if self.atmosphere_dimension == "1D" else "F"
         nlte_boolean_code = ".true." if self.nlte_flag == True else ".false."
-        pure_lte_boolean_code = ".false." if self.nlte_flag == True else ".true."
+        # NS 16.05.2025: changed to .false. to keep scattering on (see GitHub issue #88)
+        pure_lte_boolean_code = ".false."
 
         if self.windows_flag:
             segment_file_string = f"'SEGMENTSFILE:'     '{self.segment_file}'\n"

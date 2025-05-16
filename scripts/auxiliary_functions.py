@@ -32,22 +32,29 @@ def calculate_vturb(teff: float, logg: float, met: float) -> float:
     """
     t0 = 5500.
     g0 = 4.
+    tlim = 5000.
+    glim = 3.5
 
-    v_mturb: float = 0
+    delta_logg = logg - g0
 
-    if teff >= 5000.:
-        v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
-                logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
-    elif teff < 5000. and logg >= 3.5:
-        v_mturb = 1.05 + 2.51e-4 * (teff - t0) + 1.5e-7 * (5250. - t0) * (5250. - t0) - 0.14 * (logg - g0) - 0.005 * (
-                logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
-    elif teff < 5500. and logg < 3.5:
-        v_mturb = 1.25 + 4.01e-4 * (teff - t0) + 3.1e-7 * (teff - t0) * (teff - t0) - 0.14 * (logg - g0) - 0.005 * (
-                logg - g0) * (logg - g0) + 0.05 * met + 0.01 * met * met
+    if logg >= glim:
+        # dwarfs
+        if teff >= tlim:
+            # hot dwarfs
+            delta_t = teff - t0
+        else:
+            # cool dwarfs
+            delta_t = tlim - t0
 
-    if v_mturb <= 0.0:
-        print("error in calculating micro turb, setting it to 1.0")
-        return 1.0
+        v_mturb = (1.05 + 2.51e-4 * delta_t + 1.5e-7 * delta_t**2 - 0.14 * delta_logg - 0.005 * delta_logg**2 +
+                   0.05 * met + 0.01 * met**2)
+
+    elif logg < glim:
+        # giants
+        delta_t = teff - t0
+
+        v_mturb = (1.25 + 4.01e-4 * delta_t + 3.1e-7 * delta_t**2 - 0.14 * delta_logg - 0.005 * delta_logg**2 +
+                   0.05 * met + 0.01 * met**2)
 
     return v_mturb
 
