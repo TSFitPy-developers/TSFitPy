@@ -41,7 +41,11 @@ There is a WIP (developed by NS only atm) GUI for TSFitPy (at least results plot
 
 ## Acknowledgements
 
-If you use this code, please acknowledge the authors of the code and the Turbospectrum code. Please reference the following papers:
+If you use this code, please acknowledge the authors of the code and the Turbospectrum code. **The most important papers to reference are:**
+
+- TS NLTE + TSFitPy [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract) and [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
+
+Please reference these two papers in your work if you use TSFitPy, as they describe the code and its capabilities, and contain references to most other relevant papers. However, if you want to reference specifics, then here is the full list of papers to acknowledge, depending on what you use in TSFitPy:
 
 - Original TS [Alvarez, R & Plez, B. 1998](https://ui.adsabs.harvard.edu/abs/1998A%26A...330.1109A/abstract)
 - TS [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
@@ -172,10 +176,25 @@ A rapid guide to confirm that TSFitPy works, please see [extra notes](#extra-ins
    - [1D MARCS Models](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) → `TSFitPy/input_files/model_atmospheres/1D/`
    - [3D STAGGER Models](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) → `TSFitPy/input_files/model_atmospheres/3D/`
    - Unzip them so `.mod` files sit in their respective folders.
-3. **(Optional) NLTE Departure Coefficients**
-   - Download from [NLTE dep grids](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) (folder `dep grids`) → `TSFitPy/input_files/nlte_data/`
-   - Place (unzipped) `.bin` and `auxData_...` in dedicated element folders (e.g. `nlte_data/Ba/`) and put `atom.ELEMENT_AND_NUMBER` in `nlte_data/model_atoms/`.
-   - All the NLTE grids for all elements take roughly 1 TB total. However, usually you only need very few elements, so except to requite around 20-100 GB of space, depending on usage.
+3. **(Optional) NLTE Departure Coefficients**. There are two options: manually download the NLTE grids or use the `/utilities/download_nlte_grids.py` python script.
+    - **Automatic Download**:
+      - Go to `TSFitPy/utilities/` and run:
+        ```bash
+        python3 download_nlte_grids.py PATH_WHERE_TO_SAVE 1D/3D ELEMENT1 ELEMENT2 ...
+        ```
+        - Example: `python3 download_nlte_grids.py ./input_files/nlte_data/ 1D Ba Sr` will download NLTE grids for Ba and Sr in 1D MARCS models.
+        - You can specify multiple elements, e.g. `Ba Sr Y`.
+        - If you want to download 3D grids, use `3D` instead of `1D`. Use `1D,3D` or `all` to download both.
+        - If you want to download all elements, use `all` instead of `ELEMENT1 ELEMENT2 ...`.
+        - The script will NOT overwrite existing files. So if something fails, you can just run it again. Just be sure to delete half-downloaded or corrupted files, as they will not be overwritten.
+      - Syntax to download EVERYTHING (warning: this will take ~600 GB of space):
+        ```bash
+        python3 download_nlte_grids.py ../input_files/nlte_data/ all all
+        ```
+    - **Manual Download**:
+      - Download from [NLTE dep grids](https://keeper.mpdl.mpg.de/d/6eaecbf95b88448f98a4/) (folder `dep grids`) → `TSFitPy/input_files/nlte_data/`
+      - Place (unzipped) `.bin` and `auxData_...` in dedicated element folders (e.g. `nlte_data/Ba/`) and put `atom.ELEMENT_AND_NUMBER` in `nlte_data/model_atoms/`.
+      - All the NLTE grids for all elements take roughly 1 TB total. However, usually you only need very few elements, so except to requite around 20-100 GB of space, depending on usage.
 4. **Line Masks** (i.e., wavelength ranges to fit)
    - Located in `TSFitPy/input_files/linemask_files/`
    - Each folder typically has one example file: `./ELEMENT/ELEMENT-lmask.txt`
@@ -251,6 +270,22 @@ The steps to fit a spectrum are as follows:
    - Contains an output of fitted parameters and flags for each line.
    - The code sets `flag_error` and `flag_warning` bits if potential issues appear.
 6. Look at the fits (recommended: by eye; at least for a few of them). Remove any fits that are bad (either by eye or by chi2, `flag_error`, `flag_warning`).
+7. **Getting an average abundance**. Use `./plotting_tools/analyse_the_output.py` with arguments:
+   ```bash
+   python3 analyse_the_output.py ../output_files/OUTPUT_FOLDER_NAME/ --remove-errors --remove-warnings --chisqr-limit 5 --ew-limits 1 200 --ew-limit-total 350
+   ```
+   - This will create a file with average abundances for each element.
+   - Arguments (if not given, defaults are used):
+     - File path to the output folder (e.g., `../output_files/XXX-XX-20XX-XX-XX-XX_0.XXXXXXXXXXXXXXXX_LTE_Fe_1D/`)
+     - `--remove-errors` or `--no-remove-errors`: remove lines with `flag_error != 0` (recommended)
+     - `--remove-warnings` or `--no-remove-warnings`: remove lines with `flag_warning != 0` (recommended)
+     - `--chisqr-limit`: remove lines with `chi_squared > X` (default: 5). Increase for lower SNR and bigger linemasks.
+     - `--ew-limits`: remove lines with `ew < X` or `ew > Y` (excluding blends) (default: 1 and 200, respectively). Increase for molecular lines or bigger linemasks.
+     - `--ew-limit-total`: remove lines with `ew + ew_blend > X` (default: 350). Increase for molecular lines or bigger linemasks.
+   - If you use TSGuiPy and download `new_flags.csv` file, you can use put it into the folder with the output and instead run:
+   ```bash
+    python3 analyse_the_output_new_flags.py ../output_files/OUTPUT_FOLDER_NAME/ --remove-errors --no-remove-warnings --chisqr-limit 50 --ew-limits 1 400 --ew-limit-total 550
+    ```
 
 Examples of a fitlist were given before, but let's quickly go through the example of an output.
 ```text
