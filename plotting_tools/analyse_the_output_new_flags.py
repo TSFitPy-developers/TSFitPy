@@ -1,8 +1,10 @@
 from __future__ import annotations
+import sys, os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', )))
 
 import numpy as np
 import pandas as pd
-import os
 import matplotlib
 import matplotlib.pyplot as plt
 from plotting_tools.scripts_for_plotting import load_output_data
@@ -85,10 +87,10 @@ def main(
     folder_path: str,
     *,
     remove_errors: bool = True,
-    remove_warnings: bool = True,
-    chisqr_limit: float = 5.0,
-    ew_limits: tuple[float, float] = (1, 200),
-    ew_limit_total: float = 350.0,
+    remove_warnings: bool = False,
+    chisqr_limit: float = 50.0,
+    ew_limits: tuple[float, float] = (1, 400),
+    ew_limit_total: float = 550.0
 ):
     """Run TSFitPy post-processing and write average_abundance.csv."""
     output_df = get_average_abundance(
@@ -139,14 +141,14 @@ if __name__ == "__main__":
         "--remove-warnings",
         dest="remove_warnings",
         action=argparse.BooleanOptionalAction,
-        default=True,
+        default=False,
         help="Remove rows with flag_warning != 0 (default: True)",
     )
 
     parser.add_argument(
         "--chisqr-limit",
         type=float,
-        default=5.0,
+        default=50.0,
         help="Maximum chi_squared value to keep (default: 5.0)",
     )
     parser.add_argument(
@@ -154,13 +156,13 @@ if __name__ == "__main__":
         type=float,
         nargs=2,
         metavar=("MIN", "MAX"),
-        default=(1, 200),
+        default=(1, 400),
         help="Min and max equivalent width for the line (default: 1 200)",
     )
     parser.add_argument(
         "--ew-limit-total",
         type=float,
-        default=350.0,
+        default=550.0,
         help="Max equivalent width for the whole line incl. blends (default: 350)",
     )
 

@@ -270,6 +270,23 @@ The steps to fit a spectrum are as follows:
    - Contains an output of fitted parameters and flags for each line.
    - The code sets `flag_error` and `flag_warning` bits if potential issues appear.
 6. Look at the fits (recommended: by eye; at least for a few of them). Remove any fits that are bad (either by eye or by chi2, `flag_error`, `flag_warning`).
+7. **Getting an average abundance**. Use `./plotting_tools/analyse_the_output.py` with arguments:
+   ```bash
+   python3 analyse_the_output.py ../output_files/OUTPUT_FOLDER_NAME/ --remove-errors --remove-warnings --chisqr-limit 5 --ew-limits 1 200 --ew-limit-total 350
+   ```
+   - This will create a file with average abundances for each element.
+   - Arguments (if not given, defaults are used):
+     - File path to the output folder (e.g., `../output_files/XXX-XX-20XX-XX-XX-XX_0.XXXXXXXXXXXXXXXX_LTE_Fe_1D/`)
+     - `--remove-errors` or `--no-remove-errors`: remove lines with `flag_error != 0` (recommended)
+     - `--remove-warnings` or `--no-remove-warnings`: remove lines with `flag_warning != 0` (recommended)
+     - `--chisqr-limit`: remove lines with `chi_squared > X` (default: 5). Increase for lower SNR and bigger linemasks.
+     - `--ew-limits`: remove lines with `ew < X` or `ew > Y` (excluding blends) (default: 1 and 200, respectively). Increase for molecular lines or bigger linemasks.
+     - `--ew-limit-total`: remove lines with `ew + ew_blend > X` (default: 350). Increase for molecular lines or bigger linemasks.
+   - If you use TSGuiPy and download `new_flags.csv` file, you can use put it into the folder with the output and instead run:
+   ```bash
+    python3 analyse_the_output_new_flags.py ../output_files/OUTPUT_FOLDER_NAME/ --remove-errors --no-remove-warnings --chisqr-limit 50 --ew-limits 1 400 --ew-limit-total 550
+    ```
+     
 
 Examples of a fitlist were given before, but let's quickly go through the example of an output.
 ```text
