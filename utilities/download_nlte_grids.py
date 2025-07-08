@@ -9,7 +9,7 @@ python3 download_nlte_grids.py <output_dir> <grid_types> <elements>
 
 Examples
 --------
-# Download 1D **and** 3D grids for Al, Ba, Ca into ./grids/
+# Download 1D **and** 3D grids for Al, Ba, Ca into ./grids/
 python3 download_nlte_grids.py ./grids 1D,3D Al Ba Ca
 
 # Download only 1D grids for Fe & Mg (case‑insensitive, commas or spaces)
@@ -20,6 +20,10 @@ Accepted values for *grid_types*:
   • 3D        – download 3‑D grid files (…3d_bin & …3d_aux)
   • 1D,3D     – download both (comma separated list, order doesn’t matter)
   • all       – synonym for 1D,3D
+
+Accepted values for *elements*:
+    • Element symbols (case‑insensitive, e.g. Fe, Mg, Al)
+    • "All" to download all elements listed in the config file
 """
 from __future__ import annotations
 
@@ -160,6 +164,10 @@ def main() -> None:
 
     out_dir = os.path.abspath(args.output_dir)
     grid_types = _normalise_grid_types(args.grid_types)
+
+    if args.elements == ["All"]:
+        print("WARNING: Downloading all elements takes a lot of space: ~600 GB.")
+
     elements = _normalise_elements(args.elements)
 
     cfg_file = os.path.join(os.path.dirname(__file__), "nlte_grids_links.cfg")
