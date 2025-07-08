@@ -29,6 +29,7 @@ import os
 import sys
 import textwrap
 from typing import Iterable, List, Set, Tuple
+import datetime
 
 import requests
 from zipfile import ZipFile
@@ -194,4 +195,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    print(f"NLTE grid downloader script, {datetime.datetime.now().isoformat()}")
     main()
+    print(f"Done at {datetime.datetime.now().isoformat()}")
