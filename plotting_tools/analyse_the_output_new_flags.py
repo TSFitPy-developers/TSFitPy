@@ -23,7 +23,8 @@ def get_average_abundance(output_folder_location, remove_errors, remove_warnings
         fitted_element = "Fe_H"
         x_value_plot = "wave_center"
 
-    # remove any rows
+    new_flags_df = pd.read_csv(f"{output_folder_location}/new_flags.csv")
+
     if remove_errors:
         output_file_df = output_file_df[output_file_df['flag_error'] == 0]
     if remove_warnings:
@@ -33,7 +34,18 @@ def get_average_abundance(output_folder_location, remove_errors, remove_warnings
     output_file_df = output_file_df[output_file_df['ew_just_line'] <= ew_limits[1]]
     output_file_df = output_file_df[output_file_df['ew'] <= ew_limit_total]
 
-    output_file_df.reset_index(drop=True, inplace=True)
+    # remove any rows that have a flag == 1
+    # specname,linemask,extra_error columns
+    for index, row in new_flags_df.iterrows():
+        specname = row["specname"]
+        linemask = row["linemask"]
+        extra_error = row["extra_error"]
+        # find the row in the output_file_df
+        indices = np.where((output_file_df['specname'] == specname) & (output_file_df['wave_center'] == linemask))[0]
+        if extra_error == 1:
+            print(f"Removing {specname} {linemask} {output_file_df['specname'][indices].values} {output_file_df['wave_center'][indices].values}")
+            output_file_df = output_file_df.drop(indices)
+            output_file_df.reset_index(drop=True, inplace=True)
 
     output_df = pd.DataFrame()
     # new columns: specname, x_value, y_value
@@ -63,10 +75,11 @@ def get_average_abundance(output_folder_location, remove_errors, remove_warnings
                                              np.std(output_file_df["Macroturb"][indices]),
                                              np.mean(output_file_df["rotation"][indices]),
                                              np.std(output_file_df["rotation"][indices]),
-                                             np.mean(output_file_df["ew_just_line"][indices]),]
+                                                np.mean(output_file_df["ew_just_line"][indices])]
         print(f"specname: {specname}, x_value: {np.mean(output_file_df[x_value_plot][indices])}, y_value: {np.mean(output_file_df[fitted_element][indices])}")
 
     return output_df
+
 
 def main(
     folder_path: str,
@@ -94,6 +107,9 @@ def main(
 # 2.  Command-line interface (all *optional*, with sensible defaults)
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
+    # should be used together with flags from TSGuiPy. Put "new_flags.csv" in the output folder and it will remove everything that has a flag == 1 AND other limits.
+    # So if you onl want to use the flags, set remove_errors and remove_warnings to False, and set chisqr_limit, ew_limits and ew_limit_total to very high values.
+
     # remove_errors - if True, remove all rows with flag_error != 0
     # remove_warnings - if True, remove all rows with flag_warning != 0
     # chisqr_limit - maximum chi_squared value to keep (set higher for bigger linemasks, e.g. molecular bands)
@@ -160,3 +176,4 @@ if __name__ == "__main__":
         ew_limits=tuple(args.ew_limits),
         ew_limit_total=args.ew_limit_total,
     )
+
