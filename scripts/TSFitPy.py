@@ -2953,9 +2953,11 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
                                                       unpack=True)
 
     if line_centers.size > 1:
-        tsfitpy_configuration.line_begins_sorted = np.array(sorted(line_begins))
-        tsfitpy_configuration.line_ends_sorted = np.array(sorted(line_ends))
-        tsfitpy_configuration.line_centers_sorted = np.array(sorted(line_centers))
+        idx_sorted = np.argsort(line_centers)
+
+        tsfitpy_configuration.line_begins_sorted = np.array(line_begins)[idx_sorted]
+        tsfitpy_configuration.line_ends_sorted = np.array(line_ends)[idx_sorted]
+        tsfitpy_configuration.line_centers_sorted = np.array(line_centers)[idx_sorted]
     elif line_centers.size == 1:
         tsfitpy_configuration.line_begins_sorted = np.array([line_begins])
         tsfitpy_configuration.line_ends_sorted = np.array([line_ends])
