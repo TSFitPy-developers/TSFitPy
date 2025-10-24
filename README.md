@@ -286,7 +286,6 @@ The steps to fit a spectrum are as follows:
    ```bash
     python3 analyse_the_output_new_flags.py ../output_files/OUTPUT_FOLDER_NAME/ --remove-errors --no-remove-warnings --chisqr-limit 50 --ew-limits 1 400 --ew-limit-total 550
     ```
-     
 
 Examples of a fitlist were given before, but let's quickly go through the example of an output.
 ```text
