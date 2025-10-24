@@ -459,15 +459,17 @@ class GenericConfig:
             raise ValueError("Compiler not recognized")
         self.spectral_code_path = self.spectral_code_path
 
-        if os.path.exists(self.interpolators_path):
-            self.interpolators_path = os.path.join(os.getcwd(), self.interpolators_path)
-        else:
-            if self.interpolators_path.startswith("./"):
-                self.interpolators_path = self.interpolators_path[2:]
-                self.interpolators_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
 
-                if not os.path.exists(self.interpolators_path):
-                    raise ValueError(f"Interpolators path {self.interpolators_path} does not exist")
+        if check_valid_path:
+            if os.path.exists(self.interpolators_path):
+                self.interpolators_path = os.path.join(os.getcwd(), self.interpolators_path)
+            else:
+                if self.interpolators_path.startswith("./"):
+                    self.interpolators_path = self.interpolators_path[2:]
+                    self.interpolators_path = os.path.join(os.getcwd(), "scripts", self.interpolators_path)
+
+                    if not os.path.exists(self.interpolators_path):
+                        raise ValueError(f"Interpolators path {self.interpolators_path} does not exist")
 
         if self.atmosphere_type.upper() == "1D":
             self.model_atmosphere_grid_path = self._check_if_path_exists(self.model_atmosphere_grid_path_1d, check_valid_path)

@@ -82,26 +82,22 @@ def calculate_all_lines_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, 
     :param seg_ends: Segment list where it ends, array
     :return: Calculated chi squared at lines
     """
-    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
+    if (wave_mod[1] - wave_mod[0]) <= (wave_obs[1] - wave_obs[0]):
         flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-        chi_square = 0
-        for l in range(len(line_begins_sorted[np.where(
-                (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends)))])):
-            flux_line_obs = flux_obs[
-                np.where((wave_obs <= line_ends_sorted[l]) & (wave_obs >= line_begins_sorted[l]))]
-            flux_line_mod = flux_mod_interp[
-                np.where((wave_obs <= line_ends_sorted[l]) & (wave_obs >= line_begins_sorted[l]))]
-            chi_square += np.sum(np.square((flux_line_obs - flux_line_mod)) / flux_line_mod)
+        wave_ref, flux_ref_mod, flux_ref_obs = wave_obs, flux_mod_interp, flux_obs
     else:
         flux_obs_interp = np.interp(wave_mod, wave_obs, flux_obs)
-        chi_square = 0
-        for l in range(len(line_begins_sorted[np.where(
-                (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends)))])):
-            flux_line_obs = flux_obs_interp[
-                np.where((wave_mod <= line_ends_sorted[l]) & (wave_mod >= line_begins_sorted[l]))]
-            flux_line_mod = flux_mod[
-                np.where((wave_mod <= line_ends_sorted[l]) & (wave_mod >= line_begins_sorted[l]))]
-            chi_square += np.sum(np.square(flux_line_obs - flux_line_mod) / flux_line_mod)
+        wave_ref, flux_ref_mod, flux_ref_obs = wave_mod, flux_mod, flux_obs_interp
+
+    chi_square = 0.0
+
+    # Select lines within the segment range
+    valid_lines = (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends))
+    for begin, end in zip(line_begins_sorted[valid_lines], line_ends_sorted[valid_lines]):
+        mask = (wave_ref >= begin) & (wave_ref <= end)
+        diff = flux_ref_obs[mask] - flux_ref_mod[mask]
+        chi_square += np.sum((diff ** 2) / flux_ref_mod[mask])
+
     return chi_square
 
 
@@ -141,12 +137,10 @@ def calc_ts_spectra_all_lines(obs_name: str, wave_mod_orig: np.ndarray, flux_mod
     chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
                                                  line_ends_sorted, seg_begins, seg_ends)
 
-    os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, obs_name)}")
+    os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, f'spectrum_fit_{obs_name}')}")
 
-    out = open(f"{os.path.join(output_dir, f'spectrum_fit_convolved_{obs_name}')}",'w')
-    for l in range(len(wave_mod)):
-        print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
-    out.close()
+    data = np.column_stack((wave_mod, flux_mod))
+    np.savetxt(os.path.join(output_dir, f"spectrum_fit_convolved_{obs_name}"), data, fmt="%.7e")
 
     return chi_square
 
