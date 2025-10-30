@@ -480,6 +480,9 @@ For NLTE calculations, you need:
     - `bounds_vmic` are the bounds for microturbulence (HARD BOUNDS)
     - `guess_range_vmic` is the range of microturbulence for the initial guess
     - `find_upper_limit` after the fit is done, it is possible to find upper limit for abundance. This is done by increasing abundance until fitted chi-squared increases by the given `upper_limit_sigma` (e.g. 3 sigma). This is done for each line separately. Doubles the time of the fit, but can be useful to find upper limit or error estimation
+    - `fit_continuum` True/False, whether to linearly adjust the local contrinuum around the line. Equation is flux_norm += 1 - ((wavelength - wavelength_left_linemask_line) * slope + intercept)
+    - `bounds_continuum_slope` slope in the equation above. Slope = 0, means just a flat up/down shift
+    - `bounds_continuum_intercept` intercept of the continuum. Intercept = 1, means that the continuum is at 1. Slope 0 and interecept 1 means that continuum was not adjusted
   - [ParametersForModeTeff]
     - `bounds_teff` are the bounds for temperature (HARD BOUNDS)
     - `guess_range_teff` is the range of temperature for the initial guess deviated from the input temperature

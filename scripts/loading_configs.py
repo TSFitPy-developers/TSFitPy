@@ -745,6 +745,9 @@ class TSFitPyConfig(GenericConfig):
         self.compute_blend_spectra = True
         self.sensitivity_abundance_offset = 0.2
         self.just_blend_reduce_abundance = -10
+        self.fit_continuum = False
+        self.bounds_continuum_slope = [-0.1, 0.1]
+        self.bounds_continuum_intercept = [0.9, 1.1]
 
     def load_config(self, check_valid_path=True):
         # if last 3 characters are .cfg then new config file, otherwise old config file
@@ -873,6 +876,15 @@ class TSFitPyConfig(GenericConfig):
             self.just_blend_reduce_abundance = float(self.config_parser["AdvancedOptions"]["just_blend_reduce_abundance"])
         except KeyError:
             pass
+
+        try:
+            self.fit_continuum = self._convert_string_to_bool(self.config_parser["ParametersForModeLbl"]["fit_continuum"])
+            self.bounds_continuum_slope = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_continuum_slope"])
+            self.bounds_continuum_intercept = self._split_string_to_float_list(self.config_parser["ParametersForModeLbl"]["bounds_continuum_intercept"])
+        except KeyError:
+            self.fit_continuum = False
+            self.bounds_continuum_slope = [-0.1, 0.1]
+            self.bounds_continuum_intercept = [0.9, 1.1]
 
     def warn_on_config_issues(self):
         print("\n\nChecking inputs\n")
