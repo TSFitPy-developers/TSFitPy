@@ -46,8 +46,13 @@ def load_output_data(output_folder_location: str) -> dict:
     tsfitpy_config.load_config(check_valid_path=False)
     tsfitpy_config.validate_input(check_valid_path=False)
 
-    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic', 'logg']:
-        raise ValueError("Non-lbl fitting methods are not supported yet")
+    if tsfitpy_config.fitting_mode not in ["lbl", "teff", 'vmic', 'logg', 'all']:
+        raise ValueError("Fitting method is not supported yet")
+
+    if tsfitpy_config.fitting_mode == "all":
+        fitting_method_all = True
+    else:
+        fitting_method_all = False
 
     output_elem_column = f"Fe_H"
 
@@ -62,8 +67,12 @@ def load_output_data(output_folder_location: str) -> dict:
 
     filenames_output_folder_convolved = []
     for filename in filenames_output_folder:
-        if "_convolved.spec" in filename:
-            filenames_output_folder_convolved.append(os.path.join(output_folder_location, filename))
+        if not fitting_method_all:
+            if "_convolved.spec" in filename:
+                filenames_output_folder_convolved.append(os.path.join(output_folder_location, filename))
+        else:
+            if "spectrum_fit_convolved_" in filename:
+                filenames_output_folder_convolved.append(os.path.join(output_folder_location, filename))
 
     with open(os.path.join(output_folder_location, tsfitpy_config.output_filename), 'r') as output_file_reading:
         output_file_lines = output_file_reading.readlines()

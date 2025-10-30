@@ -82,26 +82,22 @@ def calculate_all_lines_chi_squared(wave_obs: np.ndarray, flux_obs: np.ndarray, 
     :param seg_ends: Segment list where it ends, array
     :return: Calculated chi squared at lines
     """
-    if wave_mod[1] - wave_mod[0] <= wave_obs[1] - wave_obs[0]:
+    if (wave_mod[1] - wave_mod[0]) <= (wave_obs[1] - wave_obs[0]):
         flux_mod_interp = np.interp(wave_obs, wave_mod, flux_mod)
-        chi_square = 0
-        for l in range(len(line_begins_sorted[np.where(
-                (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends)))])):
-            flux_line_obs = flux_obs[
-                np.where((wave_obs <= line_ends_sorted[l]) & (wave_obs >= line_begins_sorted[l]))]
-            flux_line_mod = flux_mod_interp[
-                np.where((wave_obs <= line_ends_sorted[l]) & (wave_obs >= line_begins_sorted[l]))]
-            chi_square += np.sum(np.square((flux_line_obs - flux_line_mod)) / flux_line_mod)
+        wave_ref, flux_ref_mod, flux_ref_obs = wave_obs, flux_mod_interp, flux_obs
     else:
         flux_obs_interp = np.interp(wave_mod, wave_obs, flux_obs)
-        chi_square = 0
-        for l in range(len(line_begins_sorted[np.where(
-                (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends)))])):
-            flux_line_obs = flux_obs_interp[
-                np.where((wave_mod <= line_ends_sorted[l]) & (wave_mod >= line_begins_sorted[l]))]
-            flux_line_mod = flux_mod[
-                np.where((wave_mod <= line_ends_sorted[l]) & (wave_mod >= line_begins_sorted[l]))]
-            chi_square += np.sum(np.square(flux_line_obs - flux_line_mod) / flux_line_mod)
+        wave_ref, flux_ref_mod, flux_ref_obs = wave_mod, flux_mod, flux_obs_interp
+
+    chi_square = 0.0
+
+    # Select lines within the segment range
+    valid_lines = (line_begins_sorted > np.min(seg_begins)) & (line_begins_sorted < np.max(seg_ends))
+    for begin, end in zip(line_begins_sorted[valid_lines], line_ends_sorted[valid_lines]):
+        mask = (wave_ref >= begin) & (wave_ref <= end)
+        diff = flux_ref_obs[mask] - flux_ref_mod[mask]
+        chi_square += np.sum((diff ** 2) / flux_ref_mod[mask])
+
     return chi_square
 
 
@@ -141,12 +137,10 @@ def calc_ts_spectra_all_lines(obs_name: str, wave_mod_orig: np.ndarray, flux_mod
     chi_square = calculate_all_lines_chi_squared(wave_obs, flux_obs, wave_mod, flux_mod, line_begins_sorted,
                                                  line_ends_sorted, seg_begins, seg_ends)
 
-    os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, obs_name)}")
+    os.system(f"mv {os.path.join(temp_directory, 'spectrum_00000000.spec')} {os.path.join(output_dir, f'spectrum_fit_{obs_name}')}")
 
-    out = open(f"{os.path.join(output_dir, f'spectrum_fit_convolved_{obs_name}')}",'w')
-    for l in range(len(wave_mod)):
-        print(f"{wave_mod[l]}  {flux_mod[l]}", file=out)
-    out.close()
+    data = np.column_stack((wave_mod, flux_mod))
+    np.savetxt(os.path.join(output_dir, f"spectrum_fit_convolved_{obs_name}"), data, fmt="%.7e")
 
     return chi_square
 
@@ -289,6 +283,19 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
     return res
 
 
+def apply_continuum_correction(wavelength, wavelength_0, flux, continuum_slope_coef, continuum_intercept_coef):
+    """
+    Applies correction to the continuum in the form flux_out = flux + (1 - ((wavelength - wavelength_0) * slope + intercept))
+    :param wavelength: wavelength array
+    :param wavelength_0: from where to start normalisation (0-point)
+    :param flux: normalised flux to normalise
+    :param continuum_slope_coef: slope of the normalisation
+    :param continuum_intercept_coef: intercept
+    :return:
+    """
+    return flux + (1 - (continuum_slope_coef * (wavelength - wavelength_0) + continuum_intercept_coef))
+
+
 class Spectra:
     def __init__(self, specname: str, teff: float, logg: float, rv: float, met: float, micro: float, macro: float,
                  rotation: float, abundances_dict: dict, resolution: float, snr: float, line_list_path_trimmed: str, index_temp_dir: float,
@@ -310,6 +317,9 @@ class Spectra:
         self.fit_vmic: bool = False
         self.input_vmic: bool = False
         self.fit_vmac: bool = False
+        self.fit_continuum: bool = False
+        self.bounds_continuum_slope = [-0.1, 0.1]  # bounds for continuum slope
+        self.bounds_continuum_intercept = [0.9, 1.1]  # bounds for continuum intercept
         self.input_vmac: bool = False
         self.fit_rotation: bool = False
         self.input_rotation: bool = False
@@ -526,6 +536,8 @@ class Spectra:
         self.wavelength_fitted_dict: dict = {}
         self.flux_norm_fitted_dict: dict = {}
         self.flux_fitted_dict: dict = {}
+        self.continuum_slope_fitted_dict: dict = {}
+        self.continuum_intercept_fitted_dict: dict = {}
 
     def load_observed_spectra(self):
         """
@@ -701,6 +713,11 @@ class Spectra:
         self.compute_blend_spectra = tsfitpy_config.compute_blend_spectra
         self.sensitivity_abundance_offset = tsfitpy_config.sensitivity_abundance_offset
         self.just_blend_reduce_abundance = tsfitpy_config.just_blend_reduce_abundance
+
+        self.fit_continuum = tsfitpy_config.fit_continuum
+        # flux_adjusted = flux + (1 - (slope * (wavelength - wavelength_min) + intercept))
+        self.bounds_continuum_slope = tsfitpy_config.bounds_continuum_slope
+        self.bounds_continuum_intercept = tsfitpy_config.bounds_continuum_intercept
 
         self.pickled_marcs_models_location = os.path.join(self.global_temp_dir, "marcs_models.pkl")
 
@@ -925,6 +942,8 @@ class Spectra:
         guess_length = 1
         if self.fit_vmac:
             guess_length += 1
+        if self.fit_continuum:
+            guess_length += 1
         if self.fit_rotation:
             guess_length += 1
 
@@ -937,6 +956,22 @@ class Spectra:
             macro_guess, macro_bounds = self.get_simplex_guess(guess_length, min_macroturb, max_macroturb, self.bound_min_vmac, self.bound_max_vmac)
             guesses = np.append(guesses, [macro_guess], axis=0)
             bounds.append(macro_bounds)
+        if self.fit_continuum:
+            # continuum guess between -0.01 and 0.01 for coefficient a
+            offset = (self.bounds_continuum_slope[1] - self.bounds_continuum_slope[0]) / 4
+
+            continuum_guess, continuum_bounds = self.get_simplex_guess(guess_length, self.bounds_continuum_slope[0] + offset, self.bounds_continuum_slope[1] - offset,
+                                                                      self.bounds_continuum_slope[0], self.bounds_continuum_slope[1])
+            guesses = np.append(guesses, [continuum_guess], axis=0)
+            bounds.append(continuum_bounds)
+
+            # continuum guess between 0.9 and 1.1 for coefficient b
+            offset = (self.bounds_continuum_intercept[1] - self.bounds_continuum_intercept[0]) / 4
+
+            continuum_guess, continuum_bounds = self.get_simplex_guess(guess_length, self.bounds_continuum_intercept[0] + offset, self.bounds_continuum_intercept[1] - offset,
+                                                                        self.bounds_continuum_intercept[0], self.bounds_continuum_intercept[1])
+            guesses = np.append(guesses, [continuum_guess], axis=0)
+            bounds.append(continuum_bounds)
         if self.fit_rotation:
             rotation_guess, rotation_bounds = self.get_simplex_guess(guess_length, min_rotation, max_rotation, self.bound_min_rotation, self.bound_max_rotation)
             guesses = np.append(guesses, [rotation_guess], axis=0)
@@ -958,6 +993,14 @@ class Spectra:
                     guesses[:, 1][int(np.size(guesses[:, 1]) / 2)] = np.abs(min_macroturb) / 2
                 else:
                     guesses[:, 1][int(np.size(guesses[:, 1]) / 2)] = np.abs(max_macroturb) / 2
+        if self.fit_continuum:
+            continuum_index = 1
+            if self.fit_vmac:
+                continuum_index = 2
+            if np.median(guesses[:, continuum_index]) == 0:
+                guesses[:, continuum_index][int(np.size(guesses[:, continuum_index]) / 2)] = self.bounds_continuum_slope[0] + (self.bounds_continuum_slope[1] - self.bounds_continuum_slope[0]) / 4
+            if np.median(guesses[:, continuum_index + 1]) == 1:
+                guesses[:, continuum_index + 1][int(np.size(guesses[:, continuum_index + 1]) / 2)] = self.bounds_continuum_intercept[0] + (self.bounds_continuum_intercept[1] - self.bounds_continuum_intercept[0]) / 4
         if self.fit_rotation:
             if np.median(guesses[:, -1]) <= 0.5:
                 if np.abs(min_rotation) > np.abs(max_rotation):
@@ -1257,6 +1300,12 @@ class Spectra:
             except ValueError:
                 equivalent_width = 999999
 
+            if self.fit_continuum:
+                continuum_slope_coef = result_one_line["continuum_slope_coef"]
+                continuum_intercept_coef = result_one_line["continuum_intercept_coef"]
+                flux_fit_conv = apply_continuum_correction(wavelength_fit_conv, line_left, flux_fit_conv, continuum_slope_coef,
+                                           continuum_intercept_coef)
+
             extra_wavelength_to_save = 1  # AA extra wavelength to save left and right of the line
 
             # this will save extra +/- extra_wavelength_to_save in convolved spectra. But just so that it doesn't
@@ -1322,7 +1371,8 @@ class Spectra:
                         elem_abund_dict_xh[self.elem_to_fit[0]] = result_one_line["fitted_abund"] + feh + abundance_value
 
                     if self.fit_feh:
-                        elem_abund_dict_xh["Fe"] = feh + abundance_value
+                        elem_abund_dict_xh["Fe"] = result_one_line["fitted_abund"] + abundance_value
+                        feh = result_one_line["fitted_abund"]
 
                     wavelength_synthetic_justblend, flux_norm_synthetic_justblend, _ = self.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict_xh, vmic,
                                                                                                              segment_left, segment_right,
@@ -1340,9 +1390,13 @@ class Spectra:
 
                         indices_to_use_cut = np.where((wavelength_synthetic_justblend <= segment_right) & (wavelength_synthetic_justblend >= segment_left))
                         wavelength_synthetic_justblend, flux_norm_synthetic_justblend = wavelength_synthetic_justblend[indices_to_use_cut], flux_norm_synthetic_justblend[indices_to_use_cut]
-                        wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra( wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, result_one_line["macroturb"], result_one_line["rotation"])
+                        wavelength_synthetic_justblend, flux_norm_synthetic_justblend = get_convolved_spectra(wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, result_one_line["macroturb"], result_one_line["rotation"])
 
                         analysed_values_blend_sensitivity[abundance_variant]["ew"] = equivalent_width_temp * 1000 # convert to mAngstroms
+
+                        if self.fit_continuum:
+                            flux_norm_synthetic_justblend = apply_continuum_correction(wavelength_synthetic_justblend, line_left, flux_norm_synthetic_justblend,
+                                                                                      continuum_slope_coef, continuum_intercept_coef)
 
                         chi_squared_temp = calculate_lbl_chi_squared(wave_ob, flux_ob, self.error_obs_variance, wavelength_synthetic_justblend, flux_norm_synthetic_justblend, self.resolution, line_left,
                                                                      line_right, result_one_line["macroturb"], result_one_line["rotation"], convolve_spectra=False)
@@ -1965,6 +2019,12 @@ class Spectra:
                 vmac = self.vmac_fitted_dict[line_number]
             else:
                 vmac = self.vmac
+            if self.fit_continuum:
+                continuum_slope_coef = self.continuum_slope_fitted_dict[line_number]
+                continuum_intercept_coef = self.continuum_intercept_fitted_dict[line_number]
+            else:
+                continuum_slope_coef = 0
+                continuum_intercept_coef = 1
             if self.fit_rotation:
                 rotation = self.rotation_fitted_dict[line_number]
             else:
@@ -1996,6 +2056,8 @@ class Spectra:
             wave_result = np.array([])
             flux_norm_result = np.array([])
             flux_result = np.array([])
+            continuum_slope_coef = 0
+            continuum_intercept_coef = 1
             # Create a dictionary with column names as keys and corresponding values
         result_dict = {
             "specname": self.spec_name,
@@ -2013,6 +2075,9 @@ class Spectra:
         result_dict["Macroturb"] = vmac
         result_dict["rotation"] = rotation
         result_dict["chi_squared"] = chi_squared
+        if self.fit_continuum:
+            result_dict["continuum_slope_coef"] = continuum_slope_coef
+            result_dict["continuum_intercept_coef"] = continuum_intercept_coef
 
 
         if np.size(wave_result) == 0:
@@ -2023,7 +2088,8 @@ class Spectra:
         return {"result": result_dict, "rv": doppler_fit, "vmic": vmic, "fit_wavelength": wave_result,
                 "fit_flux_norm": flux_norm_result, "fit_flux": flux_result,  "macroturb": vmac,
                 "rotation": rotation, "chi_sqr": chi_squared, "fitted_abund": elem_abund_dict[self.elem_to_fit[0]],
-                "fit_iterations": fit_iterations}
+                "fit_iterations": fit_iterations, "continuum_slope_coef": continuum_slope_coef,
+                "continuum_intercept_coef": continuum_intercept_coef}
 
     def fit_lbl_vmic(self, line_number: int) -> dict:
         """
@@ -2185,7 +2251,7 @@ def get_input_xh_abund(feh: float, spectra_to_fit: Spectra) -> dict:
     return elem_abund_dict_xh
 
 def calc_chi_sq_broadening(param: list, spectra_to_fit: Spectra, lmin: float, lmax: float,
-                           wavelength_fitted: np.ndarray, flux_norm_fitted: np.ndarray) -> float:
+                           wavelength_fitted: np.ndarray, flux_norm_fitted: np.ndarray, fit_continuum=False) -> float:
     """
     Calculates the chi squared for the given broadening parameters and small doppler shift
     :param param: Parameters list with the current evaluation guess
@@ -2204,8 +2270,16 @@ def calc_chi_sq_broadening(param: list, spectra_to_fit: Spectra, lmin: float, lm
 
     if spectra_to_fit.fit_vmac:
         macroturb = param[1]
+        idx_cont_coef = 2
     else:
         macroturb = spectra_to_fit.vmac
+        idx_cont_coef = 1
+
+    if fit_continuum:
+        # a * flux + b, where it starts from left linemask's line
+        continuum_coeff_a = param[idx_cont_coef]
+        continuum_coeff_b = param[idx_cont_coef + 1]
+        flux_norm_fitted = apply_continuum_correction(wavelength_fitted, lmin, np.copy(flux_norm_fitted), continuum_coeff_a, continuum_coeff_b)
 
     if spectra_to_fit.fit_rotation:
         rotation = param[-1]
@@ -2244,6 +2318,9 @@ def calc_chi_sqr_generic_lbl(feh: float, elem_abund_dict_xh: dict, vmic: float, 
     macroturb = 999999    # for printing only here, in case not fitted
     rotation = 999999
     rv = 999999
+    continuum_coeff_a = 0
+    continuum_coeff_b = 1
+
     # generates spectra
     wavelength_fitted, flux_norm_fitted, flux_fitted = spectra_to_fit.configure_and_run_synthetic_code(ssg, feh, elem_abund_dict_xh, vmic,
                                                                                                        lmin_segment, lmax_segment, False,
@@ -2255,7 +2332,7 @@ def calc_chi_sqr_generic_lbl(feh: float, elem_abund_dict_xh: dict, vmic: float, 
         # now for the generated abundance it tries to fit best fit macro + doppler shift.
         # Thus, macro should not be dependent on the abundance directly, hopefully
         # Seems to work way better
-        function_args = (spectra_to_fit, lmin, lmax, wavelength_fitted, flux_norm_fitted)
+        function_args = (spectra_to_fit, lmin, lmax, wavelength_fitted, flux_norm_fitted, spectra_to_fit.fit_continuum)
         minimize_options = {'maxiter': spectra_to_fit.ndimen * 50, 'disp': False}
         res = minimize_function(calc_chi_sq_broadening, np.median(param_guess, axis=0),
                                 function_args, min_bounds, 'L-BFGS-B', minimize_options)
@@ -2265,8 +2342,13 @@ def calc_chi_sqr_generic_lbl(feh: float, elem_abund_dict_xh: dict, vmic: float, 
         if spectra_to_fit.fit_vmac:
             spectra_to_fit.vmac_fitted_dict[line_number] = res.x[1]
             macroturb = spectra_to_fit.vmac_fitted_dict[line_number]
+            cont_idx = 2
         else:
             macroturb = spectra_to_fit.vmac
+            cont_idx = 1
+        if spectra_to_fit.fit_continuum:
+            continuum_coeff_a = res.x[cont_idx]
+            continuum_coeff_b = res.x[cont_idx + 1]
         if spectra_to_fit.fit_rotation:
             spectra_to_fit.rotation_fitted_dict[line_number] = res.x[-1]
             rotation = spectra_to_fit.rotation_fitted_dict[line_number]
@@ -2277,6 +2359,8 @@ def calc_chi_sqr_generic_lbl(feh: float, elem_abund_dict_xh: dict, vmic: float, 
         spectra_to_fit.wavelength_fitted_dict[line_number] = wavelength_fitted
         spectra_to_fit.flux_norm_fitted_dict[line_number] = flux_norm_fitted
         spectra_to_fit.flux_fitted_dict[line_number] = flux_fitted
+        spectra_to_fit.continuum_slope_fitted_dict[line_number] = continuum_coeff_a
+        spectra_to_fit.continuum_intercept_fitted_dict[line_number] = continuum_coeff_b
     else:
         spectra_to_fit.wavelength_fitted_dict[line_number] = np.array([])
         spectra_to_fit.flux_norm_fitted_dict[line_number] = np.array([])
@@ -2284,9 +2368,15 @@ def calc_chi_sqr_generic_lbl(feh: float, elem_abund_dict_xh: dict, vmic: float, 
         spectra_to_fit.rv_extra_fitted_dict[line_number] = rv
         spectra_to_fit.vmac_fitted_dict[line_number] = macroturb
         spectra_to_fit.rotation_fitted_dict[line_number] = rotation
+        spectra_to_fit.continuum_slope_fitted_dict[line_number] = continuum_coeff_a
+        spectra_to_fit.continuum_intercept_fitted_dict[line_number] = continuum_coeff_b
 
     intermediate_results = {"abundances": elem_abund_dict_xh, "teff": teff, "logg": logg, "rv": rv, "vmic": vmic,
                             "vmac": macroturb, "rotation": rotation, "chi_sqr": chi_squared}
+
+    if spectra_to_fit.fit_continuum:
+        intermediate_results["cont_slope"] = continuum_coeff_a
+        intermediate_results["cont_intercept"] = continuum_coeff_b
 
     print_intermediate_results(intermediate_results, spectra_to_fit.atmosphere_type, spectra_to_fit.night_mode)
 
@@ -2348,7 +2438,7 @@ def calc_chi_sqr_error_generic(feh: float, elem_abund_dict_xh: dict, vmic: float
     """
     Goes line by line, tries to call turbospectrum and find best fit spectra by varying parameters: abundance, doppler
     shift and if needed micro + macro turbulence. This specific function handles abundance + micro. Calls macro +
-    doppker inside
+    doppler inside
     :param feh: Fe/H
     :param elem_abund_dict_xh: Abundances of the elements
     :param vmic: Microturbulence
@@ -2953,9 +3043,11 @@ def launch_tsfitpy_with_config(tsfitpy_configuration: TSFitPyConfig, output_fold
                                                       unpack=True)
 
     if line_centers.size > 1:
-        tsfitpy_configuration.line_begins_sorted = np.array(sorted(line_begins))
-        tsfitpy_configuration.line_ends_sorted = np.array(sorted(line_ends))
-        tsfitpy_configuration.line_centers_sorted = np.array(sorted(line_centers))
+        idx_sorted = np.argsort(line_centers)
+
+        tsfitpy_configuration.line_begins_sorted = np.array(line_begins)[idx_sorted]
+        tsfitpy_configuration.line_ends_sorted = np.array(line_ends)[idx_sorted]
+        tsfitpy_configuration.line_centers_sorted = np.array(line_centers)[idx_sorted]
     elif line_centers.size == 1:
         tsfitpy_configuration.line_begins_sorted = np.array([line_begins])
         tsfitpy_configuration.line_ends_sorted = np.array([line_ends])
