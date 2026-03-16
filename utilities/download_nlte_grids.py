@@ -27,6 +27,7 @@ Accepted values for *elements*:
 """
 from __future__ import annotations
 
+from tqdm import tqdm
 import argparse
 import configparser
 import os
@@ -104,10 +105,22 @@ def _download_file(url: str, dest_path: str) -> Tuple[bool, bool]:
     try:
         with requests.get(url, stream=True, timeout=60) as r:
             r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
             os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            with open(dest_path, "wb") as fh:
+
+            # tqdm progress bar
+            with open(dest_path, "wb") as fh, tqdm(
+                    total=total,
+                    unit="B",
+                    unit_scale=True,
+                    unit_divisor=1024,
+                    desc=os.path.basename(dest_path),
+                    leave=True,
+            ) as bar:
                 for chunk in r.iter_content(chunk_size=8192):
-                    fh.write(chunk)
+                    if chunk:
+                        fh.write(chunk)
+                        bar.update(len(chunk))
         return True, False  # Downloaded successfully, not skipped
     except Exception as exc:
         print(f"    ✖ Failed: {exc}")
