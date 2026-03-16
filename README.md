@@ -125,7 +125,9 @@ A rapid guide to confirm that TSFitPy works, please see [extra notes](#extra-ins
    # Choose 'GNU', 'IFORT', or 'IFX' when prompted
    cd ..
    ```
-9. **Run a test fit**:
+9. **(optional: if using GFORTRAN or IFX) Change compiler in the config**:
+    - Open `./input_files/tsfitpy_input_configuration.cfg` and change the line `compiler = ifort` to `compiler = gnu` or `compiler = ifx`, depending on which one you used to compile the model interpolators.
+10. **Run a test fit**:
    ```bash
    python3 main.py ./input_files/tsfitpy_input_configuration.cfg
    ```
@@ -454,7 +456,7 @@ For NLTE calculations, you need:
     - `element_to_fit` which element to fit. Normally one would fit one element at a time, but it is possible to fit several elements at once using the same linemask (e.g. blended line) (**NOT recommended**). If you want to fit abundance for different lines, then you need to fit one element at a time
       - **IMPORTANT**: Providing several elements, will fit several elements for all lines within THE SAME linemask. So if you want to fit several elements for different lines, you need to create separate config files for each element
     - `nlte_elements` which elements to include NLTE for (ignored if `nlte = False`)
-    - `linemask_file` is the path in the `linemasks_path` from where the linemask is taken
+    - `linemask_file` is the path in the `linemasks_path` from where the linemask is taken, i.e. it will be `linemasks_path/linemask_file`, where `linemasks_path` is specified in the [MainPaths] section
     - `wavelength_delta` is the synthetic generated `wavelength_delta`. Try not to have it less than observed spectra, but too small will result in slow fitting.
     - `segment_size` is the size of the generated segment around the line. Recommended as a start: `4`. Not very important, but can be useful to change if nearby lines are very strong and affect the fit (note: H is always generated whether it is in the segment or not)
   - [ExtraParameters]
@@ -463,7 +465,7 @@ For NLTE calculations, you need:
     - `experimental_parallelisation` currently does NOTHING (experimental is now part of the main code). Might do something later, who knows...
     - `cluster_name` is the name of the cluster, used just for printing. Honestly not very important
   - [InputAndOutputFiles]
-    - `input_filename` name of the used fitlist file
+    - `input_filename` name of the used fitlist file. The actual path to the fitlist file will be taken as `fitlist_input_path/input_filename`, where `fitlist_input_path` is specified in the [MainPaths] section
     - `output_filename` name of the output file (usually `output` and no need to change)
   - [SpectraParameters]
     - `resolution` is resolution of the spectra (big R). 0 is no convolution based on the resolution. Usually your R will be around 10000-100000 (it is NOT FWHM)
