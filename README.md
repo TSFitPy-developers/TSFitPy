@@ -48,7 +48,7 @@ If you use this code, please acknowledge the authors of the code and the Turbosp
 Please reference these two papers in your work if you use TSFitPy, as they describe the code and its capabilities, and contain references to most other relevant papers. However, if you want to reference specifics, then here is the full list of papers to acknowledge, depending on what you use in TSFitPy:
 
 - Original TS [Alvarez, R & Plez, B. 1998](https://ui.adsabs.harvard.edu/abs/1998A%26A...330.1109A/abstract)
-- TS [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract)
+- TS [Plez, B. 2012](https://ui.adsabs.harvard.edu/abs/2012ascl.soft05004P/abstract), [Plez, B. et al. 2025](https://ui.adsabs.harvard.edu/abs/2025ascl.soft04012P/abstract)
 - TS NLTE + TSFitPy [Gerber, J. M. et al. 2023](https://ui.adsabs.harvard.edu/abs/2023A%26A...669A..43G/abstract) and [Storm, N. & Bergemann M. 2023](https://ui.adsabs.harvard.edu/abs/2023MNRAS.525.3718S/abstract)
 - Solar abundances input [Bergemann, M. et al. 2021](https://ui.adsabs.harvard.edu/abs/2021MNRAS.508.2236B/abstract) and [Magg, E. et al. 2022](https://ui.adsabs.harvard.edu/abs/2022A%26A...661A.140M/abstract)
 - 1D MARCS models [Gustafsson, B. et al. 2008](https://ui.adsabs.harvard.edu/abs/2008A%26A...486..951G/abstract)
