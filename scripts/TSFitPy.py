@@ -285,7 +285,7 @@ def minimize_function(function_to_minimize, input_param_guess: np.ndarray, funct
 
 def apply_continuum_correction(wavelength, wavelength_0, flux, continuum_slope_coef, continuum_intercept_coef):
     """
-    Applies correction to the continuum in the form flux_out = flux + (1 - ((wavelength - wavelength_0) * slope + intercept))
+    Applies correction to the continuum in the form flux_out = flux * (1 - ((wavelength - wavelength_0) * slope + intercept))
     :param wavelength: wavelength array
     :param wavelength_0: from where to start normalisation (0-point)
     :param flux: normalised flux to normalise
@@ -293,7 +293,7 @@ def apply_continuum_correction(wavelength, wavelength_0, flux, continuum_slope_c
     :param continuum_intercept_coef: intercept
     :return:
     """
-    return flux + (1 - (continuum_slope_coef * (wavelength - wavelength_0) + continuum_intercept_coef))
+    return flux * (1 - (continuum_slope_coef * (wavelength - wavelength_0) + continuum_intercept_coef))
 
 
 class Spectra:
@@ -715,7 +715,7 @@ class Spectra:
         self.just_blend_reduce_abundance = tsfitpy_config.just_blend_reduce_abundance
 
         self.fit_continuum = tsfitpy_config.fit_continuum
-        # flux_adjusted = flux + (1 - (slope * (wavelength - wavelength_min) + intercept))
+        # flux_adjusted = flux * (1 - (slope * (wavelength - wavelength_min) + intercept))
         self.bounds_continuum_slope = tsfitpy_config.bounds_continuum_slope
         self.bounds_continuum_intercept = tsfitpy_config.bounds_continuum_intercept
 
